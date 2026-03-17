@@ -9,7 +9,15 @@
 /* Begin PBXBuildFile section */
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
 		3C67B974F8F903F27F8D9F62 /* TokiMonitorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A83167497A1EE039A2B2494 /* TokiMonitorApp.swift */; };
+		4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */; };
+		4E185ECB80CEBAD70B4DD71F /* TokiEventStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A07540C3665358D10E114C /* TokiEventStream.swift */; };
+		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
+		909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A27A6A118A446539806BB7 /* TokiReportModels.swift */; };
+		A5A0153D1AF63F11B4BE8133 /* TokiEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4247163632AC4A7FF3582B /* TokiEvent.swift */; };
 		C4E3FFDC972A212EEC371464 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B572F782B925386C0B035893 /* Assets.xcassets */; };
+		E491CA8772352E5E5A3F4C71 /* DisconnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814B5F92E5E8722F2B0F6FE1 /* DisconnectedView.swift */; };
+		E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0103BDEAC6066E0274029149 /* ConnectionManager.swift */; };
+		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -23,18 +31,28 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		1A83167497A1EE039A2B2494 /* TokiMonitorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiMonitorApp.swift; sourceTree = "<group>"; };
 		26621218B422BFA891C1CDF6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4215CB67D3CB129464800547 /* TokiMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TokiMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManagerTests.swift; sourceTree = "<group>"; };
+		74A27A6A118A446539806BB7 /* TokiReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportModels.swift; sourceTree = "<group>"; };
+		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
+		814B5F92E5E8722F2B0F6FE1 /* DisconnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisconnectedView.swift; sourceTree = "<group>"; };
+		8B4247163632AC4A7FF3582B /* TokiEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEvent.swift; sourceTree = "<group>"; };
 		A6C1751117D1E380839B3A0E /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		B572F782B925386C0B035893 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BDE38973AE985102C6A597D9 /* TokiMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TokiMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7A07540C3665358D10E114C /* TokiEventStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStream.swift; sourceTree = "<group>"; };
+		DB2BF0000196F3EA0107C726 /* TokiConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiConnection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		0C66381CCEF5686CC69086FD /* Data */ = {
 			isa = PBXGroup;
 			children = (
+				DB2BF0000196F3EA0107C726 /* TokiConnection.swift */,
+				D7A07540C3665358D10E114C /* TokiEventStream.swift */,
 				8648934AE14365594C7132F0 /* Models */,
 			);
 			path = Data;
@@ -43,6 +61,7 @@
 		0CEEE109AB4C71255F777167 /* Popover */ = {
 			isa = PBXGroup;
 			children = (
+				814B5F92E5E8722F2B0F6FE1 /* DisconnectedView.swift */,
 			);
 			path = Popover;
 			sourceTree = "<group>";
@@ -53,6 +72,23 @@
 				73E34B75A97A1A7983F6618C /* TokiMonitor */,
 				4B98EA5DEFDD2C044A1D1FA8 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		2037DBB9FB4E100B90F4162C /* TokiMonitorTests */ = {
+			isa = PBXGroup;
+			children = (
+				29DDD5F7608E33B91408BA74 /* Data */,
+				A09E6DF1E20788C81FF0BBA5 /* Domain */,
+			);
+			path = TokiMonitorTests;
+			sourceTree = "<group>";
+		};
+		29DDD5F7608E33B91408BA74 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */,
+			);
+			path = Data;
 			sourceTree = "<group>";
 		};
 		2B53C31A8AFD444EB1D97241 /* Resources */ = {
@@ -69,6 +105,14 @@
 				A6C1751117D1E380839B3A0E /* StatusBarController.swift */,
 			);
 			path = MenuBar;
+			sourceTree = "<group>";
+		};
+		4AB7C768CDEE60FF95F3BD69 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				2037DBB9FB4E100B90F4162C /* TokiMonitorTests */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		4B98EA5DEFDD2C044A1D1FA8 /* Products */ = {
@@ -96,6 +140,7 @@
 				F742507F177D260FFECA176D /* Domain */,
 				EE3DFCBD1DA2E2C5ECCB7E9D /* Presentation */,
 				2B53C31A8AFD444EB1D97241 /* Resources */,
+				4AB7C768CDEE60FF95F3BD69 /* Tests */,
 			);
 			path = TokiMonitor;
 			sourceTree = "<group>";
@@ -103,8 +148,18 @@
 		8648934AE14365594C7132F0 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				8B4247163632AC4A7FF3582B /* TokiEvent.swift */,
+				74A27A6A118A446539806BB7 /* TokiReportModels.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */,
+			);
+			path = Domain;
 			sourceTree = "<group>";
 		};
 		AC4F582F1B6F74BCEB60BC78 /* Settings */ = {
@@ -128,6 +183,7 @@
 		F742507F177D260FFECA176D /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				0103BDEAC6066E0274029149 /* ConnectionManager.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -221,8 +277,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */,
+				E491CA8772352E5E5A3F4C71 /* DisconnectedView.swift in Sources */,
 				0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */,
+				63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */,
+				A5A0153D1AF63F11B4BE8133 /* TokiEvent.swift in Sources */,
+				4E185ECB80CEBAD70B4DD71F /* TokiEventStream.swift in Sources */,
 				3C67B974F8F903F27F8D9F62 /* TokiMonitorApp.swift in Sources */,
+				909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -230,6 +292,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */,
+				EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,6 +313,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -358,6 +423,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

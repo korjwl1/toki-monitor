@@ -21,6 +21,7 @@ targets:
       - path: TokiMonitor
         excludes:
           - "**/*Tests*"
+          - "**/Tests/**"
     settings:
       base:
         INFOPLIST_FILE: TokiMonitor/Info.plist
@@ -50,5 +51,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.toki.monitor.tests
+        GENERATE_INFOPLIST_FILE: true
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/TokiMonitor.app/Contents/MacOS/TokiMonitor"
         BUNDLE_LOADER: "$(TEST_HOST)"
