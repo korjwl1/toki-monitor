@@ -77,7 +77,7 @@ struct ModelDetailView: View {
                 AxisMarks { value in
                     AxisValueLabel {
                         if let v = value.as(UInt64.self) {
-                            Text(formatCompact(v))
+                            Text(TokenFormatter.formatTokens(v))
                         }
                     }
                 }
@@ -95,14 +95,14 @@ struct ModelDetailView: View {
                 .fontWeight(.medium)
 
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                statRow("Input Tokens", formatCompact(summary.inputTokens))
-                statRow("Output Tokens", formatCompact(summary.outputTokens))
-                statRow("Cache Create", formatCompact(summary.cacheCreationInputTokens))
-                statRow("Cache Read", formatCompact(summary.cacheReadInputTokens))
-                statRow("Total Tokens", formatCompact(summary.totalTokens))
+                statRow("Input Tokens", TokenFormatter.formatTokens(summary.inputTokens))
+                statRow("Output Tokens", TokenFormatter.formatTokens(summary.outputTokens))
+                statRow("Cache Create", TokenFormatter.formatTokens(summary.cacheCreationInputTokens))
+                statRow("Cache Read", TokenFormatter.formatTokens(summary.cacheReadInputTokens))
+                statRow("Total Tokens", TokenFormatter.formatTokens(summary.totalTokens))
                 statRow("API Calls", "\(summary.events)")
                 if let cost = summary.costUsd {
-                    statRow("추정 비용", formatCost(cost))
+                    statRow("추정 비용", TokenFormatter.formatCost(cost))
                 }
             }
         }
@@ -122,17 +122,4 @@ struct ModelDetailView: View {
         }
     }
 
-    // MARK: - Formatting
-
-    private func formatCompact(_ count: UInt64) -> String {
-        if count < 1000 { return "\(count)" }
-        if count < 1_000_000 { return String(format: "%.1fK", Double(count) / 1000) }
-        return String(format: "%.1fM", Double(count) / 1_000_000)
-    }
-
-    private func formatCost(_ cost: Double) -> String {
-        if cost < 0.01 { return String(format: "$%.4f", cost) }
-        if cost < 1 { return String(format: "$%.3f", cost) }
-        return String(format: "$%.2f", cost)
-    }
 }

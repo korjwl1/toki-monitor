@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 /// Aggregated token usage for a single provider over a time range.
 struct ProviderSummary: Identifiable, TokenUsageModel {

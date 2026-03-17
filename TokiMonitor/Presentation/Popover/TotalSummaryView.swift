@@ -22,7 +22,7 @@ struct TotalSummaryView: View {
 
             VStack(alignment: .trailing, spacing: 2) {
                 if let cost = total.estimatedCost {
-                    Text(formatCost(cost))
+                    Text(TokenFormatter.formatCost(cost))
                         .font(.system(.body, design: .monospaced))
                         .fontWeight(.semibold)
                 } else {
@@ -36,15 +36,5 @@ struct TotalSummaryView: View {
             }
         }
         .padding(.vertical, 6)
-    }
-
-    private func formatCost(_ cost: Double) -> String {
-        if cost < 0.01 {
-            return String(format: "$%.4f", cost)
-        } else if cost < 1 {
-            return String(format: "$%.3f", cost)
-        } else {
-            return String(format: "$%.2f", cost)
-        }
     }
 }

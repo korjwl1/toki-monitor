@@ -47,7 +47,7 @@ struct PopoverContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Toki Monitor")
                     .font(.headline)
-                Text(TokenAggregator.formatRate(tokensPerMinute))
+                Text(TokenFormatter.formatRate(tokensPerMinute))
                     .font(.system(.title3, design: .monospaced))
                     .foregroundStyle(.secondary)
             }

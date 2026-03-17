@@ -1,12 +1,12 @@
-import SwiftUI
+import Foundation
 
 /// Metadata for an AI provider, driven by model name prefixes.
 struct ProviderInfo: Identifiable {
     let id: String       // canonical name
     let name: String
     let prefixes: [String]
-    let icon: String     // SF Symbol
-    let color: Color
+    let icon: String     // SF Symbol name
+    let colorName: String // resolved to Color in Presentation layer
 
     func matches(model: String) -> Bool {
         let lower = model.lowercased()
@@ -22,21 +22,21 @@ struct ProviderRegistry {
             name: "Claude",
             prefixes: ["claude-", "claude_"],
             icon: "brain.head.profile",
-            color: .orange
+            colorName: "orange"
         ),
         ProviderInfo(
             id: "google",
             name: "Gemini",
             prefixes: ["gemini-", "gemini_"],
             icon: "sparkle",
-            color: .blue
+            colorName: "blue"
         ),
         ProviderInfo(
             id: "openai",
             name: "OpenAI",
             prefixes: ["gpt-", "o1-", "o3-", "o4-", "chatgpt-"],
             icon: "circle.hexagongrid",
-            color: .green
+            colorName: "green"
         ),
     ]
 
@@ -45,7 +45,7 @@ struct ProviderRegistry {
         name: "Other",
         prefixes: [],
         icon: "questionmark.circle",
-        color: .gray
+        colorName: "gray"
     )
 
     /// Resolve a model name to its provider.

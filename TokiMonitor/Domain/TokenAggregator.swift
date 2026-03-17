@@ -91,6 +91,7 @@ final class TokenAggregator {
     // MARK: - Provider Summaries
 
     private func recalculateProviderSummaries() {
+        pruneAllEvents()
         let cutoff = timeRangeCutoff()
         let filtered = allEvents.filter { $0.receivedAt >= cutoff }
 
@@ -118,16 +119,9 @@ final class TokenAggregator {
         }
     }
 
-    /// Format tokens/min for display (e.g., "1.2K/m", "0/m").
-    nonisolated static func formatRate(_ tokensPerMinute: Double) -> String {
-        if tokensPerMinute < 1 {
-            return "0/m"
-        } else if tokensPerMinute < 1000 {
-            return "\(Int(tokensPerMinute))/m"
-        } else if tokensPerMinute < 1_000_000 {
-            return String(format: "%.1fK/m", tokensPerMinute / 1000)
-        } else {
-            return String(format: "%.1fM/m", tokensPerMinute / 1_000_000)
-        }
+    /// Prune allEvents older than the current time range to prevent unbounded growth.
+    private func pruneAllEvents() {
+        let cutoff = timeRangeCutoff()
+        allEvents.removeAll { $0.receivedAt < cutoff }
     }
 }

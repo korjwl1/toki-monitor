@@ -4,7 +4,7 @@ import AppKit
 @MainActor
 struct NumericBadgeRenderer {
     func update(tokensPerMinute: Double, button: NSStatusBarButton) {
-        let text = TokenAggregator.formatRate(tokensPerMinute)
+        let text = TokenFormatter.formatRate(tokensPerMinute)
 
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .medium),

@@ -85,13 +85,13 @@ struct DashboardView: View {
             .width(min: 120, ideal: 180)
 
             TableColumn("Input") { summary in
-                Text(formatTokens(summary.inputTokens))
+                Text(TokenFormatter.formatTokens(summary.inputTokens))
                     .font(.system(.body, design: .monospaced))
             }
             .width(min: 60, ideal: 80)
 
             TableColumn("Output") { summary in
-                Text(formatTokens(summary.outputTokens))
+                Text(TokenFormatter.formatTokens(summary.outputTokens))
                     .font(.system(.body, design: .monospaced))
             }
             .width(min: 60, ideal: 80)
@@ -104,7 +104,7 @@ struct DashboardView: View {
 
             TableColumn("비용") { summary in
                 if let cost = summary.costUsd {
-                    Text(formatCost(cost))
+                    Text(TokenFormatter.formatCost(cost))
                         .font(.system(.body, design: .monospaced))
                 } else {
                     Text("--")
@@ -174,19 +174,6 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Formatting
-
-    private func formatTokens(_ count: UInt64) -> String {
-        if count < 1000 { return "\(count)" }
-        if count < 1_000_000 { return String(format: "%.1fK", Double(count) / 1000) }
-        return String(format: "%.1fM", Double(count) / 1_000_000)
-    }
-
-    private func formatCost(_ cost: Double) -> String {
-        if cost < 0.01 { return String(format: "$%.4f", cost) }
-        if cost < 1 { return String(format: "$%.3f", cost) }
-        return String(format: "$%.2f", cost)
-    }
 }
 
 // MARK: - ReportPeriod

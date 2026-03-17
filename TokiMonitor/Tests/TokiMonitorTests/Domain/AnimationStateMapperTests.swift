@@ -51,27 +51,27 @@ struct AnimationStateMapperTests {
     }
 }
 
-@Suite("TokenAggregator.formatRate")
+@Suite("TokenFormatter.formatRate")
 struct TokenAggregatorFormatTests {
     @Test("Zero formats as 0/m")
     func zero() {
-        #expect(TokenAggregator.formatRate(0) == "0/m")
+        #expect(TokenFormatter.formatRate(0) == "0/m")
     }
 
     @Test("Small number formats without K")
     func small() {
-        #expect(TokenAggregator.formatRate(42) == "42/m")
-        #expect(TokenAggregator.formatRate(999) == "999/m")
+        #expect(TokenFormatter.formatRate(42) == "42/m")
+        #expect(TokenFormatter.formatRate(999) == "999/m")
     }
 
     @Test("Thousands format with K")
     func thousands() {
-        #expect(TokenAggregator.formatRate(1200) == "1.2K/m")
-        #expect(TokenAggregator.formatRate(15000) == "15.0K/m")
+        #expect(TokenFormatter.formatRate(1200) == "1.2K/m")
+        #expect(TokenFormatter.formatRate(15000) == "15.0K/m")
     }
 
     @Test("Millions format with M")
     func millions() {
-        #expect(TokenAggregator.formatRate(1_500_000) == "1.5M/m")
+        #expect(TokenFormatter.formatRate(1_500_000) == "1.5M/m")
     }
 }
