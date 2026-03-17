@@ -14,11 +14,10 @@ final class StatusBarController {
     private let numericRenderer = NumericBadgeRenderer()
     private let sparklineRenderer = SparklineRenderer()
 
-    // Dashboard
+    // Dashboard & Settings
     private let dashboardController = DashboardWindowController()
-
-    // Current style — TODO: WP05 move to AppSettings
-    private var animationStyle: AnimationStyle = .sparkline
+    private let settings = AppSettings()
+    private var settingsPopover: NSPopover?
 
     init() {
         eventStream = TokiEventStream()
@@ -31,6 +30,9 @@ final class StatusBarController {
         setupPopover()
         setupEventHandling()
 
+        // Apply settings
+        aggregator.timeRange = settings.defaultTimeRange
+
         // Start aggregator sampling for sparkline
         aggregator.startSampling()
 
@@ -40,6 +42,7 @@ final class StatusBarController {
         // Observe state changes
         observeConnectionState()
         observeAnimationState()
+        observeSettings()
     }
 
     // MARK: - Setup
@@ -97,8 +100,8 @@ final class StatusBarController {
                     self?.popover.performClose(nil)
                     self?.dashboardController.show()
                 },
-                onSettingsTap: {
-                    // TODO: WP05 — open settings
+                onSettingsTap: { [weak self] in
+                    self?.showSettings()
                 }
             )
             popover.contentViewController = NSHostingController(rootView: contentView)
@@ -123,7 +126,7 @@ final class StatusBarController {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             effectiveStyle = .numeric
         } else {
-            effectiveStyle = animationStyle
+            effectiveStyle = settings.animationStyle
         }
 
         // Stop any previous animation
@@ -155,6 +158,23 @@ final class StatusBarController {
         )
         button.image?.size = NSSize(width: 18, height: 18)
         button.image?.isTemplate = true
+    }
+
+    // MARK: - Settings
+
+    private func showSettings() {
+        popover.performClose(nil)
+
+        let settingsView = SettingsView(settings: settings)
+        let sp = NSPopover()
+        sp.contentViewController = NSHostingController(rootView: settingsView)
+        sp.behavior = .transient
+
+        if let button = statusItem.button {
+            sp.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            sp.contentViewController?.view.window?.makeKey()
+        }
+        settingsPopover = sp
     }
 
     // MARK: - Observation
@@ -191,5 +211,22 @@ final class StatusBarController {
     private func handleAnimationChange() {
         updateMenuBarDisplay()
         observeAnimationState()
+    }
+
+    private func observeSettings() {
+        withObservationTracking {
+            _ = settings.animationStyle
+            _ = settings.defaultTimeRange
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.handleSettingsChange()
+            }
+        }
+    }
+
+    private func handleSettingsChange() {
+        aggregator.timeRange = settings.defaultTimeRange
+        updateMenuBarDisplay()
+        observeSettings()
     }
 }
