@@ -1,0 +1,54 @@
+name: TokiMonitor
+options:
+  bundleIdPrefix: com.toki
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.2"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    GENERATE_INFOPLIST_FILE: false
+
+targets:
+  TokiMonitor:
+    type: application
+    platform: macOS
+    sources:
+      - path: TokiMonitor
+        excludes:
+          - "**/*Tests*"
+    settings:
+      base:
+        INFOPLIST_FILE: TokiMonitor/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.toki.monitor
+        PRODUCT_NAME: TokiMonitor
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        COMBINE_HIDPI_IMAGES: true
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_STRICT_CONCURRENCY: complete
+    info:
+      path: TokiMonitor/Info.plist
+      properties:
+        LSUIElement: true
+        CFBundleDisplayName: Toki Monitor
+        CFBundleName: TokiMonitor
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+
+  TokiMonitorTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: TokiMonitor/Tests/TokiMonitorTests
+        optional: true
+    dependencies:
+      - target: TokiMonitor
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.toki.monitor.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/TokiMonitor.app/Contents/MacOS/TokiMonitor"
+        BUNDLE_LOADER: "$(TEST_HOST)"
