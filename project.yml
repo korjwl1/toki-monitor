@@ -22,6 +22,10 @@ targets:
         excludes:
           - "**/*Tests*"
           - "**/Tests/**"
+          - "**/CharacterFrames/**"
+    resources:
+      - path: TokiMonitor/Resources/CharacterFrames
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: TokiMonitor/Info.plist
