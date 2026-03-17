@@ -14,6 +14,9 @@ final class StatusBarController {
     private let numericRenderer = NumericBadgeRenderer()
     private let sparklineRenderer = SparklineRenderer()
 
+    // Dashboard
+    private let dashboardController = DashboardWindowController()
+
     // Current style — TODO: WP05 move to AppSettings
     private var animationStyle: AnimationStyle = .sparkline
 
@@ -90,8 +93,9 @@ final class StatusBarController {
                 onTimeRangeChange: { [weak self] range in
                     self?.aggregator.timeRange = range
                 },
-                onDashboardTap: {
-                    // TODO: WP04 — open dashboard window
+                onDashboardTap: { [weak self] in
+                    self?.popover.performClose(nil)
+                    self?.dashboardController.show()
                 },
                 onSettingsTap: {
                     // TODO: WP05 — open settings

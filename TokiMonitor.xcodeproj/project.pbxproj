@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
+		17C09A08039E023C5600729C /* ModelDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53081FDDD1535127EECF08BC /* ModelDetailView.swift */; };
 		192041B631FA773F80879D97 /* TokenAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85595784F39710A1BF95BC51 /* TokenAggregator.swift */; };
 		2310384CF16C3473F0423275 /* ProviderRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA4A0E4F385978849AD51564 /* ProviderRowView.swift */; };
 		2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */; };
@@ -17,12 +18,14 @@
 		4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */; };
 		4DBBE21D70D7916D7F2DC175 /* AnimationStateMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */; };
 		4E185ECB80CEBAD70B4DD71F /* TokiEventStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A07540C3665358D10E114C /* TokiEventStream.swift */; };
+		5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */; };
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
 		69295AAE29A8D4FB6FBD903E /* TokenUsageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */; };
 		909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A27A6A118A446539806BB7 /* TokiReportModels.swift */; };
 		A5A0153D1AF63F11B4BE8133 /* TokiEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4247163632AC4A7FF3582B /* TokiEvent.swift */; };
 		B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */; };
 		C0273F287847229BDF25CD3F /* NumericBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63499AFD964FDAA29ACADD21 /* NumericBadgeView.swift */; };
+		C33D79DB96B18D96790274FE /* DashboardWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530B806F812350D8094AA0EC /* DashboardWindow.swift */; };
 		C4E3FFDC972A212EEC371464 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B572F782B925386C0B035893 /* Assets.xcassets */; };
 		CA53B87359FD3833598A2E5C /* SparklineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */; };
 		D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */; };
@@ -32,6 +35,7 @@
 		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
 		F14010D058074B62B3893B89 /* PopoverContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D127AA4FB666D8F7AB5E873 /* PopoverContentView.swift */; };
 		F7B06F96F0152C66001A51CB /* TokiReportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */; };
+		F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,11 +56,15 @@
 		26621218B422BFA891C1CDF6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparklineView.swift; sourceTree = "<group>"; };
 		37F55200D88B2D7260541C5D /* ProviderSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSummary.swift; sourceTree = "<group>"; };
+		3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		4215CB67D3CB129464800547 /* TokiMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TokiMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManagerTests.swift; sourceTree = "<group>"; };
 		507FA6EFF17810ED320DE318 /* ProviderRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRegistryTests.swift; sourceTree = "<group>"; };
+		53081FDDD1535127EECF08BC /* ModelDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDetailView.swift; sourceTree = "<group>"; };
+		530B806F812350D8094AA0EC /* DashboardWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWindow.swift; sourceTree = "<group>"; };
 		63499AFD964FDAA29ACADD21 /* NumericBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumericBadgeView.swift; sourceTree = "<group>"; };
 		74A27A6A118A446539806BB7 /* TokiReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportModels.swift; sourceTree = "<group>"; };
+		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
 		7B52CDA13199783C9D658A8A /* TotalSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TotalSummaryView.swift; sourceTree = "<group>"; };
 		814B5F92E5E8722F2B0F6FE1 /* DisconnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisconnectedView.swift; sourceTree = "<group>"; };
@@ -119,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */,
+				750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -162,6 +171,9 @@
 		5CB76EE9FE876C983A62E891 /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
+				3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */,
+				530B806F812350D8094AA0EC /* DashboardWindow.swift */,
+				53081FDDD1535127EECF08BC /* ModelDetailView.swift */,
 			);
 			path = Dashboard;
 			sourceTree = "<group>";
@@ -322,7 +334,10 @@
 				4DBBE21D70D7916D7F2DC175 /* AnimationStateMapper.swift in Sources */,
 				D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */,
 				E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */,
+				F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */,
+				C33D79DB96B18D96790274FE /* DashboardWindow.swift in Sources */,
 				E491CA8772352E5E5A3F4C71 /* DisconnectedView.swift in Sources */,
+				17C09A08039E023C5600729C /* ModelDetailView.swift in Sources */,
 				C0273F287847229BDF25CD3F /* NumericBadgeView.swift in Sources */,
 				F14010D058074B62B3893B89 /* PopoverContentView.swift in Sources */,
 				2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */,
@@ -350,6 +365,7 @@
 				4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */,
 				2FD39BD3817670D06BE68CEF /* ProviderRegistryTests.swift in Sources */,
 				EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */,
+				5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

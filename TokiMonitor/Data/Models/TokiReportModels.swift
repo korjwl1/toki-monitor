@@ -22,7 +22,8 @@ struct TokiReportItem: Codable {
 }
 
 /// Per-model usage summary from toki report.
-struct TokiModelSummary: Codable {
+struct TokiModelSummary: Codable, Identifiable {
+    var id: String { model }
     let model: String
     let inputTokens: UInt64
     let outputTokens: UInt64
