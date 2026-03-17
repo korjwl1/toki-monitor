@@ -82,24 +82,22 @@ final class StatusBarController {
 
     private func updatePopoverContent() {
         if connectionManager.state.isConnected {
-            // TODO: WP03 — show provider summary popover
-            let placeholder = NSHostingController(
-                rootView: VStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title)
-                        .foregroundStyle(.green)
-                    Text("toki 연결됨")
-                        .font(.headline)
-                    Text(TokenAggregator.formatRate(aggregator.tokensPerMinute))
-                        .font(.system(.title2, design: .monospaced))
-                    Text("이벤트 대기 중...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            let contentView = PopoverContentView(
+                summaries: aggregator.providerSummaries,
+                total: aggregator.totalSummary,
+                timeRange: aggregator.timeRange,
+                tokensPerMinute: aggregator.tokensPerMinute,
+                onTimeRangeChange: { [weak self] range in
+                    self?.aggregator.timeRange = range
+                },
+                onDashboardTap: {
+                    // TODO: WP04 — open dashboard window
+                },
+                onSettingsTap: {
+                    // TODO: WP05 — open settings
                 }
-                .padding(20)
-                .frame(width: 260)
             )
-            popover.contentViewController = placeholder
+            popover.contentViewController = NSHostingController(rootView: contentView)
         } else {
             let disconnectedView = DisconnectedView(
                 state: connectionManager.state,

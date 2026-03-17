@@ -1,5 +1,28 @@
 import Foundation
 
+enum TimeRange: String, CaseIterable, Codable {
+    case thirtyMinutes = "30m"
+    case oneHour = "1h"
+    case today = "today"
+
+    var displayName: String {
+        switch self {
+        case .thirtyMinutes: "30분"
+        case .oneHour: "1시간"
+        case .today: "오늘"
+        }
+    }
+
+    /// toki query bucket string.
+    var queryBucket: String {
+        switch self {
+        case .thirtyMinutes: "1h"  // toki doesn't have 30m bucket, use 1h
+        case .oneHour: "1h"
+        case .today: "1d"
+        }
+    }
+}
+
 /// Aggregates token events for rate calculation and recent history.
 @MainActor
 @Observable
@@ -7,19 +30,25 @@ final class TokenAggregator {
     private(set) var tokensPerMinute: Double = 0
     private(set) var animationState: AnimationState = .idle
     private(set) var recentHistory: [Double] = []  // last N rate samples for sparkline
+    private(set) var providerSummaries: [ProviderSummary] = []
+    private(set) var totalSummary: TotalSummary?
 
+    private var allEvents: [TokenEvent] = []
     private var events: [(date: Date, tokens: UInt64)] = []
     private let rateWindow: TimeInterval = 30  // seconds for rate calc
     private let historySize = 30  // number of sparkline data points
     private let mapper = AnimationStateMapper()
     private var sampleTimer: Timer?
+    var timeRange: TimeRange = .oneHour
 
     /// Call when a new token event arrives.
     func addEvent(_ event: TokenEvent) {
         let total = event.inputTokens + event.outputTokens
         events.append((date: event.receivedAt, tokens: total))
+        allEvents.append(event)
         pruneOldEvents()
         recalculateRate()
+        recalculateProviderSummaries()
     }
 
     /// Start periodic sampling for sparkline history.
@@ -56,6 +85,36 @@ final class TokenAggregator {
         recentHistory.append(tokensPerMinute)
         if recentHistory.count > historySize {
             recentHistory.removeFirst(recentHistory.count - historySize)
+        }
+    }
+
+    // MARK: - Provider Summaries
+
+    private func recalculateProviderSummaries() {
+        let cutoff = timeRangeCutoff()
+        let filtered = allEvents.filter { $0.receivedAt >= cutoff }
+
+        var map: [String: ProviderSummary] = [:]
+        for event in filtered {
+            let provider = ProviderRegistry.resolve(model: event.model)
+            if map[provider.id] == nil {
+                map[provider.id] = ProviderSummary(provider: provider)
+            }
+            map[provider.id]?.add(event: event)
+        }
+
+        providerSummaries = map.values.sorted { $0.totalTokens > $1.totalTokens }
+        totalSummary = providerSummaries.count >= 2 ? TotalSummary(from: providerSummaries) : nil
+    }
+
+    private func timeRangeCutoff() -> Date {
+        switch timeRange {
+        case .thirtyMinutes:
+            return Date().addingTimeInterval(-30 * 60)
+        case .oneHour:
+            return Date().addingTimeInterval(-60 * 60)
+        case .today:
+            return Calendar.current.startOfDay(for: Date())
         }
     }
 
