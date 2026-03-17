@@ -8,13 +8,19 @@
 
 /* Begin PBXBuildFile section */
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
+		192041B631FA773F80879D97 /* TokenAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85595784F39710A1BF95BC51 /* TokenAggregator.swift */; };
 		3C67B974F8F903F27F8D9F62 /* TokiMonitorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A83167497A1EE039A2B2494 /* TokiMonitorApp.swift */; };
 		4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */; };
+		4DBBE21D70D7916D7F2DC175 /* AnimationStateMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */; };
 		4E185ECB80CEBAD70B4DD71F /* TokiEventStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A07540C3665358D10E114C /* TokiEventStream.swift */; };
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
 		909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A27A6A118A446539806BB7 /* TokiReportModels.swift */; };
 		A5A0153D1AF63F11B4BE8133 /* TokiEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4247163632AC4A7FF3582B /* TokiEvent.swift */; };
+		B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */; };
+		C0273F287847229BDF25CD3F /* NumericBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63499AFD964FDAA29ACADD21 /* NumericBadgeView.swift */; };
 		C4E3FFDC972A212EEC371464 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B572F782B925386C0B035893 /* Assets.xcassets */; };
+		CA53B87359FD3833598A2E5C /* SparklineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */; };
+		D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */; };
 		E491CA8772352E5E5A3F4C71 /* DisconnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814B5F92E5E8722F2B0F6FE1 /* DisconnectedView.swift */; };
 		E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0103BDEAC6066E0274029149 /* ConnectionManager.swift */; };
 		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
@@ -33,18 +39,24 @@
 /* Begin PBXFileReference section */
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		1A83167497A1EE039A2B2494 /* TokiMonitorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiMonitorApp.swift; sourceTree = "<group>"; };
+		1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterAnimationView.swift; sourceTree = "<group>"; };
 		26621218B422BFA891C1CDF6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparklineView.swift; sourceTree = "<group>"; };
 		4215CB67D3CB129464800547 /* TokiMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TokiMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManagerTests.swift; sourceTree = "<group>"; };
+		63499AFD964FDAA29ACADD21 /* NumericBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumericBadgeView.swift; sourceTree = "<group>"; };
 		74A27A6A118A446539806BB7 /* TokiReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportModels.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
 		814B5F92E5E8722F2B0F6FE1 /* DisconnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisconnectedView.swift; sourceTree = "<group>"; };
+		85595784F39710A1BF95BC51 /* TokenAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregator.swift; sourceTree = "<group>"; };
 		8B4247163632AC4A7FF3582B /* TokiEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEvent.swift; sourceTree = "<group>"; };
 		A6C1751117D1E380839B3A0E /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		B572F782B925386C0B035893 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapper.swift; sourceTree = "<group>"; };
 		BDE38973AE985102C6A597D9 /* TokiMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TokiMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D7A07540C3665358D10E114C /* TokiEventStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStream.swift; sourceTree = "<group>"; };
 		DB2BF0000196F3EA0107C726 /* TokiConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiConnection.swift; sourceTree = "<group>"; };
+		F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapperTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -102,6 +114,9 @@
 		3CC06E198D87E843450910CE /* MenuBar */ = {
 			isa = PBXGroup;
 			children = (
+				1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */,
+				63499AFD964FDAA29ACADD21 /* NumericBadgeView.swift */,
+				27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */,
 				A6C1751117D1E380839B3A0E /* StatusBarController.swift */,
 			);
 			path = MenuBar;
@@ -157,6 +172,7 @@
 		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */,
 				472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */,
 			);
 			path = Domain;
@@ -183,7 +199,9 @@
 		F742507F177D260FFECA176D /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				0103BDEAC6066E0274029149 /* ConnectionManager.swift */,
+				85595784F39710A1BF95BC51 /* TokenAggregator.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -277,9 +295,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4DBBE21D70D7916D7F2DC175 /* AnimationStateMapper.swift in Sources */,
+				D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */,
 				E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */,
 				E491CA8772352E5E5A3F4C71 /* DisconnectedView.swift in Sources */,
+				C0273F287847229BDF25CD3F /* NumericBadgeView.swift in Sources */,
+				CA53B87359FD3833598A2E5C /* SparklineView.swift in Sources */,
 				0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */,
+				192041B631FA773F80879D97 /* TokenAggregator.swift in Sources */,
 				63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */,
 				A5A0153D1AF63F11B4BE8133 /* TokiEvent.swift in Sources */,
 				4E185ECB80CEBAD70B4DD71F /* TokiEventStream.swift in Sources */,
@@ -292,6 +315,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */,
 				4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */,
 				EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */,
 			);
