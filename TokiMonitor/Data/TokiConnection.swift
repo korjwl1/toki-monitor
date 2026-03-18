@@ -36,6 +36,7 @@ final class TokiConnection: Sendable {
     /// Connect for trace mode (streaming). Does NOT send any data —
     /// the toki daemon classifies silent clients as trace clients after 200ms.
     func connectForTrace(
+        onReady: @escaping @Sendable () -> Void,
         onEvent: @escaping @Sendable (Data) -> Void,
         onError: @escaping @Sendable (Error) -> Void,
         onComplete: @escaping @Sendable () -> Void
@@ -45,6 +46,7 @@ final class TokiConnection: Sendable {
         connection.stateUpdateHandler = { state in
             switch state {
             case .ready:
+                onReady()
                 self.receiveLoop(connection: connection, onData: onEvent, onError: onError, onComplete: onComplete)
             case .failed(let error):
                 onError(ConnectionError.connectionFailed(error.localizedDescription))

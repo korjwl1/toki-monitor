@@ -21,9 +21,13 @@ final class ConnectionManager {
     private let maxReconnectAttempts = 3
     private let reconnectInterval: TimeInterval = 5.0
     private var reconnectTask: Task<Void, Never>?
+    private var connectionContinuation: CheckedContinuation<Bool, Never>?
 
     init(eventStream: TokiEventStream) {
         self.eventStream = eventStream
+        eventStream.onConnected = { [weak self] in
+            self?.handleConnected()
+        }
         eventStream.onDisconnect = { [weak self] in
             self?.handleDisconnect()
         }
@@ -33,7 +37,8 @@ final class ConnectionManager {
         guard !state.isConnected else { return }
         cancelReconnect()
         eventStream.start()
-        state = .connected
+        // State will transition to .connected via onConnected callback
+        // If connection fails, onDisconnect will fire instead
     }
 
     func disconnect() {
@@ -47,48 +52,68 @@ final class ConnectionManager {
         Task {
             let launched = await launchDaemon()
             if launched {
-                // Give daemon time to create the socket
                 try? await Task.sleep(for: .seconds(1))
                 connect()
             }
         }
     }
 
-    // MARK: - Reconnect
+    // MARK: - Connection State Callbacks
+
+    private func handleConnected() {
+        cancelReconnect()
+        state = .connected
+        // Resume any waiting reconnect attempt
+        connectionContinuation?.resume(returning: true)
+        connectionContinuation = nil
+    }
 
     private func handleDisconnect() {
-        guard state.isConnected else { return }
+        let wasConnected = state.isConnected
         eventStream.stop()
-        startReconnect()
+        // Resume any waiting reconnect attempt as failed
+        connectionContinuation?.resume(returning: false)
+        connectionContinuation = nil
+
+        if wasConnected {
+            startReconnect()
+        }
     }
+
+    // MARK: - Reconnect
 
     private func startReconnect() {
         cancelReconnect()
-        state = .reconnecting(attempt: 1, maxAttempts: maxReconnectAttempts)
 
         reconnectTask = Task { [weak self] in
             guard let self else { return }
+
             for attempt in 1...self.maxReconnectAttempts {
                 self.state = .reconnecting(attempt: attempt, maxAttempts: self.maxReconnectAttempts)
 
                 try? await Task.sleep(for: .seconds(self.reconnectInterval))
                 guard !Task.isCancelled else { return }
 
-                // Try connecting
-                self.eventStream.start()
+                // Try connecting and wait for result via callback
+                let connected = await withCheckedContinuation { continuation in
+                    self.connectionContinuation = continuation
+                    self.eventStream.start()
 
-                // Check if socket exists (simple heuristic)
-                let socketExists = FileManager.default.fileExists(
-                    atPath: "\(NSHomeDirectory())/.config/toki/daemon.sock"
-                )
-                if socketExists {
-                    self.state = .connected
-                    return
+                    // Timeout after 3 seconds — if no callback fires, treat as failed
+                    Task {
+                        try? await Task.sleep(for: .seconds(3))
+                        // If continuation hasn't been resumed yet, fail it
+                        self.connectionContinuation?.resume(returning: false)
+                        self.connectionContinuation = nil
+                    }
+                }
+
+                if connected {
+                    return // handleConnected already set state = .connected
                 }
                 self.eventStream.stop()
             }
 
-            // All attempts failed
             self.state = .disconnected
         }
     }
@@ -96,6 +121,8 @@ final class ConnectionManager {
     private func cancelReconnect() {
         reconnectTask?.cancel()
         reconnectTask = nil
+        connectionContinuation?.resume(returning: false)
+        connectionContinuation = nil
     }
 
     // MARK: - Daemon Launch

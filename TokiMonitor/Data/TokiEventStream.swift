@@ -13,6 +13,7 @@ final class TokiEventStream {
     private let decoder = JSONDecoder()
 
     var onEvent: ((TokenEvent) -> Void)?
+    var onConnected: (() -> Void)?
     var onDisconnect: (() -> Void)?
 
     init(connection: TokiConnection = TokiConnection()) {
@@ -21,6 +22,11 @@ final class TokiEventStream {
 
     func start() {
         activeConnection = connection.connectForTrace(
+            onReady: { [weak self] in
+                Task { @MainActor in
+                    self?.onConnected?()
+                }
+            },
             onEvent: { [weak self] data in
                 Task { @MainActor in
                     self?.handleData(data)

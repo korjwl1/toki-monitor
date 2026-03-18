@@ -20,7 +20,7 @@ final class CharacterAnimationRenderer {
 
         if state == .idle {
             button.image = frames.first
-            button.image?.isTemplate = true
+            button.image?.isTemplate = false
             return
         }
 
@@ -45,12 +45,12 @@ final class CharacterAnimationRenderer {
         guard !frames.isEmpty else { return }
         currentFrame = (currentFrame + 1) % frames.count
         button.image = frames[currentFrame]
-        button.image?.isTemplate = true
+        button.image?.isTemplate = false
     }
 
     private func loadFrames() {
         let bundle = Bundle.main
-        let frameCount = 8
+        let frameCount = 7
 
         frames = (0..<frameCount).compactMap { i in
             let name = String(format: "frame_%02d", i)
@@ -62,8 +62,8 @@ final class CharacterAnimationRenderer {
                 return nil
             }
             guard let image = NSImage(contentsOf: url) else { return nil }
-            image.size = NSSize(width: 18, height: 18)
-            image.isTemplate = true
+            image.size = NSSize(width: 28, height: 20)
+            image.isTemplate = false
             return image
         }
 
@@ -92,7 +92,7 @@ final class CharacterAnimationRenderer {
                 path.fill()
                 return true
             }
-            image.isTemplate = true
+            image.isTemplate = false
             return image
         }
     }
