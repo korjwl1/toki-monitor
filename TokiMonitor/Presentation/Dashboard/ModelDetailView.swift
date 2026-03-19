@@ -57,18 +57,36 @@ struct ModelDetailView: View {
                 )
                 .foregroundStyle(.green)
 
-                if summary.cacheCreationInputTokens > 0 {
+                // Claude Code specific
+                if let cache = summary.cacheCreationInputTokens, cache > 0 {
                     BarMark(
-                        x: .value("Tokens", summary.cacheCreationInputTokens),
+                        x: .value("Tokens", cache),
                         y: .value("Type", "Cache Create")
                     )
                     .foregroundStyle(.orange)
                 }
 
-                if summary.cacheReadInputTokens > 0 {
+                if let cache = summary.cacheReadInputTokens, cache > 0 {
                     BarMark(
-                        x: .value("Tokens", summary.cacheReadInputTokens),
+                        x: .value("Tokens", cache),
                         y: .value("Type", "Cache Read")
+                    )
+                    .foregroundStyle(.purple)
+                }
+
+                // Codex specific
+                if let cached = summary.cachedInputTokens, cached > 0 {
+                    BarMark(
+                        x: .value("Tokens", cached),
+                        y: .value("Type", "Cached Input")
+                    )
+                    .foregroundStyle(.orange)
+                }
+
+                if let reasoning = summary.reasoningOutputTokens, reasoning > 0 {
+                    BarMark(
+                        x: .value("Tokens", reasoning),
+                        y: .value("Type", "Reasoning")
                     )
                     .foregroundStyle(.purple)
                 }
@@ -97,8 +115,18 @@ struct ModelDetailView: View {
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
                 statRow("Input Tokens", TokenFormatter.formatTokens(summary.inputTokens))
                 statRow("Output Tokens", TokenFormatter.formatTokens(summary.outputTokens))
-                statRow("Cache Create", TokenFormatter.formatTokens(summary.cacheCreationInputTokens))
-                statRow("Cache Read", TokenFormatter.formatTokens(summary.cacheReadInputTokens))
+                if let v = summary.cacheCreationInputTokens {
+                    statRow("Cache Create", TokenFormatter.formatTokens(v))
+                }
+                if let v = summary.cacheReadInputTokens {
+                    statRow("Cache Read", TokenFormatter.formatTokens(v))
+                }
+                if let v = summary.cachedInputTokens {
+                    statRow("Cached Input", TokenFormatter.formatTokens(v))
+                }
+                if let v = summary.reasoningOutputTokens {
+                    statRow("Reasoning", TokenFormatter.formatTokens(v))
+                }
                 statRow("Total Tokens", TokenFormatter.formatTokens(summary.totalTokens))
                 statRow("API Calls", "\(summary.events)")
                 if let cost = summary.costUsd {

@@ -1,14 +1,12 @@
 import Foundation
-import Network
 
-/// Parses NDJSON stream from toki UDS trace connection into TokenEvents.
+/// Parses NDJSON from TokiTraceListener into TokenEvents.
 @MainActor
 @Observable
 final class TokiEventStream {
     private(set) var latestEvent: TokenEvent?
 
-    private let connection: TokiConnection
-    private var activeConnection: NWConnection?
+    private let listener: TokiTraceListener
     private var buffer = Data()
     private let decoder = JSONDecoder()
 
@@ -16,39 +14,55 @@ final class TokiEventStream {
     var onConnected: (() -> Void)?
     var onDisconnect: (() -> Void)?
 
-    init(connection: TokiConnection = TokiConnection()) {
-        self.connection = connection
+    init(listener: TokiTraceListener = TokiTraceListener()) {
+        self.listener = listener
+        listener.onReady = { [weak self] in
+            Task { @MainActor in self?.onConnected?() }
+        }
+        listener.onData = { [weak self] data in
+            Task { @MainActor in self?.handleData(data) }
+        }
+        listener.onDisconnect = { [weak self] in
+            Task { @MainActor in self?.handleDisconnect() }
+        }
     }
 
     func start() {
-        activeConnection = connection.connectForTrace(
-            onReady: { [weak self] in
-                Task { @MainActor in
-                    self?.onConnected?()
-                }
-            },
-            onEvent: { [weak self] data in
-                Task { @MainActor in
-                    self?.handleData(data)
-                }
-            },
-            onError: { [weak self] _ in
-                Task { @MainActor in
-                    self?.handleDisconnect()
-                }
-            },
-            onComplete: { [weak self] in
-                Task { @MainActor in
-                    self?.handleDisconnect()
-                }
-            }
-        )
+        guard listener.start() else {
+            onDisconnect?()
+            return
+        }
+        launchTokiTrace()
     }
 
     func stop() {
-        activeConnection?.cancel()
-        activeConnection = nil
+        tokiProcess?.terminate()
+        tokiProcess = nil
+        listener.stop()
         buffer = Data()
+    }
+
+    // MARK: - toki trace Process
+
+    private var tokiProcess: Process?
+
+    private func launchTokiTrace() {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["toki", "trace", "--sink", "uds:///tmp/toki-monitor.sock"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        process.terminationHandler = { [weak self] _ in
+            Task { @MainActor in self?.handleDisconnect() }
+        }
+
+        do {
+            try process.run()
+            tokiProcess = process
+        } catch {
+            onDisconnect?()
+        }
     }
 
     // MARK: - NDJSON Parsing
@@ -56,13 +70,11 @@ final class TokiEventStream {
     private func handleData(_ data: Data) {
         buffer.append(data)
 
-        // Split on newlines and parse each complete line
         while let newlineIndex = buffer.firstIndex(of: UInt8(ascii: "\n")) {
             let lineData = buffer[buffer.startIndex..<newlineIndex]
             buffer = Data(buffer[buffer.index(after: newlineIndex)...])
 
             guard !lineData.isEmpty else { continue }
-
             parseLine(Data(lineData))
         }
     }
@@ -79,7 +91,8 @@ final class TokiEventStream {
     }
 
     private func handleDisconnect() {
-        activeConnection = nil
+        tokiProcess?.terminate()
+        tokiProcess = nil
         buffer = Data()
         onDisconnect?()
     }

@@ -1,150 +1,158 @@
 import Foundation
-import Network
 
-/// Low-level UDS connection to toki daemon.
-/// Handles connect/disconnect and raw data receive.
-final class TokiConnection: Sendable {
-    enum ConnectionError: Error, LocalizedError {
-        case connectionFailed(String)
-        case notConnected
-        case sendFailed(String)
-
-        var errorDescription: String? {
-            switch self {
-            case .connectionFailed(let msg): "Connection failed: \(msg)"
-            case .notConnected: "Not connected to toki daemon"
-            case .sendFailed(let msg): "Send failed: \(msg)"
-            }
-        }
-    }
-
+/// UDS server that listens for incoming JSONL from `toki trace --sink uds://<path>`.
+/// Toki Monitor acts as the SERVER — toki connects to us and pushes events.
+final class TokiTraceListener {
     private let socketPath: String
-    private let queue = DispatchQueue(label: "com.toki.connection", qos: .utility)
+    private var serverFD: Int32 = -1
+    private var acceptSource: DispatchSourceRead?
+    private var clientSource: DispatchSourceRead?
+    private let queue = DispatchQueue(label: "com.toki.trace-listener", qos: .utility)
 
-    init(socketPath: String = "\(NSHomeDirectory())/.config/toki/daemon.sock") {
+    var onReady: (@Sendable () -> Void)?
+    var onData: (@Sendable (Data) -> Void)?
+    var onDisconnect: (@Sendable () -> Void)?
+
+    init(socketPath: String = "/tmp/toki-monitor.sock") {
         self.socketPath = socketPath
     }
 
-    /// Create a new NWConnection to the toki UDS.
-    func makeConnection() -> NWConnection {
-        let params = NWParameters()
-        params.defaultProtocolStack.transportProtocol = NWProtocolTCP.Options()
-        let endpoint = NWEndpoint.unix(path: socketPath)
-        return NWConnection(to: endpoint, using: params)
-    }
+    func start() -> Bool {
+        stop()
+        unlink(socketPath)
 
-    /// Connect for trace mode (streaming). Does NOT send any data —
-    /// the toki daemon classifies silent clients as trace clients after 200ms.
-    func connectForTrace(
-        onReady: @escaping @Sendable () -> Void,
-        onEvent: @escaping @Sendable (Data) -> Void,
-        onError: @escaping @Sendable (Error) -> Void,
-        onComplete: @escaping @Sendable () -> Void
-    ) -> NWConnection {
-        let connection = makeConnection()
+        serverFD = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard serverFD >= 0 else { return false }
 
-        connection.stateUpdateHandler = { state in
-            switch state {
-            case .ready:
-                onReady()
-                self.receiveLoop(connection: connection, onData: onEvent, onError: onError, onComplete: onComplete)
-            case .failed(let error):
-                onError(ConnectionError.connectionFailed(error.localizedDescription))
-            case .cancelled:
-                onComplete()
-            default:
-                break
-            }
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        _ = withUnsafeMutablePointer(to: &addr.sun_path.0) { ptr in
+            socketPath.withCString { cstr in strcpy(ptr, cstr) }
         }
 
-        connection.start(queue: queue)
-        return connection
-    }
-
-    /// Connect for report mode (request/response). Sends query immediately,
-    /// so toki daemon classifies this as a report client.
-    func sendReport(
-        query: String,
-        timezone: String? = nil,
-        completion: @escaping @Sendable (Result<Data, Error>) -> Void
-    ) {
-        let connection = makeConnection()
-
-        connection.stateUpdateHandler = { state in
-            switch state {
-            case .ready:
-                let request = TokiReportRequest(query: query, tz: timezone)
-                guard let jsonData = try? JSONEncoder().encode(request),
-                      var line = String(data: jsonData, encoding: .utf8) else {
-                    completion(.failure(ConnectionError.sendFailed("Failed to encode request")))
-                    connection.cancel()
-                    return
-                }
-                line += "\n"
-
-                let conn = connection
-                conn.send(
-                    content: line.data(using: .utf8),
-                    completion: .contentProcessed { error in
-                        if let error {
-                            completion(.failure(ConnectionError.sendFailed(error.localizedDescription)))
-                            conn.cancel()
-                            return
-                        }
-                        // Read single-line response
-                        self.receiveOnce(connection: conn, completion: { result in
-                            completion(result)
-                            conn.cancel()
-                        })
-                    }
-                )
-
-            case .failed(let error):
-                completion(.failure(ConnectionError.connectionFailed(error.localizedDescription)))
-            default:
-                break
+        let bindOK = withUnsafePointer(to: &addr) { ptr in
+            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
+                bind(serverFD, sockPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
             }
         }
+        guard bindOK == 0 else {
+            close(serverFD); serverFD = -1; return false
+        }
+        guard listen(serverFD, 1) == 0 else {
+            close(serverFD); serverFD = -1; return false
+        }
+        _ = fcntl(serverFD, F_SETFL, O_NONBLOCK)
 
-        connection.start(queue: queue)
+        let source = DispatchSource.makeReadSource(fileDescriptor: serverFD, queue: queue)
+        source.setEventHandler { [weak self] in
+            self?.acceptClient()
+        }
+        source.setCancelHandler { [weak self] in
+            guard let self else { return }
+            if self.serverFD >= 0 { close(self.serverFD); self.serverFD = -1 }
+        }
+        source.resume()
+        acceptSource = source
+
+        onReady?()
+        return true
+    }
+
+    func stop() {
+        clientSource?.cancel()
+        clientSource = nil
+        acceptSource?.cancel()
+        acceptSource = nil
+        if serverFD >= 0 { close(serverFD); serverFD = -1 }
+        unlink(socketPath)
     }
 
     // MARK: - Private
 
-    private func receiveLoop(
-        connection: NWConnection,
-        onData: @escaping @Sendable (Data) -> Void,
-        onError: @escaping @Sendable (Error) -> Void,
-        onComplete: @escaping @Sendable () -> Void
+    private func acceptClient() {
+        var clientAddr = sockaddr_un()
+        var len = socklen_t(MemoryLayout<sockaddr_un>.size)
+
+        let clientFD = withUnsafeMutablePointer(to: &clientAddr) { ptr in
+            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
+                accept(serverFD, sockPtr, &len)
+            }
+        }
+        guard clientFD >= 0 else { return }
+        _ = fcntl(clientFD, F_SETFL, O_NONBLOCK)
+
+        // Only keep one client (toki trace process)
+        clientSource?.cancel()
+
+        let source = DispatchSource.makeReadSource(fileDescriptor: clientFD, queue: queue)
+        source.setEventHandler { [weak self] in
+            self?.readFromClient(fd: clientFD)
+        }
+        source.setCancelHandler { [weak self] in
+            close(clientFD)
+            self?.onDisconnect?()
+        }
+        source.resume()
+        clientSource = source
+    }
+
+    private func readFromClient(fd: Int32) {
+        var buf = [UInt8](repeating: 0, count: 65536)
+        let n = read(fd, &buf, buf.count)
+
+        if n <= 0 {
+            clientSource?.cancel()
+            clientSource = nil
+            return
+        }
+
+        onData?(Data(buf[0..<n]))
+    }
+}
+
+/// Runs `toki report` CLI and returns JSON output.
+final class TokiReportRunner: Sendable {
+    private let tokiPath: String
+
+    init(tokiPath: String = "toki") {
+        self.tokiPath = tokiPath
+    }
+
+    func runReport(
+        args: [String],
+        completion: @escaping @Sendable (Result<Data, Error>) -> Void
     ) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, isComplete, error in
-            if let data, !data.isEmpty {
-                onData(data)
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = [self.tokiPath] + ["report", "--output-format", "json"] + args
+
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if process.terminationStatus == 0 {
+                    completion(.success(data))
+                } else {
+                    completion(.failure(RunnerError.exitCode(Int(process.terminationStatus))))
+                }
+            } catch {
+                completion(.failure(error))
             }
-            if isComplete {
-                onComplete()
-                return
-            }
-            if let error {
-                onError(error)
-                return
-            }
-            // Continue receiving
-            self.receiveLoop(connection: connection, onData: onData, onError: onError, onComplete: onComplete)
         }
     }
 
-    private func receiveOnce(
-        connection: NWConnection,
-        completion: @escaping @Sendable (Result<Data, Error>) -> Void
-    ) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, error in
-            if let error {
-                completion(.failure(error))
-            } else if let data {
-                completion(.success(data))
-            } else {
-                completion(.failure(ConnectionError.notConnected))
+    enum RunnerError: Error, LocalizedError {
+        case exitCode(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .exitCode(let code): "toki report exited with code \(code)"
             }
         }
     }

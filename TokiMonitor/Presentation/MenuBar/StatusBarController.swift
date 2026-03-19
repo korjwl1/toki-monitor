@@ -4,7 +4,6 @@ import SwiftUI
 @MainActor
 final class StatusBarController {
     private let statusItem: NSStatusItem
-    private let popover = NSPopover()
     private let connectionManager: ConnectionManager
     private let eventStream: TokiEventStream
     private let aggregator = TokenAggregator()
@@ -17,7 +16,6 @@ final class StatusBarController {
     // Dashboard & Settings
     private let dashboardController = DashboardWindowController()
     private let settings = AppSettings()
-    private var settingsPopover: NSPopover?
 
     init() {
         eventStream = TokiEventStream()
@@ -27,20 +25,15 @@ final class StatusBarController {
             withLength: NSStatusItem.variableLength
         )
         setupButton()
-        setupPopover()
         setupEventHandling()
 
         // Apply settings
         aggregator.timeRange = settings.defaultTimeRange
-
-        // Start aggregator sampling for sparkline
         aggregator.startSampling()
 
-        // Auto-connect on launch
-        connectionManager.connect()
+        // Don't auto-connect — user clicks "toki 시작"
 
-        // Observe state changes
-        observeConnectionState()
+        // Observe
         observeAnimationState()
         observeSettings()
     }
@@ -49,20 +42,15 @@ final class StatusBarController {
 
     private func setupButton() {
         guard let button = statusItem.button else { return }
-        button.image = NSImage(
-            systemSymbolName: "brain.head.profile",
-            accessibilityDescription: "Toki Monitor"
-        )
-        button.image?.size = NSSize(width: 18, height: 18)
-        button.image?.isTemplate = true
+        if let img = NSImage(systemSymbolName: "hare", accessibilityDescription: "Toki Monitor") {
+            img.size = NSSize(width: 18, height: 18)
+            img.isTemplate = true
+            button.image = img
+        } else {
+            button.title = "🐇"
+        }
         button.action = #selector(handleClick)
         button.target = self
-    }
-
-    private func setupPopover() {
-        popover.behavior = .transient
-        popover.animates = true
-        updatePopoverContent()
     }
 
     private func setupEventHandling() {
@@ -71,49 +59,138 @@ final class StatusBarController {
         }
     }
 
-    // MARK: - Click
+    // MARK: - Click → NSMenu
 
     @objc private func handleClick() {
-        guard let button = statusItem.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)
+        let menu = NSMenu()
+
+        if connectionManager.state.isConnected {
+            // Header
+            let headerItem = NSMenuItem()
+            let headerView = NSHostingView(rootView:
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("Toki Monitor")
+                            .font(.headline)
+                        Spacer()
+                        Circle().fill(.green).frame(width: 8, height: 8)
+                        Text("연결됨").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Text(TokenFormatter.formatRate(aggregator.tokensPerMinute))
+                        .font(.system(.title3, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .frame(width: 280)
+            )
+            headerView.frame = NSRect(x: 0, y: 0, width: 280, height: 60)
+            headerItem.view = headerView
+            menu.addItem(headerItem)
+            menu.addItem(.separator())
+
+            // Provider rows
+            if aggregator.providerSummaries.isEmpty {
+                let emptyItem = NSMenuItem()
+                let emptyView = NSHostingView(rootView:
+                    Text("이벤트 대기 중...")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .frame(width: 280, height: 30)
+                )
+                emptyView.frame = NSRect(x: 0, y: 0, width: 280, height: 30)
+                emptyItem.view = emptyView
+                menu.addItem(emptyItem)
+            } else {
+                if let total = aggregator.totalSummary {
+                    let totalItem = NSMenuItem()
+                    let totalView = NSHostingView(rootView:
+                        TotalSummaryView(total: total)
+                            .padding(.horizontal, 12)
+                            .frame(width: 280)
+                    )
+                    totalView.frame = NSRect(x: 0, y: 0, width: 280, height: 44)
+                    totalItem.view = totalView
+                    menu.addItem(totalItem)
+                    menu.addItem(.separator())
+                }
+
+                for summary in aggregator.providerSummaries {
+                    let item = NSMenuItem()
+                    let rowView = NSHostingView(rootView:
+                        ProviderRowView(summary: summary)
+                            .padding(.horizontal, 12)
+                            .frame(width: 280)
+                    )
+                    rowView.frame = NSRect(x: 0, y: 0, width: 280, height: 44)
+                    item.view = rowView
+                    menu.addItem(item)
+                }
+            }
+
+            menu.addItem(.separator())
+
+            // Dashboard
+            let dashItem = NSMenuItem(title: "대시보드", action: #selector(openDashboard), keyEquivalent: "d")
+            dashItem.target = self
+            menu.addItem(dashItem)
+
         } else {
-            updatePopoverContent()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+            // Disconnected
+            let disconnectedItem = NSMenuItem()
+            let disconnectedView = NSHostingView(rootView:
+                VStack(spacing: 10) {
+                    Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.secondary)
+                    Text("toki 데몬 미연결")
+                        .font(.headline)
+                    Text("toki 데몬이 실행되지 않고 있습니다.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(16)
+                .frame(width: 260)
+            )
+            disconnectedView.frame = NSRect(x: 0, y: 0, width: 260, height: 110)
+            disconnectedItem.view = disconnectedView
+            menu.addItem(disconnectedItem)
+            menu.addItem(.separator())
+
+            let startItem = NSMenuItem(title: "toki 시작", action: #selector(startDaemon), keyEquivalent: "")
+            startItem.target = self
+            menu.addItem(startItem)
         }
+
+        menu.addItem(.separator())
+
+        // Settings
+        let settingsItem = NSMenuItem(title: "설정...", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
+        // Quit
+        let quitItem = NSMenuItem(title: "종료", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil  // Reset so next click goes to action, not menu
     }
 
-    // MARK: - Popover Content
+    @objc private func openDashboard() {
+        dashboardController.show()
+    }
 
-    private func updatePopoverContent() {
-        if connectionManager.state.isConnected {
-            let contentView = PopoverContentView(
-                summaries: aggregator.providerSummaries,
-                total: aggregator.totalSummary,
-                timeRange: aggregator.timeRange,
-                tokensPerMinute: aggregator.tokensPerMinute,
-                onTimeRangeChange: { [weak self] range in
-                    self?.aggregator.timeRange = range
-                },
-                onDashboardTap: { [weak self] in
-                    self?.popover.performClose(nil)
-                    self?.dashboardController.show()
-                },
-                onSettingsTap: { [weak self] in
-                    self?.showSettings()
-                }
-            )
-            popover.contentViewController = NSHostingController(rootView: contentView)
-        } else {
-            let disconnectedView = DisconnectedView(
-                state: connectionManager.state,
-                onStartDaemon: { [weak self] in
-                    self?.connectionManager.startDaemonAndConnect()
-                }
-            )
-            popover.contentViewController = NSHostingController(rootView: disconnectedView)
-        }
+    @objc private func startDaemon() {
+        connectionManager.startDaemonAndConnect()
+    }
+
+    @objc private func openSettings() {
+        // TODO: open settings window
+    }
+
+    @objc private func quitApp() {
+        NSApp.terminate(nil)
     }
 
     // MARK: - Animation
@@ -121,7 +198,6 @@ final class StatusBarController {
     private func updateMenuBarDisplay() {
         guard let button = statusItem.button else { return }
 
-        // Reduce Motion → force numeric
         let effectiveStyle: AnimationStyle
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             effectiveStyle = .numeric
@@ -129,12 +205,15 @@ final class StatusBarController {
             effectiveStyle = settings.animationStyle
         }
 
-        // Stop any previous animation
         characterRenderer.stop()
         numericRenderer.clear(button: button)
 
         guard connectionManager.state.isConnected else {
-            updateDisconnectedIcon()
+            if let img = NSImage(systemSymbolName: "hare", accessibilityDescription: "Toki Monitor - Disconnected") {
+                img.size = NSSize(width: 18, height: 18)
+                img.isTemplate = true
+                button.image = img
+            }
             return
         }
 
@@ -148,54 +227,7 @@ final class StatusBarController {
         }
     }
 
-    private func updateDisconnectedIcon() {
-        guard let button = statusItem.button else { return }
-        characterRenderer.stop()
-        numericRenderer.clear(button: button)
-        button.image = NSImage(
-            systemSymbolName: "brain.head.profile.slash",
-            accessibilityDescription: "Toki Monitor - Disconnected"
-        )
-        button.image?.size = NSSize(width: 18, height: 18)
-        button.image?.isTemplate = true
-    }
-
-    // MARK: - Settings
-
-    private func showSettings() {
-        popover.performClose(nil)
-
-        let settingsView = SettingsView(settings: settings)
-        let sp = NSPopover()
-        sp.contentViewController = NSHostingController(rootView: settingsView)
-        sp.behavior = .transient
-
-        if let button = statusItem.button {
-            sp.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            sp.contentViewController?.view.window?.makeKey()
-        }
-        settingsPopover = sp
-    }
-
     // MARK: - Observation
-
-    private func observeConnectionState() {
-        withObservationTracking {
-            _ = connectionManager.state
-        } onChange: { [weak self] in
-            Task { @MainActor in
-                self?.handleConnectionChange()
-            }
-        }
-    }
-
-    private func handleConnectionChange() {
-        updateMenuBarDisplay()
-        if popover.isShown {
-            updatePopoverContent()
-        }
-        observeConnectionState()
-    }
 
     private func observeAnimationState() {
         withObservationTracking {
@@ -203,14 +235,10 @@ final class StatusBarController {
             _ = aggregator.recentHistory
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.handleAnimationChange()
+                self?.updateMenuBarDisplay()
+                self?.observeAnimationState()
             }
         }
-    }
-
-    private func handleAnimationChange() {
-        updateMenuBarDisplay()
-        observeAnimationState()
     }
 
     private func observeSettings() {
@@ -219,14 +247,10 @@ final class StatusBarController {
             _ = settings.defaultTimeRange
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.handleSettingsChange()
+                self?.aggregator.timeRange = self?.settings.defaultTimeRange ?? .oneHour
+                self?.updateMenuBarDisplay()
+                self?.observeSettings()
             }
         }
-    }
-
-    private func handleSettingsChange() {
-        aggregator.timeRange = settings.defaultTimeRange
-        updateMenuBarDisplay()
-        observeSettings()
     }
 }

@@ -160,7 +160,7 @@ struct DashboardView: View {
         isLoading = true
         errorMessage = nil
 
-        reportClient.querySummary(timeRange: selectedPeriod.toTimeRange) { result in
+        reportClient.queryAllSummaries(timeRange: selectedPeriod.toTimeRange) { result in
             Task { @MainActor in
                 isLoading = false
                 switch result {
@@ -201,7 +201,7 @@ enum ReportPeriod: String, CaseIterable {
         switch self {
         case .daily: "1d"
         case .weekly: "1w"
-        case .monthly: "1M"
+        case .monthly: "30d"
         }
     }
 }

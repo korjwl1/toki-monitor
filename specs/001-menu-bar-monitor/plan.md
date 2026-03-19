@@ -60,27 +60,29 @@ TokiMonitor/
 ├── TokiMonitorApp.swift              # @main, App lifecycle
 ├── Info.plist                         # LSUIElement = true (Dock 숨김)
 │
-├── Data/                              # Data Layer (toki 통신)
+├── Data/                              # Data Layer (toki UDS 통신만)
 │   ├── TokiConnection.swift           # NWConnection UDS 클라이언트
 │   ├── TokiEventStream.swift          # NDJSON 실시간 이벤트 파서
-│   ├── TokiReportClient.swift         # Report 쿼리 요청/응답
+│   ├── TokiReportClient.swift         # Report 쿼리 (SchemaTaggedSummary 반환)
 │   └── Models/
-│       ├── TokiEvent.swift            # {"type":"event","data":{...}} Codable
-│       ├── TokiReportRequest.swift    # {"query":"...","tz":"..."} Codable
-│       └── TokiReportResponse.swift   # {"ok":true,"data":[...]} Codable
+│       ├── TokiEvent.swift            # 이벤트 Codable (Claude + Codex 필드)
+│       └── TokiReportModels.swift     # Report 요청/응답 (schema 태깅 포함)
 │
-├── Domain/                            # Domain Layer (비즈니스 로직)
+├── Domain/                            # Domain Layer (SwiftUI/AppKit 무의존)
 │   ├── TokenUsageModel.swift          # 프로바이더-무관 토큰 사용 프로토콜
 │   ├── ProviderSummary.swift          # 프로바이더별 집계 모델
-│   ├── ProviderRegistry.swift         # 모델명 → 프로바이더 매핑 (데이터 기반)
-│   ├── TokenAggregator.swift          # 시간 범위별 이벤트 집계
+│   ├── ProviderRegistry.swift         # 모델명/schema → 프로바이더 매핑
+│   ├── TokenAggregator.swift          # 시간 범위별 이벤트 집계 + 프로바이더 그룹
+│   ├── TokenFormatter.swift           # 토큰/비용/rate 포맷팅 공유 유틸
 │   ├── AnimationStateMapper.swift     # 토큰 처리량 → AnimationState 변환
-│   └── ConnectionManager.swift        # 연결 상태 머신, 재연결 로직
+│   ├── AppSettings.swift              # 설정 (UserDefaults + SMAppService)
+│   └── ConnectionManager.swift        # 연결 상태 머신 (NWConnection .ready 검증)
 │
-├── Presentation/                      # Presentation Layer (SwiftUI)
+├── Presentation/                      # Presentation Layer (SwiftUI + AppKit)
+│   ├── ProviderColor.swift            # ProviderInfo.colorName → Color 변환
 │   ├── MenuBar/
-│   │   ├── StatusBarController.swift  # NSStatusItem + NSPopover 관리 (AppKit)
-│   │   ├── CharacterAnimationView.swift  # 프레임 기반 캐릭터 애니메이션
+│   │   ├── StatusBarController.swift  # NSStatusItem + NSPopover + 3종 렌더러
+│   │   ├── CharacterAnimationView.swift  # 7-frame 토끼 애니메이션
 │   │   ├── NumericBadgeView.swift     # "1.2K/m" 수치 표시
 │   │   └── SparklineView.swift        # 미니 그래프
 │   ├── Popover/
@@ -89,29 +91,24 @@ TokiMonitor/
 │   │   ├── TotalSummaryView.swift     # 전체 합산 행
 │   │   └── DisconnectedView.swift     # 연결 끊김 상태 뷰
 │   ├── Dashboard/
-│   │   ├── DashboardWindow.swift      # 대시보드 윈도우
-│   │   ├── ReportView.swift           # 기간별 리포트 뷰
-│   │   ├── ModelDetailView.swift      # 모델 드릴다운 뷰
-│   │   └── UsageChartView.swift       # Swift Charts 차트
+│   │   ├── DashboardWindow.swift      # 대시보드 윈도우 관리
+│   │   ├── DashboardView.swift        # 기간별 리포트 테이블 + 기간 선택
+│   │   └── ModelDetailView.swift      # 모델 드릴다운 + Swift Charts
 │   └── Settings/
 │       └── SettingsView.swift         # 설정 뷰
 │
 ├── Resources/
-│   ├── Assets.xcassets/               # 아이콘, 캐릭터 프레임
-│   └── Localizable.strings            # (향후) 다국어
+│   ├── Assets.xcassets/               # 앱 아이콘
+│   └── CharacterFrames/              # 토끼 애니메이션 프레임 (7장, 256x187)
 │
-└── Tests/
-    ├── TokiMonitorTests/
-    │   ├── Data/
-    │   │   ├── TokiEventStreamTests.swift
-    │   │   └── TokiReportClientTests.swift
-    │   ├── Domain/
-    │   │   ├── TokenAggregatorTests.swift
-    │   │   ├── AnimationStateMapperTests.swift
-    │   │   └── ProviderRegistryTests.swift
-    │   └── Integration/
-    │       └── UDSConnectionTests.swift
-    └── TokiMonitorUITests/
+└── Tests/TokiMonitorTests/
+    ├── Data/
+    │   ├── TokiEventStreamTests.swift   # NDJSON 파싱, Codex 필드
+    │   └── TokiReportClientTests.swift  # schema 태깅, 프로바이더 응답
+    └── Domain/
+        ├── AnimationStateMapperTests.swift  # 임계값, FPS, formatRate
+        ├── ConnectionManagerTests.swift     # 상태 전이
+        └── ProviderRegistryTests.swift      # 모델/schema 매핑, ProviderSummary
         └── PopoverUITests.swift
 ```
 

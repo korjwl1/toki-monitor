@@ -135,22 +135,22 @@ Toki Monitor는 [toki](https://github.com/user/toki) 데몬의 프레젠테이�
 xcodebuild test -project TokiMonitor.xcodeproj -scheme TokiMonitor -destination 'platform=macOS'
 ```
 
-32개 테스트 (7 suites):
-- NDJSON 이벤트 파싱
-- Report 응답 디코딩
+34개 테스트 (7 suites):
+- NDJSON 이벤트 파싱 (Claude + Codex 필드)
+- Report 응답 디코딩 (per-provider schema 태깅)
 - ConnectionState 상태 전이
 - AnimationStateMapper 임계값
 - TokenFormatter 포맷팅
-- ProviderRegistry 모델 매핑
+- ProviderRegistry 모델/schema 매핑
 - ProviderSummary 집계
 
 ## Supported Providers
 
-| Provider | Model Prefix | Status |
-|----------|-------------|--------|
-| Anthropic (Claude) | `claude-` | ✅ Supported |
-| Google (Gemini) | `gemini-` | ✅ Ready (toki parser 필요) |
-| OpenAI | `gpt-`, `o1-`, `o3-` | ✅ Ready (toki parser 필요) |
+| Provider | toki Schema | Model Prefix | Status |
+|----------|------------|-------------|--------|
+| Anthropic (Claude) | `claude_code` | `claude-` | ✅ Supported |
+| OpenAI (Codex CLI) | `codex` | `gpt-`, `o1-`, `o3-` | ✅ Supported |
+| Google (Gemini) | `gemini_cli` | `gemini-` | ⏳ Ready (toki parser 필요) |
 
 새 프로바이더 추가: toki에 `LogParser` 구현 → Toki Monitor UI 변경 불필요.
 

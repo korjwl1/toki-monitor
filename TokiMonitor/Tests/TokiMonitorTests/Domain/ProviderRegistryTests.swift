@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import TokiMonitor
 
@@ -45,6 +46,23 @@ struct ProviderRegistryTests {
         let result = ProviderRegistry.resolve(model: "Claude-opus-4-6")
         #expect(result.id == "anthropic")
     }
+
+    @Test("Schema resolution")
+    func schemaResolution() {
+        #expect(ProviderRegistry.resolveSchema("claude_code").id == "anthropic")
+        #expect(ProviderRegistry.resolveSchema("codex").id == "openai")
+        #expect(ProviderRegistry.resolveSchema("unknown").id == "unknown")
+    }
+}
+
+// Helper to create test events via JSON decoding (avoids fragile init signatures)
+private func makeTestEvent(model: String, input: UInt64, output: UInt64, cost: Double?) -> TokenEvent {
+    let costStr = cost.map { "\($0)" } ?? "null"
+    let json = """
+    {"type":"event","data":{"model":"\(model)","source":"test","input_tokens":\(input),"output_tokens":\(output),"cost_usd":\(costStr)}}
+    """
+    let envelope = try! JSONDecoder().decode(TokiEventEnvelope.self, from: json.data(using: .utf8)!)
+    return TokenEvent(from: envelope.data)
 }
 
 @Suite("ProviderSummary")
@@ -54,21 +72,8 @@ struct ProviderSummaryTests {
         let provider = ProviderRegistry.resolve(model: "claude-opus-4-6")
         var summary = ProviderSummary(provider: provider)
 
-        let event1 = TokenEvent(from: TokiEventData(
-            model: "claude-opus-4-6", source: "test",
-            inputTokens: 100, outputTokens: 50,
-            cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
-            costUsd: 0.01
-        ))
-        let event2 = TokenEvent(from: TokiEventData(
-            model: "claude-opus-4-6", source: "test",
-            inputTokens: 200, outputTokens: 100,
-            cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
-            costUsd: 0.02
-        ))
-
-        summary.add(event: event1)
-        summary.add(event: event2)
+        summary.add(event: makeTestEvent(model: "claude-opus-4-6", input: 100, output: 50, cost: 0.01))
+        summary.add(event: makeTestEvent(model: "claude-opus-4-6", input: 200, output: 100, cost: 0.02))
 
         #expect(summary.totalInput == 300)
         #expect(summary.totalOutput == 150)
@@ -80,21 +85,11 @@ struct ProviderSummaryTests {
     func totalSummary() {
         let claude = ProviderRegistry.resolve(model: "claude-opus-4-6")
         var s1 = ProviderSummary(provider: claude)
-        s1.add(event: TokenEvent(from: TokiEventData(
-            model: "claude-opus-4-6", source: "t",
-            inputTokens: 100, outputTokens: 50,
-            cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
-            costUsd: 0.01
-        )))
+        s1.add(event: makeTestEvent(model: "claude-opus-4-6", input: 100, output: 50, cost: 0.01))
 
         let gemini = ProviderRegistry.resolve(model: "gemini-1.5-pro")
         var s2 = ProviderSummary(provider: gemini)
-        s2.add(event: TokenEvent(from: TokiEventData(
-            model: "gemini-1.5-pro", source: "t",
-            inputTokens: 200, outputTokens: 100,
-            cacheCreationInputTokens: 0, cacheReadInputTokens: 0,
-            costUsd: 0.005
-        )))
+        s2.add(event: makeTestEvent(model: "gemini-1.5-pro", input: 200, output: 100, cost: 0.005))
 
         let total = TotalSummary(from: [s1, s2])
         #expect(total.totalInput == 300)
