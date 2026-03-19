@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var settings: AppSettings
+    var onClose: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -41,16 +42,16 @@ struct SettingsView: View {
 
             Divider()
 
-            // About
             HStack {
                 Text("Toki Monitor v0.1.0")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("종료") {
-                    NSApp.terminate(nil)
+                Button("닫기") {
+                    onClose?()
                 }
                 .controlSize(.small)
+                .keyboardShortcut(.cancelAction)
             }
         }
         .padding(16)

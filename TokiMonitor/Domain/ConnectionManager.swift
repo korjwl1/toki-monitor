@@ -9,8 +9,10 @@ enum ConnectionState: Equatable {
     }
 }
 
-/// Manages toki connection lifecycle.
-/// Starts UDS listener → launches `toki trace --sink uds://` → receives events.
+/// Manages toki connection lifecycle via CLI commands.
+/// - Status: `toki daemon status` (exit 0 = running)
+/// - Start:  `toki daemon start`
+/// - Trace:  `toki trace --sink uds://`
 @MainActor
 @Observable
 final class ConnectionManager {
@@ -29,6 +31,16 @@ final class ConnectionManager {
         }
     }
 
+    /// Check if daemon is running and auto-connect if so.
+    func checkAndConnect() {
+        Task {
+            let running = await isDaemonRunning()
+            if running {
+                connect()
+            }
+        }
+    }
+
     func connect() {
         guard !state.isConnected else { return }
         eventStream.start()
@@ -39,10 +51,10 @@ final class ConnectionManager {
         state = .disconnected
     }
 
-    /// Launch toki daemon, then connect.
+    /// Start daemon, then connect.
     func startDaemonAndConnect() {
         Task {
-            let launched = await launchDaemon()
+            let launched = await runToki(args: ["daemon", "start"])
             if launched {
                 try? await Task.sleep(for: .seconds(1))
                 connect()
@@ -50,13 +62,27 @@ final class ConnectionManager {
         }
     }
 
-    // MARK: - Daemon Launch
+    /// Stop daemon.
+    func stopDaemon() {
+        Task {
+            disconnect()
+            _ = await runToki(args: ["daemon", "stop"])
+        }
+    }
 
-    private func launchDaemon() async -> Bool {
+    // MARK: - toki CLI
+
+    /// Check daemon status via `toki daemon status`. Exit code 0 = running.
+    private func isDaemonRunning() async -> Bool {
+        await runToki(args: ["daemon", "status"])
+    }
+
+    /// Run a toki CLI command. Returns true if exit code 0.
+    private func runToki(args: [String]) async -> Bool {
         await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["toki", "daemon", "start"]
+            process.arguments = ["toki"] + args
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
 

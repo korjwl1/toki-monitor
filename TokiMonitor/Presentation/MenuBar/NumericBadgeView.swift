@@ -7,8 +7,7 @@ struct NumericBadgeRenderer {
         let text = TokenFormatter.formatRate(tokensPerMinute)
 
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .medium),
-            .foregroundColor: NSColor.labelColor,
+            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium),
         ]
 
         button.image = nil

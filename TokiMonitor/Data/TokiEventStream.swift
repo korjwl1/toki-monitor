@@ -28,6 +28,9 @@ final class TokiEventStream {
     }
 
     func start() {
+        // Kill stale toki trace from previous app run
+        killStaleTokiTrace()
+
         guard listener.start() else {
             onDisconnect?()
             return
@@ -88,6 +91,16 @@ final class TokiEventStream {
         let event = TokenEvent(from: envelope.data)
         latestEvent = event
         onEvent?(event)
+    }
+
+    private func killStaleTokiTrace() {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        process.arguments = ["-f", "toki trace --sink uds:///tmp/toki-monitor.sock"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
     }
 
     private func handleDisconnect() {

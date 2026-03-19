@@ -59,32 +59,4 @@ struct TokiEventStreamTests {
         // TokiEventStream.parseLine would skip this since type != "event"
     }
 
-    @Test("Parse report response")
-    func parseReportResponse() throws {
-        let json = """
-        {"ok":true,"data":[{"type":"summary","data":[{"model":"claude-opus-4-6","input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"total_tokens":1500,"events":10,"cost_usd":0.05}]}]}
-        """
-        let data = json.data(using: .utf8)!
-        let response = try JSONDecoder().decode(TokiReportResponse.self, from: data)
-
-        #expect(response.ok == true)
-        #expect(response.error == nil)
-        #expect(response.data?.count == 1)
-        #expect(response.data?.first?.type == "summary")
-        #expect(response.data?.first?.data?.first?.model == "claude-opus-4-6")
-        #expect(response.data?.first?.data?.first?.totalTokens == 1500)
-    }
-
-    @Test("Parse report error response")
-    func parseReportError() throws {
-        let json = """
-        {"ok":false,"error":"query parse error: unknown metric"}
-        """
-        let data = json.data(using: .utf8)!
-        let response = try JSONDecoder().decode(TokiReportResponse.self, from: data)
-
-        #expect(response.ok == false)
-        #expect(response.error == "query parse error: unknown metric")
-        #expect(response.data == nil)
-    }
 }

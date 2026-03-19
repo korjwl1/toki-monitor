@@ -160,7 +160,7 @@ struct DashboardView: View {
         isLoading = true
         errorMessage = nil
 
-        reportClient.queryAllSummaries(timeRange: selectedPeriod.toTimeRange) { result in
+        reportClient.queryAllSummaries(period: selectedPeriod) { result in
             Task { @MainActor in
                 isLoading = false
                 switch result {
@@ -189,19 +189,26 @@ enum ReportPeriod: String, CaseIterable {
         }
     }
 
-    var toTimeRange: TimeRange {
+    var subcommand: String {
         switch self {
-        case .daily: .today
-        case .weekly: .oneHour   // use 1h bucket for weekly (toki groups by hour)
-        case .monthly: .oneHour  // same
+        case .daily: "daily"
+        case .weekly: "weekly"
+        case .monthly: "monthly"
         }
     }
 
-    var queryBucket: String {
+    var sinceDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd"
+        let date: Date
         switch self {
-        case .daily: "1d"
-        case .weekly: "1w"
-        case .monthly: "30d"
+        case .daily:
+            date = Date()
+        case .weekly:
+            date = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        case .monthly:
+            date = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
         }
+        return formatter.string(from: date)
     }
 }

@@ -13,14 +13,19 @@ final class CharacterAnimationRenderer {
         loadFrames()
     }
 
-    /// Update animation speed based on state.
+    private var currentState: AnimationState?
+
+    /// Update animation speed based on state. Skips if state unchanged.
     func update(state: AnimationState, button: NSStatusBarButton) {
+        guard state != currentState else { return }
+        currentState = state
+
         timer?.invalidate()
         timer = nil
 
         if state == .idle {
             button.image = frames.first
-            button.image?.isTemplate = false
+            button.image?.isTemplate = true
             return
         }
 
@@ -37,6 +42,7 @@ final class CharacterAnimationRenderer {
         timer?.invalidate()
         timer = nil
         currentFrame = 0
+        currentState = nil
     }
 
     // MARK: - Private
@@ -45,7 +51,7 @@ final class CharacterAnimationRenderer {
         guard !frames.isEmpty else { return }
         currentFrame = (currentFrame + 1) % frames.count
         button.image = frames[currentFrame]
-        button.image?.isTemplate = false
+        button.image?.isTemplate = true
     }
 
     private func loadFrames() {
@@ -56,14 +62,13 @@ final class CharacterAnimationRenderer {
             let name = String(format: "frame_%02d", i)
             guard let url = bundle.url(
                 forResource: name,
-                withExtension: "png",
-                subdirectory: "CharacterFrames"
+                withExtension: "png"
             ) else {
                 return nil
             }
             guard let image = NSImage(contentsOf: url) else { return nil }
-            image.size = NSSize(width: 28, height: 20)
-            image.isTemplate = false
+            image.size = NSSize(width: 30, height: 22)
+            image.isTemplate = true
             return image
         }
 
@@ -92,7 +97,7 @@ final class CharacterAnimationRenderer {
                 path.fill()
                 return true
             }
-            image.isTemplate = false
+            image.isTemplate = true
             return image
         }
     }

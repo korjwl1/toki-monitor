@@ -16,6 +16,7 @@ final class StatusBarController {
     // Dashboard & Settings
     private let dashboardController = DashboardWindowController()
     private let settings = AppSettings()
+    private lazy var settingsController = SettingsWindowController(settings: settings)
 
     init() {
         eventStream = TokiEventStream()
@@ -31,7 +32,11 @@ final class StatusBarController {
         aggregator.timeRange = settings.defaultTimeRange
         aggregator.startSampling()
 
-        // Don't auto-connect — user clicks "toki 시작"
+        // Check daemon status and auto-connect if running
+        connectionManager.checkAndConnect()
+
+        // Apply initial display style
+        updateMenuBarDisplay()
 
         // Observe
         observeAnimationState()
@@ -63,9 +68,10 @@ final class StatusBarController {
 
     @objc private func handleClick() {
         let menu = NSMenu()
+        let menuWidth: CGFloat = 280
 
+        // --- Connection status section ---
         if connectionManager.state.isConnected {
-            // Header
             let headerItem = NSMenuItem()
             let headerView = NSHostingView(rootView:
                 VStack(spacing: 4) {
@@ -82,22 +88,21 @@ final class StatusBarController {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
-                .frame(width: 280)
+                .frame(width: menuWidth)
             )
-            headerView.frame = NSRect(x: 0, y: 0, width: 280, height: 60)
+            headerView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 60)
             headerItem.view = headerView
             menu.addItem(headerItem)
             menu.addItem(.separator())
 
-            // Provider rows
             if aggregator.providerSummaries.isEmpty {
                 let emptyItem = NSMenuItem()
                 let emptyView = NSHostingView(rootView:
                     Text("이벤트 대기 중...")
                         .font(.caption).foregroundStyle(.secondary)
-                        .frame(width: 280, height: 30)
+                        .frame(width: menuWidth, height: 30)
                 )
-                emptyView.frame = NSRect(x: 0, y: 0, width: 280, height: 30)
+                emptyView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 30)
                 emptyItem.view = emptyView
                 menu.addItem(emptyItem)
             } else {
@@ -106,9 +111,9 @@ final class StatusBarController {
                     let totalView = NSHostingView(rootView:
                         TotalSummaryView(total: total)
                             .padding(.horizontal, 12)
-                            .frame(width: 280)
+                            .frame(width: menuWidth)
                     )
-                    totalView.frame = NSRect(x: 0, y: 0, width: 280, height: 44)
+                    totalView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 44)
                     totalItem.view = totalView
                     menu.addItem(totalItem)
                     menu.addItem(.separator())
@@ -119,62 +124,83 @@ final class StatusBarController {
                     let rowView = NSHostingView(rootView:
                         ProviderRowView(summary: summary)
                             .padding(.horizontal, 12)
-                            .frame(width: 280)
+                            .frame(width: menuWidth)
                     )
-                    rowView.frame = NSRect(x: 0, y: 0, width: 280, height: 44)
+                    rowView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 44)
                     item.view = rowView
                     menu.addItem(item)
                 }
             }
-
-            menu.addItem(.separator())
-
-            // Dashboard
-            let dashItem = NSMenuItem(title: "대시보드", action: #selector(openDashboard), keyEquivalent: "d")
-            dashItem.target = self
-            menu.addItem(dashItem)
-
         } else {
-            // Disconnected
             let disconnectedItem = NSMenuItem()
             let disconnectedView = NSHostingView(rootView:
-                VStack(spacing: 10) {
-                    Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.secondary)
-                    Text("toki 데몬 미연결")
-                        .font(.headline)
-                    Text("toki 데몬이 실행되지 않고 있습니다.")
-                        .font(.caption).foregroundStyle(.secondary)
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Toki Monitor")
+                            .font(.headline)
+                        Spacer()
+                        Circle().fill(.red).frame(width: 8, height: 8)
+                        Text("미연결").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-                .padding(16)
-                .frame(width: 260)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .frame(width: menuWidth)
             )
-            disconnectedView.frame = NSRect(x: 0, y: 0, width: 260, height: 110)
+            disconnectedView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 36)
             disconnectedItem.view = disconnectedView
             menu.addItem(disconnectedItem)
             menu.addItem(.separator())
 
-            let startItem = NSMenuItem(title: "toki 시작", action: #selector(startDaemon), keyEquivalent: "")
+            let startItem = NSMenuItem(title: "toki 데몬 시작", action: #selector(startDaemon), keyEquivalent: "")
             startItem.target = self
             menu.addItem(startItem)
         }
 
         menu.addItem(.separator())
 
-        // Settings
-        let settingsItem = NSMenuItem(title: "설정...", action: #selector(openSettings), keyEquivalent: ",")
-        settingsItem.target = self
+        // --- Settings inline ---
+        let settingsItem = NSMenuItem()
+        let settingsView = NSHostingView(rootView:
+            VStack(alignment: .leading, spacing: 10) {
+                Text("메뉴바 스타일")
+                    .font(.caption).foregroundStyle(.secondary)
+                Picker("", selection: Binding(
+                    get: { self.settings.animationStyle },
+                    set: { self.settings.animationStyle = $0 }
+                )) {
+                    Text("캐릭터").tag(AnimationStyle.character)
+                    Text("수치").tag(AnimationStyle.numeric)
+                    Text("그래프").tag(AnimationStyle.sparkline)
+                }
+                .pickerStyle(.segmented)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .frame(width: menuWidth)
+        )
+        settingsView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 56)
+        settingsItem.view = settingsView
         menu.addItem(settingsItem)
 
-        // Quit
+        menu.addItem(.separator())
+
+        // --- Always visible items ---
+        let dashItem = NSMenuItem(title: "대시보드", action: #selector(openDashboard), keyEquivalent: "d")
+        dashItem.target = self
+        menu.addItem(dashItem)
+
+        let fullSettingsItem = NSMenuItem(title: "설정...", action: #selector(openSettings), keyEquivalent: ",")
+        fullSettingsItem.target = self
+        menu.addItem(fullSettingsItem)
+
+        menu.addItem(.separator())
+
         let quitItem = NSMenuItem(title: "종료", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
 
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
-        statusItem.menu = nil  // Reset so next click goes to action, not menu
+        statusItem.menu = nil
     }
 
     @objc private func openDashboard() {
@@ -186,7 +212,7 @@ final class StatusBarController {
     }
 
     @objc private func openSettings() {
-        // TODO: open settings window
+        settingsController.show()
     }
 
     @objc private func quitApp() {
@@ -194,6 +220,8 @@ final class StatusBarController {
     }
 
     // MARK: - Animation
+
+    private var currentStyle: AnimationStyle?
 
     private func updateMenuBarDisplay() {
         guard let button = statusItem.button else { return }
@@ -205,20 +233,19 @@ final class StatusBarController {
             effectiveStyle = settings.animationStyle
         }
 
-        characterRenderer.stop()
-        numericRenderer.clear(button: button)
-
-        guard connectionManager.state.isConnected else {
-            if let img = NSImage(systemSymbolName: "hare", accessibilityDescription: "Toki Monitor - Disconnected") {
-                img.size = NSSize(width: 18, height: 18)
-                img.isTemplate = true
-                button.image = img
-            }
-            return
+        // Full reset only when style changes
+        if currentStyle != effectiveStyle {
+            characterRenderer.stop()
+            numericRenderer.clear(button: button)
+            button.image = nil
+            button.attributedTitle = NSAttributedString(string: "")
+            currentStyle = effectiveStyle
         }
 
+        // Update current style's display
         switch effectiveStyle {
         case .character:
+            // Only restart timer if animation state changed (handled inside renderer)
             characterRenderer.update(state: aggregator.animationState, button: button)
         case .numeric:
             numericRenderer.update(tokensPerMinute: aggregator.tokensPerMinute, button: button)

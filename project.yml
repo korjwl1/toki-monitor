@@ -22,7 +22,6 @@ targets:
         excludes:
           - "**/*Tests*"
           - "**/Tests/**"
-          - "**/CharacterFrames/**"
     resources:
       - path: TokiMonitor/Resources/CharacterFrames
         buildPhase: resources

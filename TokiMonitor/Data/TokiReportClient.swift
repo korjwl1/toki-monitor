@@ -1,11 +1,5 @@
 import Foundation
 
-/// Raw result from a report query, tagged with schema name.
-struct SchemaTaggedSummary: Sendable {
-    let schema: String
-    let summaries: [TokiModelSummary]
-}
-
 /// Runs `toki report` CLI commands and parses JSON output.
 final class TokiReportClient: Sendable {
     private let runner: TokiReportRunner
@@ -14,48 +8,23 @@ final class TokiReportClient: Sendable {
         self.runner = runner
     }
 
-    /// Query toki for usage summary via CLI.
-    func querySummary(
-        timeRange: TimeRange,
-        provider: String? = nil,
+    /// Query toki report for a given period, returns flat list of model summaries.
+    func queryAllSummaries(
+        period: ReportPeriod,
         timezone: String = TimeZone.current.identifier,
-        completion: @escaping @Sendable (Result<[SchemaTaggedSummary], Error>) -> Void
+        completion: @escaping @Sendable (Result<[TokiModelSummary], Error>) -> Void
     ) {
-        var args: [String] = []
-
-        // Subcommand based on time range
-        switch timeRange {
-        case .thirtyMinutes:
-            args += ["hourly"]
-        case .oneHour:
-            args += ["hourly"]
-        case .today:
-            args += ["daily"]
-        }
-
+        var args: [String] = [period.subcommand]
+        args += ["--since", period.sinceDate]
         args += ["-z", timezone]
-
-        if let provider {
-            args += ["--provider", provider]
-        }
 
         runner.runReport(args: args) { result in
             switch result {
             case .success(let data):
                 do {
-                    let response = try JSONDecoder().decode(TokiReportResponse.self, from: data)
-                    guard response.ok else {
-                        completion(.failure(ReportError.queryFailed(response.error ?? "Unknown error")))
-                        return
-                    }
-                    let tagged = response.data?.compactMap { item -> SchemaTaggedSummary? in
-                        guard let summaries = item.data, !summaries.isEmpty else { return nil }
-                        return SchemaTaggedSummary(schema: item.schema ?? "unknown", summaries: summaries)
-                    } ?? []
-                    completion(.success(tagged))
+                    let summaries = try Self.parseCliOutput(data)
+                    completion(.success(summaries))
                 } catch {
-                    // CLI might output non-JSON (table format fallback)
-                    // Try parsing as raw array
                     completion(.failure(error))
                 }
             case .failure(let error):
@@ -64,29 +33,82 @@ final class TokiReportClient: Sendable {
         }
     }
 
-    /// Flat query — merges all schemas into one list.
-    func queryAllSummaries(
-        timeRange: TimeRange,
-        timezone: String = TimeZone.current.identifier,
-        completion: @escaping @Sendable (Result<[TokiModelSummary], Error>) -> Void
-    ) {
-        querySummary(timeRange: timeRange, timezone: timezone) { result in
-            switch result {
-            case .success(let tagged):
-                completion(.success(tagged.flatMap(\.summaries)))
-            case .failure(let error):
-                completion(.failure(error))
+    /// Parse toki CLI JSON output.
+    /// CLI may output multiple JSON objects (one per provider), each with
+    /// `{"data": [{"period": "...", "usage_per_models": [...]}], "type": "..."}`.
+    private static func parseCliOutput(_ data: Data) throws -> [TokiModelSummary] {
+        guard let text = String(data: data, encoding: .utf8) else {
+            throw ReportError.parseFailed("Invalid UTF-8")
+        }
+
+        var allSummaries: [TokiModelSummary] = []
+        let decoder = JSONDecoder()
+
+        // Split on `}\n{` to handle multiple JSON objects concatenated
+        // First try single JSON parse
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let jsonObjects = splitJsonObjects(trimmed)
+
+        for jsonStr in jsonObjects {
+            guard let jsonData = jsonStr.data(using: .utf8) else { continue }
+            guard let report = try? decoder.decode(TokiCliReport.self, from: jsonData) else { continue }
+
+            for entry in report.data {
+                if let models = entry.usagePerModels {
+                    allSummaries.append(contentsOf: models)
+                }
             }
         }
+
+        return allSummaries
+    }
+
+    /// Split concatenated JSON objects: `{...}\n{...}` → ["{...}", "{...}"]
+    private static func splitJsonObjects(_ text: String) -> [String] {
+        var objects: [String] = []
+        var depth = 0
+        var start = text.startIndex
+
+        for i in text.indices {
+            if text[i] == "{" { depth += 1 }
+            if text[i] == "}" {
+                depth -= 1
+                if depth == 0 {
+                    objects.append(String(text[start...i]))
+                    let next = text.index(after: i)
+                    if next < text.endIndex {
+                        start = next
+                    }
+                }
+            }
+        }
+        return objects
     }
 
     enum ReportError: Error, LocalizedError {
-        case queryFailed(String)
+        case parseFailed(String)
 
         var errorDescription: String? {
             switch self {
-            case .queryFailed(let msg): "Report query failed: \(msg)"
+            case .parseFailed(let msg): "Report parse failed: \(msg)"
             }
         }
+    }
+}
+
+/// CLI output format: `{"data": [...], "type": "every 1d"}`
+private struct TokiCliReport: Codable {
+    let data: [TokiCliEntry]
+    let type: String?
+}
+
+private struct TokiCliEntry: Codable {
+    let period: String?
+    let session: String?
+    let usagePerModels: [TokiModelSummary]?
+
+    enum CodingKeys: String, CodingKey {
+        case period, session
+        case usagePerModels = "usage_per_models"
     }
 }

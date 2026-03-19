@@ -1,43 +1,69 @@
 import AppKit
 
-/// Renders a mini sparkline graph in the menu bar button.
+/// Renders a mini sparkline graph in the menu bar, Stats-style.
+/// Filled area with gradient + top stroke line.
 @MainActor
 struct SparklineRenderer {
-    private let width: CGFloat = 32
+    private let width: CGFloat = 38
     private let height: CGFloat = 18
 
     func update(history: [Double], button: NSStatusBarButton) {
         let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
-            guard !history.isEmpty else {
-                // Draw flat line for empty state
+            let padding: CGFloat = 1
+            let graphRect = rect.insetBy(dx: padding, dy: padding)
+
+            guard history.count >= 2 else {
+                // Empty: flat line at bottom
                 let path = NSBezierPath()
-                path.move(to: NSPoint(x: 0, y: rect.midY))
-                path.line(to: NSPoint(x: rect.width, y: rect.midY))
+                path.move(to: NSPoint(x: graphRect.minX, y: graphRect.minY + 1))
+                path.line(to: NSPoint(x: graphRect.maxX, y: graphRect.minY + 1))
                 NSColor.tertiaryLabelColor.setStroke()
-                path.lineWidth = 1
+                path.lineWidth = 0.5
                 path.stroke()
                 return true
             }
 
             let maxValue = max(history.max() ?? 1, 1)
-            let points = history.enumerated().map { index, value in
+            let stepX = graphRect.width / CGFloat(history.count - 1)
+
+            // Build points
+            let points = history.enumerated().map { i, value in
                 NSPoint(
-                    x: CGFloat(index) / CGFloat(max(history.count - 1, 1)) * rect.width,
-                    y: CGFloat(value / maxValue) * (rect.height - 4) + 2
+                    x: graphRect.minX + CGFloat(i) * stepX,
+                    y: graphRect.minY + CGFloat(value / maxValue) * graphRect.height
                 )
             }
 
-            let path = NSBezierPath()
-            path.move(to: points[0])
-            for point in points.dropFirst() {
-                path.line(to: point)
+            // Filled area (gradient)
+            let fillPath = NSBezierPath()
+            fillPath.move(to: NSPoint(x: points.first!.x, y: graphRect.minY))
+            for point in points {
+                fillPath.line(to: point)
             }
+            fillPath.line(to: NSPoint(x: points.last!.x, y: graphRect.minY))
+            fillPath.close()
 
-            NSColor.labelColor.setStroke()
-            path.lineWidth = 1.5
-            path.lineCapStyle = .round
-            path.lineJoinStyle = .round
-            path.stroke()
+            // Gradient fill
+            NSGraphicsContext.saveGraphicsState()
+            fillPath.setClip()
+            let gradient = NSGradient(
+                starting: NSColor.labelColor.withAlphaComponent(0.25),
+                ending: NSColor.labelColor.withAlphaComponent(0.05)
+            )
+            gradient?.draw(in: graphRect, angle: 90)
+            NSGraphicsContext.restoreGraphicsState()
+
+            // Top stroke line
+            let linePath = NSBezierPath()
+            linePath.move(to: points[0])
+            for point in points.dropFirst() {
+                linePath.line(to: point)
+            }
+            NSColor.labelColor.withAlphaComponent(0.8).setStroke()
+            linePath.lineWidth = 1.0
+            linePath.lineCapStyle = .round
+            linePath.lineJoinStyle = .round
+            linePath.stroke()
 
             return true
         }

@@ -1,28 +1,5 @@
 import Foundation
 
-/// Request sent to toki daemon for report queries.
-/// Format: {"query":"usage[1h]","tz":"Asia/Seoul"}
-struct TokiReportRequest: Codable {
-    let query: String
-    let tz: String?
-}
-
-/// Top-level response from toki report query.
-struct TokiReportResponse: Codable {
-    let ok: Bool
-    let data: [TokiReportItem]?
-    let error: String?
-}
-
-/// Individual item in a report response.
-/// Each item is tagged with a `schema` field identifying the provider.
-struct TokiReportItem: Codable {
-    let type: String
-    let schema: String?
-    let data: [TokiModelSummary]?
-    let items: [String]?
-}
-
 /// Per-model usage summary from toki report.
 /// Fields vary by provider schema:
 /// - claude_code: cache_creation_input_tokens, cache_read_input_tokens
@@ -54,17 +31,5 @@ struct TokiModelSummary: Codable, Identifiable {
         case cacheReadInputTokens = "cache_read_input_tokens"
         case cachedInputTokens = "cached_input_tokens"
         case reasoningOutputTokens = "reasoning_output_tokens"
-    }
-}
-
-/// Grouped report item (hourly/daily/weekly/session).
-struct TokiGroupedEntry: Codable {
-    let period: String?
-    let session: String?
-    let usagePerModels: [TokiModelSummary]?
-
-    enum CodingKeys: String, CodingKey {
-        case period, session
-        case usagePerModels = "usage_per_models"
     }
 }
