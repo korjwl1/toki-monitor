@@ -281,12 +281,12 @@ struct MenuContentView: View {
                 Group {
                     switch settings.animationStyle {
                     case .character:
-                        if let url = Bundle.main.url(forResource: "frame_00", withExtension: "png"),
+                        if let url = Bundle.main.url(forResource: "frame_00_thin", withExtension: "png"),
                            let nsImage = NSImage(contentsOf: url) {
                             Image(nsImage: nsImage)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
-                                .frame(height: 18)
+                                .frame(height: 24)
                         } else {
                             Image(systemName: "figure.run")
                                 .font(.system(size: 18, weight: .light))

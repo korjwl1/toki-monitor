@@ -27,6 +27,7 @@
 		A10000000008 /* EventsChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000008 /* EventsChart.swift */; };
 		L10000000001 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = L20000000001 /* Localization.swift */; };
 		0C102E5047654E452890DC1C /* frame_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 0C1FFE59530A1D2FC18F1651 /* frame_00.png */; };
+		540D40E5D9941CCBE4ECE130 /* frame_00_thin.png in Resources */ = {isa = PBXBuildFile; fileRef = CBF9D170A3A566C2BE2A2F70 /* frame_00_thin.png */; };
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
 		192041B631FA773F80879D97 /* TokenAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85595784F39710A1BF95BC51 /* TokenAggregator.swift */; };
 		1AF45302417CF14FE4E62098 /* frame_02.png in Resources */ = {isa = PBXBuildFile; fileRef = A56E6C47FB0555F57056DA13 /* frame_02.png */; };
@@ -102,6 +103,7 @@
 		L20000000001 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		0C1FFE59530A1D2FC18F1651 /* frame_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00.png; sourceTree = "<group>"; };
+		CBF9D170A3A566C2BE2A2F70 /* frame_00_thin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00_thin.png; sourceTree = "<group>"; };
 		140E82C9A015AA41CD3C0C1A /* frame_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_01.png; sourceTree = "<group>"; };
 		196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenUsageModel.swift; sourceTree = "<group>"; };
 		1A83167497A1EE039A2B2494 /* TokiMonitorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiMonitorApp.swift; sourceTree = "<group>"; };
@@ -291,6 +293,7 @@
 			isa = PBXGroup;
 			children = (
 				0C1FFE59530A1D2FC18F1651 /* frame_00.png */,
+				CBF9D170A3A566C2BE2A2F70 /* frame_00_thin.png */,
 				140E82C9A015AA41CD3C0C1A /* frame_01.png */,
 				A56E6C47FB0555F57056DA13 /* frame_02.png */,
 				C060811529815B293611230B /* frame_03.png */,
@@ -434,6 +437,7 @@
 			files = (
 				C4E3FFDC972A212EEC371464 /* Assets.xcassets in Resources */,
 				0C102E5047654E452890DC1C /* frame_00.png in Resources */,
+				540D40E5D9941CCBE4ECE130 /* frame_00_thin.png in Resources */,
 				FAAE9290A0103A52B4EDDA4E /* frame_01.png in Resources */,
 				1AF45302417CF14FE4E62098 /* frame_02.png in Resources */,
 				CA9C7AA78EF38E315FCBB43D /* frame_03.png in Resources */,
