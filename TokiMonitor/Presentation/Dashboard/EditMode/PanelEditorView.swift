@@ -14,12 +14,16 @@ struct PanelEditorView: View {
         case query
         case visualization
         case options
+        case alerts
+        case links
 
         var label: String {
             switch self {
             case .query: L.tr("쿼리", "Query")
             case .visualization: L.tr("시각화", "Visualization")
             case .options: L.tr("옵션", "Options")
+            case .alerts: L.dash.alerts
+            case .links: L.dash.dataLinks
             }
         }
 
@@ -28,6 +32,8 @@ struct PanelEditorView: View {
             case .query: "terminal"
             case .visualization: "chart.xyaxis.line"
             case .options: "gearshape"
+            case .alerts: "bell"
+            case .links: "link"
             }
         }
     }
@@ -144,6 +150,10 @@ struct PanelEditorView: View {
                     visualizationTab
                 case .options:
                     optionsTab
+                case .alerts:
+                    alertsTab
+                case .links:
+                    linksTab
                 }
             }
             .padding(16)
@@ -183,7 +193,7 @@ struct PanelEditorView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
-        case .timeSeries, .barChart, .gauge:
+        case .timeSeries, .barChart, .gauge, .rowPanel:
             Text(L.tr("미리보기", "Preview"))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -323,7 +333,7 @@ struct PanelEditorView: View {
                 GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()),
                 GridItem(.flexible()), GridItem(.flexible()),
             ], spacing: 8) {
-                ForEach(PanelType.allCases, id: \.rawValue) { type in
+                ForEach(PanelType.creatableTypes, id: \.rawValue) { type in
                     Button {
                         panel.panelType = type
                     } label: {
@@ -361,6 +371,8 @@ struct PanelEditorView: View {
                 tableDisplayOptions
             case .gauge:
                 gaugeDisplayOptions
+            case .rowPanel:
+                EmptyView()
             }
         }
     }
@@ -528,6 +540,117 @@ struct PanelEditorView: View {
                     .font(.caption)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - Alerts Tab
+
+    private var alertsTab: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L.dash.alerts)
+                .font(.subheadline.bold())
+
+            Text(L.tr("이 패널에 대한 알림 규칙을 설정할 수 있습니다. 메인 알림 뷰에서 관리하세요.", "Alert rules for this panel can be configured. Manage them from the main Alerts view."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            let rules = viewModel.alertManager.rules(for: panel.id)
+            if rules.isEmpty {
+                Text(L.tr("알림 규칙이 없습니다", "No alert rules"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(rules) { rule in
+                    HStack {
+                        Image(systemName: rule.state.iconName)
+                            .foregroundStyle(rule.state == .alerting ? .red : .secondary)
+                            .font(.caption)
+                        Text(rule.name)
+                            .font(.caption)
+                        Spacer()
+                        Text("\(rule.condition.displayName) \(String(format: "%.0f", rule.threshold))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(8)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                }
+            }
+        }
+    }
+
+    // MARK: - Data Links Tab
+
+    private var linksTab: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L.dash.dataLinks)
+                .font(.subheadline.bold())
+
+            ForEach(Array(panel.dataLinks.enumerated()), id: \.element.id) { index, link in
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(L.dash.linkTitle)
+                                .font(.caption)
+                                .frame(width: 50, alignment: .leading)
+                            TextField(L.dash.linkTitle, text: Binding(
+                                get: { panel.dataLinks[index].title },
+                                set: { panel.dataLinks[index].title = $0 }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+                        }
+                        HStack {
+                            Text(L.dash.linkURL)
+                                .font(.caption)
+                                .frame(width: 50, alignment: .leading)
+                            TextField(L.dash.linkURL, text: Binding(
+                                get: { panel.dataLinks[index].url },
+                                set: { panel.dataLinks[index].url = $0 }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.caption, design: .monospaced))
+                        }
+                        Toggle(L.tr("탐색에서 열기", "Open in Explore"), isOn: Binding(
+                            get: { panel.dataLinks[index].openInExplore },
+                            set: { panel.dataLinks[index].openInExplore = $0 }
+                        ))
+                        .font(.caption)
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "link")
+                            .font(.caption)
+                        Spacer()
+                        Button(role: .destructive) {
+                            panel.dataLinks.remove(at: index)
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            Button {
+                panel.dataLinks.append(DataLink(title: "", url: ""))
+            } label: {
+                Label(L.dash.addLink, systemImage: "plus")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+
+            Text(L.tr("URL 템플릿 변수", "URL template variables"))
+                .font(.caption.bold())
+            VStack(alignment: .leading, spacing: 2) {
+                Text("${__from} - " + L.tr("시작 시간", "Start time"))
+                Text("${__to} - " + L.tr("종료 시간", "End time"))
+                Text("${variable_name} - " + L.tr("대시보드 변수 값", "Dashboard variable value"))
+            }
+            .font(.system(.caption2, design: .monospaced))
+            .foregroundStyle(.secondary)
         }
     }
 }

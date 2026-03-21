@@ -153,6 +153,60 @@ enum L {
         // Table column headers
         static var inputTokens: String { tr("입력 토큰", "Input Tokens") }
         static var outputTokens: String { tr("출력 토큰", "Output Tokens") }
+        // Sidebar & Multi-dashboard
+        static var dashboards: String { tr("대시보드 목록", "Dashboards") }
+        static var newDashboard: String { tr("새 대시보드", "New Dashboard") }
+        static var importDashboard: String { tr("가져오기", "Import") }
+        static var search: String { tr("검색", "Search") }
+        static var duplicate: String { tr("복제", "Duplicate") }
+        static var delete: String { tr("삭제", "Delete") }
+        static var confirmDelete: String { tr("정말 삭제하시겠습니까?", "Are you sure you want to delete?") }
+        // Dashboard settings
+        static var dashboardSettings: String { tr("대시보드 설정", "Dashboard Settings") }
+        static var description: String { tr("설명", "Description") }
+        static var tags: String { tr("태그", "Tags") }
+        static var timezone: String { tr("시간대", "Timezone") }
+        static var defaultTimeRange: String { tr("기본 시간 범위", "Default Time Range") }
+        static var defaultRefresh: String { tr("기본 새로고침", "Default Refresh") }
+        static var variables: String { tr("변수", "Variables") }
+        static var jsonModel: String { tr("JSON 모델", "JSON Model") }
+        // Row panels
+        static var addRow: String { tr("행 추가", "Add Row") }
+        static var collapse: String { tr("접기", "Collapse") }
+        static var expand: String { tr("펼치기", "Expand") }
+        // Annotations
+        static var annotations: String { tr("주석", "Annotations") }
+        static var addAnnotation: String { tr("주석 추가", "Add Annotation") }
+        static var annotationText: String { tr("주석 내용", "Annotation text") }
+        // Alerts
+        static var alerts: String { tr("알림 규칙", "Alert Rules") }
+        static var addAlert: String { tr("알림 추가", "Add Alert") }
+        static var alertName: String { tr("알림 이름", "Alert Name") }
+        static var condition: String { tr("조건", "Condition") }
+        static var threshold: String { tr("임계값", "Threshold") }
+        // Explore
+        static var explore: String { tr("탐색", "Explore") }
+        static var queryHistory: String { tr("쿼리 기록", "Query History") }
+        static var runQuery: String { tr("쿼리 실행", "Run Query") }
+        // Versioning
+        static var versions: String { tr("버전 기록", "Version History") }
+        static var restore: String { tr("복원", "Restore") }
+        static var compare: String { tr("비교", "Compare") }
+        // Playlists
+        static var playlists: String { tr("재생목록", "Playlists") }
+        static var newPlaylist: String { tr("새 재생목록", "New Playlist") }
+        static var interval: String { tr("간격", "Interval") }
+        static var play: String { tr("재생", "Play") }
+        static var pause: String { tr("일시정지", "Pause") }
+        static var stop: String { tr("정지", "Stop") }
+        // Data Links
+        static var dataLinks: String { tr("데이터 링크", "Data Links") }
+        static var addLink: String { tr("링크 추가", "Add Link") }
+        static var linkTitle: String { tr("링크 제목", "Link Title") }
+        static var linkURL: String { tr("URL", "URL") }
+        // Sidebar
+        static var sidebar: String { tr("사이드바", "Sidebar") }
+        static var toggleSidebar: String { tr("사이드바 토글", "Toggle Sidebar") }
     }
 
     // MARK: - Enums

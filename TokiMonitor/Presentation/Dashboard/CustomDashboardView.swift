@@ -11,66 +11,136 @@ struct CustomDashboardView: View {
         GeometryReader { geometry in
             let containerWidth = geometry.size.width - 32  // 16pt padding each side
             let containerHeight = geometry.size.height - 32
+            let panels = viewModel.visiblePanels
             let rowHeight = DashboardGridLayout.dynamicRowHeight(
-                for: viewModel.dashboardConfig.panels,
+                for: panels,
                 containerHeight: containerHeight
             )
 
-            ZStack(alignment: .topLeading) {
-                // Layout anchor
-                Color.clear
+            ScrollView(.vertical, showsIndicators: true) {
+                ZStack(alignment: .topLeading) {
+                    // Layout anchor
+                    Color.clear
+                        .frame(
+                            width: containerWidth,
+                            height: DashboardGridLayout.totalHeight(for: panels, rowHeight: rowHeight)
+                        )
 
-                // Edit mode grid overlay
-                if viewModel.isEditing {
-                    DashboardEditOverlay(
-                        containerWidth: containerWidth,
-                        totalHeight: DashboardGridLayout.totalHeight(
-                            for: viewModel.dashboardConfig.panels,
+                    // Edit mode grid overlay
+                    if viewModel.isEditing {
+                        DashboardEditOverlay(
+                            containerWidth: containerWidth,
+                            totalHeight: DashboardGridLayout.totalHeight(
+                                for: panels,
+                                rowHeight: rowHeight
+                            )
+                        )
+                    }
+
+                    // Panels
+                    ForEach(panels) { panel in
+                        let frame = DashboardGridLayout.frame(
+                            for: panel.gridPosition,
+                            in: containerWidth,
                             rowHeight: rowHeight
                         )
-                    )
-                }
 
-                // Panels
-                ForEach(viewModel.dashboardConfig.panels) { panel in
-                    let frame = DashboardGridLayout.frame(
-                        for: panel.gridPosition,
-                        in: containerWidth,
-                        rowHeight: rowHeight
-                    )
-                    panelView(for: panel, containerWidth: containerWidth)
-                        .frame(width: frame.width, height: frame.height)
-                        .offset(x: frame.origin.x, y: frame.origin.y)
-                        .panelDrag(
-                            panelID: panel.id,
-                            containerWidth: containerWidth,
-                            isEditing: viewModel.isEditing,
-                            viewModel: viewModel
-                        )
-                        .overlay {
-                            if viewModel.isEditing {
-                                PanelResizeHandle(
+                        if panel.panelType == .rowPanel {
+                            rowPanelView(panel: panel, containerWidth: containerWidth)
+                                .frame(width: frame.width, height: frame.height)
+                                .offset(x: frame.origin.x, y: frame.origin.y)
+                        } else {
+                            panelView(for: panel, containerWidth: containerWidth)
+                                .frame(width: frame.width, height: frame.height)
+                                .offset(x: frame.origin.x, y: frame.origin.y)
+                                .panelDrag(
                                     panelID: panel.id,
-                                    panelType: panel.panelType,
                                     containerWidth: containerWidth,
+                                    isEditing: viewModel.isEditing,
                                     viewModel: viewModel
                                 )
-                            }
+                                .overlay {
+                                    if viewModel.isEditing {
+                                        PanelResizeHandle(
+                                            panelID: panel.id,
+                                            panelType: panel.panelType,
+                                            containerWidth: containerWidth,
+                                            viewModel: viewModel
+                                        )
+                                    }
+                                }
                         }
+                    }
                 }
+                .padding(16)
             }
-            .frame(width: containerWidth, height: containerHeight)
-            .padding(16)
         }
+    }
+
+    // MARK: - Row Panel View
+
+    private func rowPanelView(panel: PanelConfig, containerWidth: CGFloat) -> some View {
+        let isCollapsed = viewModel.collapsedRows.contains(panel.id) || panel.collapsed
+
+        return HStack(spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.toggleRowCollapse(panelID: panel.id)
+                }
+            } label: {
+                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+
+            if viewModel.isEditing {
+                TextField(L.tr("행 제목", "Row title"), text: Binding(
+                    get: {
+                        viewModel.dashboardConfig.panels
+                            .first(where: { $0.id == panel.id })?.title ?? panel.title
+                    },
+                    set: { newTitle in
+                        if let idx = viewModel.dashboardConfig.panels.firstIndex(where: { $0.id == panel.id }) {
+                            viewModel.dashboardConfig.panels[idx].title = newTitle
+                            viewModel.saveDashboard()
+                        }
+                    }
+                ))
+                .textFieldStyle(.plain)
+                .font(.subheadline.bold())
+            } else {
+                Text(panel.title)
+                    .font(.subheadline.bold())
+            }
+
+            VStack { Divider() }
+
+            if viewModel.isEditing {
+                Button(role: .destructive) {
+                    viewModel.removePanel(id: panel.id)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
     }
 
     // MARK: - Panel Dispatch
 
     @ViewBuilder
     private func panelView(for panel: PanelConfig, containerWidth: CGFloat) -> some View {
+        let alertState = viewModel.alertManager.alertState(for: panel.id)
+
         PanelContainerView(
             title: panel.title,
             isEditing: viewModel.isEditing,
+            alertState: alertState,
             onDelete: { viewModel.removePanel(id: panel.id) },
             onEdit: { onEditPanel?(panel) }
         ) {
@@ -91,6 +161,8 @@ struct CustomDashboardView: View {
             tableContent(for: panel.effectiveMetric)
         case .gauge:
             gaugeContent(for: panel.effectiveMetric)
+        case .rowPanel:
+            EmptyView()
         }
     }
 
@@ -136,6 +208,13 @@ struct CustomDashboardView: View {
                         )
                         .foregroundStyle(by: .value(L.dash.axisModel, entry.model))
                     }
+                }
+
+                // Annotation markers
+                ForEach(viewModel.annotations) { annotation in
+                    RuleMark(x: .value("", annotation.timestamp))
+                        .foregroundStyle(.red.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 2]))
                 }
             }
             .chartForegroundStyleScale { (model: String) in

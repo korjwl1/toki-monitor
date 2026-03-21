@@ -81,6 +81,17 @@
 		G10000000010 /* PanelResizeHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000010 /* PanelResizeHandle.swift */; };
 		G10000000011 /* AddPanelPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000011 /* AddPanelPopover.swift */; };
 		G10000000012 /* PanelEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000012 /* PanelEditorView.swift */; };
+		G10000000013 /* DashboardExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000013 /* DashboardExtensions.swift */; };
+		G10000000014 /* DashboardVersionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000014 /* DashboardVersionStore.swift */; };
+		G10000000015 /* AnnotationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000015 /* AnnotationStore.swift */; };
+		G10000000016 /* AlertManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000016 /* AlertManager.swift */; };
+		G10000000017 /* PlaylistManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000017 /* PlaylistManager.swift */; };
+		G10000000018 /* DashboardSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000018 /* DashboardSettingsSheet.swift */; };
+		G10000000019 /* VersionHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000019 /* VersionHistorySheet.swift */; };
+		G10000000020 /* AnnotationListSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000020 /* AnnotationListSheet.swift */; };
+		G10000000021 /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000021 /* ExploreView.swift */; };
+		G10000000022 /* PlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000022 /* PlaylistView.swift */; };
+		G10000000023 /* AlertListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000023 /* AlertListView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -171,6 +182,17 @@
 		G20000000010 /* PanelResizeHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelResizeHandle.swift; sourceTree = "<group>"; };
 		G20000000011 /* AddPanelPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPanelPopover.swift; sourceTree = "<group>"; };
 		G20000000012 /* PanelEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEditorView.swift; sourceTree = "<group>"; };
+		G20000000013 /* DashboardExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExtensions.swift; sourceTree = "<group>"; };
+		G20000000014 /* DashboardVersionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardVersionStore.swift; sourceTree = "<group>"; };
+		G20000000015 /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
+		G20000000016 /* AlertManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertManager.swift; sourceTree = "<group>"; };
+		G20000000017 /* PlaylistManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistManager.swift; sourceTree = "<group>"; };
+		G20000000018 /* DashboardSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSettingsSheet.swift; sourceTree = "<group>"; };
+		G20000000019 /* VersionHistorySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionHistorySheet.swift; sourceTree = "<group>"; };
+		G20000000020 /* AnnotationListSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationListSheet.swift; sourceTree = "<group>"; };
+		G20000000021 /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
+		G20000000022 /* PlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistView.swift; sourceTree = "<group>"; };
+		G20000000023 /* AlertListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertListView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -255,12 +277,18 @@
 		5CB76EE9FE876C983A62E891 /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
+				G20000000023 /* AlertListView.swift */,
+				G20000000020 /* AnnotationListSheet.swift */,
 				G20000000005 /* CustomDashboardView.swift */,
+				G20000000018 /* DashboardSettingsSheet.swift */,
 				3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */,
 				G20000000004 /* DashboardGridLayout.swift */,
 				B10000000002 /* DashboardViewModel.swift */,
 				B10000000003 /* DashboardToolbar.swift */,
 				530B806F812350D8094AA0EC /* DashboardWindow.swift */,
+				G20000000021 /* ExploreView.swift */,
+				G20000000022 /* PlaylistView.swift */,
+				G20000000019 /* VersionHistorySheet.swift */,
 				C10000000001 /* Charts */,
 				G30000000001 /* EditMode */,
 				G30000000002 /* Panels */,
@@ -307,6 +335,7 @@
 			isa = PBXGroup;
 			children = (
 				G20000000001 /* DashboardConfig.swift */,
+				G20000000013 /* DashboardExtensions.swift */,
 				B10000000001 /* TimeSeriesModels.swift */,
 				8B4247163632AC4A7FF3582B /* TokiEvent.swift */,
 				74A27A6A118A446539806BB7 /* TokiReportModels.swift */,
@@ -368,13 +397,17 @@
 		F742507F177D260FFECA176D /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				G20000000015 /* AnnotationStore.swift */,
+				G20000000016 /* AlertManager.swift */,
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				5D82D563F2B758C1208E987E /* AppSettings.swift */,
 				0103BDEAC6066E0274029149 /* ConnectionManager.swift */,
 				D10000000006 /* ClaudeOAuthManager.swift */,
 				D10000000007 /* ClaudeUsageMonitor.swift */,
 				G20000000002 /* DashboardConfigStore.swift */,
+				G20000000014 /* DashboardVersionStore.swift */,
 				G20000000003 /* PanelDataExtractor.swift */,
+				G20000000017 /* PlaylistManager.swift */,
 				CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */,
 				37F55200D88B2D7260541C5D /* ProviderSummary.swift */,
 				85595784F39710A1BF95BC51 /* TokenAggregator.swift */,
@@ -566,6 +599,17 @@
 				G10000000010 /* PanelResizeHandle.swift in Sources */,
 				G10000000011 /* AddPanelPopover.swift in Sources */,
 				G10000000012 /* PanelEditorView.swift in Sources */,
+				G10000000013 /* DashboardExtensions.swift in Sources */,
+				G10000000014 /* DashboardVersionStore.swift in Sources */,
+				G10000000015 /* AnnotationStore.swift in Sources */,
+				G10000000016 /* AlertManager.swift in Sources */,
+				G10000000017 /* PlaylistManager.swift in Sources */,
+				G10000000018 /* DashboardSettingsSheet.swift in Sources */,
+				G10000000019 /* VersionHistorySheet.swift in Sources */,
+				G10000000020 /* AnnotationListSheet.swift in Sources */,
+				G10000000021 /* ExploreView.swift in Sources */,
+				G10000000022 /* PlaylistView.swift in Sources */,
+				G10000000023 /* AlertListView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

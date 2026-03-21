@@ -6,11 +6,28 @@ import SwiftUI
 struct PanelContainerView<Content: View>: View {
     let title: String
     let isEditing: Bool
+    var alertState: AlertState?
     let onDelete: () -> Void
     let onEdit: () -> Void
     @ViewBuilder let content: Content
 
     @State private var isHovered = false
+
+    init(
+        title: String,
+        isEditing: Bool,
+        alertState: AlertState? = nil,
+        onDelete: @escaping () -> Void,
+        onEdit: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.isEditing = isEditing
+        self.alertState = alertState
+        self.onDelete = onDelete
+        self.onEdit = onEdit
+        self.content = content()
+    }
 
     var body: some View {
         GroupBox {
@@ -25,6 +42,13 @@ struct PanelContainerView<Content: View>: View {
 
                 Text(title)
                     .font(.headline)
+
+                // Alert state indicator
+                if let alertState {
+                    Image(systemName: alertState.iconName)
+                        .font(.caption)
+                        .foregroundStyle(alertStateColor(alertState))
+                }
 
                 Spacer()
 
@@ -67,6 +91,19 @@ struct PanelContainerView<Content: View>: View {
                     .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
                     .foregroundStyle(.secondary.opacity(0.4))
             }
+            // Alert border
+            if let alertState, alertState == .alerting {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.red.opacity(0.6), lineWidth: 2)
+            }
+        }
+    }
+
+    private func alertStateColor(_ state: AlertState) -> Color {
+        switch state {
+        case .ok: .green
+        case .alerting: .red
+        case .noData: .secondary
         }
     }
 }

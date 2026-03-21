@@ -55,6 +55,45 @@ final class DashboardConfigStore {
         set { UserDefaults.standard.set(newValue, forKey: Self.activeDashboardKey) }
     }
 
+    // MARK: - Multi-Dashboard Operations
+
+    func addDashboard(_ config: DashboardConfig) {
+        var list = loadDashboardList()
+        list.append(config)
+        saveDashboardList(list)
+    }
+
+    func deleteDashboard(uid: String) {
+        var list = loadDashboardList()
+        list.removeAll { $0.uid == uid }
+        saveDashboardList(list)
+    }
+
+    func duplicateDashboard(uid: String) -> DashboardConfig? {
+        let list = loadDashboardList()
+        guard var original = list.first(where: { $0.uid == uid }) else { return nil }
+        original.id = UUID()
+        original.uid = DashboardConfig.generateUID()
+        original.title = original.title + " (Copy)"
+        original.version = 1
+        addDashboard(original)
+        return original
+    }
+
+    func updateDashboardInList(_ config: DashboardConfig) {
+        var list = loadDashboardList()
+        if let idx = list.firstIndex(where: { $0.uid == config.uid }) {
+            list[idx] = config
+        } else {
+            list.append(config)
+        }
+        saveDashboardList(list)
+    }
+
+    func dashboard(for uid: String) -> DashboardConfig? {
+        loadDashboardList().first { $0.uid == uid }
+    }
+
     // MARK: - JSON File Import/Export
 
     func exportToFile(_ config: DashboardConfig) {

@@ -36,7 +36,7 @@ struct AddPanelPopover: View {
                 ],
                 spacing: 12
             ) {
-                ForEach(PanelType.allCases, id: \.rawValue) { type in
+                ForEach(PanelType.creatableTypes, id: \.rawValue) { type in
                     Button {
                         selectedType = type
                     } label: {
@@ -133,12 +133,6 @@ struct AddPanelPopover: View {
     // MARK: - Helpers
 
     private func iconForType(_ type: PanelType) -> String {
-        switch type {
-        case .stat: "number.square"
-        case .timeSeries: "chart.xyaxis.line"
-        case .barChart: "chart.bar"
-        case .table: "tablecells"
-        case .gauge: "gauge.open.with.lines.needle.33percent"
-        }
+        type.icon
     }
 }

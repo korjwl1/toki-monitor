@@ -19,6 +19,12 @@ struct DashboardConfig: Codable, Equatable {
     var panels: [PanelConfig] = []
     var templating: TemplatingConfig = TemplatingConfig()
 
+    // Annotations
+    var annotations: [DashboardAnnotation] = []
+
+    // Timezone
+    var timezone: String = "UTC"
+
     // Settings
     var editable: Bool = true
 
@@ -186,6 +192,12 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     // Panel-specific display options
     var options: PanelDisplayOptions = PanelDisplayOptions()
 
+    // Data links for drill-down
+    var dataLinks: [DataLink] = []
+
+    // Row panel: collapsed state
+    var collapsed: Bool = false
+
     /// The effective metric for this panel — prefers first target's metric, falls back to legacy field
     var effectiveMetric: PanelMetric {
         targets.first?.metric ?? metric
@@ -272,6 +284,12 @@ enum PanelType: String, Codable, CaseIterable {
     case barChart
     case table
     case gauge
+    case rowPanel
+
+    /// Panel types available for user creation (excludes rowPanel from general picker)
+    static var creatableTypes: [PanelType] {
+        [.stat, .timeSeries, .barChart, .table, .gauge]
+    }
 
     var displayName: String {
         switch self {
@@ -280,6 +298,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .barChart: L.dash.barChartPanel
         case .table: L.dash.tablePanel
         case .gauge: L.dash.gaugePanel
+        case .rowPanel: L.tr("행", "Row")
         }
     }
 
@@ -290,6 +309,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .barChart: 6
         case .table: 8
         case .gauge: 4
+        case .rowPanel: 24
         }
     }
 
@@ -300,6 +320,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .barChart: 3
         case .table: 3
         case .gauge: 2
+        case .rowPanel: 1
         }
     }
 
@@ -310,6 +331,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .barChart: "chart.bar"
         case .table: "tablecells"
         case .gauge: "gauge.open.with.lines.needle.33percent"
+        case .rowPanel: "rectangle.split.1x2"
         }
     }
 }
