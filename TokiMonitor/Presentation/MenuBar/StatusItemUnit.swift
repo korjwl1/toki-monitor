@@ -32,6 +32,7 @@ final class StatusItemUnit {
         }
         button.font = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
         button.imagePosition = .imageTrailing
+
         button.target = self
         button.action = #selector(handleClick)
     }
