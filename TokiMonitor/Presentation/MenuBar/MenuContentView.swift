@@ -63,11 +63,13 @@ struct MenuContentView: View {
         VStack(alignment: .leading, spacing: DS.sm) {
             if isConnected {
                 let summaries = buildDisplaySummaries()
-                ForEach(summaries) { s in
+                ForEach(Array(summaries.enumerated()), id: \.element.id) { i, s in
+                    if i > 0 { Divider().padding(.horizontal, DS.md) }
                     providerWidget(s)
                 }
                 if let monitor = usageMonitor {
                     if let usage = monitor.currentUsage {
+                        Divider().padding(.horizontal, DS.md)
                         usageWidget(usage)
                     } else if let err = monitor.lastError {
                         errorWidget(err)
@@ -122,7 +124,6 @@ struct MenuContentView: View {
             }
         }
         .padding(DS.md)
-        .modifier(WidgetGlassModifier())
     }
 
     @ViewBuilder
@@ -160,7 +161,6 @@ struct MenuContentView: View {
             }
         }
         .padding(DS.md)
-        .modifier(WidgetGlassModifier())
     }
 
     private func usageBar(_ label: String, _ b: UsageBucket) -> some View {
@@ -247,7 +247,6 @@ struct MenuContentView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .modifier(GlassButtonModifier())
     }
 
     // MARK: - Sparkline
