@@ -102,17 +102,24 @@ struct MenuBarSettingsPane: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Circle()
                     .fill(currentColor.map { ProviderInfo.colorFromName($0) } ?? .white)
                     .frame(width: 12, height: 12)
                     .overlay(Circle().stroke(.secondary.opacity(0.3), lineWidth: 1))
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 8))
+                Text(colorDisplayName(currentColor, defaultLabel: defaultLabel))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+    }
+
+    private func colorDisplayName(_ currentColor: String?, defaultLabel: String) -> String {
+        if let colorName = currentColor {
+            return ProviderInfo.availableColors.first { $0.name == colorName }?.displayName ?? colorName
+        }
+        return defaultLabel
     }
 }

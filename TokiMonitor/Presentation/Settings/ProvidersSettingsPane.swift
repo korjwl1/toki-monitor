@@ -2,29 +2,29 @@ import SwiftUI
 
 struct ProvidersSettingsPane: View {
     @Bindable var settings: AppSettings
+    let oauthManager: ClaudeOAuthManager?
 
     var body: some View {
         Form {
-            Section("활성화") {
-                ForEach(ProviderRegistry.configurableProviders) { provider in
+            ForEach(ProviderRegistry.configurableProviders) { provider in
+                Section {
                     providerRow(provider)
-                }
-            }
 
-            if settings.providerDisplayMode == .perProvider {
-                Section("개별 스타일") {
-                    let enabledProviders = ProviderRegistry.configurableProviders.filter {
-                        settings.effectiveSettings(for: $0.id).enabled
+                    // Claude 계정 연동 (활성화된 경우만)
+                    if provider.id == "anthropic",
+                       settings.effectiveSettings(for: provider.id).enabled,
+                       let oauthManager {
+                        ClaudeAccountSection(oauthManager: oauthManager, settings: settings)
                     }
 
-                    if enabledProviders.isEmpty {
-                        Text("활성화된 프로바이더가 없습니다")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(enabledProviders) { provider in
-                            individualProviderRow(provider)
-                        }
+                    // 개별 모드일 때 스타일 오버라이드
+                    if settings.providerDisplayMode == .perProvider,
+                       settings.effectiveSettings(for: provider.id).enabled {
+                        individualProviderOptions(provider)
                     }
+                } header: {
+                    Label(provider.name, systemImage: provider.icon)
+                        .foregroundStyle(provider.color)
                 }
             }
         }
@@ -34,7 +34,7 @@ struct ProvidersSettingsPane: View {
     private func providerRow(_ provider: ProviderInfo) -> some View {
         let ps = settings.effectiveSettings(for: provider.id)
 
-        return Toggle(isOn: Binding(
+        return Toggle("활성화", isOn: Binding(
             get: { ps.enabled },
             set: { newVal in
                 settings.setProviderEnabled(
@@ -43,20 +43,15 @@ struct ProvidersSettingsPane: View {
                     tokiProviderId: provider.tokiProviderId
                 )
             }
-        )) {
-            Label(provider.name, systemImage: provider.icon)
-                .foregroundStyle(provider.color)
-        }
+        ))
     }
 
-    private func individualProviderRow(_ provider: ProviderInfo) -> some View {
+    private func individualProviderOptions(_ provider: ProviderInfo) -> some View {
         let ps = settings.effectiveSettings(for: provider.id)
-        let customColor = ps.customColorName ?? provider.colorName
 
-        return VStack(alignment: .leading, spacing: 6) {
+        return Group {
             HStack {
-                Label(provider.name, systemImage: provider.icon)
-                    .foregroundStyle(ProviderInfo.colorFromName(customColor))
+                Text("색상")
                 Spacer()
                 colorPickerMenu(
                     currentColor: ps.customColorName,
@@ -114,17 +109,24 @@ struct ProvidersSettingsPane: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Circle()
                     .fill(currentColor.map { ProviderInfo.colorFromName($0) } ?? .white)
                     .frame(width: 12, height: 12)
                     .overlay(Circle().stroke(.secondary.opacity(0.3), lineWidth: 1))
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 8))
+                Text(colorDisplayName(currentColor, defaultLabel: defaultLabel))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+    }
+
+    private func colorDisplayName(_ currentColor: String?, defaultLabel: String) -> String {
+        if let colorName = currentColor {
+            return ProviderInfo.availableColors.first { $0.name == colorName }?.displayName ?? colorName
+        }
+        return defaultLabel
     }
 }

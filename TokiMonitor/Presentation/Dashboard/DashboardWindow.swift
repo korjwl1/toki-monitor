@@ -33,6 +33,7 @@ final class DashboardWindowController {
         window.center()
         window.setFrameAutosaveName("TokiDashboard")
         window.minSize = NSSize(width: 800, height: 600)
+        window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
