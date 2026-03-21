@@ -4,15 +4,14 @@ import AppKit
 @MainActor
 struct SparklineRenderer {
     private let width: CGFloat = 32
-    private let height: CGFloat = 16
+    private let height: CGFloat = 14
 
     func update(history: [Double], button: NSStatusBarButton, tintColor: NSColor? = nil) {
         let drawColor = tintColor ?? NSColor.labelColor
         let isTemplate = tintColor == nil
 
         let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
-            let padding: CGFloat = 1
-            let graphRect = rect.insetBy(dx: padding, dy: padding)
+            let graphRect = rect
 
             guard history.count >= 2 else {
                 let path = NSBezierPath()

@@ -35,19 +35,16 @@ struct MenuContentView: View {
     // MARK: - Left
 
     private var leftPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 8) {
             if isConnected {
                 let summaries = buildDisplaySummaries()
-                ForEach(Array(summaries.enumerated()), id: \.element.id) { i, s in
-                    if i > 0 { hDiv }
+                ForEach(summaries) { s in
                     providerSection(s)
                 }
                 if let monitor = usageMonitor {
                     if let usage = monitor.currentUsage {
-                        hDiv
                         usageSection(usage)
                     } else if let err = monitor.lastError {
-                        hDiv
                         errorRow(err)
                     }
                 }
@@ -67,6 +64,7 @@ struct MenuContentView: View {
                 .padding(.vertical, 32)
             }
         }
+        .padding(8)
     }
 
     private func providerSection(_ s: ProviderSummary) -> some View {
@@ -78,12 +76,10 @@ struct MenuContentView: View {
         let sessions = aggregator.perProviderSessionCount[s.provider.id] ?? 0
 
         return HStack(spacing: 12) {
-            // Logo — vertically centered
             providerLogo(s.provider, color: clr)
                 .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: 6) {
-                // Name + cost
                 HStack {
                     Text(s.provider.name)
                         .font(.system(size: 13, weight: .bold))
@@ -94,7 +90,6 @@ struct MenuContentView: View {
                     }
                 }
 
-                // Rate + Sessions
                 HStack(spacing: 12) {
                     Label(TokenFormatter.formatRate(rate), systemImage: "speedometer")
                     Label("\(sessions) 세션", systemImage: "person.2")
@@ -102,11 +97,12 @@ struct MenuContentView: View {
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
 
-                // Sparkline
                 spark(hist.count >= 2 ? hist : Array(repeating: 0, count: 30), color: clr)
             }
         }
-        .padding(16)
+        .padding(12)
+        .frame(minHeight: 100)
+        .modifier(WidgetGlassModifier())
     }
 
     @ViewBuilder
@@ -140,7 +136,8 @@ struct MenuContentView: View {
                 if let sd = usage.sevenDay { bar("7일", sd) }
             }
         }
-        .padding(16)
+        .padding(12)
+        .modifier(WidgetGlassModifier())
     }
 
     private func bar(_ label: String, _ b: UsageBucket) -> some View {
@@ -215,6 +212,7 @@ struct MenuContentView: View {
 
     private func spark(_ h: [Double], color: Color) -> some View {
         let d = h.enumerated().map { (i: $0.offset, v: $0.element) }
+        let yMax = max(h.max() ?? 1, 1)  // never 0 — prevents auto-range padding
         return Chart(d, id: \.i) { p in
             AreaMark(x: .value("", p.i), y: .value("", p.v))
                 .foregroundStyle(.linearGradient(
@@ -226,6 +224,7 @@ struct MenuContentView: View {
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
                 .interpolationMethod(.catmullRom)
         }
+        .chartYScale(domain: 0...yMax)
         .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
         .frame(height: 28)
     }
@@ -274,6 +273,17 @@ private struct GlassPanelModifier: ViewModifier {
             content.glassEffect(.regular, in: .rect(cornerRadius: 14))
         } else {
             content
+        }
+    }
+}
+
+private struct WidgetGlassModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: .rect(cornerRadius: 12))
+        } else {
+            content
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }
