@@ -28,13 +28,14 @@ final class SettingsWindowController {
         let hostingController = NSHostingController(rootView: settingsView)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 560),
-            styleMask: [.titled, .closable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 680, height: 520),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.minSize = NSSize(width: 380, height: 400)
-        window.title = "Toki Monitor 설정"
+        window.minSize = NSSize(width: 640, height: 460)
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.contentViewController = hostingController
         window.center()
         window.isReleasedWhenClosed = false

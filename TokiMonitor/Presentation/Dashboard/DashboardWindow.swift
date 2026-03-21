@@ -23,11 +23,12 @@ final class DashboardWindowController {
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.title = "Toki Monitor — Dashboard"
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.contentViewController = hostingController
         window.center()
         window.setFrameAutosaveName("TokiDashboard")

@@ -44,6 +44,11 @@
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
 		69295AAE29A8D4FB6FBD903E /* TokenUsageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */; };
 		789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB89E56D927ABD7289F04084 /* SettingsView.swift */; };
+		DB66B79DC58248F3D46EF942 /* GeneralSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537DA1DEC2EB51E719C23F4A /* GeneralSettingsPane.swift */; };
+		F6025160AAD4877579F832AF /* MenuBarSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5456D80A9A29DD053025629 /* MenuBarSettingsPane.swift */; };
+		BA0F0698EDB2F4EA706B2521 /* ProvidersSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */; };
+		138F9EECAD72724767DFF0E2 /* AccountsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */; };
+		87A60F7ED8DC50787541BF2F /* NotificationsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */; };
 		909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A27A6A118A446539806BB7 /* TokiReportModels.swift */; };
 		9449B23FF1F7AD404910F919 /* frame_04.png in Resources */ = {isa = PBXBuildFile; fileRef = 61DDA70E53ACA059A333371E /* frame_04.png */; };
 		96C312BC7B488E45DAB00737 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D82D563F2B758C1208E987E /* AppSettings.swift */; };
@@ -132,6 +137,11 @@
 		D7A07540C3665358D10E114C /* TokiEventStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStream.swift; sourceTree = "<group>"; };
 		DB2BF0000196F3EA0107C726 /* TokiConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiConnection.swift; sourceTree = "<group>"; };
 		DB89E56D927ABD7289F04084 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		537DA1DEC2EB51E719C23F4A /* GeneralSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsPane.swift; sourceTree = "<group>"; };
+		F5456D80A9A29DD053025629 /* MenuBarSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarSettingsPane.swift; sourceTree = "<group>"; };
+		518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvidersSettingsPane.swift; sourceTree = "<group>"; };
+		1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsSettingsPane.swift; sourceTree = "<group>"; };
+		C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsSettingsPane.swift; sourceTree = "<group>"; };
 		F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapperTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -264,6 +274,11 @@
 			isa = PBXGroup;
 			children = (
 				DB89E56D927ABD7289F04084 /* SettingsView.swift */,
+				537DA1DEC2EB51E719C23F4A /* GeneralSettingsPane.swift */,
+				F5456D80A9A29DD053025629 /* MenuBarSettingsPane.swift */,
+				518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */,
+				1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */,
+				C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */,
 				D10000000009 /* ClaudeAccountSection.swift */,
 				BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */,
 			);
@@ -442,6 +457,11 @@
 				2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */,
 				46DF834236EAC2C92B2F93AE /* ProviderSummary.swift in Sources */,
 				789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */,
+				DB66B79DC58248F3D46EF942 /* GeneralSettingsPane.swift in Sources */,
+				F6025160AAD4877579F832AF /* MenuBarSettingsPane.swift in Sources */,
+				BA0F0698EDB2F4EA706B2521 /* ProvidersSettingsPane.swift in Sources */,
+				138F9EECAD72724767DFF0E2 /* AccountsSettingsPane.swift in Sources */,
+				87A60F7ED8DC50787541BF2F /* NotificationsSettingsPane.swift in Sources */,
 				30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */,
 				CA53B87359FD3833598A2E5C /* SparklineView.swift in Sources */,
 				0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */,
