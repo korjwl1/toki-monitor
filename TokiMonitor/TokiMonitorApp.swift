@@ -1,4 +1,5 @@
 import AppKit
+import UserNotifications
 
 @main
 enum TokiMonitorApp {
@@ -18,5 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Skip setup when running as test host
         guard ProcessInfo.processInfo.environment["XCTestBundlePath"] == nil else { return }
         statusBarController = StatusBarController()
+
+        // Request notification permission for usage alerts
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 }

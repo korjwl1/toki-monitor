@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var settings: AppSettings
+    let oauthManager: ClaudeOAuthManager?
     var onClose: (() -> Void)?
 
     var body: some View {
@@ -11,6 +12,11 @@ struct SettingsView: View {
                     .font(.headline)
 
                 Divider()
+
+                if let oauthManager {
+                    ClaudeAccountSection(oauthManager: oauthManager, settings: settings)
+                    Divider()
+                }
 
                 providerSection
                 Divider()

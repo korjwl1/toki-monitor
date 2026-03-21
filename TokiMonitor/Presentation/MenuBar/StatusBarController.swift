@@ -13,7 +13,15 @@ final class StatusBarController {
     // Dashboard & Settings
     private let dashboardController = DashboardWindowController()
     let settings = AppSettings()
-    private lazy var settingsController = SettingsWindowController(settings: settings)
+    private lazy var settingsController = SettingsWindowController(settings: settings, oauthManager: oauthManager)
+
+    // Claude OAuth + Usage
+    private let oauthManager = ClaudeOAuthManager()
+    private lazy var usageMonitor = ClaudeUsageMonitor(
+        oauthManager: oauthManager,
+        aggregator: aggregator,
+        settings: settings
+    )
 
     // Menu panel
     private var menuPanel: NSPanel?
@@ -35,6 +43,7 @@ final class StatusBarController {
         aggregator.timeRange = settings.defaultTimeRange
         aggregator.graphTimeRange = settings.graphTimeRange
         aggregator.startSampling()
+        usageMonitor.startPolling()
 
         // Check daemon status and auto-connect if running
         connectionManager.checkAndConnect()
@@ -184,6 +193,7 @@ final class StatusBarController {
         let contentView = MenuContentView(
             aggregator: aggregator,
             connectionManager: connectionManager,
+            usageMonitor: usageMonitor,
             filterProviderId: unit.providerId,
             settings: settings,
             onStartDaemon: { [weak self] in
@@ -229,7 +239,7 @@ final class StatusBarController {
         panel.isFloatingPanel = true
 
         let visualEffect = NSVisualEffectView()
-        visualEffect.material = .menu
+        visualEffect.material = .popover
         visualEffect.state = .active
         visualEffect.blendingMode = .behindWindow
         visualEffect.wantsLayer = true
@@ -270,6 +280,7 @@ final class StatusBarController {
                 hv.rootView = MenuContentView(
                     aggregator: self.aggregator,
                     connectionManager: self.connectionManager,
+                    usageMonitor: self.usageMonitor,
                     filterProviderId: unit.providerId,
                     settings: self.settings,
                     onStartDaemon: { [weak self] in

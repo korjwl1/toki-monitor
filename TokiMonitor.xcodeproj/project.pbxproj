@@ -7,6 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E10000000001 /* OAuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000001 /* OAuthModels.swift */; };
+		E10000000002 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000002 /* KeychainTokenStore.swift */; };
+		E10000000003 /* OAuthCallbackServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000003 /* OAuthCallbackServer.swift */; };
+		E10000000004 /* OAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000004 /* OAuthClient.swift */; };
+		E10000000005 /* ClaudeUsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000005 /* ClaudeUsageClient.swift */; };
+		E10000000006 /* ClaudeOAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000006 /* ClaudeOAuthManager.swift */; };
+		E10000000007 /* ClaudeUsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000007 /* ClaudeUsageMonitor.swift */; };
+		E10000000008 /* ClaudeUsageSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000008 /* ClaudeUsageSection.swift */; };
+		E10000000009 /* ClaudeAccountSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000009 /* ClaudeAccountSection.swift */; };
 		A10000000001 /* TimeSeriesModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000001 /* TimeSeriesModels.swift */; };
 		A10000000002 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000002 /* DashboardViewModel.swift */; };
 		A10000000003 /* DashboardToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000003 /* DashboardToolbar.swift */; };
@@ -65,6 +74,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D10000000001 /* OAuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthModels.swift; sourceTree = "<group>"; };
+		D10000000002 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
+		D10000000003 /* OAuthCallbackServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthCallbackServer.swift; sourceTree = "<group>"; };
+		D10000000004 /* OAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthClient.swift; sourceTree = "<group>"; };
+		D10000000005 /* ClaudeUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageClient.swift; sourceTree = "<group>"; };
+		D10000000006 /* ClaudeOAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthManager.swift; sourceTree = "<group>"; };
+		D10000000007 /* ClaudeUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageMonitor.swift; sourceTree = "<group>"; };
+		D10000000008 /* ClaudeUsageSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageSection.swift; sourceTree = "<group>"; };
+		D10000000009 /* ClaudeAccountSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountSection.swift; sourceTree = "<group>"; };
 		B10000000001 /* TimeSeriesModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesModels.swift; sourceTree = "<group>"; };
 		B10000000002 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		B10000000003 /* DashboardToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardToolbar.swift; sourceTree = "<group>"; };
@@ -123,6 +141,7 @@
 				D7A07540C3665358D10E114C /* TokiEventStream.swift */,
 				B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */,
 				8648934AE14365594C7132F0 /* Models */,
+				F10000000001 /* OAuth */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -166,6 +185,7 @@
 			isa = PBXGroup;
 			children = (
 				1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */,
+				D10000000008 /* ClaudeUsageSection.swift */,
 				BB1234567890ABCDEF123456 /* MenuContentView.swift */,
 				27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */,
 				A6C1751117D1E380839B3A0E /* StatusBarController.swift */,
@@ -241,6 +261,7 @@
 			isa = PBXGroup;
 			children = (
 				DB89E56D927ABD7289F04084 /* SettingsView.swift */,
+				D10000000009 /* ClaudeAccountSection.swift */,
 				BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */,
 			);
 			path = Settings;
@@ -277,6 +298,8 @@
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				5D82D563F2B758C1208E987E /* AppSettings.swift */,
 				0103BDEAC6066E0274029149 /* ConnectionManager.swift */,
+				D10000000006 /* ClaudeOAuthManager.swift */,
+				D10000000007 /* ClaudeUsageMonitor.swift */,
 				CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */,
 				37F55200D88B2D7260541C5D /* ProviderSummary.swift */,
 				85595784F39710A1BF95BC51 /* TokenAggregator.swift */,
@@ -296,6 +319,18 @@
 				B10000000008 /* EventsChart.swift */,
 			);
 			path = Charts;
+			sourceTree = "<group>";
+		};
+		F10000000001 /* OAuth */ = {
+			isa = PBXGroup;
+			children = (
+				D10000000001 /* OAuthModels.swift */,
+				D10000000002 /* KeychainTokenStore.swift */,
+				D10000000003 /* OAuthCallbackServer.swift */,
+				D10000000004 /* OAuthClient.swift */,
+				D10000000005 /* ClaudeUsageClient.swift */,
+			);
+			path = OAuth;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -418,6 +453,15 @@
 				909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */,
 				AA1234567890ABCDEF123456 /* MenuContentView.swift in Sources */,
 				CC1234567890ABCDEF123456 /* StatusItemUnit.swift in Sources */,
+				E10000000001 /* OAuthModels.swift in Sources */,
+				E10000000002 /* KeychainTokenStore.swift in Sources */,
+				E10000000003 /* OAuthCallbackServer.swift in Sources */,
+				E10000000004 /* OAuthClient.swift in Sources */,
+				E10000000005 /* ClaudeUsageClient.swift in Sources */,
+				E10000000006 /* ClaudeOAuthManager.swift in Sources */,
+				E10000000007 /* ClaudeUsageMonitor.swift in Sources */,
+				E10000000008 /* ClaudeUsageSection.swift in Sources */,
+				E10000000009 /* ClaudeAccountSection.swift in Sources */,
 				A10000000001 /* TimeSeriesModels.swift in Sources */,
 				A10000000002 /* DashboardViewModel.swift in Sources */,
 				A10000000003 /* DashboardToolbar.swift in Sources */,

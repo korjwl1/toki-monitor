@@ -5,9 +5,11 @@ import SwiftUI
 final class SettingsWindowController {
     private var window: NSWindow?
     private let settings: AppSettings
+    private let oauthManager: ClaudeOAuthManager?
 
-    init(settings: AppSettings) {
+    init(settings: AppSettings, oauthManager: ClaudeOAuthManager? = nil) {
         self.settings = settings
+        self.oauthManager = oauthManager
     }
 
     func show() {
@@ -17,7 +19,10 @@ final class SettingsWindowController {
             return
         }
 
-        let settingsView = SettingsView(settings: settings) { [weak self] in
+        let settingsView = SettingsView(
+            settings: settings,
+            oauthManager: oauthManager
+        ) { [weak self] in
             self?.window?.close()
         }
         let hostingController = NSHostingController(rootView: settingsView)

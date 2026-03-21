@@ -127,6 +127,12 @@ final class AppSettings {
     var aggregatedColorName: String? {
         didSet { save() }
     }
+    var claudeAlert75: Bool {
+        didSet { save() }
+    }
+    var claudeAlert90: Bool {
+        didSet { save() }
+    }
     var launchAtLogin: Bool {
         didSet {
             updateLoginItem()
@@ -147,6 +153,8 @@ final class AppSettings {
         providerDisplayMode = Self.loadEnum(ud, key: "providerDisplayMode") ?? .aggregated
         providerSettingsMap = Self.loadProviderSettings(ud)
         aggregatedColorName = ud.string(forKey: "aggregatedColorName")
+        claudeAlert75 = ud.object(forKey: "claudeAlert75") as? Bool ?? true
+        claudeAlert90 = ud.object(forKey: "claudeAlert90") as? Bool ?? true
         launchAtLogin = ud.bool(forKey: "launchAtLogin")
     }
 
@@ -187,6 +195,8 @@ final class AppSettings {
         defaults.set(providerDisplayMode.rawValue, forKey: "providerDisplayMode")
         defaults.set(launchAtLogin, forKey: "launchAtLogin")
         defaults.set(aggregatedColorName, forKey: "aggregatedColorName")
+        defaults.set(claudeAlert75, forKey: "claudeAlert75")
+        defaults.set(claudeAlert90, forKey: "claudeAlert90")
 
         if let data = try? JSONEncoder().encode(providerSettingsMap) {
             defaults.set(data, forKey: "providerSettings")

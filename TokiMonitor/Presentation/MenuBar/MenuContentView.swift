@@ -1,10 +1,10 @@
 import SwiftUI
 import Charts
 
-/// The dropdown menu content shown when the status bar icon is clicked.
 struct MenuContentView: View {
     let aggregator: TokenAggregator
     let connectionManager: ConnectionManager
+    let usageMonitor: ClaudeUsageMonitor?
     let filterProviderId: String?
     @Bindable var settings: AppSettings
 
@@ -13,431 +13,295 @@ struct MenuContentView: View {
     var onOpenSettings: () -> Void
     var onQuit: () -> Void
 
-    private let menuWidth: CGFloat = 280
-
-    // Live from aggregator
     private var isConnected: Bool { connectionManager.state.isConnected }
-    private var tokensPerMinute: Double { aggregator.tokensPerMinute }
-    private var providerSummaries: [ProviderSummary] { aggregator.providerSummaries }
-    private var totalSummary: TotalSummary? { aggregator.totalSummary }
     private var perProviderHistory: [String: [Double]] { aggregator.perProviderHistory }
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerSection
-            divider
+        HStack(alignment: .top, spacing: 0) {
+            leftPanel.frame(width: 252)
+            Divider()
+            rightPanel.frame(width: 72)
+        }
+        .frame(minHeight: 200)
+    }
+
+    // MARK: - Left Panel
+
+    private var leftPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack(spacing: 6) {
+                Text("Toki Monitor")
+                    .font(.headline)
+                Spacer()
+                Circle()
+                    .fill(isConnected ? Color.green : Color.red)
+                    .frame(width: 6, height: 6)
+                Text(isConnected ? "연결됨" : "미연결")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            sectionDivider
 
             if isConnected {
-                connectedContent
+                // Provider sections
+                let summaries = buildDisplaySummaries()
+                ForEach(Array(summaries.enumerated()), id: \.element.id) { i, summary in
+                    if i > 0 { sectionDivider }
+                    providerSection(summary)
+                }
+
+                // Claude usage
+                if let monitor = usageMonitor, let usage = monitor.currentUsage {
+                    sectionDivider
+                    claudeUsageSection(usage)
+                }
             } else {
-                disconnectedContent
+                disconnectedSection
             }
-
-            divider
-            styleSection
-            divider
-            footerSection
-        }
-        .frame(width: menuWidth)
-    }
-
-    // MARK: - Header
-
-    private var headerSection: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text("Toki Monitor")
-                        .font(.system(size: 13, weight: .semibold))
-                    if let pid = filterProviderId,
-                       let provider = ProviderRegistry.allProviders.first(where: { $0.id == pid }) {
-                        Text(provider.name)
-                            .font(.system(size: 10, weight: .medium))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(provider.color.opacity(0.15))
-                            .foregroundStyle(provider.color)
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
-                    }
-                }
-                HStack(spacing: 4) {
-                    Text(isConnected
-                         ? TokenFormatter.formatRate(tokensPerMinute)
-                         : "미연결")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    if isConnected {
-                        Text("· \(settings.defaultTimeRange.displayName)")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
-            Spacer()
-            statusBadge
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-
-    private var statusBadge: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(isConnected ? Color.green : Color.red)
-                .frame(width: 6, height: 6)
-            Text(isConnected ? "연결됨" : "미연결")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
         }
     }
 
-    // MARK: - Connected
+    // MARK: - Right Panel
 
-    private var connectedContent: some View {
+    private var rightPanel: some View {
         VStack(spacing: 0) {
-            let displaySummaries = buildDisplaySummaries()
-
-            if displaySummaries.isEmpty {
-                emptyState
-            } else {
-                // Total summary only in aggregated mode with 2+ providers
-                if filterProviderId == nil, let total = totalSummary, displaySummaries.count >= 2 {
-                    totalRow(total)
-                    thinDivider
-                }
-                ForEach(displaySummaries) { summary in
-                    providerRow(summary)
+            actionButton("대시보드", icon: "chart.xyaxis.line", action: onOpenDashboard)
+            Divider().padding(.horizontal, 8)
+            actionButton("설정", icon: "gearshape", action: onOpenSettings)
+            Divider().padding(.horizontal, 8)
+            actionButton(currentStyleLabel, icon: currentStyleIcon) {
+                switch settings.animationStyle {
+                case .character: settings.animationStyle = .numeric
+                case .numeric: settings.animationStyle = .sparkline
+                case .sparkline: settings.animationStyle = .character
                 }
             }
+            Spacer(minLength: 0)
+            Divider().padding(.horizontal, 8)
+            actionButton("종료", icon: "power", action: onQuit)
         }
+        .padding(.vertical, 4)
     }
 
-    /// Build summaries to display: include enabled providers even with 0 data.
-    private func buildDisplaySummaries() -> [ProviderSummary] {
-        let enabledProviders = ProviderRegistry.configurableProviders.filter {
-            settings.effectiveSettings(for: $0.id).enabled
-        }
+    // MARK: - Provider Section
 
-        // If per-provider mode with filter, only show that provider
-        if let filterId = filterProviderId {
-            if let existing = providerSummaries.first(where: { $0.provider.id == filterId }) {
-                return [existing]
-            }
-            if let provider = enabledProviders.first(where: { $0.id == filterId }) {
-                return [ProviderSummary(provider: provider)]
-            }
-            return []
-        }
-
-        // Aggregated: show all enabled providers
-        var result: [ProviderSummary] = []
-        for provider in enabledProviders {
-            if let existing = providerSummaries.first(where: { $0.provider.id == provider.id }) {
-                result.append(existing)
-            } else {
-                result.append(ProviderSummary(provider: provider))
-            }
-        }
-        return result
-    }
-
-    private var emptyState: some View {
-        HStack {
-            Image(systemName: "clock")
-                .foregroundStyle(.tertiary)
-                .font(.system(size: 12))
-            Text("이벤트 대기 중...")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-    }
-
-    // MARK: - Provider Rows
-
-    private func totalRow(_ total: TotalSummary) -> some View {
-        HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(.quaternary)
-                    .frame(width: 26, height: 26)
-                Image(systemName: "chart.bar.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.primary)
-            }
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text("전체")
-                    .font(.system(size: 12, weight: .medium))
-                Text("\(total.providerCount)개 프로바이더 · \(total.eventCount)회 호출")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-            costLabel(total.estimatedCost)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-    }
-
-    private func providerRow(_ summary: ProviderSummary) -> some View {
+    private func providerSection(_ summary: ProviderSummary) -> some View {
         let effectiveColor = summary.provider.color(
             customColorName: settings.effectiveSettings(for: summary.provider.id).customColorName
         )
         let history = perProviderHistory[summary.provider.id] ?? []
+        let rate = aggregator.perProviderRates[summary.provider.id] ?? 0
 
-        return VStack(spacing: 4) {
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(effectiveColor.opacity(0.15))
-                        .frame(width: 26, height: 26)
-                    Image(systemName: summary.provider.icon)
-                        .font(.system(size: 12))
-                        .foregroundStyle(effectiveColor)
-                }
+        return VStack(alignment: .leading, spacing: 4) {
+            // Title row
+            HStack(spacing: 6) {
+                Image(systemName: summary.provider.icon)
+                    .font(.system(size: 16))
+                    .foregroundStyle(effectiveColor)
+                    .frame(width: 20)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(summary.provider.name)
-                        .font(.system(size: 12, weight: .medium))
-                    if summary.eventCount > 0 {
-                        HStack(spacing: 6) {
-                            tokenBadge("↓", TokenFormatter.formatTokens(summary.totalInput))
-                            tokenBadge("↑", TokenFormatter.formatTokens(summary.totalOutput))
-                            Text("·")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.quaternary)
-                            Text("\(summary.eventCount)회")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
-                        }
-                    } else {
-                        Text("이벤트 없음")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
+                Text(summary.provider.name)
+                    .font(.headline)
 
                 Spacer()
-                costLabel(summary.estimatedCost)
+
+                if let cost = summary.estimatedCost, cost > 0 {
+                    Text(TokenFormatter.formatCost(cost))
+                        .font(.system(.body, design: .monospaced))
+                        .fontWeight(.medium)
+                }
             }
 
-            // Mini sparkline
-            if history.count >= 2 {
-                miniSparkline(history: history, color: effectiveColor)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-    }
-
-    private func miniSparkline(history: [Double], color: Color) -> some View {
-        let indexed = history.enumerated().map { (index: $0.offset, value: $0.element) }
-        return Chart(indexed, id: \.index) { point in
-            AreaMark(
-                x: .value("t", point.index),
-                y: .value("v", point.value)
-            )
-            .foregroundStyle(
-                .linearGradient(
-                    colors: [color.opacity(0.3), color.opacity(0.05)],
-                    startPoint: .top, endPoint: .bottom
-                )
-            )
-            .interpolationMethod(.catmullRom)
-
-            LineMark(
-                x: .value("t", point.index),
-                y: .value("v", point.value)
-            )
-            .foregroundStyle(color.opacity(0.8))
-            .lineStyle(StrokeStyle(lineWidth: 1.5))
-            .interpolationMethod(.catmullRom)
-        }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartLegend(.hidden)
-        .frame(height: 30)
-        .padding(.leading, 36)
-    }
-
-    private func tokenBadge(_ arrow: String, _ value: String) -> some View {
-        HStack(spacing: 2) {
-            Text(arrow)
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-            Text(value)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func costLabel(_ cost: Double?) -> some View {
-        Group {
-            if let cost, cost > 0 {
-                Text(TokenFormatter.formatCost(cost))
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+            // Stats
+            if summary.eventCount > 0 {
+                VStack(alignment: .leading, spacing: 2) {
+                    statRow("Rate", TokenFormatter.formatRate(rate))
+                    statRow("Input", TokenFormatter.formatTokens(summary.totalInput))
+                    statRow("Output", TokenFormatter.formatTokens(summary.totalOutput))
+                    statRow("호출", "\(summary.eventCount)")
+                }
+                .padding(.leading, 26)
             } else {
-                Text("--")
-                    .font(.system(size: 12, design: .monospaced))
+                Text("이벤트 없음")
+                    .font(.subheadline)
                     .foregroundStyle(.tertiary)
+                    .padding(.leading, 26)
+            }
+
+            // Sparkline
+            if history.count >= 2 {
+                sparkline(history, color: effectiveColor)
+                    .padding(.leading, 26)
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Claude Usage
+
+    private func claudeUsageSection(_ usage: ClaudeUsageResponse) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "gauge.with.dots.needle.50percent")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.cyan)
+                    .frame(width: 20)
+                Text("Claude 사용량")
+                    .font(.headline)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                if let fh = usage.fiveHour { usageBar("5시간 세션", bucket: fh) }
+                if let sd = usage.sevenDay { usageBar("7일 주간", bucket: sd) }
+            }
+            .padding(.leading, 26)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func usageBar(_ label: String, bucket: UsageBucket) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(Int(bucket.utilization))%")
+                    .font(.system(.subheadline, design: .monospaced))
+                    .fontWeight(.medium)
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(.quaternary)
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(barColor(bucket.utilization))
+                        .frame(width: geo.size.width * min(bucket.utilization / 100, 1))
+                }
+            }
+            .frame(height: 5)
+
+            Text("초기화: \(bucket.resetCountdown)")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private func barColor(_ pct: Double) -> Color {
+        if pct >= 90 { .red }
+        else if pct >= 75 { .orange }
+        else if pct >= 50 { .yellow }
+        else { .green }
     }
 
     // MARK: - Disconnected
 
-    private var disconnectedContent: some View {
+    private var disconnectedSection: some View {
         VStack(spacing: 8) {
             Image(systemName: "bolt.slash")
-                .font(.system(size: 20))
+                .font(.title2)
                 .foregroundStyle(.tertiary)
             Text("toki 데몬이 실행되지 않고 있습니다")
-                .font(.system(size: 11))
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
             Button(action: onStartDaemon) {
-                HStack(spacing: 4) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 9))
-                    Text("데몬 시작")
-                        .font(.system(size: 11, weight: .medium))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
-                .background(.blue.opacity(0.1))
-                .foregroundStyle(.blue)
-                .clipShape(RoundedRectangle(cornerRadius: 5))
+                Text("데몬 시작")
+                    .font(.subheadline.weight(.medium))
             }
-            .buttonStyle(.plain)
+            .controlSize(.small)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
+        .padding(.vertical, 20)
     }
 
-    // MARK: - Style Picker
+    // MARK: - Components
 
-    private var styleSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("메뉴바 스타일")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
-
-            Picker("", selection: $settings.animationStyle) {
-                Text("캐릭터").tag(AnimationStyle.character)
-                Text("수치").tag(AnimationStyle.numeric)
-                Text("그래프").tag(AnimationStyle.sparkline)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            if settings.animationStyle == .character {
-                Toggle(isOn: $settings.showRateText) {
-                    Text("캐릭터 옆 토큰 수치 표시")
-                        .font(.system(size: 11))
-                }
-                .toggleStyle(.checkbox)
-
-                if settings.showRateText {
-                    inlinePicker("위치", selection: $settings.textPosition) {
-                        Text("왼쪽").tag(TextPosition.leading)
-                        Text("오른쪽").tag(TextPosition.trailing)
-                    }
-                }
-            }
-
-            if settings.animationStyle == .numeric ||
-               (settings.animationStyle == .character && settings.showRateText) {
-                inlinePicker("단위", selection: $settings.tokenUnit) {
-                    ForEach(TokenUnit.allCases, id: \.self) { unit in
-                        Text(unit.displayName).tag(unit)
-                    }
-                }
-            }
-
-            inlinePicker("스파크라인 시간폭", selection: $settings.graphTimeRange) {
-                ForEach(GraphTimeRange.allCases, id: \.self) { range in
-                    Text(range.displayName).tag(range)
-                }
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-    }
-
-    private func inlinePicker<S: Hashable, C: View>(
-        _ label: String,
-        selection: Binding<S>,
-        @ViewBuilder content: () -> C
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+    private func statRow(_ label: String, _ value: String) -> some View {
+        HStack {
             Text(label)
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-            Picker("", selection: selection, content: content)
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.system(.subheadline, design: .monospaced))
+                .foregroundStyle(.primary)
         }
     }
 
-    // MARK: - Footer
-
-    private var footerSection: some View {
-        VStack(spacing: 0) {
-            menuButton("대시보드", icon: "chart.xyaxis.line", shortcut: "⌘D", action: onOpenDashboard)
-            menuButton("설정...", icon: "gearshape", shortcut: "⌘,", action: onOpenSettings)
-            thinDivider
-            menuButton("종료", icon: "power", shortcut: "⌘Q", action: onQuit)
-        }
-    }
-
-    private func menuButton(_ title: String, icon: String, shortcut: String, action: @escaping () -> Void) -> some View {
+    private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 11))
-                    .frame(width: 16)
+                    .font(.system(size: 16))
                     .foregroundStyle(.secondary)
                 Text(title)
-                    .font(.system(size: 13))
-                Spacer()
-                Text(shortcut)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
             .contentShape(Rectangle())
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
         }
-        .buttonStyle(MenuRowButtonStyle())
+        .buttonStyle(.plain)
     }
 
-    // MARK: - Dividers
-
-    private var divider: some View {
-        Rectangle()
-            .fill(.quaternary)
-            .frame(height: 1)
-            .padding(.horizontal, 8)
+    private var sectionDivider: some View {
+        Divider().padding(.horizontal, 12)
     }
 
-    private var thinDivider: some View {
-        Rectangle()
-            .fill(.quaternary.opacity(0.5))
-            .frame(height: 0.5)
-            .padding(.horizontal, 14)
+    private func sparkline(_ history: [Double], color: Color) -> some View {
+        let d = history.enumerated().map { (i: $0.offset, v: $0.element) }
+        return Chart(d, id: \.i) { p in
+            AreaMark(x: .value("", p.i), y: .value("", p.v))
+                .foregroundStyle(
+                    .linearGradient(colors: [color.opacity(0.4), color.opacity(0)],
+                                    startPoint: .top, endPoint: .bottom)
+                )
+                .interpolationMethod(.catmullRom)
+            LineMark(x: .value("", p.i), y: .value("", p.v))
+                .foregroundStyle(color)
+                .lineStyle(StrokeStyle(lineWidth: 1.5))
+                .interpolationMethod(.catmullRom)
+        }
+        .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
+        .frame(height: 24)
     }
-}
 
-private struct MenuRowButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(configuration.isPressed ? Color.accentColor.opacity(0.15) : .clear)
-                    .padding(.horizontal, 4)
-            )
+    private var currentStyleLabel: String {
+        switch settings.animationStyle {
+        case .character: "캐릭터"
+        case .numeric: "수치"
+        case .sparkline: "그래프"
+        }
+    }
+    private var currentStyleIcon: String {
+        switch settings.animationStyle {
+        case .character: "hare"
+        case .numeric: "number"
+        case .sparkline: "chart.line.uptrend.xyaxis"
+        }
+    }
+
+    // MARK: - Data
+
+    private func buildDisplaySummaries() -> [ProviderSummary] {
+        let enabled = ProviderRegistry.configurableProviders.filter {
+            settings.effectiveSettings(for: $0.id).enabled
+        }
+        if let fid = filterProviderId {
+            if let e = aggregator.providerSummaries.first(where: { $0.provider.id == fid }) { return [e] }
+            if let p = enabled.first(where: { $0.id == fid }) { return [ProviderSummary(provider: p)] }
+            return []
+        }
+        return enabled.map { p in
+            aggregator.providerSummaries.first(where: { $0.provider.id == p.id }) ?? ProviderSummary(provider: p)
+        }
     }
 }
