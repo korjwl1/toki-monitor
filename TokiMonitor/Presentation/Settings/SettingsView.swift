@@ -32,77 +32,20 @@ struct SettingsView: View {
     let oauthManager: ClaudeOAuthManager?
     var onClose: (() -> Void)?
 
-    @State private var selectedCategory: SettingsCategory = .menuBar
-    @State private var sidebarExpanded = true
+    @State private var selectedCategory: SettingsCategory? = .menuBar
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Sidebar
-            VStack(spacing: 0) {
-                // Collapse toggle
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            sidebarExpanded.toggle()
-                        }
-                    }) {
-                        Image(systemName: "sidebar.leading")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(8)
-                }
-
-                // Category list
-                VStack(spacing: 2) {
-                    ForEach(SettingsCategory.allCases) { category in
-                        sidebarButton(category)
-                    }
-                }
-                .padding(.horizontal, 6)
-
-                Spacer()
+        NavigationSplitView {
+            List(SettingsCategory.allCases, selection: $selectedCategory) { category in
+                Label(category.title, systemImage: category.icon)
+                    .tag(category)
             }
-            .frame(width: sidebarExpanded ? 180 : 52)
-            .background(.ultraThinMaterial)
-
-            Divider()
-
-            // Detail
+            .toolbar(removing: .sidebarToggle)
+            .navigationSplitViewColumnWidth(min: 160, ideal: 176, max: 192)
+        } detail: {
             detailView
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationSplitViewColumnWidth(min: 400, ideal: 480)
         }
-    }
-
-    private func sidebarButton(_ category: SettingsCategory) -> some View {
-        Button(action: { selectedCategory = category }) {
-            HStack(spacing: 8) {
-                Image(systemName: category.icon)
-                    .font(.system(size: 14))
-                    .frame(width: 20)
-
-                if sidebarExpanded {
-                    Text(category.title)
-                        .font(.system(size: 13))
-                        .lineLimit(1)
-                    Spacer()
-                }
-            }
-            .padding(.vertical, 6)
-            .padding(.horizontal, sidebarExpanded ? 10 : 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                selectedCategory == category
-                    ? Color.accentColor.opacity(0.15)
-                    : Color.clear,
-                in: RoundedRectangle(cornerRadius: 6)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 6))
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(selectedCategory == category ? .primary : .secondary)
     }
 
     @ViewBuilder
@@ -116,6 +59,9 @@ struct SettingsView: View {
             ProvidersSettingsPane(settings: settings, oauthManager: oauthManager)
         case .notifications:
             NotificationsSettingsPane(settings: settings)
+        case nil:
+            Text(L.cat.menuBar)
+                .foregroundStyle(.secondary)
         }
     }
 }

@@ -7,7 +7,7 @@ struct DashboardEditOverlay: View {
     let totalHeight: CGFloat
 
     private let columnCount = DashboardGridLayout.columnCount
-    private let rowHeight = DashboardGridLayout.rowHeight
+    private let rowHeight = DashboardGridLayout.defaultRowHeight
     private let gap = DashboardGridLayout.gap
 
     var body: some View {

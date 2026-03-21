@@ -37,6 +37,11 @@ final class SettingsWindowController {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.contentViewController = hostingController
+
+        // Empty toolbar — required for fullSizeContentView to integrate traffic lights into sidebar
+        let toolbar = NSToolbar(identifier: "SettingsToolbar")
+        toolbar.showsBaselineSeparator = false
+        window.toolbar = toolbar
         window.center()
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)

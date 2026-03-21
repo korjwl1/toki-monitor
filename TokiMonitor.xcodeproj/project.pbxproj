@@ -80,6 +80,7 @@
 		G10000000009 /* PanelDragModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000009 /* PanelDragModifier.swift */; };
 		G10000000010 /* PanelResizeHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000010 /* PanelResizeHandle.swift */; };
 		G10000000011 /* AddPanelPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000011 /* AddPanelPopover.swift */; };
+		G10000000012 /* PanelEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000012 /* PanelEditorView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -169,6 +170,7 @@
 		G20000000009 /* PanelDragModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelDragModifier.swift; sourceTree = "<group>"; };
 		G20000000010 /* PanelResizeHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelResizeHandle.swift; sourceTree = "<group>"; };
 		G20000000011 /* AddPanelPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPanelPopover.swift; sourceTree = "<group>"; };
+		G20000000012 /* PanelEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEditorView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -273,6 +275,7 @@
 				G20000000009 /* PanelDragModifier.swift */,
 				G20000000010 /* PanelResizeHandle.swift */,
 				G20000000011 /* AddPanelPopover.swift */,
+				G20000000012 /* PanelEditorView.swift */,
 			);
 			path = EditMode;
 			sourceTree = "<group>";
@@ -562,6 +565,7 @@
 				G10000000009 /* PanelDragModifier.swift in Sources */,
 				G10000000010 /* PanelResizeHandle.swift in Sources */,
 				G10000000011 /* AddPanelPopover.swift in Sources */,
+				G10000000012 /* PanelEditorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,15 +1,26 @@
 import Foundation
+import AppKit
 
-/// Persists dashboard layout configuration via UserDefaults.
+/// Persists dashboard configurations. Supports multiple dashboards,
+/// JSON import/export, and schema migration.
 @MainActor
 final class DashboardConfigStore {
     private static let userDefaultsKey = "dashboardConfig"
+    private static let dashboardListKey = "dashboardList"
+    private static let activeDashboardKey = "activeDashboardUID"
+
+    // MARK: - Single Dashboard (backward compatible)
 
     func load() -> DashboardConfig {
         guard let data = UserDefaults.standard.data(forKey: Self.userDefaultsKey),
-              let config = try? JSONDecoder().decode(DashboardConfig.self, from: data)
+              var config = try? JSONDecoder().decode(DashboardConfig.self, from: data)
         else {
             return Self.defaultConfig
+        }
+        // Migrate if needed
+        if config.schemaVersion < 2 {
+            config = DashboardConfig.migrateV1toV2(config)
+            save(config)
         }
         return config
     }
@@ -23,64 +34,124 @@ final class DashboardConfigStore {
         save(Self.defaultConfig)
     }
 
-    // MARK: - Default Layout
+    // MARK: - Dashboard List (multiple dashboards)
 
-    /// 7 panels matching the current dashboard layout:
-    /// - 4 stat cards in row 0 (3 columns wide each at columns 0, 3, 6, 9)
-    /// - Token trend timeSeries at (0,1) spanning 12x3
-    /// - Cost trend timeSeries at (0,4) spanning 6x3
-    /// - API trend barChart at (6,4) spanning 6x3
+    func loadDashboardList() -> [DashboardConfig] {
+        guard let data = UserDefaults.standard.data(forKey: Self.dashboardListKey),
+              let list = try? JSONDecoder().decode([DashboardConfig].self, from: data)
+        else {
+            return [load()]
+        }
+        return list
+    }
+
+    func saveDashboardList(_ list: [DashboardConfig]) {
+        guard let data = try? JSONEncoder().encode(list) else { return }
+        UserDefaults.standard.set(data, forKey: Self.dashboardListKey)
+    }
+
+    var activeDashboardUID: String? {
+        get { UserDefaults.standard.string(forKey: Self.activeDashboardKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.activeDashboardKey) }
+    }
+
+    // MARK: - JSON File Import/Export
+
+    func exportToFile(_ config: DashboardConfig) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "\(config.title).json"
+        panel.title = L.tr("대시보드 내보내기", "Export Dashboard")
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let data = try config.exportJSON()
+            try data.write(to: url)
+        } catch {
+            // Error handled silently — could add alert later
+        }
+    }
+
+    func importFromFile() -> DashboardConfig? {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.title = L.tr("대시보드 가져오기", "Import Dashboard")
+
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+
+        do {
+            let data = try Data(contentsOf: url)
+            return try DashboardConfig.importJSON(data)
+        } catch {
+            return nil
+        }
+    }
+
+    // MARK: - Default Layout (24-column grid)
+
+    /// Default dashboard with 24-column grid layout
     static var defaultConfig: DashboardConfig {
         DashboardConfig(
-            name: "Default",
+            title: "Default",
+            time: TimeConfig(from: "now-24h", to: "now"),
+            refresh: .off,
             panels: [
-                // Row 0: stat cards
+                // Row 0: 4 stat cards (6 cols each)
                 PanelConfig(
                     title: L.dash.totalTokens,
                     panelType: .stat,
                     metric: .totalTokens,
-                    gridPosition: GridPosition(column: 0, row: 0, width: 3, height: 1)
+                    gridPosition: GridPosition(column: 0, row: 0, width: 6, height: 1),
+                    targets: [PanelTarget(refId: "A", metric: .totalTokens)]
                 ),
                 PanelConfig(
                     title: L.dash.totalCost,
                     panelType: .stat,
                     metric: .totalCost,
-                    gridPosition: GridPosition(column: 3, row: 0, width: 3, height: 1)
+                    gridPosition: GridPosition(column: 6, row: 0, width: 6, height: 1),
+                    targets: [PanelTarget(refId: "A", metric: .totalCost)]
                 ),
                 PanelConfig(
                     title: L.dash.apiCalls,
                     panelType: .stat,
                     metric: .apiCalls,
-                    gridPosition: GridPosition(column: 6, row: 0, width: 3, height: 1)
+                    gridPosition: GridPosition(column: 12, row: 0, width: 6, height: 1),
+                    targets: [PanelTarget(refId: "A", metric: .apiCalls)]
                 ),
                 PanelConfig(
                     title: L.dash.topModel,
                     panelType: .stat,
                     metric: .topModel,
-                    gridPosition: GridPosition(column: 9, row: 0, width: 3, height: 1)
+                    gridPosition: GridPosition(column: 18, row: 0, width: 6, height: 1),
+                    targets: [PanelTarget(refId: "A", metric: .topModel)]
                 ),
                 // Row 1-3: token trend (full width)
                 PanelConfig(
                     title: L.dash.tokenTrend,
                     panelType: .timeSeries,
                     metric: .tokensByModel,
-                    gridPosition: GridPosition(column: 0, row: 1, width: 12, height: 3)
+                    gridPosition: GridPosition(column: 0, row: 1, width: 24, height: 3),
+                    targets: [PanelTarget(refId: "A", metric: .tokensByModel)]
                 ),
-                // Row 4-6: cost trend (left half)
+                // Row 4-6: cost trend (left half) + API trend (right half)
                 PanelConfig(
                     title: L.dash.costTrend,
                     panelType: .timeSeries,
                     metric: .costByModel,
-                    gridPosition: GridPosition(column: 0, row: 4, width: 6, height: 3)
+                    gridPosition: GridPosition(column: 0, row: 4, width: 12, height: 3),
+                    targets: [PanelTarget(refId: "A", metric: .costByModel)]
                 ),
-                // Row 4-6: API trend (right half)
                 PanelConfig(
                     title: L.dash.apiTrend,
                     panelType: .barChart,
                     metric: .eventsByModel,
-                    gridPosition: GridPosition(column: 6, row: 4, width: 6, height: 3)
+                    gridPosition: GridPosition(column: 12, row: 4, width: 12, height: 3),
+                    targets: [PanelTarget(refId: "A", metric: .eventsByModel)]
                 ),
-            ]
+            ],
+            templating: DashboardConfig.defaultTemplating
         )
     }
 }

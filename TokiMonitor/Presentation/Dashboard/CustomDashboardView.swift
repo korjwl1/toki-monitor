@@ -1,69 +1,67 @@
 import SwiftUI
 import Charts
 
-/// Main customizable dashboard grid view.
-/// Positions panels absolutely using DashboardGridLayout within a scrollable ZStack.
+/// Responsive dashboard grid view.
+/// Fills the available window space — panels resize dynamically with the window.
 struct CustomDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
+    var onEditPanel: ((PanelConfig) -> Void)?
 
     var body: some View {
         GeometryReader { geometry in
-            let containerWidth = geometry.size.width - 40 // 20pt padding on each side
+            let containerWidth = geometry.size.width - 32  // 16pt padding each side
+            let containerHeight = geometry.size.height - 32
+            let rowHeight = DashboardGridLayout.dynamicRowHeight(
+                for: viewModel.dashboardConfig.panels,
+                containerHeight: containerHeight
+            )
 
-            ScrollView {
-                ZStack(alignment: .topLeading) {
-                    // Edit mode grid overlay (behind panels)
-                    if viewModel.isEditing {
-                        DashboardEditOverlay(
-                            containerWidth: containerWidth,
-                            totalHeight: gridTotalHeight(containerWidth)
+            ZStack(alignment: .topLeading) {
+                // Layout anchor
+                Color.clear
+
+                // Edit mode grid overlay
+                if viewModel.isEditing {
+                    DashboardEditOverlay(
+                        containerWidth: containerWidth,
+                        totalHeight: DashboardGridLayout.totalHeight(
+                            for: viewModel.dashboardConfig.panels,
+                            rowHeight: rowHeight
                         )
-                    }
-
-                    // Panels
-                    ForEach(viewModel.dashboardConfig.panels) { panel in
-                        panelView(for: panel, containerWidth: containerWidth)
-                            .frame(
-                                width: DashboardGridLayout.frame(for: panel.gridPosition, in: containerWidth).width,
-                                height: DashboardGridLayout.frame(for: panel.gridPosition, in: containerWidth).height
-                            )
-                            .offset(
-                                x: DashboardGridLayout.frame(for: panel.gridPosition, in: containerWidth).origin.x,
-                                y: DashboardGridLayout.frame(for: panel.gridPosition, in: containerWidth).origin.y
-                            )
-                            .panelDrag(
-                                panelID: panel.id,
-                                containerWidth: containerWidth,
-                                isEditing: viewModel.isEditing,
-                                viewModel: viewModel
-                            )
-                            .overlay {
-                                if viewModel.isEditing {
-                                    PanelResizeHandle(
-                                        panelID: panel.id,
-                                        panelType: panel.panelType,
-                                        containerWidth: containerWidth,
-                                        viewModel: viewModel
-                                    )
-                                }
-                            }
-                    }
+                    )
                 }
-                .frame(
-                    width: containerWidth,
-                    height: gridTotalHeight(containerWidth)
-                )
-                .padding(20)
+
+                // Panels
+                ForEach(viewModel.dashboardConfig.panels) { panel in
+                    let frame = DashboardGridLayout.frame(
+                        for: panel.gridPosition,
+                        in: containerWidth,
+                        rowHeight: rowHeight
+                    )
+                    panelView(for: panel, containerWidth: containerWidth)
+                        .frame(width: frame.width, height: frame.height)
+                        .offset(x: frame.origin.x, y: frame.origin.y)
+                        .panelDrag(
+                            panelID: panel.id,
+                            containerWidth: containerWidth,
+                            isEditing: viewModel.isEditing,
+                            viewModel: viewModel
+                        )
+                        .overlay {
+                            if viewModel.isEditing {
+                                PanelResizeHandle(
+                                    panelID: panel.id,
+                                    panelType: panel.panelType,
+                                    containerWidth: containerWidth,
+                                    viewModel: viewModel
+                                )
+                            }
+                        }
+                }
             }
+            .frame(width: containerWidth, height: containerHeight)
+            .padding(16)
         }
-    }
-
-    // MARK: - Grid Height
-
-    private func gridTotalHeight(_ containerWidth: CGFloat) -> CGFloat {
-        let height = DashboardGridLayout.totalHeight(for: viewModel.dashboardConfig.panels)
-        // Add extra row in edit mode for drop targets
-        return viewModel.isEditing ? height + DashboardGridLayout.rowHeight + DashboardGridLayout.gap : height
     }
 
     // MARK: - Panel Dispatch
@@ -73,7 +71,8 @@ struct CustomDashboardView: View {
         PanelContainerView(
             title: panel.title,
             isEditing: viewModel.isEditing,
-            onDelete: { viewModel.removePanel(id: panel.id) }
+            onDelete: { viewModel.removePanel(id: panel.id) },
+            onEdit: { onEditPanel?(panel) }
         ) {
             panelContent(for: panel)
         }
@@ -83,15 +82,15 @@ struct CustomDashboardView: View {
     private func panelContent(for panel: PanelConfig) -> some View {
         switch panel.panelType {
         case .stat:
-            statContent(for: panel.metric)
+            statContent(for: panel.effectiveMetric)
         case .timeSeries:
-            timeSeriesContent(for: panel.metric)
+            timeSeriesContent(for: panel.effectiveMetric)
         case .barChart:
-            barChartContent(for: panel.metric)
+            barChartContent(for: panel.effectiveMetric)
         case .table:
-            tableContent(for: panel.metric)
+            tableContent(for: panel.effectiveMetric)
         case .gauge:
-            gaugeContent(for: panel.metric)
+            gaugeContent(for: panel.effectiveMetric)
         }
     }
 

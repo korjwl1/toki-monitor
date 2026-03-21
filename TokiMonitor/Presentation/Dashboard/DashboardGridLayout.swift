@@ -1,19 +1,41 @@
 import Foundation
 
-/// 12-column grid calculation engine for the customizable dashboard.
-/// Each column is proportional to the container width. Rows are fixed at 80pt.
+/// 24-column responsive grid calculation engine for the customizable dashboard.
+/// Column width is proportional to container width. Row height is proportional to container height.
 struct DashboardGridLayout {
 
     // MARK: - Constants
 
-    static let columnCount = 12
-    static let rowHeight: CGFloat = 80
-    static let gap: CGFloat = 12
+    static let columnCount = 24
+    static let gap: CGFloat = 8
+    static let defaultRowHeight: CGFloat = 80
+
+    // MARK: - Dynamic Row Height
+
+    /// Calculate row height to fill available container height
+    static func dynamicRowHeight(for panels: [PanelConfig], containerHeight: CGFloat) -> CGFloat {
+        let totalRows = totalLogicalRows(for: panels)
+        guard totalRows > 0 else { return defaultRowHeight }
+        let totalGaps = gap * CGFloat(totalRows - 1)
+        let available = containerHeight - totalGaps
+        let rowHeight = available / CGFloat(totalRows)
+        return max(rowHeight, 40) // minimum 40pt per row
+    }
+
+    /// Total logical rows needed
+    static func totalLogicalRows(for panels: [PanelConfig]) -> Int {
+        guard !panels.isEmpty else { return 1 }
+        return panels.map { $0.gridPosition.row + $0.gridPosition.height }.max() ?? 1
+    }
 
     // MARK: - Frame Calculation
 
-    /// Returns the frame rect for a panel at the given grid position within the container width.
-    static func frame(for gridPosition: GridPosition, in containerWidth: CGFloat) -> CGRect {
+    /// Returns the frame rect for a panel at the given grid position.
+    static func frame(
+        for gridPosition: GridPosition,
+        in containerWidth: CGFloat,
+        rowHeight: CGFloat = defaultRowHeight
+    ) -> CGRect {
         let columnWidth = (containerWidth - gap * CGFloat(columnCount - 1)) / CGFloat(columnCount)
 
         let x = CGFloat(gridPosition.column) * (columnWidth + gap)
@@ -26,8 +48,11 @@ struct DashboardGridLayout {
 
     // MARK: - Snap to Grid
 
-    /// Converts a point to the nearest grid column/row.
-    static func snapToGrid(point: CGPoint, in containerWidth: CGFloat) -> (column: Int, row: Int) {
+    static func snapToGrid(
+        point: CGPoint,
+        in containerWidth: CGFloat,
+        rowHeight: CGFloat = defaultRowHeight
+    ) -> (column: Int, row: Int) {
         let columnWidth = (containerWidth - gap * CGFloat(columnCount - 1)) / CGFloat(columnCount)
         let cellWidth = columnWidth + gap
         let cellHeight = rowHeight + gap
@@ -40,23 +65,22 @@ struct DashboardGridLayout {
 
     // MARK: - Total Height
 
-    /// Calculates total grid height needed to contain all panels.
-    static func totalHeight(for panels: [PanelConfig]) -> CGFloat {
+    static func totalHeight(
+        for panels: [PanelConfig],
+        rowHeight: CGFloat = defaultRowHeight
+    ) -> CGFloat {
         guard !panels.isEmpty else { return rowHeight }
-
         let maxRow = panels.map { $0.gridPosition.row + $0.gridPosition.height }.max() ?? 1
         return CGFloat(maxRow) * (rowHeight + gap) - gap
     }
 
     // MARK: - First Available Position
 
-    /// Finds the first available grid position for a panel of the given size.
     static func firstAvailablePosition(
         width: Int,
         height: Int,
         existing: [PanelConfig]
     ) -> GridPosition {
-        // Build an occupancy grid
         let maxRow = (existing.map { $0.gridPosition.row + $0.gridPosition.height }.max() ?? 0) + height + 1
         var occupied = Array(repeating: Array(repeating: false, count: columnCount), count: maxRow)
 
@@ -71,7 +95,6 @@ struct DashboardGridLayout {
             }
         }
 
-        // Scan row by row, column by column
         for row in 0..<maxRow {
             for col in 0...(columnCount - width) {
                 var fits = true
@@ -90,7 +113,6 @@ struct DashboardGridLayout {
             }
         }
 
-        // Fallback: place below everything
         let nextRow = existing.map { $0.gridPosition.row + $0.gridPosition.height }.max() ?? 0
         return GridPosition(column: 0, row: nextRow, width: width, height: height)
     }
