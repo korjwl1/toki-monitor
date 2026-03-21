@@ -30,6 +30,18 @@ enum TimeRange: String, CaseIterable, Codable {
 @MainActor
 @Observable
 final class TokenAggregator {
+
+    private func debugLog(_ msg: String) {
+        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".toki-monitor-debug.log")
+        let line = "\(Date()): \(msg)\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(line.data(using: .utf8)!)
+            handle.closeFile()
+        } else {
+            try? line.data(using: .utf8)?.write(to: url)
+        }
+    }
     // MARK: - Real-time (trace only)
 
     private(set) var tokensPerMinute: Double = 0
@@ -81,6 +93,7 @@ final class TokenAggregator {
     // MARK: - Start/Stop
 
     func startSampling() {
+        // debugLog("[TokiAggregator] startSampling called")
         // Rate recalc every 2s for animation
         rateTimer?.invalidate()
         rateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
@@ -142,8 +155,12 @@ final class TokenAggregator {
         reportClient.runner.runReport(reportOptions: reportOptions, subcommandArgs: subcommandArgs) { [weak self] result in
             Task { @MainActor in
                 guard let self else { return }
-                if case .success(let data) = result {
+                switch result {
+                case .success(let data):
+                    // self.debugLog("[TokiAggregator] PromQL fetch OK, \(data.count) bytes")
                     self.parseAndApply(data)
+                case .failure:
+                    break
                 }
             }
         }
@@ -178,8 +195,10 @@ final class TokenAggregator {
             }
         }
 
+        // debugLog("[TokiAggregator] Parsed \(pointsByDate.count) time points")
         buildBins(from: pointsByDate)
         buildSummaries(from: pointsByDate)
+        // debugLog("[TokiAggregator] Bins: \(recentHistory.filter { $0 > 0 }.count) non-zero, Summaries: \(providerSummaries.count) providers")
     }
 
     private func parseEntries(

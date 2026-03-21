@@ -17,6 +17,8 @@ final class StatusBarController {
 
     // Menu panel
     private var menuPanel: NSPanel?
+    private var menuHostingView: NSHostingView<MenuContentView>?
+    private var panelRefreshTimer: Timer?
     private var eventMonitor: Any?
     private var globalMonitor: Any?
 
@@ -205,6 +207,7 @@ final class StatusBarController {
 
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.setFrameSize(hostingView.fittingSize)
+        menuHostingView = hostingView
 
         let panel = NSPanel(
             contentRect: .zero,
@@ -256,6 +259,32 @@ final class StatusBarController {
         panel.orderFrontRegardless()
         menuPanel = panel
 
+        // Refresh panel content periodically (NSPanel + nonactivating doesn't auto-update SwiftUI)
+        panelRefreshTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, let hv = self.menuHostingView else { return }
+                hv.rootView = MenuContentView(
+                    aggregator: self.aggregator,
+                    connectionManager: self.connectionManager,
+                    filterProviderId: unit.providerId,
+                    settings: self.settings,
+                    onStartDaemon: { [weak self] in
+                        self?.dismissPanel()
+                        DispatchQueue.main.async { self?.connectionManager.startDaemonAndConnect() }
+                    },
+                    onOpenDashboard: { [weak self] in
+                        self?.dismissPanel()
+                        DispatchQueue.main.async { self?.dashboardController.show() }
+                    },
+                    onOpenSettings: { [weak self] in
+                        self?.dismissPanel()
+                        DispatchQueue.main.async { self?.settingsController.show() }
+                    },
+                    onQuit: { NSApp.terminate(nil) }
+                )
+            }
+        }
+
         // Dismiss when clicking outside (but not on any of our status bar buttons)
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
             guard let self, let panel = self.menuPanel else { return event }
@@ -280,6 +309,9 @@ final class StatusBarController {
     }
 
     private func dismissPanel() {
+        panelRefreshTimer?.invalidate()
+        panelRefreshTimer = nil
+        menuHostingView = nil
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
