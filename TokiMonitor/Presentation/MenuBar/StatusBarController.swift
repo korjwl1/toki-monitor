@@ -232,38 +232,32 @@ final class StatusBarController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.level = .statusBar
+        panel.styleMask.insert(.borderless)
         panel.isMovable = false
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.acceptsMouseMovedEvents = true
         panel.isFloatingPanel = true
 
-        let visualEffect = NSVisualEffectView()
-        visualEffect.material = .hudWindow
-        visualEffect.state = .active
-        visualEffect.blendingMode = .behindWindow
-        visualEffect.appearance = NSAppearance(named: .darkAqua)
-        visualEffect.wantsLayer = true
-        visualEffect.layer?.cornerRadius = 10
-        visualEffect.layer?.masksToBounds = true
-
-        visualEffect.addSubview(hostingView)
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            hostingView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
-            hostingView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
-        ])
-
-        panel.contentView = visualEffect
+        panel.contentView = hostingView
 
         // Position below the clicked status item
         if let button = unit.statusItem.button,
            let window = button.window {
             let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
             let panelSize = hostingView.fittingSize
-            let x = buttonFrame.midX - panelSize.width / 2
+            let screenFrame = NSScreen.main?.visibleFrame ?? .zero
+
+            // Align roughly 1/4 of panel width left of button center
+            var x = buttonFrame.midX - panelSize.width / 4
+            // If panel would go off screen right, shift left
+            if x + panelSize.width > screenFrame.maxX {
+                x = screenFrame.maxX - panelSize.width - 4
+            }
+            // If panel would go off screen left, shift right
+            if x < screenFrame.minX {
+                x = screenFrame.minX + 4
+            }
             let y = buttonFrame.minY - panelSize.height - 4
             panel.setFrame(
                 NSRect(x: x, y: y, width: panelSize.width, height: panelSize.height),

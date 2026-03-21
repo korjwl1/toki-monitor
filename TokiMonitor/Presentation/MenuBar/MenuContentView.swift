@@ -1,9 +1,7 @@
 import SwiftUI
 import Charts
 
-private let borderClr = Color.white.opacity(0.18)
-private let subClr = Color.white.opacity(0.55)
-private let dimClr = Color.white.opacity(0.3)
+private let divClr = Color.primary.opacity(0.1)
 
 struct MenuContentView: View {
     let aggregator: TokenAggregator
@@ -20,12 +18,18 @@ struct MenuContentView: View {
     private var isConnected: Bool { connectionManager.state.isConnected }
     private var perProviderHistory: [String: [Double]] { aggregator.perProviderHistory }
 
+    // Right button square size
+    private let btnSize: CGFloat = 64
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            leftPanel.frame(width: 200)
-            rightPanel.frame(width: 80)
+            leftPanel
+                .frame(width: 210)
+            rightPanel
+                .frame(width: btnSize + 16)
         }
-        .environment(\.colorScheme, .dark)
+        .padding(.bottom, 8)
+        .modifier(GlassPanelModifier())
     }
 
     // MARK: - Left
@@ -44,32 +48,23 @@ struct MenuContentView: View {
                         usageSection(usage)
                     } else if let err = monitor.lastError {
                         hDiv
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .foregroundStyle(.orange)
-                            Text(err)
-                                .font(.system(size: 9))
-                                .foregroundStyle(dimClr)
-                                .lineLimit(2)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                        errorRow(err)
                     }
                 }
             } else {
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     Image(systemName: "bolt.slash")
-                        .font(.system(size: 20))
-                        .foregroundStyle(dimClr)
+                        .font(.system(size: 22))
+                        .foregroundStyle(.tertiary)
                     Text("toki 미연결")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(subClr)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
                     Button("데몬 시작", action: onStartDaemon)
                         .font(.system(size: 11))
                         .controlSize(.small)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+                .padding(.vertical, 32)
             }
         }
     }
@@ -80,37 +75,38 @@ struct MenuContentView: View {
         )
         let hist = perProviderHistory[s.provider.id] ?? []
         let rate = aggregator.perProviderRates[s.provider.id] ?? 0
+        let sessions = aggregator.perProviderSessionCount[s.provider.id] ?? 0
 
-        return HStack(spacing: 10) {
+        return HStack(spacing: 12) {
             // Logo — vertically centered
             providerLogo(s.provider, color: clr)
                 .frame(width: 28, height: 28)
 
-            VStack(alignment: .leading, spacing: 4) {
-                // Name + cost on one line
+            VStack(alignment: .leading, spacing: 6) {
+                // Name + cost
                 HStack {
-                    Text("\(s.provider.name):")
+                    Text(s.provider.name)
                         .font(.system(size: 13, weight: .bold))
+                    Spacer()
                     if let c = s.estimatedCost, c > 0 {
                         Text(TokenFormatter.formatCost(c))
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
                     }
                 }
 
+                // Rate + Sessions
                 HStack(spacing: 12) {
                     Label(TokenFormatter.formatRate(rate), systemImage: "speedometer")
-                    let sessions = aggregator.perProviderSessionCount[s.provider.id] ?? 0
                     Label("\(sessions) 세션", systemImage: "person.2")
                 }
                 .font(.system(size: 10))
-                .foregroundStyle(subClr)
+                .foregroundStyle(.secondary)
 
-                // Sparkline (always show — flat line if no data)
+                // Sparkline
                 spark(hist.count >= 2 ? hist : Array(repeating: 0, count: 30), color: clr)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(16)
     }
 
     @ViewBuilder
@@ -127,14 +123,16 @@ struct MenuContentView: View {
         }
     }
 
+    // MARK: - Usage
+
     private func usageSection(_ usage: ClaudeUsageResponse) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Image(systemName: "gauge.with.dots.needle.50percent")
                 .font(.system(size: 18))
                 .foregroundStyle(.cyan)
                 .frame(width: 28, height: 28)
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Claude 사용량")
                     .font(.system(size: 13, weight: .bold))
 
@@ -142,18 +140,17 @@ struct MenuContentView: View {
                 if let sd = usage.sevenDay { bar("7일", sd) }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(16)
     }
 
     private func bar(_ label: String, _ b: UsageBucket) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(label).foregroundStyle(subClr)
+                Text(label).foregroundStyle(.secondary)
                 Spacer()
                 Text("\(Int(b.utilization))%").fontWeight(.medium)
                 Text("· \(b.resetCountdown)")
-                    .foregroundStyle(dimClr)
+                    .foregroundStyle(.tertiary)
             }
             .font(.system(size: 10))
             GeometryReader { g in
@@ -168,10 +165,22 @@ struct MenuContentView: View {
         }
     }
 
+    private func errorRow(_ err: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+            Text(err)
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .lineLimit(2)
+        }
+        .padding(16)
+    }
+
     // MARK: - Right
 
     private var rightPanel: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             gridBtn("대시보드", "chart.xyaxis.line", onOpenDashboard)
             gridBtn("설정", "gearshape", onOpenSettings)
             gridBtn(styleLabel, styleIcon) {
@@ -181,31 +190,25 @@ struct MenuContentView: View {
                 case .sparkline: settings.animationStyle = .character
                 }
             }
-            Spacer(minLength: 0)
-            gridBtn("종료", "power", onQuit)
         }
-        .padding(6)
+        .padding(8)
+        .modifier(GlassContainerModifier())
     }
 
     private func gridBtn(_ t: String, _ ic: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 4) {
+            VStack(spacing: 5) {
                 Image(systemName: ic)
-                    .font(.system(size: 16))
-                    .foregroundStyle(subClr)
+                    .font(.system(size: 18, weight: .light))
                 Text(t)
-                    .font(.system(size: 9))
-                    .foregroundStyle(dimClr)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(borderClr, lineWidth: 0.5)
-            )
+            .frame(width: btnSize, height: btnSize)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .modifier(GlassButtonModifier())
     }
 
     // MARK: - Components
@@ -228,7 +231,7 @@ struct MenuContentView: View {
     }
 
     private var hDiv: some View {
-        Rectangle().fill(borderClr).frame(height: 0.5).padding(.horizontal, 12)
+        Divider().padding(.horizontal, 16)
     }
 
     private var styleLabel: String {
@@ -246,6 +249,8 @@ struct MenuContentView: View {
         }
     }
 
+    // MARK: - Build Data
+
     private func buildDisplaySummaries() -> [ProviderSummary] {
         let enabled = ProviderRegistry.configurableProviders.filter {
             settings.effectiveSettings(for: $0.id).enabled
@@ -257,6 +262,48 @@ struct MenuContentView: View {
         }
         return enabled.map { p in
             aggregator.providerSummaries.first(where: { $0.provider.id == p.id }) ?? ProviderSummary(provider: p)
+        }
+    }
+}
+
+// MARK: - Glass Panel (whole panel as liquid glass)
+
+private struct GlassPanelModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: .rect(cornerRadius: 14))
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: - Glass Modifiers
+
+private struct GlassContainerModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer {
+                content
+            }
+        } else {
+            content
+        }
+    }
+}
+
+private struct GlassButtonModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: 10))
+        } else {
+            content
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                )
         }
     }
 }
