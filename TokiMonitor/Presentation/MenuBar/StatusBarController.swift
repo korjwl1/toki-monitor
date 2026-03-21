@@ -244,7 +244,7 @@ final class StatusBarController {
         panel.backgroundColor = .clear
         panel.level = .statusBar
         panel.isMovable = false
-        panel.hasShadow = false
+        panel.hasShadow = true
 
         // Debug: dump view hierarchy to verify safe area fix
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
