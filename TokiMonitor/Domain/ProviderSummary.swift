@@ -25,6 +25,16 @@ struct ProviderSummary: Identifiable, TokenUsageModel {
             estimatedCost = (estimatedCost ?? 0) + cost
         }
     }
+
+    /// Add from a report model summary (PromQL result).
+    mutating func addSummary(_ summary: TokiModelSummary) {
+        totalInput += summary.inputTokens
+        totalOutput += summary.outputTokens
+        eventCount += summary.events
+        if let cost = summary.costUsd {
+            estimatedCost = (estimatedCost ?? 0) + cost
+        }
+    }
 }
 
 /// Total summary across all providers.

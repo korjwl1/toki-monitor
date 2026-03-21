@@ -9,12 +9,14 @@ final class CharacterAnimationRenderer {
     private let mapper = AnimationStateMapper()
     private var currentInterval: TimeInterval = 0
     private var currentTintColor: NSColor?
+    private var isStopped = false
 
     init() {
         loadFrames()
     }
 
     func update(tokensPerMinute: Double, button: NSStatusBarButton, tintColor: NSColor? = nil) {
+        isStopped = false
         currentTintColor = tintColor
         let idle = mapper.isIdle(tokensPerMinute: tokensPerMinute)
 
@@ -37,6 +39,7 @@ final class CharacterAnimationRenderer {
     }
 
     func stop() {
+        isStopped = true
         stopAnimation()
         currentFrame = 0
     }
@@ -76,7 +79,7 @@ final class CharacterAnimationRenderer {
     }
 
     private func advanceFrame(button: NSStatusBarButton) {
-        guard !frames.isEmpty else { return }
+        guard !frames.isEmpty, !isStopped else { return }
         currentFrame = (currentFrame + 1) % frames.count
         applyFrame(currentFrame, to: button)
     }

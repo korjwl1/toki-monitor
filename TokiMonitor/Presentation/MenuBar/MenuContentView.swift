@@ -3,12 +3,9 @@ import Charts
 
 /// The dropdown menu content shown when the status bar icon is clicked.
 struct MenuContentView: View {
-    let isConnected: Bool
-    let tokensPerMinute: Double
-    let providerSummaries: [ProviderSummary]
-    let totalSummary: TotalSummary?
-    let perProviderHistory: [String: [Double]]
-    let filterProviderId: String?  // non-nil in per-provider mode
+    let aggregator: TokenAggregator
+    let connectionManager: ConnectionManager
+    let filterProviderId: String?
     @Bindable var settings: AppSettings
 
     var onStartDaemon: () -> Void
@@ -17,6 +14,13 @@ struct MenuContentView: View {
     var onQuit: () -> Void
 
     private let menuWidth: CGFloat = 280
+
+    // Live from aggregator
+    private var isConnected: Bool { connectionManager.state.isConnected }
+    private var tokensPerMinute: Double { aggregator.tokensPerMinute }
+    private var providerSummaries: [ProviderSummary] { aggregator.providerSummaries }
+    private var totalSummary: TotalSummary? { aggregator.totalSummary }
+    private var perProviderHistory: [String: [Double]] { aggregator.perProviderHistory }
 
     var body: some View {
         VStack(spacing: 0) {

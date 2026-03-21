@@ -176,11 +176,8 @@ final class StatusBarController {
         }
 
         let contentView = MenuContentView(
-            isConnected: connectionManager.state.isConnected,
-            tokensPerMinute: aggregator.tokensPerMinute,
-            providerSummaries: aggregator.providerSummaries,
-            totalSummary: aggregator.totalSummary,
-            perProviderHistory: aggregator.perProviderHistory,
+            aggregator: aggregator,
+            connectionManager: connectionManager,
             filterProviderId: unit.providerId,
             settings: settings,
             onStartDaemon: { [weak self] in

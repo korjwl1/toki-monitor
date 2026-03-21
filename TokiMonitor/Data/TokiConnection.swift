@@ -154,9 +154,13 @@ final class TokiReportRunner: Sendable {
 
             do {
                 try process.run()
+
+                // Read stdout BEFORE waitUntilExit to avoid pipe buffer deadlock.
+                // If output exceeds ~64KB, the process blocks on write and
+                // waitUntilExit never returns.
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 process.waitUntilExit()
 
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 if process.terminationStatus == 0 {
                     completion(.success(data))
                 } else {
@@ -245,8 +249,8 @@ final class TokiSettingsRunner: Sendable {
 
             do {
                 try process.run()
-                process.waitUntilExit()
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
                 let output = String(data: data, encoding: .utf8) ?? ""
                 if process.terminationStatus == 0 {
                     completion(.success(output))

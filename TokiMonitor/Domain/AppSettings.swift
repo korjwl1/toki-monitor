@@ -52,6 +52,26 @@ enum GraphTimeRange: String, CaseIterable, Codable {
         case .oneHourGraph: 120.0
         }
     }
+
+    /// PromQL time bucket matching bin width.
+    var promqlBucket: String {
+        switch self {
+        case .fiveMinutes: "10s"
+        case .tenMinutes: "20s"
+        case .thirtyMinutes: "1m"
+        case .oneHourGraph: "2m"
+        }
+    }
+
+    /// Since timestamp for PromQL query (YYYYMMDDHHmmss, UTC).
+    var sinceTimestamp: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMddHHmmss"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        // 30 bins * sampleInterval = total window + small buffer
+        let duration = Double(30) * sampleInterval + sampleInterval
+        return formatter.string(from: Date().addingTimeInterval(-duration))
+    }
 }
 
 enum ProviderDisplayMode: String, CaseIterable, Codable {

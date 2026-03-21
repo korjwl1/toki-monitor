@@ -60,13 +60,14 @@ final class StatusItemUnit {
             effectiveStyle = style
         }
 
-        // Full reset on style change
+        // Full reset on style change — clear everything to prevent ghosting
         if currentStyle != effectiveStyle {
             characterRenderer.stop()
-            numericRenderer.clear(button: button)
             button.image = nil
             button.title = ""
             button.attributedTitle = NSAttributedString(string: "")
+            button.imagePosition = .imageOnly
+            button.needsDisplay = true
             currentStyle = effectiveStyle
         }
 
