@@ -3,6 +3,7 @@ import Charts
 
 struct DashboardView: View {
     @State private var viewModel: DashboardViewModel
+    @State private var showAddPanel = false
 
     init(reportClient: TokiReportClient) {
         _viewModel = State(initialValue: DashboardViewModel(reportClient: reportClient))
@@ -15,8 +16,8 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = viewModel.errorMessage {
                 errorView(error)
-            } else if let data = viewModel.timeSeriesData {
-                dashboardContent(data)
+            } else if viewModel.timeSeriesData != nil {
+                CustomDashboardView(viewModel: viewModel)
             } else {
                 emptyView
             }
@@ -25,12 +26,16 @@ struct DashboardView: View {
             ToolbarItemGroup(placement: .automatic) {
                 timeRangePicker
                 Spacer()
+                editModeControls
                 modelFilterMenu
                 refreshButton
             }
         }
         .navigationTitle(L.dash.title)
         .onAppear { viewModel.fetchData() }
+        .popover(isPresented: $showAddPanel) {
+            AddPanelPopover(viewModel: viewModel)
+        }
     }
 
     // MARK: - Toolbar Items
@@ -43,6 +48,36 @@ struct DashboardView: View {
         }
         .pickerStyle(.segmented)
         .frame(maxWidth: 400)
+    }
+
+    @ViewBuilder
+    private var editModeControls: some View {
+        // Edit / Done toggle
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.isEditing.toggle()
+            }
+        } label: {
+            Label(
+                viewModel.isEditing ? L.dash.done : L.dash.edit,
+                systemImage: viewModel.isEditing ? "checkmark" : "pencil"
+            )
+        }
+
+        // Add panel (edit mode only)
+        if viewModel.isEditing {
+            Button {
+                showAddPanel = true
+            } label: {
+                Label(L.dash.addPanel, systemImage: "plus")
+            }
+
+            Button {
+                viewModel.resetToDefault()
+            } label: {
+                Label(L.dash.resetLayout, systemImage: "arrow.counterclockwise")
+            }
+        }
     }
 
     private var modelFilterMenu: some View {
@@ -70,91 +105,7 @@ struct DashboardView: View {
         .disabled(viewModel.isLoading)
     }
 
-    // MARK: - Dashboard Content
-
-    private func dashboardContent(_ data: TimeSeriesData) -> some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Summary stat cards
-                Grid(horizontalSpacing: 12, verticalSpacing: 12) {
-                    GridRow {
-                        StatCard(
-                            title: L.dash.totalTokens,
-                            value: TokenFormatter.formatTokens(viewModel.totalTokens),
-                            icon: "number"
-                        )
-                        StatCard(
-                            title: L.dash.totalCost,
-                            value: TokenFormatter.formatCost(viewModel.totalCost),
-                            icon: "dollarsign.circle"
-                        )
-                        StatCard(
-                            title: L.dash.apiCalls,
-                            value: "\(viewModel.totalEvents)",
-                            icon: "arrow.up.arrow.down"
-                        )
-                        StatCard(
-                            title: L.dash.topModel,
-                            value: shortModelName(viewModel.topModel ?? "-"),
-                            icon: "star"
-                        )
-                    }
-                }
-
-                // Token usage chart (large)
-                ChartPanel(title: L.dash.tokenTrend) {
-                    if viewModel.filteredModelNames.isEmpty {
-                        noModelSelected
-                    } else {
-                        TokenUsageChart(
-                            data: data,
-                            enabledModels: viewModel.filteredModelNames,
-                            colorForModel: viewModel.colorForModel
-                        )
-                    }
-                }
-
-                // Cost + Events side by side
-                HStack(spacing: 12) {
-                    ChartPanel(title: L.dash.costTrend) {
-                        if viewModel.filteredModelNames.isEmpty {
-                            noModelSelected
-                        } else {
-                            CostChart(
-                                data: data,
-                                enabledModels: viewModel.filteredModelNames,
-                                colorForModel: viewModel.colorForModel
-                            )
-                        }
-                    }
-
-                    ChartPanel(title: L.dash.apiTrend) {
-                        if viewModel.filteredModelNames.isEmpty {
-                            noModelSelected
-                        } else {
-                            EventsChart(
-                                data: data,
-                                enabledModels: viewModel.filteredModelNames,
-                                colorForModel: viewModel.colorForModel
-                            )
-                        }
-                    }
-                }
-            }
-            .padding(20)
-        }
-    }
-
     // MARK: - States
-
-    private var noModelSelected: some View {
-        ContentUnavailableView(
-            L.dash.selectModel,
-            systemImage: "line.3.horizontal.decrease.circle",
-            description: Text(L.dash.selectModelDesc)
-        )
-        .frame(minHeight: 150)
-    }
 
     private func errorView(_ message: String) -> some View {
         ContentUnavailableView {
@@ -172,12 +123,5 @@ struct DashboardView: View {
             L.dash.loading,
             systemImage: "chart.xyaxis.line"
         )
-    }
-
-    private func shortModelName(_ model: String) -> String {
-        if model.count > 15 {
-            return String(model.prefix(15)) + "…"
-        }
-        return model
     }
 }

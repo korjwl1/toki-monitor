@@ -33,19 +33,76 @@ struct SettingsView: View {
     var onClose: (() -> Void)?
 
     @State private var selectedCategory: SettingsCategory = .menuBar
+    @State private var sidebarExpanded = true
 
     var body: some View {
-        NavigationSplitView {
-            List(SettingsCategory.allCases, selection: $selectedCategory) { category in
-                Label(category.title, systemImage: category.icon)
-                    .tag(category)
+        HStack(spacing: 0) {
+            // Sidebar
+            VStack(spacing: 0) {
+                // Collapse toggle
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            sidebarExpanded.toggle()
+                        }
+                    }) {
+                        Image(systemName: "sidebar.leading")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(8)
+                }
+
+                // Category list
+                VStack(spacing: 2) {
+                    ForEach(SettingsCategory.allCases) { category in
+                        sidebarButton(category)
+                    }
+                }
+                .padding(.horizontal, 6)
+
+                Spacer()
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 220)
-        } detail: {
+            .frame(width: sidebarExpanded ? 180 : 52)
+            .background(.ultraThinMaterial)
+
+            Divider()
+
+            // Detail
             detailView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationSplitViewStyle(.balanced)
-        .toolbar(removing: .sidebarToggle)
+    }
+
+    private func sidebarButton(_ category: SettingsCategory) -> some View {
+        Button(action: { selectedCategory = category }) {
+            HStack(spacing: 8) {
+                Image(systemName: category.icon)
+                    .font(.system(size: 14))
+                    .frame(width: 20)
+
+                if sidebarExpanded {
+                    Text(category.title)
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+                    Spacer()
+                }
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, sidebarExpanded ? 10 : 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                selectedCategory == category
+                    ? Color.accentColor.opacity(0.15)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 6)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(selectedCategory == category ? .primary : .secondary)
     }
 
     @ViewBuilder

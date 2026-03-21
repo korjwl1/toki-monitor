@@ -113,12 +113,46 @@ enum L {
         static var selectModelDesc: String { tr("필터에서 모델을 선택하면 데이터가 표시됩니다", "Select a model from the filter to display data") }
         static var error: String { tr("오류 발생", "Error") }
         static var loading: String { tr("데이터를 불러오는 중...", "Loading data...") }
+        // Dashboard editing
+        static var edit: String { tr("편집", "Edit") }
+        static var addPanel: String { tr("패널 추가", "Add Panel") }
+        static var removePanel: String { tr("패널 삭제", "Remove Panel") }
+        static var resetLayout: String { tr("레이아웃 초기화", "Reset Layout") }
+        static var done: String { tr("완료", "Done") }
+        static var pickPanelType: String { tr("패널 종류 선택", "Pick Panel Type") }
+        static var pickMetric: String { tr("지표 선택", "Pick Metric") }
+        static var cancel: String { tr("취소", "Cancel") }
+        static var add: String { tr("추가", "Add") }
+        static var modelBreakdown: String { tr("모델 상세", "Model Breakdown") }
+        static var cacheHitRate: String { tr("캐시 적중률", "Cache Hit Rate") }
+        static var reasoningTokens: String { tr("추론 토큰", "Reasoning Tokens") }
+        // Panel type names
+        static var statPanel: String { tr("통계", "Stat") }
+        static var timeSeriesPanel: String { tr("시계열", "Time Series") }
+        static var barChartPanel: String { tr("막대 차트", "Bar Chart") }
+        static var tablePanel: String { tr("테이블", "Table") }
+        static var gaugePanel: String { tr("게이지", "Gauge") }
+        // Metric names
+        static var metricTotalTokens: String { tr("총 토큰", "Total Tokens") }
+        static var metricTotalCost: String { tr("총 비용", "Total Cost") }
+        static var metricApiCalls: String { tr("API 호출", "API Calls") }
+        static var metricTopModel: String { tr("최다 모델", "Top Model") }
+        static var metricTokensByModel: String { tr("모델별 토큰", "Tokens by Model") }
+        static var metricCostByModel: String { tr("모델별 비용", "Cost by Model") }
+        static var metricEventsByModel: String { tr("모델별 호출", "Events by Model") }
+        static var metricInputVsOutput: String { tr("입력 vs 출력", "Input vs Output") }
+        static var metricCacheHitRate: String { tr("캐시 적중률", "Cache Hit Rate") }
+        static var metricReasoningTokens: String { tr("추론 토큰", "Reasoning Tokens") }
+        static var metricModelBreakdown: String { tr("모델 상세", "Model Breakdown") }
         // Chart axis labels
         static var axisTime: String { tr("시간", "Time") }
         static var axisTokens: String { tr("토큰", "Tokens") }
         static var axisCost: String { tr("비용", "Cost") }
         static var axisModel: String { tr("모델", "Model") }
         static var axisCalls: String { tr("호출", "Calls") }
+        // Table column headers
+        static var inputTokens: String { tr("입력 토큰", "Input Tokens") }
+        static var outputTokens: String { tr("출력 토큰", "Output Tokens") }
     }
 
     // MARK: - Enums

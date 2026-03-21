@@ -12,10 +12,17 @@ final class DashboardViewModel {
     var errorMessage: String?
     var enabledModels: Set<String> = []
 
+    // MARK: - Dashboard Layout
+
+    var isEditing = false
+    var dashboardConfig: DashboardConfig
+
     private let reportClient: TokiReportClient
+    private let configStore = DashboardConfigStore()
 
     init(reportClient: TokiReportClient = TokiReportClient()) {
         self.reportClient = reportClient
+        self.dashboardConfig = DashboardConfigStore().load()
     }
 
     func fetchData() {
@@ -71,6 +78,33 @@ final class DashboardViewModel {
     var totalCost: Double { timeSeriesData?.totalCost ?? 0 }
     var totalEvents: Int { timeSeriesData?.totalEvents ?? 0 }
     var topModel: String? { timeSeriesData?.topModel }
+
+    // MARK: - Panel Management
+
+    func addPanel(_ panel: PanelConfig) {
+        dashboardConfig.panels.append(panel)
+        saveDashboard()
+    }
+
+    func removePanel(id: UUID) {
+        dashboardConfig.panels.removeAll { $0.id == id }
+        saveDashboard()
+    }
+
+    func updatePanelPosition(id: UUID, position: GridPosition) {
+        guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == id }) else { return }
+        dashboardConfig.panels[index].gridPosition = position
+        saveDashboard()
+    }
+
+    func saveDashboard() {
+        configStore.save(dashboardConfig)
+    }
+
+    func resetToDefault() {
+        configStore.resetToDefault()
+        dashboardConfig = DashboardConfigStore.defaultConfig
+    }
 
     /// Color for a model, based on provider
     func colorForModel(_ model: String) -> Color {

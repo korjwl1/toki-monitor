@@ -69,6 +69,17 @@
 		F7B06F96F0152C66001A51CB /* TokiReportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */; };
 		F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */; };
 		FAAE9290A0103A52B4EDDA4E /* frame_01.png in Resources */ = {isa = PBXBuildFile; fileRef = 140E82C9A015AA41CD3C0C1A /* frame_01.png */; };
+		G10000000001 /* DashboardConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000001 /* DashboardConfig.swift */; };
+		G10000000002 /* DashboardConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000002 /* DashboardConfigStore.swift */; };
+		G10000000003 /* PanelDataExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000003 /* PanelDataExtractor.swift */; };
+		G10000000004 /* DashboardGridLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000004 /* DashboardGridLayout.swift */; };
+		G10000000005 /* CustomDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000005 /* CustomDashboardView.swift */; };
+		G10000000006 /* PanelContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000006 /* PanelContainerView.swift */; };
+		G10000000007 /* StatPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000007 /* StatPanelView.swift */; };
+		G10000000008 /* DashboardEditOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000008 /* DashboardEditOverlay.swift */; };
+		G10000000009 /* PanelDragModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000009 /* PanelDragModifier.swift */; };
+		G10000000010 /* PanelResizeHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000010 /* PanelResizeHandle.swift */; };
+		G10000000011 /* AddPanelPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000011 /* AddPanelPopover.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -147,6 +158,17 @@
 		1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsSettingsPane.swift; sourceTree = "<group>"; };
 		C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsSettingsPane.swift; sourceTree = "<group>"; };
 		F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapperTests.swift; sourceTree = "<group>"; };
+		G20000000001 /* DashboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfig.swift; sourceTree = "<group>"; };
+		G20000000002 /* DashboardConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfigStore.swift; sourceTree = "<group>"; };
+		G20000000003 /* PanelDataExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelDataExtractor.swift; sourceTree = "<group>"; };
+		G20000000004 /* DashboardGridLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardGridLayout.swift; sourceTree = "<group>"; };
+		G20000000005 /* CustomDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomDashboardView.swift; sourceTree = "<group>"; };
+		G20000000006 /* PanelContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelContainerView.swift; sourceTree = "<group>"; };
+		G20000000007 /* StatPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatPanelView.swift; sourceTree = "<group>"; };
+		G20000000008 /* DashboardEditOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardEditOverlay.swift; sourceTree = "<group>"; };
+		G20000000009 /* PanelDragModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelDragModifier.swift; sourceTree = "<group>"; };
+		G20000000010 /* PanelResizeHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelResizeHandle.swift; sourceTree = "<group>"; };
+		G20000000011 /* AddPanelPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPanelPopover.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -231,13 +253,37 @@
 		5CB76EE9FE876C983A62E891 /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
+				G20000000005 /* CustomDashboardView.swift */,
 				3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */,
+				G20000000004 /* DashboardGridLayout.swift */,
 				B10000000002 /* DashboardViewModel.swift */,
 				B10000000003 /* DashboardToolbar.swift */,
 				530B806F812350D8094AA0EC /* DashboardWindow.swift */,
 				C10000000001 /* Charts */,
+				G30000000001 /* EditMode */,
+				G30000000002 /* Panels */,
 			);
 			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		G30000000001 /* EditMode */ = {
+			isa = PBXGroup;
+			children = (
+				G20000000008 /* DashboardEditOverlay.swift */,
+				G20000000009 /* PanelDragModifier.swift */,
+				G20000000010 /* PanelResizeHandle.swift */,
+				G20000000011 /* AddPanelPopover.swift */,
+			);
+			path = EditMode;
+			sourceTree = "<group>";
+		};
+		G30000000002 /* Panels */ = {
+			isa = PBXGroup;
+			children = (
+				G20000000006 /* PanelContainerView.swift */,
+				G20000000007 /* StatPanelView.swift */,
+			);
+			path = Panels;
 			sourceTree = "<group>";
 		};
 		73E34B75A97A1A7983F6618C /* TokiMonitor */ = {
@@ -257,6 +303,7 @@
 		8648934AE14365594C7132F0 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				G20000000001 /* DashboardConfig.swift */,
 				B10000000001 /* TimeSeriesModels.swift */,
 				8B4247163632AC4A7FF3582B /* TokiEvent.swift */,
 				74A27A6A118A446539806BB7 /* TokiReportModels.swift */,
@@ -323,6 +370,8 @@
 				0103BDEAC6066E0274029149 /* ConnectionManager.swift */,
 				D10000000006 /* ClaudeOAuthManager.swift */,
 				D10000000007 /* ClaudeUsageMonitor.swift */,
+				G20000000002 /* DashboardConfigStore.swift */,
+				G20000000003 /* PanelDataExtractor.swift */,
 				CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */,
 				37F55200D88B2D7260541C5D /* ProviderSummary.swift */,
 				85595784F39710A1BF95BC51 /* TokenAggregator.swift */,
@@ -502,6 +551,17 @@
 				A10000000007 /* CostChart.swift in Sources */,
 				A10000000008 /* EventsChart.swift in Sources */,
 				L10000000001 /* Localization.swift in Sources */,
+				G10000000001 /* DashboardConfig.swift in Sources */,
+				G10000000002 /* DashboardConfigStore.swift in Sources */,
+				G10000000003 /* PanelDataExtractor.swift in Sources */,
+				G10000000004 /* DashboardGridLayout.swift in Sources */,
+				G10000000005 /* CustomDashboardView.swift in Sources */,
+				G10000000006 /* PanelContainerView.swift in Sources */,
+				G10000000007 /* StatPanelView.swift in Sources */,
+				G10000000008 /* DashboardEditOverlay.swift in Sources */,
+				G10000000009 /* PanelDragModifier.swift in Sources */,
+				G10000000010 /* PanelResizeHandle.swift in Sources */,
+				G10000000011 /* AddPanelPopover.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
