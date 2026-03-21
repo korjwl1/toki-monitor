@@ -14,11 +14,13 @@ final class TokiReportClient: Sendable {
         timezone: String = TimeZone.current.identifier,
         completion: @escaping @Sendable (Result<[TokiModelSummary], Error>) -> Void
     ) {
-        var args: [String] = [period.subcommand]
-        args += ["--since", period.sinceDate]
-        args += ["-z", timezone]
+        // toki report [report-level-options] <subcommand> [subcommand-options]
+        // Report-level: --output-format, -z, --no-cost, --provider
+        // Subcommand-level: --since, --until, --project, --session-id
+        let reportOptions: [String] = ["-z", timezone]
+        let subcommandArgs: [String] = [period.subcommand, "--since", period.sinceDate]
 
-        runner.runReport(args: args) { result in
+        runner.runReport(reportOptions: reportOptions, subcommandArgs: subcommandArgs) { result in
             switch result {
             case .success(let data):
                 do {

@@ -5,49 +5,49 @@ import Testing
 struct AnimationStateMapperTests {
     let mapper = AnimationStateMapper()
 
-    @Test("Zero rate maps to idle")
+    @Test("Zero rate is idle")
     func zeroRate() {
-        #expect(mapper.map(tokensPerMinute: 0) == .idle)
+        #expect(mapper.isIdle(tokensPerMinute: 0))
     }
 
-    @Test("Sub-threshold rate maps to idle")
+    @Test("Sub-threshold rate is idle")
     func subThreshold() {
-        #expect(mapper.map(tokensPerMinute: 0.5) == .idle)
+        #expect(mapper.isIdle(tokensPerMinute: 0.5))
     }
 
-    @Test("Low range maps to low")
-    func lowRange() {
-        #expect(mapper.map(tokensPerMinute: 1) == .low)
-        #expect(mapper.map(tokensPerMinute: 50) == .low)
-        #expect(mapper.map(tokensPerMinute: 99) == .low)
+    @Test("Above threshold is not idle")
+    func aboveThreshold() {
+        #expect(!mapper.isIdle(tokensPerMinute: 1))
+        #expect(!mapper.isIdle(tokensPerMinute: 100))
     }
 
-    @Test("Medium range maps to medium")
-    func mediumRange() {
-        #expect(mapper.map(tokensPerMinute: 100) == .medium)
-        #expect(mapper.map(tokensPerMinute: 500) == .medium)
-        #expect(mapper.map(tokensPerMinute: 999) == .medium)
+    @Test("Idle rate returns zero interval")
+    func idleInterval() {
+        #expect(mapper.interval(for: 0) == 0)
+        #expect(mapper.interval(for: 0.5) == 0)
     }
 
-    @Test("High range maps to high")
-    func highRange() {
-        #expect(mapper.map(tokensPerMinute: 1000) == .high)
-        #expect(mapper.map(tokensPerMinute: 50000) == .high)
+    @Test("Higher rate produces shorter interval (faster animation)")
+    func intervalDecreasesWithRate() {
+        let slow = mapper.interval(for: 50)
+        let fast = mapper.interval(for: 500)
+        let sprint = mapper.interval(for: 5000)
+        #expect(slow > fast)
+        #expect(fast > sprint)
     }
 
-    @Test("AnimationState is comparable")
-    func comparable() {
-        #expect(AnimationState.idle < AnimationState.low)
-        #expect(AnimationState.low < AnimationState.medium)
-        #expect(AnimationState.medium < AnimationState.high)
+    @Test("Interval is clamped at max rate")
+    func intervalClamped() {
+        let atMax = mapper.interval(for: 5000)
+        let beyondMax = mapper.interval(for: 50000)
+        #expect(atMax == beyondMax)
     }
 
-    @Test("Character FPS increases with state")
-    func characterFPS() {
-        #expect(AnimationState.idle.characterFPS == 0)
-        #expect(AnimationState.low.characterFPS == 2)
-        #expect(AnimationState.medium.characterFPS == 6)
-        #expect(AnimationState.high.characterFPS == 12)
+    @Test("Interval is positive for non-idle rates")
+    func intervalPositive() {
+        #expect(mapper.interval(for: 1) > 0)
+        #expect(mapper.interval(for: 100) > 0)
+        #expect(mapper.interval(for: 5000) > 0)
     }
 }
 

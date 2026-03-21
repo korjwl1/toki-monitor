@@ -119,13 +119,16 @@ final class TokiReportRunner: Sendable {
     }
 
     func runReport(
-        args: [String],
+        reportOptions: [String] = [],
+        subcommandArgs: [String],
         completion: @escaping @Sendable (Result<Data, Error>) -> Void
     ) {
         DispatchQueue.global(qos: .utility).async {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = [self.tokiPath] + ["report", "--output-format", "json"] + args
+            // Order: toki report [--output-format json] [report-options] <subcommand> [subcommand-options]
+            process.arguments = [self.tokiPath, "report", "--output-format", "json"]
+                + reportOptions + subcommandArgs
 
             let pipe = Pipe()
             process.standardOutput = pipe

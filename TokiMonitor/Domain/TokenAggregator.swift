@@ -28,23 +28,36 @@ enum TimeRange: String, CaseIterable, Codable {
 @Observable
 final class TokenAggregator {
     private(set) var tokensPerMinute: Double = 0
-    private(set) var animationState: AnimationState = .idle
     private(set) var recentHistory: [Double] = []  // last N rate samples for sparkline
     private(set) var providerSummaries: [ProviderSummary] = []
     private(set) var totalSummary: TotalSummary?
 
+    // Per-provider rates and history for perProvider display mode
+    private(set) var perProviderRates: [String: Double] = [:]
+    private(set) var perProviderHistory: [String: [Double]] = [:]
+
     private var allEvents: [TokenEvent] = []
-    private var events: [(date: Date, tokens: UInt64)] = []
+    private var events: [(date: Date, tokens: UInt64, providerId: String)] = []
     private let rateWindow: TimeInterval = 30  // seconds for rate calc
     private let historySize = 30  // number of sparkline data points
-    private let mapper = AnimationStateMapper()
     private var sampleTimer: Timer?
     var timeRange: TimeRange = .oneHour
+
+    var graphTimeRange: GraphTimeRange = .oneMinute {
+        didSet {
+            if oldValue != graphTimeRange {
+                recentHistory = []
+                perProviderHistory = [:]
+                restartSampling()
+            }
+        }
+    }
 
     /// Call when a new token event arrives.
     func addEvent(_ event: TokenEvent) {
         let total = event.inputTokens + event.outputTokens
-        events.append((date: event.receivedAt, tokens: total))
+        let provider = ProviderRegistry.resolve(model: event.model)
+        events.append((date: event.receivedAt, tokens: total, providerId: provider.id))
         allEvents.append(event)
         pruneOldEvents()
         recalculateRate()
@@ -53,7 +66,9 @@ final class TokenAggregator {
 
     /// Start periodic sampling for sparkline history.
     func startSampling() {
-        sampleTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        sampleTimer?.invalidate()
+        let interval = graphTimeRange.sampleInterval
+        sampleTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.sampleRate()
             }
@@ -67,6 +82,11 @@ final class TokenAggregator {
 
     // MARK: - Private
 
+    private func restartSampling() {
+        stopSampling()
+        startSampling()
+    }
+
     private func pruneOldEvents() {
         let cutoff = Date().addingTimeInterval(-rateWindow)
         events.removeAll { $0.date < cutoff }
@@ -77,14 +97,38 @@ final class TokenAggregator {
         let totalTokens = events.reduce(UInt64(0)) { $0 + $1.tokens }
         let minutes = rateWindow / 60.0
         tokensPerMinute = Double(totalTokens) / minutes
-        animationState = mapper.map(tokensPerMinute: tokensPerMinute)
+
+        // Per-provider rates
+        var providerTotals: [String: UInt64] = [:]
+        for e in events {
+            providerTotals[e.providerId, default: 0] += e.tokens
+        }
+        var newRates: [String: Double] = [:]
+        for (pid, total) in providerTotals {
+            newRates[pid] = Double(total) / minutes
+        }
+        perProviderRates = newRates
     }
 
     private func sampleRate() {
         recalculateRate()
+
+        // Global history
         recentHistory.append(tokensPerMinute)
         if recentHistory.count > historySize {
             recentHistory.removeFirst(recentHistory.count - historySize)
+        }
+
+        // Per-provider history
+        let allProviderIds = Set(perProviderRates.keys).union(perProviderHistory.keys)
+        for pid in allProviderIds {
+            let rate = perProviderRates[pid] ?? 0
+            var history = perProviderHistory[pid] ?? []
+            history.append(rate)
+            if history.count > historySize {
+                history.removeFirst(history.count - historySize)
+            }
+            perProviderHistory[pid] = history
         }
     }
 

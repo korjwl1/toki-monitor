@@ -57,6 +57,15 @@ struct ProviderRegistry {
         colorName: "gray"
     )
 
+    /// All known providers (excluding unknown).
+    static let allProviders: [ProviderInfo] = providers
+
+    /// Providers available for user configuration (currently supported only).
+    static let configurableProviders: [ProviderInfo] = providers.filter {
+        // Gemini not yet supported by toki
+        $0.id != "google"
+    }
+
     /// Resolve a model name to its provider.
     static func resolve(model: String) -> ProviderInfo {
         providers.first { $0.matches(model: model) } ?? unknown

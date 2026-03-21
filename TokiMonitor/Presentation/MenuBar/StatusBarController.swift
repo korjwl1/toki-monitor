@@ -3,60 +3,47 @@ import SwiftUI
 
 @MainActor
 final class StatusBarController {
-    private let statusItem: NSStatusItem
     private let connectionManager: ConnectionManager
     private let eventStream: TokiEventStream
     private let aggregator = TokenAggregator()
 
-    // Animation renderers
-    private let characterRenderer = CharacterAnimationRenderer()
-    private let numericRenderer = NumericBadgeRenderer()
-    private let sparklineRenderer = SparklineRenderer()
+    // Status item units (single for aggregated, multiple for perProvider)
+    private var units: [StatusItemUnit] = []
 
     // Dashboard & Settings
     private let dashboardController = DashboardWindowController()
-    private let settings = AppSettings()
+    let settings = AppSettings()
     private lazy var settingsController = SettingsWindowController(settings: settings)
+
+    // Menu panel
+    private var menuPanel: NSPanel?
+    private var eventMonitor: Any?
+    private var globalMonitor: Any?
 
     init() {
         eventStream = TokiEventStream()
         connectionManager = ConnectionManager(eventStream: eventStream)
 
-        statusItem = NSStatusBar.system.statusItem(
-            withLength: NSStatusItem.variableLength
-        )
-        setupButton()
         setupEventHandling()
+        setupSleepWakeHandling()
 
         // Apply settings
         aggregator.timeRange = settings.defaultTimeRange
+        aggregator.graphTimeRange = settings.graphTimeRange
         aggregator.startSampling()
 
         // Check daemon status and auto-connect if running
         connectionManager.checkAndConnect()
 
-        // Apply initial display style
-        updateMenuBarDisplay()
+        // Build initial status items
+        rebuildStatusItems()
 
         // Observe
-        observeAnimationState()
+        observeTokenRate()
         observeSettings()
     }
 
     // MARK: - Setup
-
-    private func setupButton() {
-        guard let button = statusItem.button else { return }
-        if let img = NSImage(systemSymbolName: "hare", accessibilityDescription: "Toki Monitor") {
-            img.size = NSSize(width: 18, height: 18)
-            img.isTemplate = true
-            button.image = img
-        } else {
-            button.title = "🐇"
-        }
-        button.action = #selector(handleClick)
-        button.target = self
-    }
 
     private func setupEventHandling() {
         eventStream.onEvent = { [weak self] event in
@@ -64,206 +51,257 @@ final class StatusBarController {
         }
     }
 
-    // MARK: - Click → NSMenu
+    // MARK: - Sleep/Wake
 
-    @objc private func handleClick() {
-        let menu = NSMenu()
-        let menuWidth: CGFloat = 280
-
-        // --- Connection status section ---
-        if connectionManager.state.isConnected {
-            let headerItem = NSMenuItem()
-            let headerView = NSHostingView(rootView:
-                VStack(spacing: 4) {
-                    HStack {
-                        Text("Toki Monitor")
-                            .font(.headline)
-                        Spacer()
-                        Circle().fill(.green).frame(width: 8, height: 8)
-                        Text("연결됨").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Text(TokenFormatter.formatRate(aggregator.tokensPerMinute))
-                        .font(.system(.title3, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+    private func setupSleepWakeHandling() {
+        let nc = NSWorkspace.shared.notificationCenter
+        nc.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                for unit in self?.units ?? [] {
+                    unit.statusItem.button?.title = ""
                 }
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .frame(width: menuWidth)
-            )
-            headerView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 60)
-            headerItem.view = headerView
-            menu.addItem(headerItem)
-            menu.addItem(.separator())
+                self?.aggregator.stopSampling()
+            }
+        }
+        nc.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.aggregator.startSampling()
+                self?.updateAllDisplays()
+            }
+        }
+    }
 
-            if aggregator.providerSummaries.isEmpty {
-                let emptyItem = NSMenuItem()
-                let emptyView = NSHostingView(rootView:
-                    Text("이벤트 대기 중...")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .frame(width: menuWidth, height: 30)
+    // MARK: - Status Item Management
+
+    private func rebuildStatusItems() {
+        // Tear down existing
+        for unit in units {
+            unit.teardown()
+        }
+        units.removeAll()
+
+        switch settings.providerDisplayMode {
+        case .aggregated:
+            let unit = StatusItemUnit(providerId: nil)
+            unit.onClick = { [weak self] in self?.handleClick(from: unit) }
+            units.append(unit)
+
+        case .perProvider:
+            let providers = ProviderRegistry.configurableProviders.filter { provider in
+                settings.effectiveSettings(for: provider.id).enabled
+            }
+            for provider in providers {
+                let unit = StatusItemUnit(providerId: provider.id)
+                unit.onClick = { [weak self] in self?.handleClick(from: unit) }
+                units.append(unit)
+            }
+            // Fallback: at least one unit
+            if units.isEmpty {
+                let unit = StatusItemUnit(providerId: nil)
+                unit.onClick = { [weak self] in self?.handleClick(from: unit) }
+                units.append(unit)
+            }
+        }
+
+        updateAllDisplays()
+    }
+
+    private func updateAllDisplays() {
+        for unit in units {
+            if let pid = unit.providerId {
+                // Per-provider mode — use provider's theme color
+                let rate = aggregator.perProviderRates[pid] ?? 0
+                let history = aggregator.perProviderHistory[pid] ?? []
+                let style = settings.effectiveStyle(for: pid)
+                let colorName = settings.effectiveColorName(
+                    for: ProviderRegistry.allProviders.first { $0.id == pid } ?? ProviderRegistry.unknown
                 )
-                emptyView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 30)
-                emptyItem.view = emptyView
-                menu.addItem(emptyItem)
+                let tint = Self.nsColor(from: colorName)
+                unit.update(
+                    tokensPerMinute: rate,
+                    history: history,
+                    style: style,
+                    showRateText: settings.showRateText,
+                    textPosition: settings.textPosition,
+                    tokenUnit: settings.tokenUnit,
+                    tintColor: tint
+                )
             } else {
-                if let total = aggregator.totalSummary {
-                    let totalItem = NSMenuItem()
-                    let totalView = NSHostingView(rootView:
-                        TotalSummaryView(total: total)
-                            .padding(.horizontal, 12)
-                            .frame(width: menuWidth)
-                    )
-                    totalView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 44)
-                    totalItem.view = totalView
-                    menu.addItem(totalItem)
-                    menu.addItem(.separator())
-                }
-
-                for summary in aggregator.providerSummaries {
-                    let item = NSMenuItem()
-                    let rowView = NSHostingView(rootView:
-                        ProviderRowView(summary: summary)
-                            .padding(.horizontal, 12)
-                            .frame(width: menuWidth)
-                    )
-                    rowView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 44)
-                    item.view = rowView
-                    menu.addItem(item)
-                }
+                // Aggregated mode
+                let tint: NSColor? = settings.aggregatedColorName.map { Self.nsColor(from: $0) }
+                unit.update(
+                    tokensPerMinute: aggregator.tokensPerMinute,
+                    history: aggregator.recentHistory,
+                    style: settings.animationStyle,
+                    showRateText: settings.showRateText,
+                    textPosition: settings.textPosition,
+                    tokenUnit: settings.tokenUnit,
+                    tintColor: tint
+                )
             }
-        } else {
-            let disconnectedItem = NSMenuItem()
-            let disconnectedView = NSHostingView(rootView:
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("Toki Monitor")
-                            .font(.headline)
-                        Spacer()
-                        Circle().fill(.red).frame(width: 8, height: 8)
-                        Text("미연결").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .frame(width: menuWidth)
-            )
-            disconnectedView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 36)
-            disconnectedItem.view = disconnectedView
-            menu.addItem(disconnectedItem)
-            menu.addItem(.separator())
+        }
+    }
 
-            let startItem = NSMenuItem(title: "toki 데몬 시작", action: #selector(startDaemon), keyEquivalent: "")
-            startItem.target = self
-            menu.addItem(startItem)
+    private static func nsColor(from colorName: String) -> NSColor {
+        switch colorName {
+        case "orange": .systemOrange
+        case "blue": .systemBlue
+        case "green": .systemGreen
+        case "purple": .systemPurple
+        case "red": .systemRed
+        case "pink": .systemPink
+        case "yellow": .systemYellow
+        case "teal": .systemTeal
+        case "indigo": .systemIndigo
+        case "mint": .systemMint
+        case "cyan": .systemCyan
+        case "brown": .systemBrown
+        case "gray": .systemGray
+        default: .labelColor
+        }
+    }
+
+    // MARK: - Click → Panel
+
+    private func handleClick(from unit: StatusItemUnit) {
+        if menuPanel != nil {
+            dismissPanel()
+            return
         }
 
-        menu.addItem(.separator())
-
-        // --- Settings inline ---
-        let settingsItem = NSMenuItem()
-        let settingsView = NSHostingView(rootView:
-            VStack(alignment: .leading, spacing: 10) {
-                Text("메뉴바 스타일")
-                    .font(.caption).foregroundStyle(.secondary)
-                Picker("", selection: Binding(
-                    get: { self.settings.animationStyle },
-                    set: { self.settings.animationStyle = $0 }
-                )) {
-                    Text("캐릭터").tag(AnimationStyle.character)
-                    Text("수치").tag(AnimationStyle.numeric)
-                    Text("그래프").tag(AnimationStyle.sparkline)
-                }
-                .pickerStyle(.segmented)
+        let contentView = MenuContentView(
+            isConnected: connectionManager.state.isConnected,
+            tokensPerMinute: aggregator.tokensPerMinute,
+            providerSummaries: aggregator.providerSummaries,
+            totalSummary: aggregator.totalSummary,
+            settings: settings,
+            onStartDaemon: { [weak self] in
+                self?.dismissPanel()
+                self?.connectionManager.startDaemonAndConnect()
+            },
+            onOpenDashboard: { [weak self] in
+                self?.dismissPanel()
+                self?.dashboardController.show()
+            },
+            onOpenSettings: { [weak self] in
+                self?.dismissPanel()
+                self?.settingsController.show()
+            },
+            onQuit: {
+                NSApp.terminate(nil)
             }
-            .padding(.horizontal, 12).padding(.vertical, 6)
-            .frame(width: menuWidth)
         )
-        settingsView.frame = NSRect(x: 0, y: 0, width: menuWidth, height: 56)
-        settingsItem.view = settingsView
-        menu.addItem(settingsItem)
 
-        menu.addItem(.separator())
+        let hostingView = NSHostingView(rootView: contentView)
+        hostingView.setFrameSize(hostingView.fittingSize)
 
-        // --- Always visible items ---
-        let dashItem = NSMenuItem(title: "대시보드", action: #selector(openDashboard), keyEquivalent: "d")
-        dashItem.target = self
-        menu.addItem(dashItem)
+        let panel = NSPanel(
+            contentRect: .zero,
+            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            backing: .buffered,
+            defer: true
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.level = .statusBar
+        panel.isMovable = false
+        panel.hasShadow = true
 
-        let fullSettingsItem = NSMenuItem(title: "설정...", action: #selector(openSettings), keyEquivalent: ",")
-        fullSettingsItem.target = self
-        menu.addItem(fullSettingsItem)
+        let visualEffect = NSVisualEffectView()
+        visualEffect.material = .menu
+        visualEffect.state = .active
+        visualEffect.blendingMode = .behindWindow
+        visualEffect.wantsLayer = true
+        visualEffect.layer?.cornerRadius = 10
+        visualEffect.layer?.masksToBounds = true
 
-        menu.addItem(.separator())
+        visualEffect.addSubview(hostingView)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            hostingView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
+            hostingView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
+        ])
 
-        let quitItem = NSMenuItem(title: "종료", action: #selector(quitApp), keyEquivalent: "q")
-        quitItem.target = self
-        menu.addItem(quitItem)
+        panel.contentView = visualEffect
 
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-        statusItem.menu = nil
-    }
-
-    @objc private func openDashboard() {
-        dashboardController.show()
-    }
-
-    @objc private func startDaemon() {
-        connectionManager.startDaemonAndConnect()
-    }
-
-    @objc private func openSettings() {
-        settingsController.show()
-    }
-
-    @objc private func quitApp() {
-        NSApp.terminate(nil)
-    }
-
-    // MARK: - Animation
-
-    private var currentStyle: AnimationStyle?
-
-    private func updateMenuBarDisplay() {
-        guard let button = statusItem.button else { return }
-
-        let effectiveStyle: AnimationStyle
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            effectiveStyle = .numeric
-        } else {
-            effectiveStyle = settings.animationStyle
+        // Position below the clicked status item
+        if let button = unit.statusItem.button,
+           let window = button.window {
+            let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
+            let panelSize = hostingView.fittingSize
+            let x = buttonFrame.midX - panelSize.width / 2
+            let y = buttonFrame.minY - panelSize.height - 4
+            panel.setFrame(
+                NSRect(x: x, y: y, width: panelSize.width, height: panelSize.height),
+                display: true
+            )
         }
 
-        // Full reset only when style changes
-        if currentStyle != effectiveStyle {
-            characterRenderer.stop()
-            numericRenderer.clear(button: button)
-            button.image = nil
-            button.attributedTitle = NSAttributedString(string: "")
-            currentStyle = effectiveStyle
+        panel.orderFrontRegardless()
+        menuPanel = panel
+
+        // Dismiss when clicking outside (but not on any of our status bar buttons)
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self, let panel = self.menuPanel else { return event }
+            let clickPoint = NSEvent.mouseLocation
+
+            // Ignore clicks on any of our status bar buttons
+            for u in self.units {
+                if let frame = self.statusItemFrame(u) {
+                    if frame.contains(clickPoint) { return event }
+                }
+            }
+
+            if !panel.frame.contains(clickPoint) {
+                self.dismissPanel()
+            }
+            return event
         }
 
-        // Update current style's display
-        switch effectiveStyle {
-        case .character:
-            // Only restart timer if animation state changed (handled inside renderer)
-            characterRenderer.update(state: aggregator.animationState, button: button)
-        case .numeric:
-            numericRenderer.update(tokensPerMinute: aggregator.tokensPerMinute, button: button)
-        case .sparkline:
-            sparklineRenderer.update(history: aggregator.recentHistory, button: button)
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.dismissPanel()
         }
+    }
+
+    private func dismissPanel() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+        if let monitor = globalMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMonitor = nil
+        }
+        menuPanel?.close()
+        menuPanel = nil
+    }
+
+    private func statusItemFrame(_ unit: StatusItemUnit) -> NSRect? {
+        guard let button = unit.statusItem.button,
+              let window = button.window else { return nil }
+        return window.convertToScreen(button.convert(button.bounds, to: nil))
     }
 
     // MARK: - Observation
 
-    private func observeAnimationState() {
+    private func observeTokenRate() {
         withObservationTracking {
-            _ = aggregator.animationState
+            _ = aggregator.tokensPerMinute
             _ = aggregator.recentHistory
+            _ = aggregator.perProviderRates
+            _ = aggregator.perProviderHistory
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.updateMenuBarDisplay()
-                self?.observeAnimationState()
+                self?.updateAllDisplays()
+                self?.observeTokenRate()
             }
         }
     }
@@ -272,12 +310,42 @@ final class StatusBarController {
         withObservationTracking {
             _ = settings.animationStyle
             _ = settings.defaultTimeRange
+            _ = settings.showRateText
+            _ = settings.textPosition
+            _ = settings.tokenUnit
+            _ = settings.graphTimeRange
+            _ = settings.providerDisplayMode
+            _ = settings.providerSettingsMap
+            _ = settings.aggregatedColorName
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.aggregator.timeRange = self?.settings.defaultTimeRange ?? .oneHour
-                self?.updateMenuBarDisplay()
-                self?.observeSettings()
+                guard let self else { return }
+                self.aggregator.timeRange = self.settings.defaultTimeRange
+                self.aggregator.graphTimeRange = self.settings.graphTimeRange
+
+                // Rebuild items if display mode or provider enablement changed
+                let needsRebuild = self.needsRebuild()
+                if needsRebuild {
+                    self.rebuildStatusItems()
+                } else {
+                    self.updateAllDisplays()
+                }
+
+                self.observeSettings()
             }
+        }
+    }
+
+    private func needsRebuild() -> Bool {
+        switch settings.providerDisplayMode {
+        case .aggregated:
+            return units.count != 1 || units.first?.providerId != nil
+        case .perProvider:
+            let enabledIds = ProviderRegistry.configurableProviders
+                .filter { settings.effectiveSettings(for: $0.id).enabled }
+                .map(\.id)
+            let currentIds = units.compactMap(\.providerId)
+            return Set(enabledIds) != Set(currentIds)
         }
     }
 }

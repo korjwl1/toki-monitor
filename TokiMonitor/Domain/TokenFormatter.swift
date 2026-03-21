@@ -34,4 +34,21 @@ enum TokenFormatter {
             return String(format: "%.1fM/m", tokensPerMinute / 1_000_000)
         }
     }
+
+    /// Unit-aware rate formatting.
+    static func formatRate(_ tokensPerMinute: Double, unit: TokenUnit) -> String {
+        switch unit {
+        case .perMinute:
+            return formatRate(tokensPerMinute)
+        case .perSecond:
+            let tps = tokensPerMinute / 60.0
+            if tps < 0.1 { return "0/s" }
+            else if tps < 1000 { return String(format: "%.0f/s", tps) }
+            else if tps < 1_000_000 { return String(format: "%.1fK/s", tps / 1000) }
+            else { return String(format: "%.1fM/s", tps / 1_000_000) }
+        case .raw:
+            let total = UInt64(max(0, tokensPerMinute * 0.5))  // 30s window estimate
+            return formatTokens(total)
+        }
+    }
 }

@@ -1,57 +1,94 @@
 import AppKit
 
 /// Renders frame-based character animation in the menu bar.
-/// Loads PNG frames from Resources/CharacterFrames/ and cycles them
-/// at a speed proportional to the animation state.
 @MainActor
 final class CharacterAnimationRenderer {
     private var frames: [NSImage] = []
     private var currentFrame = 0
-    private var timer: Timer?
+    private var frameTimer: Timer?
+    private let mapper = AnimationStateMapper()
+    private var currentInterval: TimeInterval = 0
+    private var currentTintColor: NSColor?
 
     init() {
         loadFrames()
     }
 
-    private var currentState: AnimationState?
+    func update(tokensPerMinute: Double, button: NSStatusBarButton, tintColor: NSColor? = nil) {
+        currentTintColor = tintColor
+        let idle = mapper.isIdle(tokensPerMinute: tokensPerMinute)
 
-    /// Update animation speed based on state. Skips if state unchanged.
-    func update(state: AnimationState, button: NSStatusBarButton) {
-        guard state != currentState else { return }
-        currentState = state
-
-        timer?.invalidate()
-        timer = nil
-
-        if state == .idle {
-            button.image = frames.first
-            button.image?.isTemplate = true
+        if idle {
+            stopAnimation()
+            applyFrame(0, to: button)
             return
         }
 
-        let interval = 1.0 / state.characterFPS
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        let newInterval = mapper.interval(for: tokensPerMinute)
+
+        let threshold = 0.1
+        if frameTimer != nil,
+           currentInterval > 0,
+           abs(newInterval - currentInterval) / currentInterval < threshold {
+            return
+        }
+
+        startAnimation(interval: newInterval, button: button)
+    }
+
+    func stop() {
+        stopAnimation()
+        currentFrame = 0
+    }
+
+    // MARK: - Private
+
+    private func applyFrame(_ index: Int, to button: NSStatusBarButton) {
+        guard index < frames.count else { return }
+        let frame = frames[index]
+        if let tint = currentTintColor {
+            button.image = tintedImage(frame, color: tint)
+            button.image?.isTemplate = false
+        } else {
+            button.image = frame
+            button.image?.isTemplate = true
+        }
+    }
+
+    private func startAnimation(interval: TimeInterval, button: NSStatusBarButton) {
+        frameTimer?.invalidate()
+        currentInterval = interval
+
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
                 self.advanceFrame(button: button)
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        frameTimer = timer
     }
 
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-        currentFrame = 0
-        currentState = nil
+    private func stopAnimation() {
+        frameTimer?.invalidate()
+        frameTimer = nil
+        currentInterval = 0
     }
-
-    // MARK: - Private
 
     private func advanceFrame(button: NSStatusBarButton) {
         guard !frames.isEmpty else { return }
         currentFrame = (currentFrame + 1) % frames.count
-        button.image = frames[currentFrame]
-        button.image?.isTemplate = true
+        applyFrame(currentFrame, to: button)
+    }
+
+    private func tintedImage(_ image: NSImage, color: NSColor) -> NSImage {
+        let tinted = NSImage(size: image.size, flipped: false) { rect in
+            image.draw(in: rect)
+            color.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        return tinted
     }
 
     private func loadFrames() {
@@ -60,19 +97,13 @@ final class CharacterAnimationRenderer {
 
         frames = (0..<frameCount).compactMap { i in
             let name = String(format: "frame_%02d", i)
-            guard let url = bundle.url(
-                forResource: name,
-                withExtension: "png"
-            ) else {
-                return nil
-            }
-            guard let image = NSImage(contentsOf: url) else { return nil }
-            image.size = NSSize(width: 30, height: 22)
+            guard let url = bundle.url(forResource: name, withExtension: "png"),
+                  let image = NSImage(contentsOf: url) else { return nil }
+            image.size = NSSize(width: 24, height: 18)
             image.isTemplate = true
             return image
         }
 
-        // Fallback: if no frames found, generate simple placeholders
         if frames.isEmpty {
             frames = generatePlaceholderFrames()
         }

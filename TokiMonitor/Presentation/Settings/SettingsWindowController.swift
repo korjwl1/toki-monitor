@@ -23,11 +23,12 @@ final class SettingsWindowController {
         let hostingController = NSHostingController(rootView: settingsView)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 250),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 500),
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
+        window.minSize = NSSize(width: 320, height: 300)
         window.title = "Toki Monitor 설정"
         window.contentViewController = hostingController
         window.center()
