@@ -220,21 +220,45 @@ final class StatusBarController {
         )
 
         let hostingView = NSHostingView(rootView: contentView)
+        hostingView.sizingOptions = [.minSize]
+        if #available(macOS 14.0, *) {
+            hostingView.safeAreaRegions = []
+        }
         hostingView.setFrameSize(hostingView.fittingSize)
         menuHostingView = hostingView
 
         let panel = NSPanel(
             contentRect: .zero,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.titled, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: true
         )
+        // Cosmetically borderless — hide titlebar chrome
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.level = .statusBar
-        panel.styleMask.insert(.borderless)
         panel.isMovable = false
         panel.hasShadow = false
+
+        // Debug: dump view hierarchy to verify safe area fix
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            func dmp(_ v: NSView, d: Int = 0) -> String {
+                let c = type(of: v).description()
+                let f = v.frame
+                var s = "\(String(repeating: "  ", count: d))\(c) \(Int(f.width))x\(Int(f.height))\n"
+                for sub in v.subviews { s += dmp(sub, d: d+1) }
+                return s
+            }
+            if let tf = panel.contentView?.superview {
+                try? dmp(tf).write(toFile: NSHomeDirectory() + "/.toki-view-dump.txt", atomically: true, encoding: .utf8)
+            }
+        }
         panel.becomesKeyOnlyIfNeeded = true
         panel.acceptsMouseMovedEvents = true
         panel.isFloatingPanel = true
@@ -245,24 +269,23 @@ final class StatusBarController {
         if let button = unit.statusItem.button,
            let window = button.window {
             let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
-            let panelSize = hostingView.fittingSize
+            let contentSize = hostingView.fittingSize
             let screenFrame = NSScreen.main?.visibleFrame ?? .zero
 
-            // Align roughly 1/4 of panel width left of button center
-            var x = buttonFrame.midX - panelSize.width / 4
-            // If panel would go off screen right, shift left
+            // Set content size — panel auto-calculates frame including titlebar
+            panel.setContentSize(contentSize)
+            let panelSize = panel.frame.size
+
+            // Align panel left edge to button left edge (standard macOS menu behavior)
+            var x = buttonFrame.minX
             if x + panelSize.width > screenFrame.maxX {
                 x = screenFrame.maxX - panelSize.width - 4
             }
-            // If panel would go off screen left, shift right
             if x < screenFrame.minX {
                 x = screenFrame.minX + 4
             }
             let y = buttonFrame.minY - panelSize.height - 4
-            panel.setFrame(
-                NSRect(x: x, y: y, width: panelSize.width, height: panelSize.height),
-                display: true
-            )
+            panel.setFrameOrigin(NSPoint(x: x, y: y))
         }
 
         panel.orderFrontRegardless()

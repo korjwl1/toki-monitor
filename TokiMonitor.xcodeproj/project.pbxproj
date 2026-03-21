@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F20000000001 /* GlassWorkaround.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000001 /* GlassWorkaround.swift */; };
 		E10000000001 /* OAuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000001 /* OAuthModels.swift */; };
 		E10000000002 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000002 /* KeychainTokenStore.swift */; };
 		E10000000003 /* OAuthCallbackServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000003 /* OAuthCallbackServer.swift */; };
@@ -74,6 +75,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		F30000000001 /* GlassWorkaround.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWorkaround.swift; sourceTree = "<group>"; };
 		D10000000001 /* OAuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthModels.swift; sourceTree = "<group>"; };
 		D10000000002 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
 		D10000000003 /* OAuthCallbackServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthCallbackServer.swift; sourceTree = "<group>"; };
@@ -190,6 +192,7 @@
 				27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */,
 				A6C1751117D1E380839B3A0E /* StatusBarController.swift */,
 				DD1234567890ABCDEF123456 /* StatusItemUnit.swift */,
+				F30000000001 /* GlassWorkaround.swift */,
 			);
 			path = MenuBar;
 			sourceTree = "<group>";
@@ -453,6 +456,7 @@
 				909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */,
 				AA1234567890ABCDEF123456 /* MenuContentView.swift in Sources */,
 				CC1234567890ABCDEF123456 /* StatusItemUnit.swift in Sources */,
+				F20000000001 /* GlassWorkaround.swift in Sources */,
 				E10000000001 /* OAuthModels.swift in Sources */,
 				E10000000002 /* KeychainTokenStore.swift in Sources */,
 				E10000000003 /* OAuthCallbackServer.swift in Sources */,

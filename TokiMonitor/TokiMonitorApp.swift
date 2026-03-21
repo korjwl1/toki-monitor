@@ -18,6 +18,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Skip setup when running as test host
         guard ProcessInfo.processInfo.environment["XCTestBundlePath"] == nil else { return }
+
+        // Enable liquid glass in non-activating panels
+        GlassFixWorkaround.install()
+
         statusBarController = StatusBarController()
 
         // Request notification permission for usage alerts
