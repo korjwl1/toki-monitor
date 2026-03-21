@@ -126,6 +126,13 @@ final class ClaudeOAuthManager {
         }
     }
 
+    /// Force refresh token to get a new access token (resets rate limit window).
+    func forceRefreshToken() async throws -> String {
+        guard let currentTokens = tokens else { throw OAuthError.noTokens }
+        let refreshed = try await refreshTokens(using: currentTokens.refreshToken)
+        return refreshed.accessToken
+    }
+
     // MARK: - Private
 
     private func refreshTokens(using refreshToken: String, retryCount: Int = 0) async throws -> OAuthTokens {

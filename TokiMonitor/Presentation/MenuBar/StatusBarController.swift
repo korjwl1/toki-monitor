@@ -239,9 +239,10 @@ final class StatusBarController {
         panel.isFloatingPanel = true
 
         let visualEffect = NSVisualEffectView()
-        visualEffect.material = .popover
+        visualEffect.material = .hudWindow
         visualEffect.state = .active
         visualEffect.blendingMode = .behindWindow
+        visualEffect.appearance = NSAppearance(named: .darkAqua)
         visualEffect.wantsLayer = true
         visualEffect.layer?.cornerRadius = 10
         visualEffect.layer?.masksToBounds = true

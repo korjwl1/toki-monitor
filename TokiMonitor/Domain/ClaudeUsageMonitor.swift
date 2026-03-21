@@ -6,6 +6,7 @@ import UserNotifications
 @Observable
 final class ClaudeUsageMonitor {
     private(set) var currentUsage: ClaudeUsageResponse?
+    private(set) var lastError: String?
 
     private let oauthManager: ClaudeOAuthManager
     private let aggregator: TokenAggregator
@@ -52,33 +53,47 @@ final class ClaudeUsageMonitor {
             let token = try await oauthManager.getValidAccessToken()
             let usage = try await ClaudeUsageClient.fetchUsage(accessToken: token)
             currentUsage = usage
+            lastError = nil
             checkThresholds(usage)
-        } catch {
-            // On permanent auth failure, usage becomes nil
-            if case .permanentAuthFailure = error as? OAuthError {
+        } catch let error as OAuthError {
+            if case .usageFetchFailed(429) = error {
+                // Rate limited — refresh token to get a new ~5-request window
+                lastError = nil // Don't show 429 to user, handle silently
+                do {
+                    let newToken = try await oauthManager.forceRefreshToken()
+                    let usage = try await ClaudeUsageClient.fetchUsage(accessToken: newToken)
+                    currentUsage = usage
+                    checkThresholds(usage)
+                } catch {
+                    // Refresh retry also failed — wait for next poll
+                    lastError = "사용량 조회 제한 — 잠시 후 재시도"
+                }
+            } else if case .permanentAuthFailure = error {
                 currentUsage = nil
+                lastError = error.localizedDescription
+            } else {
+                lastError = error.localizedDescription
             }
-            // Transient errors: keep old data, retry on next tick
+        } catch {
+            lastError = error.localizedDescription
         }
     }
 
     // MARK: - Adaptive Interval
 
     private func computeInterval() -> TimeInterval {
-        // Near limit → 15s
+        // Usage API is severely rate-limited (~5 requests per access token).
+        // Minimum 120s between polls to stay under limit.
+        // Near limit (>75%) → 120s (minimum safe interval)
+        // Active → 180s
+        // Default → 300s
         if let usage = currentUsage, usage.maxUtilization > 75 {
-            return 15
+            return 120
         }
-
-        // Active (tokens flowing) → 30s
         if aggregator.tokensPerMinute > 0 {
-            return 30
+            return 180
         }
-
-        // Idle (no events for 5min) → 5min
-        // Check via tokensPerMinute being 0 for a while
-        // Since we don't track "time since last event", use rate as proxy
-        return 60  // default
+        return 300
     }
 
     // MARK: - Threshold Alerts

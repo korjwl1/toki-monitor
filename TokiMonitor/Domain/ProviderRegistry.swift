@@ -6,7 +6,8 @@ struct ProviderInfo: Identifiable {
     let name: String
     let prefixes: [String]   // model name prefixes
     let schemas: [String]    // toki schema names (e.g., "claude_code", "codex")
-    let icon: String         // SF Symbol name
+    let icon: String         // SF Symbol name (fallback)
+    let logoImage: String?   // Asset Catalog image name (preferred)
     let colorName: String    // resolved to Color in Presentation layer
 
     func matches(model: String) -> Bool {
@@ -33,6 +34,7 @@ struct ProviderRegistry {
             prefixes: ["claude-", "claude_"],
             schemas: ["claude_code"],
             icon: "brain.head.profile",
+            logoImage: "claude-logo",
             colorName: "orange"
         ),
         ProviderInfo(
@@ -41,6 +43,7 @@ struct ProviderRegistry {
             prefixes: ["gpt-", "o1-", "o3-", "o4-", "chatgpt-"],
             schemas: ["codex"],
             icon: "circle.hexagongrid",
+            logoImage: "openai-logo",
             colorName: "green"
         ),
         ProviderInfo(
@@ -49,6 +52,7 @@ struct ProviderRegistry {
             prefixes: ["gemini-", "gemini_"],
             schemas: ["gemini_cli"],
             icon: "sparkle",
+            logoImage: nil,
             colorName: "blue"
         ),
     ]
@@ -59,6 +63,7 @@ struct ProviderRegistry {
         prefixes: [],
         schemas: [],
         icon: "questionmark.circle",
+        logoImage: nil,
         colorName: "gray"
     )
 

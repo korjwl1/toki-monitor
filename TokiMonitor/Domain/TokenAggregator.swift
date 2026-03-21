@@ -32,6 +32,8 @@ final class TokenAggregator {
 
     private(set) var tokensPerMinute: Double = 0
     private(set) var perProviderRates: [String: Double] = [:]
+    /// Active session count per provider (unique sources in rate window).
+    private(set) var perProviderSessionCount: [String: Int] = [:]
 
     // MARK: - PromQL data
 
@@ -51,7 +53,7 @@ final class TokenAggregator {
 
     // MARK: - Private
 
-    private var traceEvents: [(date: Date, tokens: UInt64, providerId: String)] = []
+    private var traceEvents: [(date: Date, tokens: UInt64, providerId: String, source: String)] = []
     private let rateWindow: TimeInterval = 30
     private let historyBins = 30
     private var rateTimer: Timer?
@@ -66,7 +68,7 @@ final class TokenAggregator {
     func addEvent(_ event: TokenEvent) {
         let total = event.inputTokens + event.outputTokens
         let provider = ProviderRegistry.resolve(model: event.model)
-        traceEvents.append((date: event.receivedAt, tokens: total, providerId: provider.id))
+        traceEvents.append((date: event.receivedAt, tokens: total, providerId: provider.id, source: event.source))
         pruneTraceEvents()
         recalculateRate()
     }
@@ -118,6 +120,13 @@ final class TokenAggregator {
             providerTotals[e.providerId, default: 0] += e.tokens
         }
         perProviderRates = providerTotals.mapValues { Double($0) / minutes }
+
+        // Count unique sessions per provider in rate window
+        var sessionsByProvider: [String: Set<String>] = [:]
+        for e in recent {
+            sessionsByProvider[e.providerId, default: []].insert(e.source)
+        }
+        perProviderSessionCount = sessionsByProvider.mapValues(\.count)
     }
 
     // MARK: - PromQL Report

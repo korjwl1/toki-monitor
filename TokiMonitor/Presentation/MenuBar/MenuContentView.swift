@@ -1,6 +1,10 @@
 import SwiftUI
 import Charts
 
+private let borderClr = Color.white.opacity(0.18)
+private let subClr = Color.white.opacity(0.55)
+private let dimClr = Color.white.opacity(0.3)
+
 struct MenuContentView: View {
     let aggregator: TokenAggregator
     let connectionManager: ConnectionManager
@@ -18,62 +22,159 @@ struct MenuContentView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            leftPanel.frame(width: 252)
-            Divider()
-            rightPanel.frame(width: 72)
+            leftPanel.frame(width: 200)
+            rightPanel.frame(width: 80)
         }
-        .frame(minHeight: 200)
+        .environment(\.colorScheme, .dark)
     }
 
-    // MARK: - Left Panel
+    // MARK: - Left
 
     private var leftPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 6) {
-                Text("Toki Monitor")
-                    .font(.headline)
-                Spacer()
-                Circle()
-                    .fill(isConnected ? Color.green : Color.red)
-                    .frame(width: 6, height: 6)
-                Text(isConnected ? "연결됨" : "미연결")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-
-            sectionDivider
-
             if isConnected {
-                // Provider sections
                 let summaries = buildDisplaySummaries()
-                ForEach(Array(summaries.enumerated()), id: \.element.id) { i, summary in
-                    if i > 0 { sectionDivider }
-                    providerSection(summary)
+                ForEach(Array(summaries.enumerated()), id: \.element.id) { i, s in
+                    if i > 0 { hDiv }
+                    providerSection(s)
                 }
-
-                // Claude usage
-                if let monitor = usageMonitor, let usage = monitor.currentUsage {
-                    sectionDivider
-                    claudeUsageSection(usage)
+                if let monitor = usageMonitor {
+                    if let usage = monitor.currentUsage {
+                        hDiv
+                        usageSection(usage)
+                    } else if let err = monitor.lastError {
+                        hDiv
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundStyle(.orange)
+                            Text(err)
+                                .font(.system(size: 9))
+                                .foregroundStyle(dimClr)
+                                .lineLimit(2)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                    }
                 }
             } else {
-                disconnectedSection
+                VStack(spacing: 10) {
+                    Image(systemName: "bolt.slash")
+                        .font(.system(size: 20))
+                        .foregroundStyle(dimClr)
+                    Text("toki 미연결")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(subClr)
+                    Button("데몬 시작", action: onStartDaemon)
+                        .font(.system(size: 11))
+                        .controlSize(.small)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
             }
         }
     }
 
-    // MARK: - Right Panel
+    private func providerSection(_ s: ProviderSummary) -> some View {
+        let clr = s.provider.color(
+            customColorName: settings.effectiveSettings(for: s.provider.id).customColorName
+        )
+        let hist = perProviderHistory[s.provider.id] ?? []
+        let rate = aggregator.perProviderRates[s.provider.id] ?? 0
+
+        return HStack(spacing: 10) {
+            // Logo — vertically centered
+            providerLogo(s.provider, color: clr)
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                // Name + cost on one line
+                HStack {
+                    Text("\(s.provider.name):")
+                        .font(.system(size: 13, weight: .bold))
+                    if let c = s.estimatedCost, c > 0 {
+                        Text(TokenFormatter.formatCost(c))
+                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    Label(TokenFormatter.formatRate(rate), systemImage: "speedometer")
+                    let sessions = aggregator.perProviderSessionCount[s.provider.id] ?? 0
+                    Label("\(sessions) 세션", systemImage: "person.2")
+                }
+                .font(.system(size: 10))
+                .foregroundStyle(subClr)
+
+                // Sparkline (always show — flat line if no data)
+                spark(hist.count >= 2 ? hist : Array(repeating: 0, count: 30), color: clr)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private func providerLogo(_ provider: ProviderInfo, color: Color) -> some View {
+        if let logoName = provider.logoImage {
+            Image(logoName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        } else {
+            Image(systemName: provider.icon)
+                .font(.system(size: 18))
+                .foregroundStyle(color)
+        }
+    }
+
+    private func usageSection(_ usage: ClaudeUsageResponse) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "gauge.with.dots.needle.50percent")
+                .font(.system(size: 18))
+                .foregroundStyle(.cyan)
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Claude 사용량")
+                    .font(.system(size: 13, weight: .bold))
+
+                if let fh = usage.fiveHour { bar("5시간", fh) }
+                if let sd = usage.sevenDay { bar("7일", sd) }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private func bar(_ label: String, _ b: UsageBucket) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(label).foregroundStyle(subClr)
+                Spacer()
+                Text("\(Int(b.utilization))%").fontWeight(.medium)
+                Text("· \(b.resetCountdown)")
+                    .foregroundStyle(dimClr)
+            }
+            .font(.system(size: 10))
+            GeometryReader { g in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2).fill(Color.white.opacity(0.1))
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(b.utilization >= 90 ? .red : b.utilization >= 75 ? .orange : b.utilization >= 50 ? .yellow : .green)
+                        .frame(width: max(g.size.width * min(b.utilization / 100, 1), 3))
+                }
+            }
+            .frame(height: 4)
+        }
+    }
+
+    // MARK: - Right
 
     private var rightPanel: some View {
-        VStack(spacing: 0) {
-            actionButton("대시보드", icon: "chart.xyaxis.line", action: onOpenDashboard)
-            Divider().padding(.horizontal, 8)
-            actionButton("설정", icon: "gearshape", action: onOpenSettings)
-            Divider().padding(.horizontal, 8)
-            actionButton(currentStyleLabel, icon: currentStyleIcon) {
+        VStack(spacing: 6) {
+            gridBtn("대시보드", "chart.xyaxis.line", onOpenDashboard)
+            gridBtn("설정", "gearshape", onOpenSettings)
+            gridBtn(styleLabel, styleIcon) {
                 switch settings.animationStyle {
                 case .character: settings.animationStyle = .numeric
                 case .numeric: settings.animationStyle = .sparkline
@@ -81,189 +182,41 @@ struct MenuContentView: View {
                 }
             }
             Spacer(minLength: 0)
-            Divider().padding(.horizontal, 8)
-            actionButton("종료", icon: "power", action: onQuit)
+            gridBtn("종료", "power", onQuit)
         }
-        .padding(.vertical, 4)
+        .padding(6)
     }
 
-    // MARK: - Provider Section
-
-    private func providerSection(_ summary: ProviderSummary) -> some View {
-        let effectiveColor = summary.provider.color(
-            customColorName: settings.effectiveSettings(for: summary.provider.id).customColorName
-        )
-        let history = perProviderHistory[summary.provider.id] ?? []
-        let rate = aggregator.perProviderRates[summary.provider.id] ?? 0
-
-        return VStack(alignment: .leading, spacing: 4) {
-            // Title row
-            HStack(spacing: 6) {
-                Image(systemName: summary.provider.icon)
-                    .font(.system(size: 16))
-                    .foregroundStyle(effectiveColor)
-                    .frame(width: 20)
-
-                Text(summary.provider.name)
-                    .font(.headline)
-
-                Spacer()
-
-                if let cost = summary.estimatedCost, cost > 0 {
-                    Text(TokenFormatter.formatCost(cost))
-                        .font(.system(.body, design: .monospaced))
-                        .fontWeight(.medium)
-                }
-            }
-
-            // Stats
-            if summary.eventCount > 0 {
-                VStack(alignment: .leading, spacing: 2) {
-                    statRow("Rate", TokenFormatter.formatRate(rate))
-                    statRow("Input", TokenFormatter.formatTokens(summary.totalInput))
-                    statRow("Output", TokenFormatter.formatTokens(summary.totalOutput))
-                    statRow("호출", "\(summary.eventCount)")
-                }
-                .padding(.leading, 26)
-            } else {
-                Text("이벤트 없음")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-                    .padding(.leading, 26)
-            }
-
-            // Sparkline
-            if history.count >= 2 {
-                sparkline(history, color: effectiveColor)
-                    .padding(.leading, 26)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-
-    // MARK: - Claude Usage
-
-    private func claudeUsageSection(_ usage: ClaudeUsageResponse) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "gauge.with.dots.needle.50percent")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.cyan)
-                    .frame(width: 20)
-                Text("Claude 사용량")
-                    .font(.headline)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                if let fh = usage.fiveHour { usageBar("5시간 세션", bucket: fh) }
-                if let sd = usage.sevenDay { usageBar("7일 주간", bucket: sd) }
-            }
-            .padding(.leading, 26)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-
-    private func usageBar(_ label: String, bucket: UsageBucket) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack {
-                Text(label)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(Int(bucket.utilization))%")
-                    .font(.system(.subheadline, design: .monospaced))
-                    .fontWeight(.medium)
-            }
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                        .fill(.quaternary)
-                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                        .fill(barColor(bucket.utilization))
-                        .frame(width: geo.size.width * min(bucket.utilization / 100, 1))
-                }
-            }
-            .frame(height: 5)
-
-            Text("초기화: \(bucket.resetCountdown)")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-    }
-
-    private func barColor(_ pct: Double) -> Color {
-        if pct >= 90 { .red }
-        else if pct >= 75 { .orange }
-        else if pct >= 50 { .yellow }
-        else { .green }
-    }
-
-    // MARK: - Disconnected
-
-    private var disconnectedSection: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "bolt.slash")
-                .font(.title2)
-                .foregroundStyle(.tertiary)
-            Text("toki 데몬이 실행되지 않고 있습니다")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Button(action: onStartDaemon) {
-                Text("데몬 시작")
-                    .font(.subheadline.weight(.medium))
-            }
-            .controlSize(.small)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-    }
-
-    // MARK: - Components
-
-    private func statRow(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(.system(.subheadline, design: .monospaced))
-                .foregroundStyle(.primary)
-        }
-    }
-
-    private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func gridBtn(_ t: String, _ ic: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
+                Image(systemName: ic)
                     .font(.system(size: 16))
-                    .foregroundStyle(.secondary)
-                Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(subClr)
+                Text(t)
+                    .font(.system(size: 9))
+                    .foregroundStyle(dimClr)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 48)
+            .frame(height: 54)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(borderClr, lineWidth: 0.5)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private var sectionDivider: some View {
-        Divider().padding(.horizontal, 12)
-    }
+    // MARK: - Components
 
-    private func sparkline(_ history: [Double], color: Color) -> some View {
-        let d = history.enumerated().map { (i: $0.offset, v: $0.element) }
+    private func spark(_ h: [Double], color: Color) -> some View {
+        let d = h.enumerated().map { (i: $0.offset, v: $0.element) }
         return Chart(d, id: \.i) { p in
             AreaMark(x: .value("", p.i), y: .value("", p.v))
-                .foregroundStyle(
-                    .linearGradient(colors: [color.opacity(0.4), color.opacity(0)],
-                                    startPoint: .top, endPoint: .bottom)
-                )
+                .foregroundStyle(.linearGradient(
+                    colors: [color.opacity(0.4), color.opacity(0)],
+                    startPoint: .top, endPoint: .bottom))
                 .interpolationMethod(.catmullRom)
             LineMark(x: .value("", p.i), y: .value("", p.v))
                 .foregroundStyle(color)
@@ -271,25 +224,27 @@ struct MenuContentView: View {
                 .interpolationMethod(.catmullRom)
         }
         .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
-        .frame(height: 24)
+        .frame(height: 28)
     }
 
-    private var currentStyleLabel: String {
+    private var hDiv: some View {
+        Rectangle().fill(borderClr).frame(height: 0.5).padding(.horizontal, 12)
+    }
+
+    private var styleLabel: String {
         switch settings.animationStyle {
         case .character: "캐릭터"
         case .numeric: "수치"
         case .sparkline: "그래프"
         }
     }
-    private var currentStyleIcon: String {
+    private var styleIcon: String {
         switch settings.animationStyle {
         case .character: "hare"
         case .numeric: "number"
         case .sparkline: "chart.line.uptrend.xyaxis"
         }
     }
-
-    // MARK: - Data
 
     private func buildDisplaySummaries() -> [ProviderSummary] {
         let enabled = ProviderRegistry.configurableProviders.filter {
