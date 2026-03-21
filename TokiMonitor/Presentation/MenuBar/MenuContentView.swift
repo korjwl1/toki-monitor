@@ -18,8 +18,8 @@ private enum DS {
 
     // Layout
     static let leftWidth: CGFloat = 200
-    static let rightWidth: CGFloat = 80
-    static let btnSize: CGFloat = 64      // square buttons
+    static let rightWidth: CGFloat = 56
+    static let btnSize: CGFloat = 56      // square buttons
 
     // Border radius (nested: inner = outer - padding)
     static let panelRadius: CGFloat = 14
@@ -52,7 +52,7 @@ struct MenuContentView: View {
             leftPanel.frame(width: DS.leftWidth)
             rightPanel.frame(width: DS.rightWidth)
         }
-        .padding(.vertical, DS.sm)
+        .padding(DS.sm)
         .modifier(GlassPanelModifier())
         .ignoresSafeArea()
     }
@@ -79,8 +79,7 @@ struct MenuContentView: View {
                 disconnectedWidget
             }
         }
-        .padding(.leading, DS.sm)
-        .padding(.trailing, DS.xs)
+        .padding(0)
     }
 
     // MARK: - Provider Widget
@@ -93,7 +92,7 @@ struct MenuContentView: View {
         let rate = aggregator.perProviderRates[s.provider.id] ?? 0
         let sessions = aggregator.perProviderSessionCount[s.provider.id] ?? 0
 
-        return HStack(spacing: DS.sm) {
+        return HStack(spacing: DS.md) {
             // Icon — vertically centered
             providerLogo(s.provider, color: clr)
                 .frame(width: 28, height: 28)
@@ -120,10 +119,12 @@ struct MenuContentView: View {
 
                 // Sparkline
                 sparkline(hist.count >= 2 ? hist : Array(repeating: 0, count: 30), color: clr)
-                    .padding(.bottom, DS.sm)
+                    .padding(.top, DS.xs)
             }
         }
-        .padding(DS.md)
+        .padding(.leading, DS.sm)
+        .padding(.trailing, DS.md)
+        .padding(.vertical, DS.md)
     }
 
     @ViewBuilder
@@ -132,7 +133,7 @@ struct MenuContentView: View {
             Image(logoName)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .clipShape(Circle())
         } else {
             Image(systemName: provider.icon)
                 .font(.system(size: 16))
@@ -143,11 +144,13 @@ struct MenuContentView: View {
     // MARK: - Usage Widget
 
     private func usageWidget(_ usage: ClaudeUsageResponse) -> some View {
-        HStack(spacing: DS.sm) {
+        HStack(spacing: DS.md) {
             Image(systemName: "gauge.with.dots.needle.50percent")
-                .font(.system(size: 18))
-                .foregroundStyle(.cyan)
+                .font(.system(size: 14))
+                .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
+                .background(.cyan)
+                .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: DS.sm) {
                 Text("Claude 사용량")
@@ -156,11 +159,12 @@ struct MenuContentView: View {
                 if let fh = usage.fiveHour { usageBar("5시간", fh) }
                 if let sd = usage.sevenDay {
                     usageBar("7일", sd)
-                        .padding(.bottom, DS.sm)
                 }
             }
         }
-        .padding(DS.md)
+        .padding(.leading, DS.sm)
+        .padding(.trailing, DS.md)
+        .padding(.vertical, DS.md)
     }
 
     private func usageBar(_ label: String, _ b: UsageBucket) -> some View {
@@ -230,8 +234,7 @@ struct MenuContentView: View {
                 }
             }
         }
-        .padding(.leading, DS.xs)
-        .padding(.trailing, DS.sm)
+        .padding(0)
     }
 
     private func gridBtn(_ t: String, _ ic: String, _ action: @escaping () -> Void) -> some View {
