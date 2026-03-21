@@ -4,6 +4,8 @@ struct SettingsView: View {
     @Bindable var settings: AppSettings
     var onClose: (() -> Void)?
 
+    private let settingsRunner = TokiSettingsRunner()
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -12,15 +14,63 @@ struct SettingsView: View {
 
                 Divider()
 
+                providerSection
+                Divider()
                 menuBarStyleSection
                 Divider()
-                providerSection
+                displayModeSection
                 Divider()
                 miscSection
             }
             .padding(16)
         }
         .frame(width: 300)
+    }
+
+    // MARK: - Provider Section (Global)
+
+    private var providerSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader("프로바이더")
+
+            ForEach(ProviderRegistry.configurableProviders) { provider in
+                globalProviderRow(provider)
+            }
+        }
+    }
+
+    private func globalProviderRow(_ provider: ProviderInfo) -> some View {
+        let ps = settings.effectiveSettings(for: provider.id)
+
+        return HStack(spacing: 8) {
+            Toggle("", isOn: Binding(
+                get: { ps.enabled },
+                set: { newVal in
+                    var updated = ps
+                    updated.enabled = newVal
+                    settings.providerSettingsMap[provider.id] = updated
+
+                    // Sync with toki settings
+                    if let tokiId = provider.tokiProviderId {
+                        if newVal {
+                            settingsRunner.addProvider(tokiId) { _ in }
+                        }
+                        // Don't remove from toki on disable — user might want data retention
+                    }
+                }
+            ))
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+
+            Image(systemName: provider.icon)
+                .foregroundStyle(provider.color)
+                .frame(width: 16)
+
+            Text(provider.name)
+                .font(.system(size: 12, weight: .medium))
+
+            Spacer()
+        }
     }
 
     // MARK: - Menu Bar Style
@@ -37,7 +87,6 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
 
-            // Character options
             if settings.animationStyle == .character {
                 Toggle("캐릭터 옆 토큰 수치 표시", isOn: $settings.showRateText)
                     .font(.system(size: 12))
@@ -55,7 +104,6 @@ struct SettingsView: View {
                 }
             }
 
-            // Token unit
             if shouldShowTokenUnit {
                 settingRow("단위") {
                     Picker("", selection: $settings.tokenUnit) {
@@ -68,17 +116,14 @@ struct SettingsView: View {
                 }
             }
 
-            // Graph time range
-            if settings.animationStyle == .sparkline {
-                settingRow("그래프 시간폭") {
-                    Picker("", selection: $settings.graphTimeRange) {
-                        ForEach(GraphTimeRange.allCases, id: \.self) { range in
-                            Text(range.displayName).tag(range)
-                        }
+            settingRow("스파크라인 시간폭") {
+                Picker("", selection: $settings.graphTimeRange) {
+                    ForEach(GraphTimeRange.allCases, id: \.self) { range in
+                        Text(range.displayName).tag(range)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
         }
     }
@@ -88,11 +133,11 @@ struct SettingsView: View {
         (settings.animationStyle == .character && settings.showRateText)
     }
 
-    // MARK: - Provider Section
+    // MARK: - Display Mode Section
 
-    private var providerSection: some View {
+    private var displayModeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("프로바이더")
+            sectionHeader("표시 모드")
 
             Picker("", selection: $settings.providerDisplayMode) {
                 ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
@@ -107,75 +152,39 @@ struct SettingsView: View {
                 HStack(spacing: 8) {
                     Text("아이콘 색상")
                         .font(.system(size: 12))
-
                     Spacer()
-
-                    Menu {
-                        Button(action: { settings.aggregatedColorName = nil }) {
-                            HStack {
-                                Text("기본 (흰색)")
-                                if settings.aggregatedColorName == nil {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                        Divider()
-                        ForEach(ProviderInfo.availableColors, id: \.name) { color in
-                            Button(action: { settings.aggregatedColorName = color.name }) {
-                                HStack {
-                                    Circle()
-                                        .fill(ProviderInfo.colorFromName(color.name))
-                                        .frame(width: 10, height: 10)
-                                    Text(color.displayName)
-                                    if settings.aggregatedColorName == color.name {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            if let colorName = settings.aggregatedColorName {
-                                Circle()
-                                    .fill(ProviderInfo.colorFromName(colorName))
-                                    .frame(width: 12, height: 12)
-                            } else {
-                                Circle()
-                                    .fill(.white)
-                                    .frame(width: 12, height: 12)
-                                    .overlay(Circle().stroke(.secondary.opacity(0.3), lineWidth: 1))
-                            }
-                        }
+                    colorPickerMenu(
+                        currentColor: settings.aggregatedColorName,
+                        defaultLabel: "기본 (흰색)"
+                    ) { color in
+                        settings.aggregatedColorName = color
                     }
-                    .menuStyle(.borderlessButton)
-                    .frame(width: 24)
                 }
             } else {
-                // 개별 모드 — 프로바이더별 설정
-                ForEach(ProviderRegistry.configurableProviders) { provider in
-                    providerRow(provider)
+                // 개별 모드 — 활성화된 프로바이더만 개별 설정
+                let enabledProviders = ProviderRegistry.configurableProviders.filter {
+                    settings.effectiveSettings(for: $0.id).enabled
+                }
+
+                if enabledProviders.isEmpty {
+                    Text("활성화된 프로바이더가 없습니다")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(enabledProviders) { provider in
+                        individualProviderRow(provider)
+                    }
                 }
             }
         }
     }
 
-    private func providerRow(_ provider: ProviderInfo) -> some View {
+    private func individualProviderRow(_ provider: ProviderInfo) -> some View {
         let ps = settings.effectiveSettings(for: provider.id)
         let customColor = ps.customColorName ?? provider.colorName
 
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Toggle("", isOn: Binding(
-                    get: { ps.enabled },
-                    set: { newVal in
-                        var updated = ps
-                        updated.enabled = newVal
-                        settings.providerSettingsMap[provider.id] = updated
-                    }
-                ))
-                .toggleStyle(.checkbox)
-                .labelsHidden()
-
                 Image(systemName: provider.icon)
                     .foregroundStyle(ProviderInfo.colorFromName(customColor))
                     .frame(width: 16)
@@ -185,61 +194,38 @@ struct SettingsView: View {
 
                 Spacer()
 
-                // Color picker
-                Menu {
-                    ForEach(ProviderInfo.availableColors, id: \.name) { color in
-                        Button(action: {
-                            var updated = ps
-                            updated.customColorName = color.name == provider.colorName ? nil : color.name
-                            settings.providerSettingsMap[provider.id] = updated
-                        }) {
-                            HStack {
-                                Circle()
-                                    .fill(ProviderInfo.colorFromName(color.name))
-                                    .frame(width: 10, height: 10)
-                                Text(color.displayName)
-                                if customColor == color.name {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Circle()
-                        .fill(ProviderInfo.colorFromName(customColor))
-                        .frame(width: 12, height: 12)
-                        .overlay(
-                            Circle().stroke(.secondary.opacity(0.3), lineWidth: 1)
-                        )
+                colorPickerMenu(
+                    currentColor: ps.customColorName,
+                    defaultLabel: "기본 (\(provider.colorName))"
+                ) { color in
+                    var updated = ps
+                    updated.customColorName = color
+                    settings.providerSettingsMap[provider.id] = updated
                 }
-                .menuStyle(.borderlessButton)
-                .frame(width: 24)
             }
 
-            if ps.enabled {
-                HStack(spacing: 4) {
-                    Text("스타일")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 30, alignment: .leading)
-                    Picker("", selection: Binding(
-                        get: { ps.animationStyle ?? settings.animationStyle },
-                        set: { newVal in
-                            var updated = ps
-                            updated.animationStyle = newVal == settings.animationStyle ? nil : newVal
-                            settings.providerSettingsMap[provider.id] = updated
-                        }
-                    )) {
-                        Text("캐릭터").tag(AnimationStyle.character)
-                        Text("수치").tag(AnimationStyle.numeric)
-                        Text("그래프").tag(AnimationStyle.sparkline)
+            HStack(spacing: 4) {
+                Text("스타일")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 30, alignment: .leading)
+                Picker("", selection: Binding(
+                    get: { ps.animationStyle ?? settings.animationStyle },
+                    set: { newVal in
+                        var updated = ps
+                        updated.animationStyle = newVal == settings.animationStyle ? nil : newVal
+                        settings.providerSettingsMap[provider.id] = updated
                     }
-                    .pickerStyle(.segmented)
-                    .controlSize(.small)
-                    .labelsHidden()
+                )) {
+                    Text("캐릭터").tag(AnimationStyle.character)
+                    Text("수치").tag(AnimationStyle.numeric)
+                    Text("그래프").tag(AnimationStyle.sparkline)
                 }
-                .padding(.leading, 24)
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                .labelsHidden()
             }
+            .padding(.leading, 24)
         }
         .padding(.vertical, 2)
     }
@@ -273,7 +259,6 @@ struct SettingsView: View {
             .textCase(.uppercase)
     }
 
-    /// Label + control in a consistent row layout
     private func settingRow<C: View>(_ label: String, @ViewBuilder control: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
@@ -281,5 +266,50 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             control()
         }
+    }
+
+    private func colorPickerMenu(
+        currentColor: String?,
+        defaultLabel: String,
+        onSelect: @escaping (String?) -> Void
+    ) -> some View {
+        Menu {
+            Button(action: { onSelect(nil) }) {
+                HStack {
+                    Text(defaultLabel)
+                    if currentColor == nil {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+            Divider()
+            ForEach(ProviderInfo.availableColors, id: \.name) { color in
+                Button(action: { onSelect(color.name) }) {
+                    HStack {
+                        Circle()
+                            .fill(ProviderInfo.colorFromName(color.name))
+                            .frame(width: 10, height: 10)
+                        Text(color.displayName)
+                        if currentColor == color.name {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            if let colorName = currentColor {
+                Circle()
+                    .fill(ProviderInfo.colorFromName(colorName))
+                    .frame(width: 12, height: 12)
+                    .overlay(Circle().stroke(.secondary.opacity(0.3), lineWidth: 1))
+            } else {
+                Circle()
+                    .fill(.white)
+                    .frame(width: 12, height: 12)
+                    .overlay(Circle().stroke(.secondary.opacity(0.3), lineWidth: 1))
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .frame(width: 24)
     }
 }

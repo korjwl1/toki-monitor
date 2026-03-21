@@ -30,23 +30,26 @@ enum TokenUnit: String, CaseIterable, Codable {
 }
 
 enum GraphTimeRange: String, CaseIterable, Codable {
-    case oneMinute      // 30 samples x 2s
-    case fiveMinutes    // 30 samples x 10s
-    case thirtyMinutes  // 30 samples x 60s
+    case fiveMinutes     // 30 samples x 10s
+    case tenMinutes      // 30 samples x 20s
+    case thirtyMinutes   // 30 samples x 60s
+    case oneHourGraph    // 30 samples x 120s
 
     var displayName: String {
         switch self {
-        case .oneMinute: "1분"
         case .fiveMinutes: "5분"
+        case .tenMinutes: "10분"
         case .thirtyMinutes: "30분"
+        case .oneHourGraph: "1시간"
         }
     }
 
     var sampleInterval: TimeInterval {
         switch self {
-        case .oneMinute: 2.0
         case .fiveMinutes: 10.0
+        case .tenMinutes: 20.0
         case .thirtyMinutes: 60.0
+        case .oneHourGraph: 120.0
         }
     }
 }
@@ -120,7 +123,7 @@ final class AppSettings {
         showRateText = ud.bool(forKey: "showRateText")
         textPosition = Self.loadEnum(ud, key: "textPosition") ?? .trailing
         tokenUnit = Self.loadEnum(ud, key: "tokenUnit") ?? .perMinute
-        graphTimeRange = Self.loadEnum(ud, key: "graphTimeRange") ?? .oneMinute
+        graphTimeRange = Self.loadEnum(ud, key: "graphTimeRange") ?? .oneHourGraph
         providerDisplayMode = Self.loadEnum(ud, key: "providerDisplayMode") ?? .aggregated
         providerSettingsMap = Self.loadProviderSettings(ud)
         aggregatedColorName = ud.string(forKey: "aggregatedColorName")

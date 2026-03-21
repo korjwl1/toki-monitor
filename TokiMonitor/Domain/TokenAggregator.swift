@@ -13,43 +13,40 @@ enum TimeRange: String, CaseIterable, Codable {
         }
     }
 
-    /// toki query bucket string.
     var queryBucket: String {
         switch self {
-        case .thirtyMinutes: "1h"  // toki doesn't have 30m bucket, use 1h
+        case .thirtyMinutes: "1h"
         case .oneHour: "1h"
         case .today: "1d"
         }
     }
 }
 
-/// Aggregates token events for rate calculation and recent history.
+/// Aggregates token events for rate calculation and sparkline history.
+/// Keeps raw events and re-bins on demand — no data loss when changing time range.
 @MainActor
 @Observable
 final class TokenAggregator {
     private(set) var tokensPerMinute: Double = 0
-    private(set) var recentHistory: [Double] = []  // last N rate samples for sparkline
+    private(set) var recentHistory: [Double] = []
     private(set) var providerSummaries: [ProviderSummary] = []
     private(set) var totalSummary: TotalSummary?
-
-    // Per-provider rates and history for perProvider display mode
     private(set) var perProviderRates: [String: Double] = [:]
     private(set) var perProviderHistory: [String: [Double]] = [:]
 
     private var allEvents: [TokenEvent] = []
-    private var events: [(date: Date, tokens: UInt64, providerId: String)] = []
-    private let rateWindow: TimeInterval = 30  // seconds for rate calc
-    private let historySize = 30  // number of sparkline data points
-    private var sampleTimer: Timer?
-    var timeRange: TimeRange = .oneHour
+    /// Raw rate events with timestamps — kept for the full graph time range for re-binning.
+    private var rateEvents: [(date: Date, tokens: UInt64, providerId: String)] = []
+    private let rateWindow: TimeInterval = 30
+    private let historyBins = 30
+    private var refreshTimer: Timer?
 
-    var graphTimeRange: GraphTimeRange = .oneMinute {
+    var timeRange: TimeRange = .oneHour
+    var graphTimeRange: GraphTimeRange = .oneHourGraph {
         didSet {
-            if oldValue != graphTimeRange {
-                recentHistory = []
-                perProviderHistory = [:]
-                restartSampling()
-            }
+            // No data loss — just rebuild from raw events
+            rebuildHistory()
+            restartRefreshTimer()
         }
     }
 
@@ -57,79 +54,95 @@ final class TokenAggregator {
     func addEvent(_ event: TokenEvent) {
         let total = event.inputTokens + event.outputTokens
         let provider = ProviderRegistry.resolve(model: event.model)
-        events.append((date: event.receivedAt, tokens: total, providerId: provider.id))
+        rateEvents.append((date: event.receivedAt, tokens: total, providerId: provider.id))
         allEvents.append(event)
-        pruneOldEvents()
+        pruneRateEvents()
         recalculateRate()
+        rebuildHistory()
         recalculateProviderSummaries()
     }
 
-    /// Start periodic sampling for sparkline history.
+    /// Start periodic refresh for sparkline history (recalculates bins from raw data).
     func startSampling() {
-        sampleTimer?.invalidate()
-        let interval = graphTimeRange.sampleInterval
-        sampleTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.sampleRate()
-            }
-        }
+        restartRefreshTimer()
     }
 
     func stopSampling() {
-        sampleTimer?.invalidate()
-        sampleTimer = nil
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
 
-    // MARK: - Private
-
-    private func restartSampling() {
-        stopSampling()
-        startSampling()
-    }
-
-    private func pruneOldEvents() {
-        let cutoff = Date().addingTimeInterval(-rateWindow)
-        events.removeAll { $0.date < cutoff }
-    }
+    // MARK: - Rate Calculation
 
     private func recalculateRate() {
-        pruneOldEvents()
-        let totalTokens = events.reduce(UInt64(0)) { $0 + $1.tokens }
+        let cutoff = Date().addingTimeInterval(-rateWindow)
+        let recentTokens = rateEvents.filter { $0.date >= cutoff }
+        let totalTokens = recentTokens.reduce(UInt64(0)) { $0 + $1.tokens }
         let minutes = rateWindow / 60.0
         tokensPerMinute = Double(totalTokens) / minutes
 
         // Per-provider rates
         var providerTotals: [String: UInt64] = [:]
-        for e in events {
+        for e in recentTokens {
             providerTotals[e.providerId, default: 0] += e.tokens
         }
-        var newRates: [String: Double] = [:]
-        for (pid, total) in providerTotals {
-            newRates[pid] = Double(total) / minutes
-        }
-        perProviderRates = newRates
+        perProviderRates = providerTotals.mapValues { Double($0) / minutes }
     }
 
-    private func sampleRate() {
-        recalculateRate()
+    // MARK: - History (re-binnable from raw events)
 
-        // Global history
-        recentHistory.append(tokensPerMinute)
-        if recentHistory.count > historySize {
-            recentHistory.removeFirst(recentHistory.count - historySize)
-        }
+    /// Rebuild sparkline history by binning raw events into time slots.
+    /// Called on every event and on timer tick — no sampling artifacts.
+    private func rebuildHistory() {
+        let now = Date()
+        let totalDuration = Double(historyBins) * graphTimeRange.sampleInterval
+        let binWidth = graphTimeRange.sampleInterval
 
-        // Per-provider history
-        let allProviderIds = Set(perProviderRates.keys).union(perProviderHistory.keys)
-        for pid in allProviderIds {
-            let rate = perProviderRates[pid] ?? 0
-            var history = perProviderHistory[pid] ?? []
-            history.append(rate)
-            if history.count > historySize {
-                history.removeFirst(history.count - historySize)
+        // Only consider events within the graph time window
+        let windowStart = now.addingTimeInterval(-totalDuration)
+        let relevantEvents = rateEvents.filter { $0.date >= windowStart }
+
+        // Build per-bin token rates
+        var globalBins = [Double](repeating: 0, count: historyBins)
+        var providerBins: [String: [Double]] = [:]
+
+        for event in relevantEvents {
+            let age = now.timeIntervalSince(event.date)
+            let binIndex = historyBins - 1 - Int(age / binWidth)
+            guard binIndex >= 0 && binIndex < historyBins else { continue }
+
+            // Convert to tokens/minute for this bin
+            let rateContribution = Double(event.tokens) / (binWidth / 60.0)
+            globalBins[binIndex] += rateContribution
+
+            if providerBins[event.providerId] == nil {
+                providerBins[event.providerId] = [Double](repeating: 0, count: historyBins)
             }
-            perProviderHistory[pid] = history
+            providerBins[event.providerId]?[binIndex] += rateContribution
         }
+
+        recentHistory = globalBins
+        perProviderHistory = providerBins
+    }
+
+    private func restartRefreshTimer() {
+        refreshTimer?.invalidate()
+        // Refresh at the bin interval rate, but at least every 2 seconds
+        let interval = min(graphTimeRange.sampleInterval, 2.0)
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.pruneRateEvents()
+                self?.recalculateRate()
+                self?.rebuildHistory()
+            }
+        }
+    }
+
+    /// Keep rate events for the full graph window + some buffer.
+    private func pruneRateEvents() {
+        let maxDuration = Double(historyBins) * graphTimeRange.sampleInterval + 60
+        let cutoff = Date().addingTimeInterval(-maxDuration)
+        rateEvents.removeAll { $0.date < cutoff }
     }
 
     // MARK: - Provider Summaries
@@ -163,7 +176,6 @@ final class TokenAggregator {
         }
     }
 
-    /// Prune allEvents older than the current time range to prevent unbounded growth.
     private func pruneAllEvents() {
         let cutoff = timeRangeCutoff()
         allEvents.removeAll { $0.receivedAt < cutoff }

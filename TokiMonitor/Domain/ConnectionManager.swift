@@ -81,8 +81,8 @@ final class ConnectionManager {
     private func runToki(args: [String]) async -> Bool {
         await withCheckedContinuation { continuation in
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["toki"] + args
+            process.executableURL = URL(fileURLWithPath: TokiPath.resolved)
+            process.arguments = args
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
 

@@ -180,18 +180,26 @@ final class StatusBarController {
             tokensPerMinute: aggregator.tokensPerMinute,
             providerSummaries: aggregator.providerSummaries,
             totalSummary: aggregator.totalSummary,
+            perProviderHistory: aggregator.perProviderHistory,
+            filterProviderId: unit.providerId,
             settings: settings,
             onStartDaemon: { [weak self] in
                 self?.dismissPanel()
-                self?.connectionManager.startDaemonAndConnect()
+                DispatchQueue.main.async {
+                    self?.connectionManager.startDaemonAndConnect()
+                }
             },
             onOpenDashboard: { [weak self] in
                 self?.dismissPanel()
-                self?.dashboardController.show()
+                DispatchQueue.main.async {
+                    self?.dashboardController.show()
+                }
             },
             onOpenSettings: { [weak self] in
                 self?.dismissPanel()
-                self?.settingsController.show()
+                DispatchQueue.main.async {
+                    self?.settingsController.show()
+                }
             },
             onQuit: {
                 NSApp.terminate(nil)
@@ -212,6 +220,9 @@ final class StatusBarController {
         panel.level = .statusBar
         panel.isMovable = false
         panel.hasShadow = true
+        panel.becomesKeyOnlyIfNeeded = true
+        panel.acceptsMouseMovedEvents = true
+        panel.isFloatingPanel = true
 
         let visualEffect = NSVisualEffectView()
         visualEffect.material = .menu

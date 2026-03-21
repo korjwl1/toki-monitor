@@ -1,5 +1,24 @@
 import Foundation
 
+/// Resolves the absolute path to the `toki` binary.
+/// GUI apps don't inherit shell PATH, so we search common locations.
+enum TokiPath {
+    static let resolved: String = {
+        let candidates = [
+            "/opt/homebrew/bin/toki",
+            "/usr/local/bin/toki",
+            "\(NSHomeDirectory())/.cargo/bin/toki",
+        ]
+        for path in candidates {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                return path
+            }
+        }
+        // Fallback — hope it's in PATH
+        return "toki"
+    }()
+}
+
 /// UDS server that listens for incoming JSONL from `toki trace --sink uds://<path>`.
 /// Toki Monitor acts as the SERVER — toki connects to us and pushes events.
 final class TokiTraceListener {
@@ -114,7 +133,7 @@ final class TokiTraceListener {
 final class TokiReportRunner: Sendable {
     private let tokiPath: String
 
-    init(tokiPath: String = "toki") {
+    init(tokiPath: String = TokiPath.resolved) {
         self.tokiPath = tokiPath
     }
 
@@ -125,9 +144,8 @@ final class TokiReportRunner: Sendable {
     ) {
         DispatchQueue.global(qos: .utility).async {
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            // Order: toki report [--output-format json] [report-options] <subcommand> [subcommand-options]
-            process.arguments = [self.tokiPath, "report", "--output-format", "json"]
+            process.executableURL = URL(fileURLWithPath: self.tokiPath)
+            process.arguments = ["report", "--output-format", "json"]
                 + reportOptions + subcommandArgs
 
             let pipe = Pipe()
@@ -156,6 +174,87 @@ final class TokiReportRunner: Sendable {
         var errorDescription: String? {
             switch self {
             case .exitCode(let code): "toki report exited with code \(code)"
+            }
+        }
+    }
+}
+
+/// Runs toki settings commands.
+final class TokiSettingsRunner: Sendable {
+    private let tokiPath: String
+
+    init(tokiPath: String = TokiPath.resolved) {
+        self.tokiPath = tokiPath
+    }
+
+    /// Get current list of enabled provider IDs.
+    func getProviders(completion: @escaping @Sendable (Result<[String], Error>) -> Void) {
+        runCommand(["settings", "list"]) { result in
+            switch result {
+            case .success(let output):
+                // Parse "providers = ["claude_code","codex"]" line
+                let lines = output.components(separatedBy: "\n")
+                for line in lines {
+                    if line.contains("providers") && line.contains("=") {
+                        let parts = line.components(separatedBy: "=")
+                        if parts.count >= 2 {
+                            let raw = parts[1].trimmingCharacters(in: .whitespaces)
+                            // Parse ["claude_code","codex"] format
+                            let cleaned = raw
+                                .replacingOccurrences(of: "[", with: "")
+                                .replacingOccurrences(of: "]", with: "")
+                                .replacingOccurrences(of: "\"", with: "")
+                            let ids = cleaned.components(separatedBy: ",")
+                                .map { $0.trimmingCharacters(in: .whitespaces) }
+                                .filter { !$0.isEmpty }
+                            completion(.success(ids))
+                            return
+                        }
+                    }
+                }
+                completion(.success([]))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+
+    /// Add a provider to toki settings.
+    func addProvider(_ id: String, completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
+        runCommand(["settings", "set", "providers", "--add", id]) { result in
+            completion(result.map { _ in () })
+        }
+    }
+
+    /// Remove a provider from toki settings.
+    func removeProvider(_ id: String, completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
+        runCommand(["settings", "set", "providers", "--remove", id]) { result in
+            completion(result.map { _ in () })
+        }
+    }
+
+    private func runCommand(_ args: [String], completion: @escaping @Sendable (Result<String, Error>) -> Void) {
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: self.tokiPath)
+            process.arguments = args
+
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                if process.terminationStatus == 0 {
+                    completion(.success(output))
+                } else {
+                    completion(.failure(TokiReportRunner.RunnerError.exitCode(Int(process.terminationStatus))))
+                }
+            } catch {
+                completion(.failure(error))
             }
         }
     }

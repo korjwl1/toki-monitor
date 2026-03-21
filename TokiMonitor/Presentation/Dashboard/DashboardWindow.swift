@@ -22,7 +22,7 @@ final class DashboardWindowController {
         let hostingController = NSHostingController(rootView: dashboardView)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -31,7 +31,7 @@ final class DashboardWindowController {
         window.contentViewController = hostingController
         window.center()
         window.setFrameAutosaveName("TokiDashboard")
-        window.minSize = NSSize(width: 500, height: 400)
+        window.minSize = NSSize(width: 800, height: 600)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 

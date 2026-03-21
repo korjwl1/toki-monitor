@@ -1,13 +1,14 @@
 import SwiftUI
+import Charts
 
 /// The dropdown menu content shown when the status bar icon is clicked.
-/// Designed as a single SwiftUI view to fix @Observable binding issues
-/// and provide a cohesive, polished look inspired by Stats/RunCat.
 struct MenuContentView: View {
     let isConnected: Bool
     let tokensPerMinute: Double
     let providerSummaries: [ProviderSummary]
     let totalSummary: TotalSummary?
+    let perProviderHistory: [String: [Double]]
+    let filterProviderId: String?  // non-nil in per-provider mode
     @Bindable var settings: AppSettings
 
     var onStartDaemon: () -> Void
@@ -19,11 +20,9 @@ struct MenuContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Header
             headerSection
             divider
 
-            // MARK: - Content
             if isConnected {
                 connectedContent
             } else {
@@ -31,12 +30,8 @@ struct MenuContentView: View {
             }
 
             divider
-
-            // MARK: - Style Picker
             styleSection
             divider
-
-            // MARK: - Footer Actions
             footerSection
         }
         .frame(width: menuWidth)
@@ -47,13 +42,32 @@ struct MenuContentView: View {
     private var headerSection: some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Toki Monitor")
-                    .font(.system(size: 13, weight: .semibold))
-                Text(isConnected
-                     ? TokenFormatter.formatRate(tokensPerMinute)
-                     : "미연결")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text("Toki Monitor")
+                        .font(.system(size: 13, weight: .semibold))
+                    if let pid = filterProviderId,
+                       let provider = ProviderRegistry.allProviders.first(where: { $0.id == pid }) {
+                        Text(provider.name)
+                            .font(.system(size: 10, weight: .medium))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(provider.color.opacity(0.15))
+                            .foregroundStyle(provider.color)
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    }
+                }
+                HStack(spacing: 4) {
+                    Text(isConnected
+                         ? TokenFormatter.formatRate(tokensPerMinute)
+                         : "미연결")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    if isConnected {
+                        Text("· \(settings.defaultTimeRange.displayName)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
             }
             Spacer()
             statusBadge
@@ -77,20 +91,50 @@ struct MenuContentView: View {
 
     private var connectedContent: some View {
         VStack(spacing: 0) {
-            if providerSummaries.isEmpty {
+            let displaySummaries = buildDisplaySummaries()
+
+            if displaySummaries.isEmpty {
                 emptyState
             } else {
-                // Total summary (if multi-provider)
-                if let total = totalSummary {
+                // Total summary only in aggregated mode with 2+ providers
+                if filterProviderId == nil, let total = totalSummary, displaySummaries.count >= 2 {
                     totalRow(total)
                     thinDivider
                 }
-                // Provider rows
-                ForEach(providerSummaries) { summary in
+                ForEach(displaySummaries) { summary in
                     providerRow(summary)
                 }
             }
         }
+    }
+
+    /// Build summaries to display: include enabled providers even with 0 data.
+    private func buildDisplaySummaries() -> [ProviderSummary] {
+        let enabledProviders = ProviderRegistry.configurableProviders.filter {
+            settings.effectiveSettings(for: $0.id).enabled
+        }
+
+        // If per-provider mode with filter, only show that provider
+        if let filterId = filterProviderId {
+            if let existing = providerSummaries.first(where: { $0.provider.id == filterId }) {
+                return [existing]
+            }
+            if let provider = enabledProviders.first(where: { $0.id == filterId }) {
+                return [ProviderSummary(provider: provider)]
+            }
+            return []
+        }
+
+        // Aggregated: show all enabled providers
+        var result: [ProviderSummary] = []
+        for provider in enabledProviders {
+            if let existing = providerSummaries.first(where: { $0.provider.id == provider.id }) {
+                result.append(existing)
+            } else {
+                result.append(ProviderSummary(provider: provider))
+            }
+        }
+        return result
     }
 
     private var emptyState: some View {
@@ -110,7 +154,6 @@ struct MenuContentView: View {
 
     private func totalRow(_ total: TotalSummary) -> some View {
         HStack(spacing: 10) {
-            // Icon
             ZStack {
                 RoundedRectangle(cornerRadius: 5)
                     .fill(.quaternary)
@@ -120,7 +163,6 @@ struct MenuContentView: View {
                     .foregroundStyle(.primary)
             }
 
-            // Info
             VStack(alignment: .leading, spacing: 1) {
                 Text("전체")
                     .font(.system(size: 12, weight: .medium))
@@ -130,8 +172,6 @@ struct MenuContentView: View {
             }
 
             Spacer()
-
-            // Cost
             costLabel(total.estimatedCost)
         }
         .padding(.horizontal, 14)
@@ -142,40 +182,81 @@ struct MenuContentView: View {
         let effectiveColor = summary.provider.color(
             customColorName: settings.effectiveSettings(for: summary.provider.id).customColorName
         )
-        return HStack(spacing: 10) {
-            // Provider icon with color
-            ZStack {
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(effectiveColor.opacity(0.15))
-                    .frame(width: 26, height: 26)
-                Image(systemName: summary.provider.icon)
-                    .font(.system(size: 12))
-                    .foregroundStyle(effectiveColor)
-            }
+        let history = perProviderHistory[summary.provider.id] ?? []
 
-            // Info
-            VStack(alignment: .leading, spacing: 1) {
-                Text(summary.provider.name)
-                    .font(.system(size: 12, weight: .medium))
-                HStack(spacing: 6) {
-                    tokenBadge("↓", TokenFormatter.formatTokens(summary.totalInput))
-                    tokenBadge("↑", TokenFormatter.formatTokens(summary.totalOutput))
-                    Text("·")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.quaternary)
-                    Text("\(summary.eventCount)회")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+        return VStack(spacing: 4) {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(effectiveColor.opacity(0.15))
+                        .frame(width: 26, height: 26)
+                    Image(systemName: summary.provider.icon)
+                        .font(.system(size: 12))
+                        .foregroundStyle(effectiveColor)
                 }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(summary.provider.name)
+                        .font(.system(size: 12, weight: .medium))
+                    if summary.eventCount > 0 {
+                        HStack(spacing: 6) {
+                            tokenBadge("↓", TokenFormatter.formatTokens(summary.totalInput))
+                            tokenBadge("↑", TokenFormatter.formatTokens(summary.totalOutput))
+                            Text("·")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.quaternary)
+                            Text("\(summary.eventCount)회")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                    } else {
+                        Text("이벤트 없음")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                Spacer()
+                costLabel(summary.estimatedCost)
             }
 
-            Spacer()
-
-            // Cost
-            costLabel(summary.estimatedCost)
+            // Mini sparkline
+            if history.count >= 2 {
+                miniSparkline(history: history, color: effectiveColor)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
+    }
+
+    private func miniSparkline(history: [Double], color: Color) -> some View {
+        let indexed = history.enumerated().map { (index: $0.offset, value: $0.element) }
+        return Chart(indexed, id: \.index) { point in
+            AreaMark(
+                x: .value("t", point.index),
+                y: .value("v", point.value)
+            )
+            .foregroundStyle(
+                .linearGradient(
+                    colors: [color.opacity(0.3), color.opacity(0.05)],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
+            .interpolationMethod(.catmullRom)
+
+            LineMark(
+                x: .value("t", point.index),
+                y: .value("v", point.value)
+            )
+            .foregroundStyle(color.opacity(0.8))
+            .lineStyle(StrokeStyle(lineWidth: 1.5))
+            .interpolationMethod(.catmullRom)
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.hidden)
+        .frame(height: 30)
+        .padding(.leading, 36)
     }
 
     private func tokenBadge(_ arrow: String, _ value: String) -> some View {
@@ -191,7 +272,7 @@ struct MenuContentView: View {
 
     private func costLabel(_ cost: Double?) -> some View {
         Group {
-            if let cost {
+            if let cost, cost > 0 {
                 Text(TokenFormatter.formatCost(cost))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
             } else {
@@ -263,7 +344,6 @@ struct MenuContentView: View {
                 }
             }
 
-            // Token unit (character+text or numeric)
             if settings.animationStyle == .numeric ||
                (settings.animationStyle == .character && settings.showRateText) {
                 inlinePicker("단위", selection: $settings.tokenUnit) {
@@ -273,12 +353,9 @@ struct MenuContentView: View {
                 }
             }
 
-            // Graph time range
-            if settings.animationStyle == .sparkline {
-                inlinePicker("시간폭", selection: $settings.graphTimeRange) {
-                    ForEach(GraphTimeRange.allCases, id: \.self) { range in
-                        Text(range.displayName).tag(range)
-                    }
+            inlinePicker("스파크라인 시간폭", selection: $settings.graphTimeRange) {
+                ForEach(GraphTimeRange.allCases, id: \.self) { range in
+                    Text(range.displayName).tag(range)
                 }
             }
         }
@@ -350,7 +427,6 @@ struct MenuContentView: View {
     }
 }
 
-/// Hover-highlight style for menu action rows.
 private struct MenuRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

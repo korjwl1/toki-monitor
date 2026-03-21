@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000001 /* TimeSeriesModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000001 /* TimeSeriesModels.swift */; };
+		A10000000002 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000002 /* DashboardViewModel.swift */; };
+		A10000000003 /* DashboardToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000003 /* DashboardToolbar.swift */; };
+		A10000000004 /* ChartPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000004 /* ChartPanel.swift */; };
+		A10000000005 /* StatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000005 /* StatCard.swift */; };
+		A10000000006 /* TokenUsageChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000006 /* TokenUsageChart.swift */; };
+		A10000000007 /* CostChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000007 /* CostChart.swift */; };
+		A10000000008 /* EventsChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000008 /* EventsChart.swift */; };
 		0C102E5047654E452890DC1C /* frame_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 0C1FFE59530A1D2FC18F1651 /* frame_00.png */; };
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
 		17C09A08039E023C5600729C /* ModelDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53081FDDD1535127EECF08BC /* ModelDetailView.swift */; };
@@ -63,6 +71,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B10000000001 /* TimeSeriesModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesModels.swift; sourceTree = "<group>"; };
+		B10000000002 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		B10000000003 /* DashboardToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardToolbar.swift; sourceTree = "<group>"; };
+		B10000000004 /* ChartPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartPanel.swift; sourceTree = "<group>"; };
+		B10000000005 /* StatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCard.swift; sourceTree = "<group>"; };
+		B10000000006 /* TokenUsageChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenUsageChart.swift; sourceTree = "<group>"; };
+		B10000000007 /* CostChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CostChart.swift; sourceTree = "<group>"; };
+		B10000000008 /* EventsChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsChart.swift; sourceTree = "<group>"; };
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		0C1FFE59530A1D2FC18F1651 /* frame_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00.png; sourceTree = "<group>"; };
 		140E82C9A015AA41CD3C0C1A /* frame_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_01.png; sourceTree = "<group>"; };
@@ -203,8 +219,11 @@
 			isa = PBXGroup;
 			children = (
 				3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */,
+				B10000000002 /* DashboardViewModel.swift */,
+				B10000000003 /* DashboardToolbar.swift */,
 				530B806F812350D8094AA0EC /* DashboardWindow.swift */,
 				53081FDDD1535127EECF08BC /* ModelDetailView.swift */,
+				C10000000001 /* Charts */,
 			);
 			path = Dashboard;
 			sourceTree = "<group>";
@@ -226,6 +245,7 @@
 		8648934AE14365594C7132F0 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000001 /* TimeSeriesModels.swift */,
 				8B4247163632AC4A7FF3582B /* TokiEvent.swift */,
 				74A27A6A118A446539806BB7 /* TokiReportModels.swift */,
 			);
@@ -290,6 +310,18 @@
 				196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */,
 			);
 			path = Domain;
+			sourceTree = "<group>";
+		};
+		C10000000001 /* Charts */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000004 /* ChartPanel.swift */,
+				B10000000005 /* StatCard.swift */,
+				B10000000006 /* TokenUsageChart.swift */,
+				B10000000007 /* CostChart.swift */,
+				B10000000008 /* EventsChart.swift */,
+			);
+			path = Charts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -418,6 +450,14 @@
 				E6F03BD027B373896549DB92 /* TotalSummaryView.swift in Sources */,
 				AA1234567890ABCDEF123456 /* MenuContentView.swift in Sources */,
 				CC1234567890ABCDEF123456 /* StatusItemUnit.swift in Sources */,
+				A10000000001 /* TimeSeriesModels.swift in Sources */,
+				A10000000002 /* DashboardViewModel.swift in Sources */,
+				A10000000003 /* DashboardToolbar.swift in Sources */,
+				A10000000004 /* ChartPanel.swift in Sources */,
+				A10000000005 /* StatCard.swift in Sources */,
+				A10000000006 /* TokenUsageChart.swift in Sources */,
+				A10000000007 /* CostChart.swift in Sources */,
+				A10000000008 /* EventsChart.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

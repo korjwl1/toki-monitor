@@ -51,8 +51,8 @@ final class TokiEventStream {
 
     private func launchTokiTrace() {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["toki", "trace", "--sink", "uds:///tmp/toki-monitor.sock"]
+        process.executableURL = URL(fileURLWithPath: TokiPath.resolved)
+        process.arguments = ["trace", "--sink", "uds:///tmp/toki-monitor.sock"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 

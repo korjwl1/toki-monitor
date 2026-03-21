@@ -17,6 +17,11 @@ struct ProviderInfo: Identifiable {
     func matchesSchema(_ schema: String) -> Bool {
         schemas.contains(schema)
     }
+
+    /// The toki settings provider ID (first schema name).
+    var tokiProviderId: String? {
+        schemas.first
+    }
 }
 
 /// Maps model names and toki schemas to providers. Data-driven, no hardcoded UI logic.
