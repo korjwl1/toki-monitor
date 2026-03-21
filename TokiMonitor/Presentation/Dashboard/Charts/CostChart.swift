@@ -13,10 +13,10 @@ struct CostChart: View {
                 let points = data.costFor(model: model)
                 ForEach(points) { point in
                     LineMark(
-                        x: .value("시간", point.date),
-                        y: .value("비용", point.value)
+                        x: .value(L.dash.axisTime, point.date),
+                        y: .value(L.dash.axisCost, point.value)
                     )
-                    .foregroundStyle(by: .value("모델", model))
+                    .foregroundStyle(by: .value(L.dash.axisModel, model))
                     .interpolationMethod(.catmullRom)
                     .lineStyle(StrokeStyle(lineWidth: 2))
                 }

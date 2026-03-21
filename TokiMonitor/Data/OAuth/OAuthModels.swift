@@ -87,18 +87,18 @@ struct UsageBucket: Codable {
     }
 
     /// Formatted countdown string.
-    var resetCountdown: String {
-        guard let remaining = timeUntilReset, remaining > 0 else { return "곧 초기화" }
+    @MainActor var resetCountdown: String {
+        guard let remaining = timeUntilReset, remaining > 0 else { return L.usage.resetSoon }
         let hours = Int(remaining) / 3600
         let minutes = (Int(remaining) % 3600) / 60
         if hours > 24 {
             let days = hours / 24
             let remHours = hours % 24
-            return "\(days)일 \(remHours)시간 후"
+            return L.usage.countdown(days: days, hours: remHours)
         } else if hours > 0 {
-            return "\(hours)시간 \(minutes)분 후"
+            return L.usage.countdownHours(hours: hours, minutes: minutes)
         } else {
-            return "\(minutes)분 후"
+            return L.usage.countdownMinutes(minutes)
         }
     }
 }

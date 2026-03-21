@@ -10,10 +10,10 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .general: "일반"
-        case .menuBar: "메뉴바"
-        case .providers: "프로바이더"
-        case .notifications: "알림"
+        case .general: L.cat.general
+        case .menuBar: L.cat.menuBar
+        case .providers: L.cat.providers
+        case .notifications: L.cat.notifications
         }
     }
 
@@ -40,11 +40,12 @@ struct SettingsView: View {
                 Label(category.title, systemImage: category.icon)
                     .tag(category)
             }
-            .navigationSplitViewColumnWidth(200)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 220)
         } detail: {
             detailView
         }
-        .navigationSplitViewColumnWidth(min: 440, ideal: 480)
+        .navigationSplitViewStyle(.balanced)
+        .toolbar(removing: .sidebarToggle)
     }
 
     @ViewBuilder

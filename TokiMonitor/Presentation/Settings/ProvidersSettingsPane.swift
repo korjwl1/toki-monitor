@@ -34,7 +34,7 @@ struct ProvidersSettingsPane: View {
     private func providerRow(_ provider: ProviderInfo) -> some View {
         let ps = settings.effectiveSettings(for: provider.id)
 
-        return Toggle("활성화", isOn: Binding(
+        return Toggle(L.provider.enabled, isOn: Binding(
             get: { ps.enabled },
             set: { newVal in
                 settings.setProviderEnabled(
@@ -51,11 +51,11 @@ struct ProvidersSettingsPane: View {
 
         return Group {
             HStack {
-                Text("색상")
+                Text(L.provider.color)
                 Spacer()
                 colorPickerMenu(
                     currentColor: ps.customColorName,
-                    defaultLabel: "기본 (\(provider.colorName))"
+                    defaultLabel: L.provider.defaultColor(provider.colorName)
                 ) { color in
                     var updated = ps
                     updated.customColorName = color
@@ -63,7 +63,7 @@ struct ProvidersSettingsPane: View {
                 }
             }
 
-            Picker("스타일", selection: Binding(
+            Picker(L.menuBar.style, selection: Binding(
                 get: { ps.animationStyle ?? settings.animationStyle },
                 set: { newVal in
                     var updated = ps
@@ -71,9 +71,9 @@ struct ProvidersSettingsPane: View {
                     settings.providerSettingsMap[provider.id] = updated
                 }
             )) {
-                Text("캐릭터").tag(AnimationStyle.character)
-                Text("수치").tag(AnimationStyle.numeric)
-                Text("그래프").tag(AnimationStyle.sparkline)
+                Text(L.menuBar.character).tag(AnimationStyle.character)
+                Text(L.menuBar.numeric).tag(AnimationStyle.numeric)
+                Text(L.menuBar.graph).tag(AnimationStyle.sparkline)
             }
             .pickerStyle(.segmented)
             .controlSize(.small)

@@ -112,7 +112,7 @@ struct MenuContentView: View {
                 // Metrics
                 HStack(spacing: DS.md) {
                     Label(TokenFormatter.formatRate(rate), systemImage: "speedometer")
-                    Label("\(sessions) 세션", systemImage: "person.2")
+                    Label(L.panel.sessions(sessions), systemImage: "person.2")
                 }
                 .font(.system(size: DS.fontCaption))
                 .foregroundStyle(.secondary)
@@ -153,12 +153,12 @@ struct MenuContentView: View {
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: DS.sm) {
-                Text("Claude 사용량")
+                Text(L.panel.claudeUsage)
                     .font(.system(size: DS.fontTitle, weight: .semibold))
 
-                if let fh = usage.fiveHour { usageBar("5시간", fh) }
+                if let fh = usage.fiveHour { usageBar(L.panel.fiveHour, fh) }
                 if let sd = usage.sevenDay {
-                    usageBar("7일", sd)
+                    usageBar(L.panel.sevenDay, sd)
                 }
             }
         }
@@ -209,10 +209,10 @@ struct MenuContentView: View {
             Image(systemName: "bolt.slash")
                 .font(.system(size: 24))
                 .foregroundStyle(.tertiary)
-            Text("toki 미연결")
+            Text(L.panel.disconnected)
                 .font(.system(size: DS.fontBody, weight: .medium))
                 .foregroundStyle(.secondary)
-            Button("데몬 시작", action: onStartDaemon)
+            Button(L.panel.startDaemon, action: onStartDaemon)
                 .font(.system(size: DS.fontCaption))
                 .controlSize(.small)
         }
@@ -224,9 +224,9 @@ struct MenuContentView: View {
 
     private var rightPanel: some View {
         VStack(spacing: DS.sm) {
-            gridBtn("대시보드", "chart.xyaxis.line", onOpenDashboard)
-            gridBtn("설정", "gearshape", onOpenSettings)
-            gridBtn(styleLabel, styleIcon) {
+            gridBtn(L.panel.dashboard, "chart.xyaxis.line", onOpenDashboard)
+            gridBtn(L.panel.settings, "gearshape", onOpenSettings)
+            styleToggleBtn {
                 switch settings.animationStyle {
                 case .character: settings.animationStyle = .numeric
                 case .numeric: settings.animationStyle = .sparkline
@@ -275,18 +275,46 @@ struct MenuContentView: View {
 
     // MARK: - Helpers
 
+    private func styleToggleBtn(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: DS.xs) {
+                Group {
+                    switch settings.animationStyle {
+                    case .character:
+                        if let url = Bundle.main.url(forResource: "frame_00", withExtension: "png"),
+                           let nsImage = NSImage(contentsOf: url) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(height: 18)
+                        } else {
+                            Image(systemName: "figure.run")
+                                .font(.system(size: 18, weight: .light))
+                        }
+                    case .numeric:
+                        Image(systemName: "number")
+                            .font(.system(size: 18, weight: .light))
+                    case .sparkline:
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 18, weight: .light))
+                    }
+                }
+                .frame(height: 20)
+                Text(styleLabel)
+                    .font(.system(size: DS.fontTiny))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: DS.btnSize, height: DS.btnSize)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var styleLabel: String {
         switch settings.animationStyle {
-        case .character: "캐릭터"
-        case .numeric: "수치"
-        case .sparkline: "그래프"
-        }
-    }
-    private var styleIcon: String {
-        switch settings.animationStyle {
-        case .character: "hare"
-        case .numeric: "number"
-        case .sparkline: "chart.line.uptrend.xyaxis"
+        case .character: L.menuBar.character
+        case .numeric: L.menuBar.numeric
+        case .sparkline: L.menuBar.graph
         }
     }
 

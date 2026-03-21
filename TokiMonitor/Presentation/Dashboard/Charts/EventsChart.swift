@@ -13,10 +13,10 @@ struct EventsChart: View {
                 let points = data.eventsFor(model: model)
                 ForEach(points) { point in
                     BarMark(
-                        x: .value("시간", point.date),
-                        y: .value("호출", point.value)
+                        x: .value(L.dash.axisTime, point.date),
+                        y: .value(L.dash.axisCalls, point.value)
                     )
-                    .foregroundStyle(by: .value("모델", model))
+                    .foregroundStyle(by: .value(L.dash.axisModel, model))
                 }
             }
         }

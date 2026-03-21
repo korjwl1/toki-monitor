@@ -12,7 +12,11 @@ final class StatusBarController {
 
     // Dashboard & Settings
     private let dashboardController = DashboardWindowController()
-    let settings = AppSettings()
+    let settings: AppSettings = {
+        let s = AppSettings()
+        L.settings = s
+        return s
+    }()
     private lazy var settingsController = SettingsWindowController(settings: settings, oauthManager: oauthManager)
 
     // Claude OAuth + Usage

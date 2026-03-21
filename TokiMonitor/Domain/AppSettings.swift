@@ -1,6 +1,33 @@
 import Foundation
 import ServiceManagement
 
+// MARK: - Language
+
+enum AppLanguage: String, CaseIterable, Codable {
+    case system
+    case ko
+    case en
+
+    var displayName: String {
+        switch self {
+        case .system: "시스템 기본"
+        case .ko: "한국어"
+        case .en: "English"
+        }
+    }
+
+    /// Resolved language code based on system locale when set to .system
+    var resolvedCode: String {
+        switch self {
+        case .system:
+            let preferred = Locale.preferredLanguages.first ?? "en"
+            return preferred.hasPrefix("ko") ? "ko" : "en"
+        case .ko: return "ko"
+        case .en: return "en"
+        }
+    }
+}
+
 // MARK: - Setting Enums
 
 enum TextPosition: String, CaseIterable, Codable {
@@ -9,8 +36,8 @@ enum TextPosition: String, CaseIterable, Codable {
 
     var displayName: String {
         switch self {
-        case .leading: "왼쪽"
-        case .trailing: "오른쪽"
+        case .leading: L.enumStr.left
+        case .trailing: L.enumStr.right
         }
     }
 }
@@ -22,9 +49,9 @@ enum TokenUnit: String, CaseIterable, Codable {
 
     var displayName: String {
         switch self {
-        case .perMinute: "/분"
-        case .perSecond: "/초"
-        case .raw: "원시값"
+        case .perMinute: L.enumStr.perMinute
+        case .perSecond: L.enumStr.perSecond
+        case .raw: L.enumStr.rawValue
         }
     }
 }
@@ -37,10 +64,10 @@ enum GraphTimeRange: String, CaseIterable, Codable {
 
     var displayName: String {
         switch self {
-        case .fiveMinutes: "5분"
-        case .tenMinutes: "10분"
-        case .thirtyMinutes: "30분"
-        case .oneHourGraph: "1시간"
+        case .fiveMinutes: L.enumStr.fiveMin
+        case .tenMinutes: L.enumStr.tenMin
+        case .thirtyMinutes: L.enumStr.thirtyMin
+        case .oneHourGraph: L.enumStr.oneHour
         }
     }
 
@@ -80,8 +107,8 @@ enum ProviderDisplayMode: String, CaseIterable, Codable {
 
     var displayName: String {
         switch self {
-        case .aggregated: "합산"
-        case .perProvider: "개별"
+        case .aggregated: L.enumStr.aggregated
+        case .perProvider: L.enumStr.perProvider
         }
     }
 }
@@ -133,6 +160,9 @@ final class AppSettings {
     var claudeAlert90: Bool {
         didSet { save() }
     }
+    var language: AppLanguage {
+        didSet { save() }
+    }
     var launchAtLogin: Bool {
         didSet {
             updateLoginItem()
@@ -155,6 +185,7 @@ final class AppSettings {
         aggregatedColorName = ud.string(forKey: "aggregatedColorName")
         claudeAlert75 = ud.object(forKey: "claudeAlert75") as? Bool ?? true
         claudeAlert90 = ud.object(forKey: "claudeAlert90") as? Bool ?? true
+        language = Self.loadEnum(ud, key: "language") ?? .system
         launchAtLogin = ud.bool(forKey: "launchAtLogin")
     }
 
@@ -197,6 +228,7 @@ final class AppSettings {
         defaults.set(aggregatedColorName, forKey: "aggregatedColorName")
         defaults.set(claudeAlert75, forKey: "claudeAlert75")
         defaults.set(claudeAlert90, forKey: "claudeAlert90")
+        defaults.set(language.rawValue, forKey: "language")
 
         if let data = try? JSONEncoder().encode(providerSettingsMap) {
             defaults.set(data, forKey: "providerSettings")

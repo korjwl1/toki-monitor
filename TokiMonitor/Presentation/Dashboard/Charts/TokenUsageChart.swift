@@ -13,11 +13,11 @@ struct TokenUsageChart: View {
                 let points = data.tokensFor(model: model)
                 ForEach(points) { point in
                     AreaMark(
-                        x: .value("시간", point.date),
-                        y: .value("토큰", point.value),
+                        x: .value(L.dash.axisTime, point.date),
+                        y: .value(L.dash.axisTokens, point.value),
                         stacking: .standard
                     )
-                    .foregroundStyle(by: .value("모델", model))
+                    .foregroundStyle(by: .value(L.dash.axisModel, model))
                     .interpolationMethod(.catmullRom)
                 }
             }

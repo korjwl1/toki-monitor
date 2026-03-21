@@ -31,19 +31,21 @@ extension ProviderInfo {
     }
 
     /// All available color names for the color picker.
-    static let availableColors: [(name: String, displayName: String)] = [
-        ("orange", "주황"),
-        ("blue", "파랑"),
-        ("green", "초록"),
-        ("purple", "보라"),
-        ("red", "빨강"),
-        ("pink", "분홍"),
-        ("yellow", "노랑"),
-        ("teal", "청록"),
-        ("indigo", "남색"),
-        ("mint", "민트"),
-        ("cyan", "시안"),
-        ("brown", "갈색"),
-        ("gray", "회색"),
-    ]
+    @MainActor static var availableColors: [(name: String, displayName: String)] {
+        [
+            ("orange", L.color.orange),
+            ("blue", L.color.blue),
+            ("green", L.color.green),
+            ("purple", L.color.purple),
+            ("red", L.color.red),
+            ("pink", L.color.pink),
+            ("yellow", L.color.yellow),
+            ("teal", L.color.teal),
+            ("indigo", L.color.indigo),
+            ("mint", L.color.mint),
+            ("cyan", L.color.cyan),
+            ("brown", L.color.brown),
+            ("gray", L.color.gray),
+        ]
+    }
 }

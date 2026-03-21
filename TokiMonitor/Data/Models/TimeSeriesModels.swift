@@ -42,12 +42,12 @@ enum DashboardTimeRange: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .sixHours: "6시간"
-        case .twelveHours: "12시간"
-        case .twentyFourHours: "24시간"
-        case .sevenDays: "7일"
-        case .fourteenDays: "14일"
-        case .thirtyDays: "30일"
+        case .sixHours: L.enumStr.sixHours
+        case .twelveHours: L.enumStr.twelveHours
+        case .twentyFourHours: L.enumStr.twentyFourHours
+        case .sevenDays: L.enumStr.sevenDays
+        case .fourteenDays: L.enumStr.fourteenDays
+        case .thirtyDays: L.enumStr.thirtyDays
         }
     }
 

@@ -29,14 +29,14 @@ struct DashboardView: View {
                 refreshButton
             }
         }
-        .navigationTitle("대시보드")
+        .navigationTitle(L.dash.title)
         .onAppear { viewModel.fetchData() }
     }
 
     // MARK: - Toolbar Items
 
     private var timeRangePicker: some View {
-        Picker("기간", selection: $viewModel.selectedTimeRange) {
+        Picker(L.dash.period, selection: $viewModel.selectedTimeRange) {
             ForEach(DashboardTimeRange.allCases) { range in
                 Text(range.displayName).tag(range)
             }
@@ -47,8 +47,8 @@ struct DashboardView: View {
 
     private var modelFilterMenu: some View {
         Menu {
-            Button("전체 선택") { viewModel.selectAllModels() }
-            Button("전체 해제") { viewModel.deselectAllModels() }
+            Button(L.dash.selectAll) { viewModel.selectAllModels() }
+            Button(L.dash.deselectAll) { viewModel.deselectAllModels() }
             Divider()
             if let data = viewModel.timeSeriesData {
                 ForEach(data.allModelNames, id: \.self) { model in
@@ -59,13 +59,13 @@ struct DashboardView: View {
                 }
             }
         } label: {
-            Label("필터", systemImage: "line.3.horizontal.decrease.circle")
+            Label(L.dash.filter, systemImage: "line.3.horizontal.decrease.circle")
         }
     }
 
     private var refreshButton: some View {
         Button(action: { viewModel.fetchData() }) {
-            Label("새로고침", systemImage: "arrow.clockwise")
+            Label(L.dash.refresh, systemImage: "arrow.clockwise")
         }
         .disabled(viewModel.isLoading)
     }
@@ -79,22 +79,22 @@ struct DashboardView: View {
                 Grid(horizontalSpacing: 12, verticalSpacing: 12) {
                     GridRow {
                         StatCard(
-                            title: "총 토큰",
+                            title: L.dash.totalTokens,
                             value: TokenFormatter.formatTokens(viewModel.totalTokens),
                             icon: "number"
                         )
                         StatCard(
-                            title: "총 비용",
+                            title: L.dash.totalCost,
                             value: TokenFormatter.formatCost(viewModel.totalCost),
                             icon: "dollarsign.circle"
                         )
                         StatCard(
-                            title: "API 호출",
+                            title: L.dash.apiCalls,
                             value: "\(viewModel.totalEvents)",
                             icon: "arrow.up.arrow.down"
                         )
                         StatCard(
-                            title: "최다 모델",
+                            title: L.dash.topModel,
                             value: shortModelName(viewModel.topModel ?? "-"),
                             icon: "star"
                         )
@@ -102,7 +102,7 @@ struct DashboardView: View {
                 }
 
                 // Token usage chart (large)
-                ChartPanel(title: "토큰 사용량 추이") {
+                ChartPanel(title: L.dash.tokenTrend) {
                     if viewModel.filteredModelNames.isEmpty {
                         noModelSelected
                     } else {
@@ -116,7 +116,7 @@ struct DashboardView: View {
 
                 // Cost + Events side by side
                 HStack(spacing: 12) {
-                    ChartPanel(title: "비용 추이") {
+                    ChartPanel(title: L.dash.costTrend) {
                         if viewModel.filteredModelNames.isEmpty {
                             noModelSelected
                         } else {
@@ -128,7 +128,7 @@ struct DashboardView: View {
                         }
                     }
 
-                    ChartPanel(title: "API 호출 추이") {
+                    ChartPanel(title: L.dash.apiTrend) {
                         if viewModel.filteredModelNames.isEmpty {
                             noModelSelected
                         } else {
@@ -149,27 +149,27 @@ struct DashboardView: View {
 
     private var noModelSelected: some View {
         ContentUnavailableView(
-            "모델을 선택하세요",
+            L.dash.selectModel,
             systemImage: "line.3.horizontal.decrease.circle",
-            description: Text("필터에서 모델을 선택하면 데이터가 표시됩니다")
+            description: Text(L.dash.selectModelDesc)
         )
         .frame(minHeight: 150)
     }
 
     private func errorView(_ message: String) -> some View {
         ContentUnavailableView {
-            Label("오류 발생", systemImage: "exclamationmark.triangle")
+            Label(L.dash.error, systemImage: "exclamationmark.triangle")
         } description: {
             Text(message)
         } actions: {
-            Button("다시 시도") { viewModel.fetchData() }
+            Button(L.account.retry) { viewModel.fetchData() }
                 .buttonStyle(.bordered)
         }
     }
 
     private var emptyView: some View {
         ContentUnavailableView(
-            "데이터를 불러오는 중...",
+            L.dash.loading,
             systemImage: "chart.xyaxis.line"
         )
     }

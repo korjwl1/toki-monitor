@@ -6,8 +6,16 @@ struct GeneralSettingsPane: View {
 
     var body: some View {
         Form {
-            Section("시작") {
-                Toggle("로그인 시 자동 시작", isOn: $settings.launchAtLogin)
+            Section(L.general.language) {
+                Picker(L.general.language, selection: $settings.language) {
+                    ForEach(AppLanguage.allCases, id: \.self) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+            }
+
+            Section(L.general.startup) {
+                Toggle(L.general.launchAtLogin, isOn: $settings.launchAtLogin)
             }
 
             Section {

@@ -7,9 +7,9 @@ enum TimeRange: String, CaseIterable, Codable {
 
     var displayName: String {
         switch self {
-        case .thirtyMinutes: "30분"
-        case .oneHour: "1시간"
-        case .today: "오늘"
+        case .thirtyMinutes: L.enumStr.halfHour
+        case .oneHour: L.enumStr.oneHour
+        case .today: L.enumStr.today
         }
     }
 

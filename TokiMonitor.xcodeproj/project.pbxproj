@@ -25,6 +25,7 @@
 		A10000000006 /* TokenUsageChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000006 /* TokenUsageChart.swift */; };
 		A10000000007 /* CostChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000007 /* CostChart.swift */; };
 		A10000000008 /* EventsChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000008 /* EventsChart.swift */; };
+		L10000000001 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = L20000000001 /* Localization.swift */; };
 		0C102E5047654E452890DC1C /* frame_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 0C1FFE59530A1D2FC18F1651 /* frame_00.png */; };
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
 		192041B631FA773F80879D97 /* TokenAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85595784F39710A1BF95BC51 /* TokenAggregator.swift */; };
@@ -98,6 +99,7 @@
 		B10000000006 /* TokenUsageChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenUsageChart.swift; sourceTree = "<group>"; };
 		B10000000007 /* CostChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CostChart.swift; sourceTree = "<group>"; };
 		B10000000008 /* EventsChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsChart.swift; sourceTree = "<group>"; };
+		L20000000001 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		0C1FFE59530A1D2FC18F1651 /* frame_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00.png; sourceTree = "<group>"; };
 		140E82C9A015AA41CD3C0C1A /* frame_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_01.png; sourceTree = "<group>"; };
@@ -323,6 +325,7 @@
 				85595784F39710A1BF95BC51 /* TokenAggregator.swift */,
 				5B278895C8F3233433F88309 /* TokenFormatter.swift */,
 				196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */,
+				L20000000001 /* Localization.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -494,6 +497,7 @@
 				A10000000006 /* TokenUsageChart.swift in Sources */,
 				A10000000007 /* CostChart.swift in Sources */,
 				A10000000008 /* EventsChart.swift in Sources */,
+				L10000000001 /* Localization.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

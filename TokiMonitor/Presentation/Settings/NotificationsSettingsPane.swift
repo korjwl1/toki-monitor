@@ -5,9 +5,9 @@ struct NotificationsSettingsPane: View {
 
     var body: some View {
         Form {
-            Section("Claude 사용량 알림") {
-                Toggle("75% 도달 시 알림", isOn: $settings.claudeAlert75)
-                Toggle("90% 도달 시 알림", isOn: $settings.claudeAlert90)
+            Section(L.notification.claudeUsageAlerts) {
+                Toggle(L.notification.alert75, isOn: $settings.claudeAlert75)
+                Toggle(L.notification.alert90, isOn: $settings.claudeAlert90)
             }
         }
         .formStyle(.grouped)

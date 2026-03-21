@@ -12,7 +12,7 @@ struct AccountsSettingsPane: View {
                 }
             } else {
                 Section("Claude") {
-                    Text("OAuth 매니저를 사용할 수 없습니다")
+                    Text(L.account.oauthUnavailable)
                         .foregroundStyle(.secondary)
                 }
             }

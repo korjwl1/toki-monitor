@@ -5,19 +5,19 @@ struct MenuBarSettingsPane: View {
 
     var body: some View {
         Form {
-            Section("애니메이션") {
-                Picker("스타일", selection: $settings.animationStyle) {
-                    Text("캐릭터").tag(AnimationStyle.character)
-                    Text("수치").tag(AnimationStyle.numeric)
-                    Text("그래프").tag(AnimationStyle.sparkline)
+            Section(L.menuBar.animation) {
+                Picker(L.menuBar.style, selection: $settings.animationStyle) {
+                    Text(L.menuBar.character).tag(AnimationStyle.character)
+                    Text(L.menuBar.numeric).tag(AnimationStyle.numeric)
+                    Text(L.menuBar.graph).tag(AnimationStyle.sparkline)
                 }
                 .pickerStyle(.segmented)
 
                 if settings.animationStyle == .character {
-                    Toggle("캐릭터 옆 토큰 수치 표시", isOn: $settings.showRateText)
+                    Toggle(L.menuBar.showRateText, isOn: $settings.showRateText)
 
                     if settings.showRateText {
-                        Picker("텍스트 위치", selection: $settings.textPosition) {
+                        Picker(L.menuBar.textPosition, selection: $settings.textPosition) {
                             ForEach(TextPosition.allCases, id: \.self) { pos in
                                 Text(pos.displayName).tag(pos)
                             }
@@ -27,7 +27,7 @@ struct MenuBarSettingsPane: View {
                 }
 
                 if shouldShowTokenUnit {
-                    Picker("단위", selection: $settings.tokenUnit) {
+                    Picker(L.menuBar.unit, selection: $settings.tokenUnit) {
                         ForEach(TokenUnit.allCases, id: \.self) { unit in
                             Text(unit.displayName).tag(unit)
                         }
@@ -35,7 +35,7 @@ struct MenuBarSettingsPane: View {
                     .pickerStyle(.segmented)
                 }
 
-                Picker("스파크라인 시간폭", selection: $settings.graphTimeRange) {
+                Picker(L.menuBar.sparklineTimeRange, selection: $settings.graphTimeRange) {
                     ForEach(GraphTimeRange.allCases, id: \.self) { range in
                         Text(range.displayName).tag(range)
                     }
@@ -43,8 +43,8 @@ struct MenuBarSettingsPane: View {
                 .pickerStyle(.segmented)
             }
 
-            Section("표시 모드") {
-                Picker("모드", selection: $settings.providerDisplayMode) {
+            Section(L.menuBar.displayMode) {
+                Picker(L.menuBar.mode, selection: $settings.providerDisplayMode) {
                     ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
                     }
@@ -53,11 +53,11 @@ struct MenuBarSettingsPane: View {
 
                 if settings.providerDisplayMode == .aggregated {
                     HStack {
-                        Text("아이콘 색상")
+                        Text(L.menuBar.iconColor)
                         Spacer()
                         colorPickerMenu(
                             currentColor: settings.aggregatedColorName,
-                            defaultLabel: "기본 (흰색)"
+                            defaultLabel: L.menuBar.defaultWhite
                         ) { color in
                             settings.aggregatedColorName = color
                         }
