@@ -4,8 +4,6 @@ struct SettingsView: View {
     @Bindable var settings: AppSettings
     var onClose: (() -> Void)?
 
-    private let settingsRunner = TokiSettingsRunner()
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -46,17 +44,11 @@ struct SettingsView: View {
             Toggle("", isOn: Binding(
                 get: { ps.enabled },
                 set: { newVal in
-                    var updated = ps
-                    updated.enabled = newVal
-                    settings.providerSettingsMap[provider.id] = updated
-
-                    // Sync with toki settings
-                    if let tokiId = provider.tokiProviderId {
-                        if newVal {
-                            settingsRunner.addProvider(tokiId) { _ in }
-                        }
-                        // Don't remove from toki on disable — user might want data retention
-                    }
+                    settings.setProviderEnabled(
+                        provider.id,
+                        enabled: newVal,
+                        tokiProviderId: provider.tokiProviderId
+                    )
                 }
             ))
             .toggleStyle(.checkbox)

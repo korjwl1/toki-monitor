@@ -155,6 +155,18 @@ final class AppSettings {
         providerSettingsMap[providerId] ?? ProviderSettings()
     }
 
+    /// Toggle a provider's enabled state and sync with toki CLI.
+    func setProviderEnabled(_ providerId: String, enabled: Bool, tokiProviderId: String?) {
+        var ps = effectiveSettings(for: providerId)
+        ps.enabled = enabled
+        providerSettingsMap[providerId] = ps
+
+        // Sync with toki daemon when enabling
+        if enabled, let tokiId = tokiProviderId {
+            TokiSettingsRunner().addProvider(tokiId) { _ in }
+        }
+    }
+
     func effectiveStyle(for providerId: String) -> AnimationStyle {
         effectiveSettings(for: providerId).animationStyle ?? animationStyle
     }

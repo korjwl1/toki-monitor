@@ -25,35 +25,18 @@ enum TimeRange: String, CaseIterable, Codable {
 /// Two data sources:
 /// - **trace (UDS)**: real-time → `tokensPerMinute` for animation
 /// - **report (PromQL)**: periodic re-fetch → sparklines, summaries
-///
-/// No client-side binning or overlay. Just fetch fresh data every N seconds.
 @MainActor
 @Observable
 final class TokenAggregator {
-
-    private func debugLog(_ msg: String) {
-        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".toki-monitor-debug.log")
-        let line = "\(Date()): \(msg)\n"
-        if let handle = try? FileHandle(forWritingTo: url) {
-            handle.seekToEndOfFile()
-            handle.write(line.data(using: .utf8)!)
-            handle.closeFile()
-        } else {
-            try? line.data(using: .utf8)?.write(to: url)
-        }
-    }
-    // MARK: - Real-time (trace only)
+    // MARK: - Real-time (trace)
 
     private(set) var tokensPerMinute: Double = 0
     private(set) var perProviderRates: [String: Double] = [:]
 
-    // MARK: - PromQL data (refreshed periodically)
+    // MARK: - PromQL data
 
-    /// Sparkline bins for menu bar graph and dropdown charts.
     private(set) var recentHistory: [Double] = []
-    /// Per-provider sparkline bins.
     private(set) var perProviderHistory: [String: [Double]] = [:]
-    /// Provider summaries.
     private(set) var providerSummaries: [ProviderSummary] = []
     private(set) var totalSummary: TotalSummary?
 
@@ -62,9 +45,7 @@ final class TokenAggregator {
     var timeRange: TimeRange = .oneHour
     var graphTimeRange: GraphTimeRange = .oneHourGraph {
         didSet {
-            if oldValue != graphTimeRange {
-                fetchReportData()
-            }
+            if oldValue != graphTimeRange { fetchReportData() }
         }
     }
 
@@ -76,9 +57,9 @@ final class TokenAggregator {
     private var rateTimer: Timer?
     private var reportTimer: Timer?
     private let reportClient = TokiReportClient()
-
-    /// UI refresh interval — how often to re-fetch PromQL data.
     private let reportRefreshInterval: TimeInterval = 10
+
+    // Timers are cleaned up via stopSampling(), called by StatusBarController's sleep handler.
 
     // MARK: - Trace Events
 
@@ -93,8 +74,6 @@ final class TokenAggregator {
     // MARK: - Start/Stop
 
     func startSampling() {
-        // debugLog("[TokiAggregator] startSampling called")
-        // Rate recalc every 2s for animation
         rateTimer?.invalidate()
         rateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -103,7 +82,6 @@ final class TokenAggregator {
             }
         }
 
-        // PromQL re-fetch every 10s for charts
         reportTimer?.invalidate()
         reportTimer = Timer.scheduledTimer(withTimeInterval: reportRefreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -111,7 +89,6 @@ final class TokenAggregator {
             }
         }
 
-        // Immediate first fetch
         fetchReportData()
     }
 
@@ -143,82 +120,21 @@ final class TokenAggregator {
         perProviderRates = providerTotals.mapValues { Double($0) / minutes }
     }
 
-    // MARK: - PromQL Fetch
+    // MARK: - PromQL Report
 
     private func fetchReportData() {
         let bucket = graphTimeRange.promqlBucket
         let since = graphTimeRange.sinceTimestamp
-        let reportOptions: [String] = ["-z", "UTC"]
         let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
-        let subcommandArgs: [String] = ["query", query]
 
-        reportClient.runner.runReport(reportOptions: reportOptions, subcommandArgs: subcommandArgs) { [weak self] result in
+        reportClient.queryPromQL(query: query) { [weak self] result in
             Task { @MainActor in
                 guard let self else { return }
-                switch result {
-                case .success(let data):
-                    // self.debugLog("[TokiAggregator] PromQL fetch OK, \(data.count) bytes")
-                    self.parseAndApply(data)
-                case .failure:
-                    break
+                if case .success(let pointsByDate) = result {
+                    self.buildBins(from: pointsByDate)
+                    self.buildSummaries(from: pointsByDate)
                 }
             }
-        }
-    }
-
-    private func parseAndApply(_ data: Data) {
-        guard let text = String(data: data, encoding: .utf8) else { return }
-
-        let jsonText = text.components(separatedBy: "\n")
-            .filter { !$0.hasPrefix("[toki]") }
-            .joined(separator: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        let decoder = JSONDecoder()
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.timeZone = TimeZone(identifier: "UTC")
-
-        var pointsByDate: [Date: [TokiModelSummary]] = [:]
-
-        if let jsonData = jsonText.data(using: .utf8),
-           let report = try? decoder.decode(TokiReportV2.self, from: jsonData) {
-            for (_, entries) in report.providers {
-                parseEntries(entries, into: &pointsByDate, formatter: fmt)
-            }
-        } else {
-            for jsonStr in splitJsonObjects(jsonText) {
-                guard let jsonData = jsonStr.data(using: .utf8),
-                      let report = try? decoder.decode(TokiCliReportLegacy.self, from: jsonData)
-                else { continue }
-                parseEntries(report.data, into: &pointsByDate, formatter: fmt)
-            }
-        }
-
-        // debugLog("[TokiAggregator] Parsed \(pointsByDate.count) time points")
-        buildBins(from: pointsByDate)
-        buildSummaries(from: pointsByDate)
-        // debugLog("[TokiAggregator] Bins: \(recentHistory.filter { $0 > 0 }.count) non-zero, Summaries: \(providerSummaries.count) providers")
-    }
-
-    private func parseEntries(
-        _ entries: [TokiCliEntry],
-        into pointsByDate: inout [Date: [TokiModelSummary]],
-        formatter: DateFormatter
-    ) {
-        for entry in entries {
-            guard let periodStr = entry.period, let models = entry.usagePerModels else { continue }
-            let dateStr = periodStr.contains("|")
-                ? String(periodStr[..<periodStr.firstIndex(of: "|")!])
-                : periodStr
-
-            var date: Date?
-            for f in ["yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd"] {
-                formatter.dateFormat = f
-                if let d = formatter.date(from: dateStr) { date = d; break }
-            }
-            guard let d = date else { continue }
-            pointsByDate[d, default: []].append(contentsOf: models)
         }
     }
 
@@ -279,52 +195,4 @@ final class TokenAggregator {
         case .today: Calendar.current.startOfDay(for: Date())
         }
     }
-
-    private func splitJsonObjects(_ text: String) -> [String] {
-        var objects: [String] = []
-        var depth = 0
-        var start = text.startIndex
-        for i in text.indices {
-            if text[i] == "{" { depth += 1 }
-            if text[i] == "}" {
-                depth -= 1
-                if depth == 0 {
-                    objects.append(String(text[start...i]))
-                    let next = text.index(after: i)
-                    if next < text.endIndex { start = next }
-                }
-            }
-        }
-        return objects
-    }
-}
-
-// MARK: - JSON types (shared with TokiReportClient)
-
-struct TokiReportV2: Codable {
-    let information: TokiReportInfo?
-    let providers: [String: [TokiCliEntry]]
-}
-
-struct TokiReportInfo: Codable {
-    let type: String?
-    let since: String?
-    let until: String?
-    let timezone: String?
-}
-
-struct TokiCliEntry: Codable {
-    let period: String?
-    let session: String?
-    let usagePerModels: [TokiModelSummary]?
-
-    enum CodingKeys: String, CodingKey {
-        case period, session
-        case usagePerModels = "usage_per_models"
-    }
-}
-
-struct TokiCliReportLegacy: Codable {
-    let data: [TokiCliEntry]
-    let type: String?
 }

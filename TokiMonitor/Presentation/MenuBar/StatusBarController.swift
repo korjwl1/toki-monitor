@@ -21,6 +21,8 @@ final class StatusBarController {
     private var panelRefreshTimer: Timer?
     private var eventMonitor: Any?
     private var globalMonitor: Any?
+    private var sleepObserver: Any?
+    private var wakeObserver: Any?
 
     init() {
         eventStream = TokiEventStream()
@@ -45,6 +47,8 @@ final class StatusBarController {
         observeSettings()
     }
 
+    // StatusBarController lives for app lifetime — no deinit cleanup needed.
+
     // MARK: - Setup
 
     private func setupEventHandling() {
@@ -57,7 +61,7 @@ final class StatusBarController {
 
     private func setupSleepWakeHandling() {
         let nc = NSWorkspace.shared.notificationCenter
-        nc.addObserver(
+        sleepObserver = nc.addObserver(
             forName: NSWorkspace.willSleepNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
@@ -68,7 +72,7 @@ final class StatusBarController {
                 self?.aggregator.stopSampling()
             }
         }
-        nc.addObserver(
+        wakeObserver = nc.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil, queue: .main
         ) { [weak self] _ in

@@ -17,10 +17,8 @@
 		A10000000008 /* EventsChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000008 /* EventsChart.swift */; };
 		0C102E5047654E452890DC1C /* frame_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 0C1FFE59530A1D2FC18F1651 /* frame_00.png */; };
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
-		17C09A08039E023C5600729C /* ModelDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53081FDDD1535127EECF08BC /* ModelDetailView.swift */; };
 		192041B631FA773F80879D97 /* TokenAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85595784F39710A1BF95BC51 /* TokenAggregator.swift */; };
 		1AF45302417CF14FE4E62098 /* frame_02.png in Resources */ = {isa = PBXBuildFile; fileRef = A56E6C47FB0555F57056DA13 /* frame_02.png */; };
-		2310384CF16C3473F0423275 /* ProviderRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA4A0E4F385978849AD51564 /* ProviderRowView.swift */; };
 		27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5952046CCD5E92A6AE3E38A5 /* ProviderColor.swift */; };
 		2B4230ABE31D423999570F70 /* frame_06.png in Resources */ = {isa = PBXBuildFile; fileRef = 551CF929C655CBA53D7A432E /* frame_06.png */; };
 		2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */; };
@@ -42,17 +40,13 @@
 		A5A0153D1AF63F11B4BE8133 /* TokiEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4247163632AC4A7FF3582B /* TokiEvent.swift */; };
 		B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */; };
 		BCE0DA81930B1736E9AB03A5 /* TokenFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B278895C8F3233433F88309 /* TokenFormatter.swift */; };
-		C0273F287847229BDF25CD3F /* NumericBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63499AFD964FDAA29ACADD21 /* NumericBadgeView.swift */; };
 		C33D79DB96B18D96790274FE /* DashboardWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530B806F812350D8094AA0EC /* DashboardWindow.swift */; };
 		C4E3FFDC972A212EEC371464 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B572F782B925386C0B035893 /* Assets.xcassets */; };
 		CA53B87359FD3833598A2E5C /* SparklineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */; };
 		CA9C7AA78EF38E315FCBB43D /* frame_03.png in Resources */ = {isa = PBXBuildFile; fileRef = C060811529815B293611230B /* frame_03.png */; };
 		D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */; };
-		E491CA8772352E5E5A3F4C71 /* DisconnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814B5F92E5E8722F2B0F6FE1 /* DisconnectedView.swift */; };
-		E6F03BD027B373896549DB92 /* TotalSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B52CDA13199783C9D658A8A /* TotalSummaryView.swift */; };
 		E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0103BDEAC6066E0274029149 /* ConnectionManager.swift */; };
 		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
-		F14010D058074B62B3893B89 /* PopoverContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D127AA4FB666D8F7AB5E873 /* PopoverContentView.swift */; };
 		AA1234567890ABCDEF123456 /* MenuContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1234567890ABCDEF123456 /* MenuContentView.swift */; };
 		CC1234567890ABCDEF123456 /* StatusItemUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1234567890ABCDEF123456 /* StatusItemUnit.swift */; };
 		F7B06F96F0152C66001A51CB /* TokiReportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */; };
@@ -92,24 +86,19 @@
 		4215CB67D3CB129464800547 /* TokiMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TokiMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManagerTests.swift; sourceTree = "<group>"; };
 		507FA6EFF17810ED320DE318 /* ProviderRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRegistryTests.swift; sourceTree = "<group>"; };
-		53081FDDD1535127EECF08BC /* ModelDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDetailView.swift; sourceTree = "<group>"; };
 		530B806F812350D8094AA0EC /* DashboardWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWindow.swift; sourceTree = "<group>"; };
 		551CF929C655CBA53D7A432E /* frame_06.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_06.png; sourceTree = "<group>"; };
 		5952046CCD5E92A6AE3E38A5 /* ProviderColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderColor.swift; sourceTree = "<group>"; };
 		5B278895C8F3233433F88309 /* TokenFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenFormatter.swift; sourceTree = "<group>"; };
 		5D82D563F2B758C1208E987E /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		61DDA70E53ACA059A333371E /* frame_04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_04.png; sourceTree = "<group>"; };
-		63499AFD964FDAA29ACADD21 /* NumericBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumericBadgeView.swift; sourceTree = "<group>"; };
 		BB1234567890ABCDEF123456 /* MenuContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuContentView.swift; sourceTree = "<group>"; };
 		DD1234567890ABCDEF123456 /* StatusItemUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemUnit.swift; sourceTree = "<group>"; };
 		74A27A6A118A446539806BB7 /* TokiReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportModels.swift; sourceTree = "<group>"; };
 		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
-		7B52CDA13199783C9D658A8A /* TotalSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TotalSummaryView.swift; sourceTree = "<group>"; };
-		814B5F92E5E8722F2B0F6FE1 /* DisconnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisconnectedView.swift; sourceTree = "<group>"; };
 		85595784F39710A1BF95BC51 /* TokenAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregator.swift; sourceTree = "<group>"; };
 		8B4247163632AC4A7FF3582B /* TokiEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEvent.swift; sourceTree = "<group>"; };
-		9D127AA4FB666D8F7AB5E873 /* PopoverContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverContentView.swift; sourceTree = "<group>"; };
 		A56E6C47FB0555F57056DA13 /* frame_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_02.png; sourceTree = "<group>"; };
 		A6C1751117D1E380839B3A0E /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClient.swift; sourceTree = "<group>"; };
@@ -121,7 +110,6 @@
 		C89A62671E6B8235B289897B /* frame_05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_05.png; sourceTree = "<group>"; };
 		CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRegistry.swift; sourceTree = "<group>"; };
 		D7A07540C3665358D10E114C /* TokiEventStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStream.swift; sourceTree = "<group>"; };
-		DA4A0E4F385978849AD51564 /* ProviderRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRowView.swift; sourceTree = "<group>"; };
 		DB2BF0000196F3EA0107C726 /* TokiConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiConnection.swift; sourceTree = "<group>"; };
 		DB89E56D927ABD7289F04084 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapperTests.swift; sourceTree = "<group>"; };
@@ -137,17 +125,6 @@
 				8648934AE14365594C7132F0 /* Models */,
 			);
 			path = Data;
-			sourceTree = "<group>";
-		};
-		0CEEE109AB4C71255F777167 /* Popover */ = {
-			isa = PBXGroup;
-			children = (
-				814B5F92E5E8722F2B0F6FE1 /* DisconnectedView.swift */,
-				9D127AA4FB666D8F7AB5E873 /* PopoverContentView.swift */,
-				DA4A0E4F385978849AD51564 /* ProviderRowView.swift */,
-				7B52CDA13199783C9D658A8A /* TotalSummaryView.swift */,
-			);
-			path = Popover;
 			sourceTree = "<group>";
 		};
 		12C6C9AB20CDE12890D87646 = {
@@ -190,7 +167,6 @@
 			children = (
 				1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */,
 				BB1234567890ABCDEF123456 /* MenuContentView.swift */,
-				63499AFD964FDAA29ACADD21 /* NumericBadgeView.swift */,
 				27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */,
 				A6C1751117D1E380839B3A0E /* StatusBarController.swift */,
 				DD1234567890ABCDEF123456 /* StatusItemUnit.swift */,
@@ -222,7 +198,6 @@
 				B10000000002 /* DashboardViewModel.swift */,
 				B10000000003 /* DashboardToolbar.swift */,
 				530B806F812350D8094AA0EC /* DashboardWindow.swift */,
-				53081FDDD1535127EECF08BC /* ModelDetailView.swift */,
 				C10000000001 /* Charts */,
 			);
 			path = Dashboard;
@@ -291,7 +266,6 @@
 				5952046CCD5E92A6AE3E38A5 /* ProviderColor.swift */,
 				5CB76EE9FE876C983A62E891 /* Dashboard */,
 				3CC06E198D87E843450910CE /* MenuBar */,
-				0CEEE109AB4C71255F777167 /* Popover */,
 				AC4F582F1B6F74BCEB60BC78 /* Settings */,
 			);
 			path = Presentation;
@@ -426,13 +400,8 @@
 				E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */,
 				F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */,
 				C33D79DB96B18D96790274FE /* DashboardWindow.swift in Sources */,
-				E491CA8772352E5E5A3F4C71 /* DisconnectedView.swift in Sources */,
-				17C09A08039E023C5600729C /* ModelDetailView.swift in Sources */,
-				C0273F287847229BDF25CD3F /* NumericBadgeView.swift in Sources */,
-				F14010D058074B62B3893B89 /* PopoverContentView.swift in Sources */,
 				27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */,
 				2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */,
-				2310384CF16C3473F0423275 /* ProviderRowView.swift in Sources */,
 				46DF834236EAC2C92B2F93AE /* ProviderSummary.swift in Sources */,
 				789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */,
 				30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */,
@@ -447,7 +416,6 @@
 				3C67B974F8F903F27F8D9F62 /* TokiMonitorApp.swift in Sources */,
 				F7B06F96F0152C66001A51CB /* TokiReportClient.swift in Sources */,
 				909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */,
-				E6F03BD027B373896549DB92 /* TotalSummaryView.swift in Sources */,
 				AA1234567890ABCDEF123456 /* MenuContentView.swift in Sources */,
 				CC1234567890ABCDEF123456 /* StatusItemUnit.swift in Sources */,
 				A10000000001 /* TimeSeriesModels.swift in Sources */,

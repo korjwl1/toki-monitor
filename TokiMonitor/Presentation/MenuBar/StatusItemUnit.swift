@@ -7,7 +7,6 @@ final class StatusItemUnit {
     let providerId: String?  // nil = aggregated
 
     private let characterRenderer = CharacterAnimationRenderer()
-    private let numericRenderer = NumericBadgeRenderer()
     private let sparklineRenderer = SparklineRenderer()
     private var currentStyle: AnimationStyle?
 
