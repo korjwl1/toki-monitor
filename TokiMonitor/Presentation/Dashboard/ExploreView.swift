@@ -67,6 +67,7 @@ struct ExploreView: View {
                     systemImage: "terminal",
                     description: Text(L.tr("PromQL 쿼리를 입력하고 실행하면 결과가 표시됩니다", "Enter a PromQL query and run it to see results"))
                 )
+                .frame(maxHeight: .infinity)
             }
         }
     }

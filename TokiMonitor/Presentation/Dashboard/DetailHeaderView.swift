@@ -30,6 +30,7 @@ struct DetailHeaderView<Trailing: View>: View {
             }
             .padding(.horizontal, 16)
             .frame(height: Self.headerHeight)
+            .background(.ultraThinMaterial)
 
             Rectangle()
                 .fill(Color.primary.opacity(0.1))

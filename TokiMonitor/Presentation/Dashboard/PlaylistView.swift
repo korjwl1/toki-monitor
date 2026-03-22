@@ -26,6 +26,7 @@ struct PlaylistView: View {
                     systemImage: "play.rectangle",
                     description: Text(L.tr("대시보드를 자동으로 순환하는 재생목록을 만들어보세요", "Create a playlist to auto-cycle through dashboards"))
                 )
+                .frame(maxHeight: .infinity)
             } else {
                 List {
                     ForEach(viewModel.playlistManager.playlists) { playlist in

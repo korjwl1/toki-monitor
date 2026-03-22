@@ -60,7 +60,7 @@ struct DashboardView: View {
                     dashboardContent
                 }
             }
-            .padding(.top, 28) // macOS title bar hit area height
+            .padding(.top, 36) // macOS title bar + sidebar toggle clearance
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea(.container, edges: .top)
         }
@@ -301,6 +301,7 @@ struct DashboardView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: DetailHeaderView<EmptyView>.headerHeight)
+        .background(.ultraThinMaterial)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.primary.opacity(0.1)).frame(height: 0.5)
         }

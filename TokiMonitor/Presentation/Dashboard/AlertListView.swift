@@ -25,6 +25,7 @@ struct AlertListView: View {
                     systemImage: "bell.slash",
                     description: Text(L.tr("패널에 알림 규칙을 추가하여 임계값 초과 시 알림을 받으세요", "Add alert rules to panels to get notified when thresholds are exceeded"))
                 )
+                .frame(maxHeight: .infinity)
             } else {
                 List {
                     ForEach(rules) { rule in
