@@ -7,10 +7,14 @@ struct CustomDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
     var onEditPanel: ((PanelConfig) -> Void)?
 
+    // 8pt grid spacing
+    private let gridPadding: CGFloat = 16   // DS.lg
+    private let gridSpacing: CGFloat = 8    // DS.sm
+
     var body: some View {
         GeometryReader { geometry in
-            let containerWidth = geometry.size.width - 32  // 16pt padding each side
-            let containerHeight = geometry.size.height - 32
+            let containerWidth = geometry.size.width - (gridPadding * 2)
+            let containerHeight = geometry.size.height - (gridPadding * 2)
             let panels = viewModel.visiblePanels
             let rowHeight = DashboardGridLayout.dynamicRowHeight(
                 for: panels,
@@ -72,7 +76,7 @@ struct CustomDashboardView: View {
                         }
                     }
                 }
-                .padding(16)
+                .padding(gridPadding)
             }
         }
     }
@@ -89,7 +93,7 @@ struct CustomDashboardView: View {
                 }
             } label: {
                 Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                    .font(.caption)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -108,10 +112,10 @@ struct CustomDashboardView: View {
                     }
                 ))
                 .textFieldStyle(.plain)
-                .font(.subheadline.bold())
+                .font(.system(size: 12, weight: .semibold))
             } else {
                 Text(panel.title)
-                    .font(.subheadline.bold())
+                    .font(.system(size: 12, weight: .semibold))
             }
 
             VStack { Divider() }
@@ -122,7 +126,7 @@ struct CustomDashboardView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
-                        .font(.caption)
+                        .font(.system(size: 10))
                 }
                 .buttonStyle(.plain)
             }
@@ -182,7 +186,7 @@ struct CustomDashboardView: View {
                 .minimumScaleFactor(0.6)
             if let subtitle = stat.subtitle {
                 Text(subtitle)
-                    .font(.caption)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
         }
@@ -262,9 +266,11 @@ struct CustomDashboardView: View {
                 TableColumn(L.dash.axisModel, value: \.model)
                 TableColumn(L.dash.axisTokens) { row in
                     Text(TokenFormatter.formatTokens(row.tokens))
+                        .monospacedDigit()
                 }
                 TableColumn(L.dash.axisCost) { row in
                     Text(TokenFormatter.formatCost(row.cost))
+                        .monospacedDigit()
                 }
             }
         }

@@ -29,6 +29,7 @@ final class DashboardWindowController {
         )
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
+        window.title = "TokiMonitor"
         window.contentViewController = hostingController
         window.center()
         window.setFrameAutosaveName("TokiDashboard")

@@ -1,6 +1,26 @@
 import SwiftUI
 import Charts
 
+// Dashboard design system — mirrors MenuContentView DS (8pt grid)
+private enum DS {
+    static let xs: CGFloat = 4
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 12
+    static let lg: CGFloat = 16
+    static let xl: CGFloat = 24
+
+    static let fontTitle: CGFloat = 14
+    static let fontBody: CGFloat = 12
+    static let fontCaption: CGFloat = 10
+    static let fontTiny: CGFloat = 9
+
+    static let panelRadius: CGFloat = 14
+    static let widgetRadius: CGFloat = 10
+    static let btnRadius: CGFloat = 8
+}
+
+private let divClr = Color.primary.opacity(0.1)
+
 struct DashboardView: View {
     @State private var viewModel: DashboardViewModel
     @State private var showAddPanel = false
@@ -24,20 +44,10 @@ struct DashboardView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Sidebar
-            if viewModel.showSidebar {
-                dashboardSidebar
-                    .frame(width: 220)
-                    .transition(.move(edge: .leading))
-            } else {
-                // Thin strip to toggle sidebar back
-                sidebarToggleStrip
-            }
-
-            Divider()
-
-            // Main content area
+        NavigationSplitView {
+            dashboardSidebar
+                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 260)
+        } detail: {
             VStack(spacing: 0) {
                 switch sidebarSelection {
                 case .explore:
@@ -51,6 +61,7 @@ struct DashboardView: View {
                 }
             }
         }
+        .toolbar(removing: .sidebarToggle)
         .onAppear { viewModel.fetchData() }
         .popover(isPresented: $showAddPanel) {
             AddPanelPopover(viewModel: viewModel)
@@ -75,90 +86,82 @@ struct DashboardView: View {
     // MARK: - Sidebar
 
     private var dashboardSidebar: some View {
-        VStack(spacing: 0) {
-            // Sidebar header
-            HStack {
-                Text(L.dash.dashboards)
-                    .font(.headline)
-                Spacer()
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewModel.showSidebar = false
-                    }
-                } label: {
-                    Image(systemName: "sidebar.left")
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
+        List(selection: $sidebarSelection) {
+            Section {
+                Label(L.dash.dashboards, systemImage: "square.grid.2x2")
+                    .tag(SidebarItem.dashboards)
+                Label(L.dash.explore, systemImage: "magnifyingglass.circle")
+                    .tag(SidebarItem.explore)
+                Label(L.dash.playlists, systemImage: "play.rectangle")
+                    .tag(SidebarItem.playlists)
+                Label(L.dash.alerts, systemImage: "bell")
+                    .tag(SidebarItem.alerts)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
 
-            Divider()
-
+            Section(L.dash.dashboards) {
+                ForEach(viewModel.filteredDashboardList, id: \.uid) { dashboard in
+                    Button {
+                        viewModel.switchDashboard(dashboard)
+                        sidebarSelection = .dashboards
+                    } label: {
+                        HStack(spacing: DS.sm) {
+                            Image(systemName: "square.grid.2x2")
+                                .font(.system(size: DS.fontTiny))
+                                .foregroundStyle(.secondary)
+                            Text(dashboard.title)
+                                .font(.system(size: DS.fontBody))
+                                .lineLimit(1)
+                            Spacer()
+                            if dashboard.uid == viewModel.dashboardConfig.uid {
+                                Circle()
+                                    .fill(Color.accentColor)
+                                    .frame(width: 6, height: 6)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button {
+                            viewModel.duplicateDashboard(uid: dashboard.uid)
+                        } label: {
+                            Label(L.dash.duplicate, systemImage: "doc.on.doc")
+                        }
+                        Button {
+                            viewModel.configStore.exportToFile(dashboard)
+                        } label: {
+                            Label(L.tr("JSON 내보내기", "Export JSON"), systemImage: "square.and.arrow.up")
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            viewModel.deleteDashboard(uid: dashboard.uid)
+                        } label: {
+                            Label(L.dash.delete, systemImage: "trash")
+                        }
+                    }
+                }
+            }
+        }
+        .safeAreaInset(edge: .top) {
             // Search field
-            HStack {
+            HStack(spacing: DS.sm) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .font(.system(size: DS.fontCaption))
                 TextField(L.dash.search, text: $viewModel.sidebarSearchText)
                     .textFieldStyle(.plain)
-                    .font(.caption)
+                    .font(.system(size: DS.fontBody))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.quaternary.opacity(0.5))
-
-            Divider()
-
-            // Navigation items
-            VStack(spacing: 2) {
-                sidebarNavItem(
-                    title: L.dash.dashboards,
-                    icon: "square.grid.2x2",
-                    item: .dashboards
-                )
-                sidebarNavItem(
-                    title: L.dash.explore,
-                    icon: "magnifyingglass.circle",
-                    item: .explore
-                )
-                sidebarNavItem(
-                    title: L.dash.playlists,
-                    icon: "play.rectangle",
-                    item: .playlists
-                )
-                sidebarNavItem(
-                    title: L.dash.alerts,
-                    icon: "bell",
-                    item: .alerts
-                )
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-
-            Divider()
-
-            // Dashboard list
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(viewModel.filteredDashboardList, id: \.uid) { dashboard in
-                        dashboardListItem(dashboard)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-            }
-
-            Divider()
-
+            .padding(.horizontal, DS.md)
+            .padding(.vertical, DS.sm)
+        }
+        .safeAreaInset(edge: .bottom) {
             // Bottom actions
-            HStack(spacing: 8) {
+            HStack(spacing: DS.sm) {
                 Button {
                     viewModel.createNewDashboard()
                 } label: {
                     Label(L.dash.newDashboard, systemImage: "plus")
-                        .font(.caption)
+                        .font(.system(size: DS.fontCaption))
                 }
                 .buttonStyle(.plain)
 
@@ -169,114 +172,20 @@ struct DashboardView: View {
                     viewModel.dashboardList = viewModel.configStore.loadDashboardList()
                 } label: {
                     Label(L.dash.importDashboard, systemImage: "square.and.arrow.down")
-                        .font(.caption)
+                        .font(.system(size: DS.fontCaption))
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, DS.md)
+            .padding(.vertical, DS.sm)
         }
-        .background(.ultraThinMaterial)
-    }
-
-    private func sidebarNavItem(title: String, icon: String, item: SidebarItem) -> some View {
-        Button {
-            sidebarSelection = item
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.caption)
-                    .frame(width: 16)
-                Text(title)
-                    .font(.caption)
-                Spacer()
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                sidebarSelection == item
-                    ? AnyShapeStyle(Color.accentColor.opacity(0.15))
-                    : AnyShapeStyle(.clear),
-                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func dashboardListItem(_ dashboard: DashboardConfig) -> some View {
-        Button {
-            viewModel.switchDashboard(dashboard)
-            sidebarSelection = .dashboards
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                Text(dashboard.title)
-                    .font(.caption)
-                    .lineLimit(1)
-                Spacer()
-                if dashboard.uid == viewModel.dashboardConfig.uid {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 6, height: 6)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                dashboard.uid == viewModel.dashboardConfig.uid
-                    ? AnyShapeStyle(Color.accentColor.opacity(0.1))
-                    : AnyShapeStyle(.clear),
-                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-            )
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            Button {
-                viewModel.duplicateDashboard(uid: dashboard.uid)
-            } label: {
-                Label(L.dash.duplicate, systemImage: "doc.on.doc")
-            }
-            Button {
-                viewModel.configStore.exportToFile(dashboard)
-            } label: {
-                Label(L.tr("JSON 내보내기", "Export JSON"), systemImage: "square.and.arrow.up")
-            }
-            Divider()
-            Button(role: .destructive) {
-                viewModel.deleteDashboard(uid: dashboard.uid)
-            } label: {
-                Label(L.dash.delete, systemImage: "trash")
-            }
-        }
-    }
-
-    private var sidebarToggleStrip: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                viewModel.showSidebar = true
-            }
-        } label: {
-            VStack {
-                Spacer()
-                Image(systemName: "sidebar.left")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .frame(width: 20)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .background(.ultraThinMaterial)
     }
 
     // MARK: - Dashboard Content
 
     private var dashboardContent: some View {
         VStack(spacing: 0) {
-            // Top toolbar bar (Grafana-style)
+            // Top toolbar bar
             dashboardToolbar
 
             // Variable bar (if variables exist)
@@ -310,11 +219,11 @@ struct DashboardView: View {
     // MARK: - Playlist Control Bar
 
     private var playlistControlBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DS.md) {
             Image(systemName: "play.rectangle.fill")
                 .foregroundStyle(Color.accentColor)
             Text(L.dash.playlists)
-                .font(.caption)
+                .font(.system(size: DS.fontCaption))
 
             Spacer()
 
@@ -324,7 +233,7 @@ struct DashboardView: View {
                 }
             } label: {
                 Image(systemName: "backward.fill")
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
             }
             .buttonStyle(.plain)
 
@@ -334,7 +243,7 @@ struct DashboardView: View {
                 }
             } label: {
                 Image(systemName: "pause.fill")
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
             }
             .buttonStyle(.plain)
 
@@ -344,7 +253,7 @@ struct DashboardView: View {
                 }
             } label: {
                 Image(systemName: "forward.fill")
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
             }
             .buttonStyle(.plain)
 
@@ -352,19 +261,19 @@ struct DashboardView: View {
                 viewModel.playlistManager.stop()
             } label: {
                 Image(systemName: "stop.fill")
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 4)
+        .padding(.horizontal, DS.lg)
+        .padding(.vertical, DS.xs)
         .background(Color.accentColor.opacity(0.1))
     }
 
     // MARK: - Dashboard Toolbar
 
     private var dashboardToolbar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DS.sm) {
             // Dashboard title / switcher
             dashboardTitle
 
@@ -373,7 +282,7 @@ struct DashboardView: View {
             // Model filter
             modelFilterMenu
 
-            Divider().frame(height: 16)
+            toolbarDivider
 
             // Time range picker button
             timeRangeButton
@@ -381,39 +290,48 @@ struct DashboardView: View {
             // Auto-refresh picker
             refreshPicker
 
-            Divider().frame(height: 16)
+            toolbarDivider
 
             // Refresh now
             refreshButton
 
-            Divider().frame(height: 16)
+            toolbarDivider
 
             // Edit mode controls
             editModeControls
 
-            // More menu (settings, versions, annotations, import/export)
+            // More menu
             moreMenu
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.bar)
+        .padding(.horizontal, DS.lg)
+        .padding(.vertical, DS.sm)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(divClr).frame(height: 0.5)
+        }
+    }
+
+    private var toolbarDivider: some View {
+        Rectangle()
+            .fill(divClr)
+            .frame(width: 0.5, height: DS.lg)
     }
 
     // MARK: - Dashboard Title
 
     private var dashboardTitle: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: DS.xs) {
             if viewModel.isEditing {
                 TextField(L.dash.title, text: Binding(
                     get: { viewModel.dashboardConfig.title },
                     set: { viewModel.dashboardConfig.title = $0; viewModel.saveDashboard() }
                 ))
                 .textFieldStyle(.plain)
-                .font(.headline)
+                .font(.system(size: DS.fontTitle, weight: .semibold))
                 .frame(maxWidth: 200)
             } else {
                 Text(viewModel.dashboardConfig.title)
-                    .font(.headline)
+                    .font(.system(size: DS.fontTitle, weight: .semibold))
             }
 
             if viewModel.isLoading {
@@ -425,7 +343,7 @@ struct DashboardView: View {
             if let state = overallAlertState, state == .alerting {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
             }
         }
     }
@@ -437,11 +355,10 @@ struct DashboardView: View {
         return .ok
     }
 
-    // MARK: - Time Range Button (Grafana-style dropdown)
+    // MARK: - Time Range Button
 
     private var timeRangeButton: some View {
         Menu {
-            // Quick ranges section
             Section(L.tr("빠른 범위", "Quick ranges")) {
                 ForEach(TimeRangePreset.presets) { preset in
                     Button {
@@ -458,17 +375,15 @@ struct DashboardView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: DS.xs) {
                 Image(systemName: "clock")
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
                 Text(viewModel.timeRangeLabel)
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 8))
+                    .font(.system(size: DS.fontTiny))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .modifier(ToolbarPillModifier())
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -497,15 +412,13 @@ struct DashboardView: View {
                     ? "arrow.clockwise"
                     : "arrow.clockwise.circle.fill"
                 )
-                .font(.caption)
+                .font(.system(size: DS.fontCaption))
                 if viewModel.refreshInterval != .off {
                     Text(viewModel.refreshInterval.displayName)
-                        .font(.caption)
+                        .font(.system(size: DS.fontCaption))
                 }
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .modifier(ToolbarPillModifier())
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -527,15 +440,13 @@ struct DashboardView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: DS.xs) {
                 Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
                 Text(L.dash.filter)
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .modifier(ToolbarPillModifier())
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -546,7 +457,7 @@ struct DashboardView: View {
     private var refreshButton: some View {
         Button(action: { viewModel.fetchData() }) {
             Image(systemName: "arrow.clockwise")
-                .font(.caption)
+                .font(.system(size: DS.fontCaption))
         }
         .buttonStyle(.plain)
         .disabled(viewModel.isLoading)
@@ -564,20 +475,13 @@ struct DashboardView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: DS.xs) {
                 Image(systemName: viewModel.isEditing ? "checkmark" : "pencil")
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
                 Text(viewModel.isEditing ? L.dash.done : L.dash.edit)
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                viewModel.isEditing
-                    ? AnyShapeStyle(Color.accentColor.opacity(0.2))
-                    : AnyShapeStyle(.quaternary),
-                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-            )
+            .modifier(ToolbarPillModifier(isActive: viewModel.isEditing))
         }
         .buttonStyle(.plain)
 
@@ -586,10 +490,8 @@ struct DashboardView: View {
                 showAddPanel = true
             } label: {
                 Image(systemName: "plus")
-                    .font(.caption)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .font(.system(size: DS.fontCaption))
+                    .modifier(ToolbarPillModifier())
             }
             .buttonStyle(.plain)
 
@@ -598,10 +500,8 @@ struct DashboardView: View {
                 viewModel.addRow()
             } label: {
                 Image(systemName: "rectangle.split.1x2")
-                    .font(.caption)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .font(.system(size: DS.fontCaption))
+                    .modifier(ToolbarPillModifier())
             }
             .buttonStyle(.plain)
             .help(L.dash.addRow)
@@ -610,16 +510,14 @@ struct DashboardView: View {
                 viewModel.resetToDefault()
             } label: {
                 Image(systemName: "arrow.counterclockwise")
-                    .font(.caption)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .font(.system(size: DS.fontCaption))
+                    .modifier(ToolbarPillModifier())
             }
             .buttonStyle(.plain)
         }
     }
 
-    // MARK: - More Menu (replaces import/export menu, adds settings/versions/annotations)
+    // MARK: - More Menu
 
     private var moreMenu: some View {
         Menu {
@@ -657,7 +555,6 @@ struct DashboardView: View {
 
             Divider()
 
-            // Copy JSON to clipboard
             Button {
                 if let json = try? viewModel.dashboardConfig.exportJSONString() {
                     NSPasteboard.general.clearContents()
@@ -668,7 +565,7 @@ struct DashboardView: View {
             }
         } label: {
             Image(systemName: "ellipsis.circle")
-                .font(.caption)
+                .font(.system(size: DS.fontCaption))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -677,7 +574,7 @@ struct DashboardView: View {
     // MARK: - Variable Bar
 
     private var variableBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DS.md) {
             ForEach(viewModel.variables) { variable in
                 if variable.hide != .hidden {
                     variableControl(for: variable)
@@ -685,17 +582,20 @@ struct DashboardView: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .background(.bar.opacity(0.5))
+        .padding(.horizontal, DS.lg)
+        .padding(.vertical, DS.sm)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(divClr).frame(height: 0.5)
+        }
     }
 
     @ViewBuilder
     private func variableControl(for variable: DashboardVariable) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: DS.xs) {
             if variable.hide != .hideLabel, let label = variable.label ?? Optional(variable.name) {
                 Text(label)
-                    .font(.caption)
+                    .font(.system(size: DS.fontCaption))
                     .foregroundStyle(.secondary)
             }
 
@@ -720,7 +620,6 @@ struct DashboardView: View {
                 ForEach(variable.options, id: \.value) { option in
                     Button {
                         if variable.multi {
-                            // Toggle multi-select
                             var current = variable.current
                             if current.value.contains(option.value) {
                                 current.value.removeAll { $0 == option.value }
@@ -748,16 +647,14 @@ struct DashboardView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: DS.xs) {
                     Text(variable.current.text.joined(separator: ", "))
-                        .font(.caption)
+                        .font(.system(size: DS.fontCaption))
                         .lineLimit(1)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 8))
+                        .font(.system(size: DS.fontTiny))
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .modifier(ToolbarPillModifier())
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
@@ -782,5 +679,36 @@ struct DashboardView: View {
             L.dash.loading,
             systemImage: "chart.xyaxis.line"
         )
+    }
+}
+
+// MARK: - Toolbar Pill Modifier (glass on macOS 26+, quaternary fallback)
+
+private struct ToolbarPillModifier: ViewModifier {
+    var isActive: Bool = false
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .padding(.horizontal, DS.sm)
+                .padding(.vertical, DS.xs)
+                .glassEffect(.regular, in: .rect(cornerRadius: DS.btnRadius))
+                .overlay {
+                    if isActive {
+                        RoundedRectangle(cornerRadius: DS.btnRadius, style: .continuous)
+                            .fill(Color.accentColor.opacity(0.15))
+                    }
+                }
+        } else {
+            content
+                .padding(.horizontal, DS.sm)
+                .padding(.vertical, DS.xs)
+                .background(
+                    isActive
+                        ? AnyShapeStyle(Color.accentColor.opacity(0.2))
+                        : AnyShapeStyle(.quaternary),
+                    in: RoundedRectangle(cornerRadius: DS.btnRadius, style: .continuous)
+                )
+        }
     }
 }
