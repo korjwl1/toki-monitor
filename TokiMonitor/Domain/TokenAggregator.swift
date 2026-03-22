@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 
 enum TimeRange: String, CaseIterable, Codable {
     case thirtyMinutes = "30m"
@@ -32,6 +33,7 @@ final class TokenAggregator {
 
     private(set) var tokensPerMinute: Double = 0
     private(set) var perProviderRates: [String: Double] = [:]
+    private(set) var perProviderCostPerMinute: [String: Double] = [:]
     /// Active session count per provider (unique sources in rate window).
     private(set) var perProviderSessionCount: [String: Int] = [:]
 
@@ -47,9 +49,9 @@ final class TokenAggregator {
     /// Cost per minute in current rate window.
     private(set) var costPerMinute: Double = 0
     /// Historical average cost per minute (from 24h PromQL query).
-    private var historicalAvgCostPerMinute: Double?
-    /// Velocity threshold: cost/min above this = critical.
-    private let criticalCostPerMinute: Double = 0.50
+    private(set) var historicalAvgCostPerMinute: Double?
+    /// Settings reference for thresholds.
+    weak var settings: AppSettings?
 
     // MARK: - PromQL data
 
@@ -173,19 +175,64 @@ final class TokenAggregator {
         perProviderSessionCount = sessionsByProvider.mapValues(\.count)
 
         // Cost velocity
+        var costByProvider: [String: Double] = [:]
+        for e in recent {
+            costByProvider[e.providerId, default: 0] += e.cost
+        }
+        perProviderCostPerMinute = costByProvider.mapValues { $0 / minutes }
         let totalCost = recent.reduce(0.0) { $0 + $1.cost }
         costPerMinute = totalCost / minutes
         updateSpendAlert()
     }
 
+    private var lastNotifiedAlert: SpendAlert = .normal
+
     private func updateSpendAlert() {
-        if costPerMinute >= criticalCostPerMinute {
-            spendAlert = .critical
-        } else if let avg = historicalAvgCostPerMinute, avg > 0, costPerMinute > avg * 3 {
-            spendAlert = .elevated
+        guard let s = settings else { spendAlert = .normal; return }
+
+        let newAlert: SpendAlert
+        if s.velocityAlertEnabled, costPerMinute >= s.velocityThreshold {
+            newAlert = .critical
+        } else if s.historicalAlertEnabled,
+                  let avg = historicalAvgCostPerMinute, avg > 0,
+                  costPerMinute > avg * s.historicalMultiplier {
+            newAlert = .elevated
         } else {
-            spendAlert = .normal
+            newAlert = .normal
         }
+
+        // Send system notification on state change
+        if newAlert != lastNotifiedAlert, newAlert != .normal {
+            let mode = newAlert == .critical ? s.velocityAlertMode : s.historicalAlertMode
+            if mode == .notification || mode == .both {
+                sendAlertNotification(newAlert)
+            }
+            lastNotifiedAlert = newAlert
+        } else if newAlert == .normal {
+            lastNotifiedAlert = .normal
+        }
+
+        spendAlert = newAlert
+    }
+
+    private func sendAlertNotification(_ alert: SpendAlert) {
+        let content = UNMutableNotificationContent()
+        switch alert {
+        case .critical:
+            content.title = L.tr("비용 속도 경고", "Cost Velocity Alert")
+            content.body = L.tr(
+                String(format: "분당 $%.2f 소모 중 — 임계값 초과", costPerMinute),
+                String(format: "$%.2f/min spending — threshold exceeded", costPerMinute)
+            )
+        case .elevated:
+            content.title = L.tr("이상 급증 감지", "Unusual Spike Detected")
+            content.body = L.tr("현재 사용량이 24시간 평균을 크게 초과합니다.", "Current usage significantly exceeds the 24-hour average.")
+        case .normal: return
+        }
+        content.sound = .default
+
+        let request = UNNotificationRequest(identifier: "spendAlert-\(alert)", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
     }
 
     // MARK: - PromQL Report

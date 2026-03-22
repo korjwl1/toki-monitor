@@ -71,13 +71,17 @@ final class ConnectionManager {
         state = .disconnected
     }
 
-    /// Start daemon, then connect.
+    /// Start daemon, then verify it's running before connecting.
     func startDaemonAndConnect() {
         Task {
-            let launched = await runToki(args: ["daemon", "start"])
-            if launched {
-                try? await Task.sleep(for: .seconds(1))
-                connect()
+            _ = await runToki(args: ["daemon", "start"])
+            // Verify daemon actually started via status check
+            for _ in 0..<5 {
+                try? await Task.sleep(for: .milliseconds(500))
+                if await isDaemonRunning() {
+                    connect()
+                    return
+                }
             }
         }
     }
@@ -92,9 +96,29 @@ final class ConnectionManager {
 
     // MARK: - toki CLI
 
-    /// Check daemon status via `toki daemon status`. Exit code 0 = running.
+    /// Check daemon status via `toki daemon status`.
+    /// toki always exits 0, so we parse stdout for "is running".
     private func isDaemonRunning() async -> Bool {
-        await runToki(args: ["daemon", "status"])
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: TokiPath.resolved)
+                process.arguments = ["daemon", "status"]
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = FileHandle.nullDevice
+
+                do {
+                    try process.run()
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+                    let output = String(data: data, encoding: .utf8) ?? ""
+                    continuation.resume(returning: output.contains("is running"))
+                } catch {
+                    continuation.resume(returning: false)
+                }
+            }
+        }
     }
 
     /// Run a toki CLI command. Returns true if exit code 0.

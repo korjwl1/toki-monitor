@@ -82,6 +82,13 @@ enum L {
         static var claudeUsageAlerts: String { tr("Claude 사용량 알림", "Claude Usage Alerts") }
         static var alert75: String { tr("75% 도달 시 알림", "Alert at 75%") }
         static var alert90: String { tr("90% 도달 시 알림", "Alert at 90%") }
+        static var anomalyDetection: String { tr("이상 감지", "Anomaly Detection") }
+        static var velocityAlert: String { tr("비용 속도 경고", "Cost Velocity Alert") }
+        static var velocityDesc: String { tr("분당 비용이 임계값 초과 시 아이콘이 빨간색으로 변합니다.", "Icon turns red when cost per minute exceeds the threshold.") }
+        static var velocityThreshold: String { tr("임계값 ($/분)", "Threshold ($/min)") }
+        static var historicalAlert: String { tr("이상 급증 경고", "Unusual Spike Alert") }
+        static var historicalDesc: String { tr("현재 사용량이 24시간 평균의 N배를 초과하면 아이콘이 주황색으로 변합니다.", "Icon turns orange when current usage exceeds N times the 24-hour average.") }
+        static var historicalMultiplier: String { tr("배수", "Multiplier") }
     }
 
     // MARK: - Menu Panel

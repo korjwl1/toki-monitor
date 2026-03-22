@@ -45,6 +45,7 @@ final class StatusBarController {
         setupSleepWakeHandling()
 
         // Apply settings
+        aggregator.settings = settings
         aggregator.timeRange = settings.defaultTimeRange
         aggregator.graphTimeRange = settings.graphTimeRange
         aggregator.startSampling()
@@ -136,11 +137,13 @@ final class StatusBarController {
     }
 
     private func updateAllDisplays() {
-        // Override tint color based on spend alert
+        // Override tint color based on spend alert (only if icon color mode)
         let alertTint: NSColor? = switch aggregator.spendAlert {
-        case .critical: .systemRed
-        case .elevated: .systemOrange
-        case .normal: nil
+        case .critical where [.iconColor, .both].contains(settings.velocityAlertMode):
+            ProviderInfo.nsColorFromName(settings.velocityAlertColor)
+        case .elevated where [.iconColor, .both].contains(settings.historicalAlertMode):
+            ProviderInfo.nsColorFromName(settings.historicalAlertColor)
+        default: nil
         }
 
         for unit in units {

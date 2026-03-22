@@ -14,13 +14,7 @@ enum TokenFormatter {
     }
 
     static func formatCost(_ cost: Double) -> String {
-        if cost < 0.01 {
-            return String(format: "$%.4f", cost)
-        } else if cost < 1 {
-            return String(format: "$%.3f", cost)
-        } else {
-            return String(format: "$%.2f", cost)
-        }
+        String(format: "$%.2f", cost)
     }
 
     static func formatRate(_ tokensPerMinute: Double) -> String {

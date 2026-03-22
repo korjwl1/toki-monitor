@@ -91,22 +91,19 @@ struct MenuContentView: View {
         let hist = perProviderHistory[s.provider.id] ?? []
         let rate = aggregator.perProviderRates[s.provider.id] ?? 0
         let sessions = aggregator.perProviderSessionCount[s.provider.id] ?? 0
+        let cpm = aggregator.perProviderCostPerMinute[s.provider.id] ?? 0
 
         return HStack(spacing: DS.md) {
-            // Icon — vertically centered
             providerLogo(s.provider, color: clr)
                 .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: DS.xs) {
-                // Name + cost
                 HStack {
                     Text(s.provider.name)
                         .font(.system(size: DS.fontTitle, weight: .semibold))
                     Spacer()
-                    if let c = s.estimatedCost, c > 0 {
-                        Text(TokenFormatter.formatCost(c))
-                            .font(.system(size: DS.fontTitle, weight: .semibold, design: .monospaced))
-                    }
+                    Text(TokenFormatter.formatCost(cpm) + "/m")
+                        .font(.system(size: DS.fontTitle, weight: .semibold, design: .monospaced))
                 }
 
                 // Metrics
