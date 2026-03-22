@@ -34,6 +34,7 @@ struct DashboardView: View {
     @State private var editableDashboardList: [DashboardConfig] = []
     @State private var dashboardToDelete: DashboardConfig?
     @State private var isEditingTitle = false
+    @State private var preEditConfig: DashboardConfig?
 
     enum SidebarItem: Hashable {
         case explore
@@ -46,6 +47,51 @@ struct DashboardView: View {
     }
 
     var body: some View {
+        mainContent
+            .sheet(item: $editingPanel) { panel in
+                PanelEditorView(panel: panel, viewModel: viewModel) { updated in
+                    viewModel.updatePanel(updated)
+                    editingPanel = nil
+                }
+            }
+            .transaction { $0.animation = nil }
+            .sheet(isPresented: $showDashboardSettings) {
+                DashboardSettingsSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showVersionHistory) {
+                VersionHistorySheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showAnnotationList) {
+                AnnotationListSheet(viewModel: viewModel)
+            }
+            .popover(isPresented: $showAddPanel) {
+                AddPanelPopover(viewModel: viewModel)
+            }
+            .alert(
+                L.tr("대시보드 삭제", "Delete Dashboard"),
+                isPresented: Binding(
+                    get: { dashboardToDelete != nil },
+                    set: { if !$0 { dashboardToDelete = nil } }
+                )
+            ) {
+                Button(L.dash.cancel, role: .cancel) {
+                    dashboardToDelete = nil
+                }
+                Button(L.dash.delete, role: .destructive) {
+                    if let d = dashboardToDelete {
+                        editableDashboardList.removeAll { $0.uid == d.uid }
+                        viewModel.deleteDashboard(uid: d.uid)
+                        dashboardToDelete = nil
+                    }
+                }
+            } message: {
+                if let d = dashboardToDelete {
+                    Text(L.tr("'\(d.title)' 대시보드를 삭제하시겠습니까?", "Delete dashboard '\(d.title)'?"))
+                }
+            }
+    }
+
+    private var mainContent: some View {
         NavigationSplitView {
             dashboardSidebar
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 260)
@@ -62,7 +108,7 @@ struct DashboardView: View {
                     dashboardContent
                 }
             }
-            .padding(.top, 36) // macOS title bar + sidebar toggle clearance
+            .padding(.top, 36)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea(.container, edges: .top)
         }
@@ -70,46 +116,6 @@ struct DashboardView: View {
         .onAppear { viewModel.fetchData() }
         .onChange(of: sidebarSelection) { _, _ in
             isEditingTitle = false
-        }
-        .popover(isPresented: $showAddPanel) {
-            AddPanelPopover(viewModel: viewModel)
-        }
-        .sheet(item: $editingPanel) { panel in
-            PanelEditorView(panel: panel, viewModel: viewModel) { updated in
-                viewModel.updatePanel(updated)
-                editingPanel = nil
-            }
-        }
-        .sheet(isPresented: $showDashboardSettings) {
-            DashboardSettingsSheet(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showVersionHistory) {
-            VersionHistorySheet(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showAnnotationList) {
-            AnnotationListSheet(viewModel: viewModel)
-        }
-        .alert(
-            L.tr("대시보드 삭제", "Delete Dashboard"),
-            isPresented: Binding(
-                get: { dashboardToDelete != nil },
-                set: { if !$0 { dashboardToDelete = nil } }
-            )
-        ) {
-            Button(L.dash.cancel, role: .cancel) {
-                dashboardToDelete = nil
-            }
-            Button(L.dash.delete, role: .destructive) {
-                if let d = dashboardToDelete {
-                    editableDashboardList.removeAll { $0.uid == d.uid }
-                    viewModel.deleteDashboard(uid: d.uid)
-                    dashboardToDelete = nil
-                }
-            }
-        } message: {
-            if let d = dashboardToDelete {
-                Text(L.tr("'\(d.title)' 대시보드를 삭제하시겠습니까?", "Delete dashboard '\(d.title)'?"))
-            }
         }
     }
 
@@ -271,17 +277,26 @@ struct DashboardView: View {
                     errorView(error)
                 } else if viewModel.timeSeriesData != nil {
                     CustomDashboardView(viewModel: viewModel, onEditPanel: { panel in
-                        editingPanel = panel
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            editingPanel = panel
+                        }
                     })
                 } else {
                     emptyView
                 }
             }
-            .onTapGesture {
+            .background {
+                // Dismiss title editing when clicking content area
                 if isEditingTitle {
-                    isEditingTitle = false
-                    viewModel.saveDashboard()
-                    viewModel.dashboardList = viewModel.configStore.loadDashboardList()
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            isEditingTitle = false
+                            viewModel.saveDashboard()
+                            viewModel.dashboardList = viewModel.configStore.loadDashboardList()
+                        }
                 }
             }
         }
@@ -533,11 +548,39 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var editModeControls: some View {
+        if viewModel.isEditing {
+            // Cancel button
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if let original = preEditConfig {
+                        viewModel.dashboardConfig = original
+                        viewModel.saveDashboard()
+                    }
+                    viewModel.isEditing = false
+                    preEditConfig = nil
+                }
+            } label: {
+                HStack(spacing: DS.xs) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: DS.fontCaption))
+                    Text(L.dash.cancel)
+                        .font(.system(size: DS.fontCaption))
+                }
+                .modifier(ToolbarPillModifier())
+            }
+            .buttonStyle(.plain)
+        }
+
+        // Edit/Done toggle
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
-                viewModel.isEditing.toggle()
-                if !viewModel.isEditing {
+                if viewModel.isEditing {
                     viewModel.saveDashboardWithVersion()
+                    viewModel.isEditing = false
+                    preEditConfig = nil
+                } else {
+                    preEditConfig = viewModel.dashboardConfig
+                    viewModel.isEditing = true
                 }
             }
         } label: {

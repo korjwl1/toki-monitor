@@ -84,6 +84,8 @@ struct PanelContainerView<Content: View>: View {
                         Image(systemName: "slider.horizontal.3")
                             .font(.system(size: DashDS.fontBody))
                             .foregroundStyle(.secondary)
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
 
@@ -110,9 +112,6 @@ struct PanelContainerView<Content: View>: View {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
-        }
-        .onTapGesture(count: 2) {
-            onEdit()
         }
         .overlay {
             if isEditing {
