@@ -35,6 +35,22 @@ final class TokenAggregator {
     /// Active session count per provider (unique sources in rate window).
     private(set) var perProviderSessionCount: [String: Int] = [:]
 
+    // MARK: - Anomaly Detection
+
+    enum SpendAlert: Equatable {
+        case normal
+        case elevated   // above historical average
+        case critical   // velocity threshold exceeded
+    }
+
+    private(set) var spendAlert: SpendAlert = .normal
+    /// Cost per minute in current rate window.
+    private(set) var costPerMinute: Double = 0
+    /// Historical average cost per minute (from 24h PromQL query).
+    private var historicalAvgCostPerMinute: Double?
+    /// Velocity threshold: cost/min above this = critical.
+    private let criticalCostPerMinute: Double = 0.50
+
     // MARK: - PromQL data
 
     private(set) var recentHistory: [Double] = []
@@ -54,7 +70,7 @@ final class TokenAggregator {
 
     // MARK: - Private
 
-    private var traceEvents: [(date: Date, tokens: UInt64, providerId: String, source: String)] = []
+    private var traceEvents: [(date: Date, tokens: UInt64, cost: Double, providerId: String, source: String)] = []
     private let rateWindow: TimeInterval = 30
     private let historyBins = 30
     private var rateTimer: Timer?
@@ -68,8 +84,9 @@ final class TokenAggregator {
 
     func addEvent(_ event: TokenEvent) {
         let total = event.inputTokens + event.outputTokens
+        let cost = event.costUSD ?? 0
         let provider = ProviderRegistry.resolve(model: event.model)
-        traceEvents.append((date: event.receivedAt, tokens: total, providerId: provider.id, source: event.source))
+        traceEvents.append((date: event.receivedAt, tokens: total, cost: cost, providerId: provider.id, source: event.source))
         pruneTraceEvents()
         recalculateRate()
     }
@@ -93,6 +110,7 @@ final class TokenAggregator {
         }
 
         fetchReportData()
+        fetchHistoricalBaseline()
     }
 
     func stopSampling() {
@@ -100,6 +118,31 @@ final class TokenAggregator {
         rateTimer = nil
         reportTimer?.invalidate()
         reportTimer = nil
+    }
+
+    // MARK: - Historical Baseline (Level 2)
+
+    private func fetchHistoricalBaseline() {
+        Task {
+            let sinceFmt = DateFormatter()
+            sinceFmt.dateFormat = "yyyyMMddHHmmss"
+            sinceFmt.timeZone = TimeZone(identifier: "UTC")
+            let since = sinceFmt.string(from: Date().addingTimeInterval(-86400)) // 24h ago
+            let query = "usage{since=\"\(since)\"}[1h] by (model)"
+
+            guard let pointsByDate = try? await reportClient.queryPromQL(query: query) else { return }
+
+            // Sum total cost across all points
+            var totalCost: Double = 0
+            for (_, models) in pointsByDate {
+                for m in models {
+                    totalCost += m.costUsd ?? 0
+                }
+            }
+
+            // Average cost per minute over 24h
+            self.historicalAvgCostPerMinute = totalCost / (24 * 60)
+        }
     }
 
     // MARK: - Rate (trace, 30s window)
@@ -128,6 +171,21 @@ final class TokenAggregator {
             sessionsByProvider[e.providerId, default: []].insert(e.source)
         }
         perProviderSessionCount = sessionsByProvider.mapValues(\.count)
+
+        // Cost velocity
+        let totalCost = recent.reduce(0.0) { $0 + $1.cost }
+        costPerMinute = totalCost / minutes
+        updateSpendAlert()
+    }
+
+    private func updateSpendAlert() {
+        if costPerMinute >= criticalCostPerMinute {
+            spendAlert = .critical
+        } else if let avg = historicalAvgCostPerMinute, avg > 0, costPerMinute > avg * 3 {
+            spendAlert = .elevated
+        } else {
+            spendAlert = .normal
+        }
     }
 
     // MARK: - PromQL Report

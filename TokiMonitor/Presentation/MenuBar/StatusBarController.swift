@@ -136,16 +136,22 @@ final class StatusBarController {
     }
 
     private func updateAllDisplays() {
+        // Override tint color based on spend alert
+        let alertTint: NSColor? = switch aggregator.spendAlert {
+        case .critical: .systemRed
+        case .elevated: .systemOrange
+        case .normal: nil
+        }
+
         for unit in units {
             if let pid = unit.providerId {
-                // Per-provider mode — use provider's theme color
                 let rate = aggregator.perProviderRates[pid] ?? 0
                 let history = aggregator.perProviderHistory[pid] ?? []
                 let style = settings.effectiveStyle(for: pid)
                 let colorName = settings.effectiveColorName(
                     for: ProviderRegistry.allProviders.first { $0.id == pid } ?? ProviderRegistry.unknown
                 )
-                let tint = ProviderInfo.nsColorFromName( colorName)
+                let tint = alertTint ?? ProviderInfo.nsColorFromName(colorName)
                 unit.update(
                     tokensPerMinute: rate,
                     history: history,
@@ -157,8 +163,8 @@ final class StatusBarController {
                     sleepDelay: settings.sleepDelay.interval
                 )
             } else {
-                // Aggregated mode
-                let tint: NSColor? = settings.aggregatedColorName.map { ProviderInfo.nsColorFromName( $0) }
+                let baseTint: NSColor? = settings.aggregatedColorName.map { ProviderInfo.nsColorFromName($0) }
+                let tint = alertTint ?? baseTint
                 unit.update(
                     tokensPerMinute: aggregator.tokensPerMinute,
                     history: aggregator.recentHistory,
@@ -397,6 +403,7 @@ final class StatusBarController {
             _ = aggregator.recentHistory
             _ = aggregator.perProviderRates
             _ = aggregator.perProviderHistory
+            _ = aggregator.spendAlert
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.updateAllDisplays()
