@@ -15,6 +15,7 @@ final class DashboardViewModel {
     // MARK: - Sidebar
     var showSidebar = true
     var sidebarSearchText = ""
+    var isEditingDashboardList = false
 
     // MARK: - Row collapse state (by panel ID)
     var collapsedRows: Set<UUID> = []
@@ -400,6 +401,31 @@ final class DashboardViewModel {
                 createNewDashboard()
             }
         }
+    }
+
+    func reorderDashboards(from source: IndexSet, to destination: Int) {
+        dashboardList.move(fromOffsets: source, toOffset: destination)
+    }
+
+    func finishEditingDashboardList() {
+        isEditingDashboardList = false
+        configStore.saveDashboardList(dashboardList)
+    }
+
+    func moveDashboardUp(uid: String) {
+        var list = configStore.loadDashboardList()
+        guard let index = list.firstIndex(where: { $0.uid == uid }), index > 0 else { return }
+        list.swapAt(index, index - 1)
+        configStore.saveDashboardList(list)
+        dashboardList = list
+    }
+
+    func moveDashboardDown(uid: String) {
+        var list = configStore.loadDashboardList()
+        guard let index = list.firstIndex(where: { $0.uid == uid }), index < list.count - 1 else { return }
+        list.swapAt(index, index + 1)
+        configStore.saveDashboardList(list)
+        dashboardList = list
     }
 
     func duplicateDashboard(uid: String) {

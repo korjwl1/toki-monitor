@@ -203,6 +203,9 @@ struct CustomDashboardView: View {
                 viewModel: viewModel,
                 timeSeriesData: viewModel.timeSeriesData
             )
+            // Use monotone for sparse data (prevents overshoot), catmullRom for dense
+            let maxPoints = modelData.map(\.points.count).max() ?? 0
+            let useSmoothCurve = maxPoints > 48
             Chart {
                 ForEach(modelData, id: \.model) { entry in
                     let color = viewModel.colorForModel(entry.model)
@@ -214,7 +217,7 @@ struct CustomDashboardView: View {
                         .foregroundStyle(.linearGradient(
                             colors: [color.opacity(0.35), color.opacity(0)],
                             startPoint: .top, endPoint: .bottom))
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(useSmoothCurve ? .catmullRom : .monotone)
 
                         LineMark(
                             x: .value(L.dash.axisTime, point.date),
@@ -222,7 +225,7 @@ struct CustomDashboardView: View {
                         )
                         .foregroundStyle(color.opacity(0.8))
                         .lineStyle(StrokeStyle(lineWidth: 1.5))
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(useSmoothCurve ? .catmullRom : .monotone)
                     }
                 }
 
@@ -233,6 +236,7 @@ struct CustomDashboardView: View {
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 2]))
                 }
             }
+            .chartYScale(domain: .automatic(includesZero: true))
         }
     }
 

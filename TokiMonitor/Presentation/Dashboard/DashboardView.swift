@@ -31,6 +31,8 @@ struct DashboardView: View {
     @State private var showVersionHistory = false
     @State private var showAnnotationList = false
     @State private var sidebarSelection: SidebarItem?
+    @State private var editableDashboardList: [DashboardConfig] = []
+    @State private var dashboardToDelete: DashboardConfig?
 
     enum SidebarItem: Hashable {
         case explore
@@ -83,6 +85,28 @@ struct DashboardView: View {
         .sheet(isPresented: $showAnnotationList) {
             AnnotationListSheet(viewModel: viewModel)
         }
+        .alert(
+            L.tr("대시보드 삭제", "Delete Dashboard"),
+            isPresented: Binding(
+                get: { dashboardToDelete != nil },
+                set: { if !$0 { dashboardToDelete = nil } }
+            )
+        ) {
+            Button(L.dash.cancel, role: .cancel) {
+                dashboardToDelete = nil
+            }
+            Button(L.dash.delete, role: .destructive) {
+                if let d = dashboardToDelete {
+                    editableDashboardList.removeAll { $0.uid == d.uid }
+                    viewModel.deleteDashboard(uid: d.uid)
+                    dashboardToDelete = nil
+                }
+            }
+        } message: {
+            if let d = dashboardToDelete {
+                Text(L.tr("'\(d.title)' 대시보드를 삭제하시겠습니까?", "Delete dashboard '\(d.title)'?"))
+            }
+        }
     }
 
     // MARK: - Sidebar
@@ -98,12 +122,31 @@ struct DashboardView: View {
                     .tag(SidebarItem.alerts)
             }
 
-            Section(L.dash.dashboards) {
-                ForEach(viewModel.filteredDashboardList, id: \.uid) { dashboard in
-                    Button {
-                        viewModel.switchDashboard(dashboard)
-                        sidebarSelection = nil
-                    } label: {
+            Section(header: HStack {
+                Text(L.dash.dashboards)
+                Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if viewModel.isEditingDashboardList {
+                            // 완료: @State 배열을 store에 저장
+                            viewModel.isEditingDashboardList = false
+                            viewModel.dashboardList = editableDashboardList
+                            viewModel.configStore.saveDashboardList(editableDashboardList)
+                        } else {
+                            // 편집 시작: viewModel 배열을 @State로 복사
+                            editableDashboardList = viewModel.dashboardList
+                            viewModel.isEditingDashboardList = true
+                        }
+                    }
+                } label: {
+                    Text(viewModel.isEditingDashboardList ? L.dash.done : L.dash.edit)
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: DS.fontCaption))
+            }.padding(.trailing, DS.md)) {
+                if viewModel.isEditingDashboardList {
+                    // 편집 모드: @State 배열 사용 → .onMove 반복 동작
+                    ForEach(editableDashboardList, id: \.uid) { dashboard in
                         HStack(spacing: DS.sm) {
                             Image(systemName: "square.grid.2x2")
                                 .font(.system(size: DS.fontTiny))
@@ -112,69 +155,90 @@ struct DashboardView: View {
                                 .font(.system(size: DS.fontBody))
                                 .lineLimit(1)
                             Spacer()
-                            if dashboard.uid == viewModel.dashboardConfig.uid {
+                            Button {
+                                dashboardToDelete = dashboard
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.red)
+                                    .font(.system(size: 14))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .onMove { from, to in
+                        editableDashboardList.move(fromOffsets: from, toOffset: to)
+                    }
+                } else {
+                    // 보기 모드: viewModel 배열 사용
+                    ForEach(viewModel.dashboardList, id: \.uid) { dashboard in
+                        HStack(spacing: DS.sm) {
+                            Image(systemName: "square.grid.2x2")
+                                .font(.system(size: DS.fontTiny))
+                                .foregroundStyle(.secondary)
+                            Text(dashboard.title)
+                                .font(.system(size: DS.fontBody))
+                                .lineLimit(1)
+                            Spacer()
+                            if dashboard.uid == viewModel.dashboardConfig.uid && sidebarSelection == nil {
                                 Circle()
                                     .fill(Color.accentColor)
                                     .frame(width: 6, height: 6)
                             }
                         }
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button {
-                            viewModel.duplicateDashboard(uid: dashboard.uid)
-                        } label: {
-                            Label(L.dash.duplicate, systemImage: "doc.on.doc")
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            viewModel.switchDashboard(dashboard)
+                            sidebarSelection = nil
                         }
-                        Button {
-                            viewModel.configStore.exportToFile(dashboard)
-                        } label: {
-                            Label(L.tr("JSON 내보내기", "Export JSON"), systemImage: "square.and.arrow.up")
-                        }
-                        Divider()
-                        Button(role: .destructive) {
-                            viewModel.deleteDashboard(uid: dashboard.uid)
-                        } label: {
-                            Label(L.dash.delete, systemImage: "trash")
+                        .listRowBackground(
+                            dashboard.uid == viewModel.dashboardConfig.uid && sidebarSelection == nil
+                                ? Color.accentColor.opacity(0.15)
+                                : Color.clear
+                        )
+                        .contextMenu {
+                            Button {
+                                viewModel.duplicateDashboard(uid: dashboard.uid)
+                            } label: {
+                                Label(L.dash.duplicate, systemImage: "doc.on.doc")
+                            }
+                            Button {
+                                viewModel.configStore.exportToFile(dashboard)
+                            } label: {
+                                Label(L.tr("JSON 내보내기", "Export JSON"), systemImage: "square.and.arrow.up")
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                dashboardToDelete = dashboard
+                            } label: {
+                                Label(L.dash.delete, systemImage: "trash")
+                            }
                         }
                     }
                 }
             }
         }
-        .safeAreaInset(edge: .top) {
-            // Search field
-            HStack(spacing: DS.sm) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.tertiary)
-                    .font(.system(size: DS.fontCaption))
-                TextField(L.dash.search, text: $viewModel.sidebarSearchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: DS.fontBody))
-            }
-            .padding(.horizontal, DS.md)
-            .padding(.vertical, DS.sm)
-        }
         .safeAreaInset(edge: .bottom) {
-            // Bottom actions
-            HStack(spacing: DS.sm) {
-                Button {
-                    viewModel.createNewDashboard()
+            HStack {
+                Menu {
+                    Button {
+                        viewModel.createNewDashboard()
+                    } label: {
+                        Label(L.tr("빈 대시보드 만들기", "Create empty dashboard"), systemImage: "plus.square")
+                    }
+                    Button {
+                        viewModel.importDashboard()
+                        viewModel.dashboardList = viewModel.configStore.loadDashboardList()
+                    } label: {
+                        Label(L.tr("JSON에서 가져오기", "Import from JSON"), systemImage: "square.and.arrow.down")
+                    }
                 } label: {
                     Label(L.dash.newDashboard, systemImage: "plus")
                         .font(.system(size: DS.fontCaption))
                 }
-                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .menuStyle(.borderlessButton)
+                .fixedSize()
 
-                Spacer()
-
-                Button {
-                    viewModel.importDashboard()
-                    viewModel.dashboardList = viewModel.configStore.loadDashboardList()
-                } label: {
-                    Label(L.dash.importDashboard, systemImage: "square.and.arrow.down")
-                        .font(.system(size: DS.fontCaption))
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, DS.md)
             .padding(.vertical, DS.sm)
@@ -272,20 +336,17 @@ struct DashboardView: View {
             // Dashboard title
             dashboardTitle
 
-            // Variables
+            Spacer()
+
+            // Controls (right side) — variables + filters together
             ForEach(viewModel.variables) { variable in
                 if variable.hide != .hidden {
                     variableControl(for: variable)
                 }
             }
-
-            Spacer()
-
-            // Controls (right side)
             modelFilterMenu
             timeRangeButton
             refreshControl
-
             editModeControls
             moreMenu
         }
@@ -424,15 +485,28 @@ struct DashboardView: View {
             }
         } label: {
             HStack(spacing: DS.xs) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
+                Image(systemName: isFilterActive
+                    ? "line.3.horizontal.decrease.circle.fill"
+                    : "line.3.horizontal.decrease.circle")
                     .font(.system(size: DS.fontCaption))
-                Text(L.dash.filter)
+                Text(isFilterActive ? filterActiveLabel : L.dash.filter)
                     .font(.system(size: DS.fontCaption))
             }
-            .modifier(ToolbarPillModifier())
+            .modifier(ToolbarPillModifier(isActive: isFilterActive))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+    }
+
+    private var isFilterActive: Bool {
+        guard let data = viewModel.timeSeriesData else { return false }
+        return viewModel.enabledModels.count < data.allModelNames.count
+    }
+
+    private var filterActiveLabel: String {
+        let total = viewModel.timeSeriesData?.allModelNames.count ?? 0
+        let active = viewModel.enabledModels.count
+        return "\(active)/\(total)"
     }
 
     // MARK: - Edit Mode Controls
@@ -568,7 +642,7 @@ struct DashboardView: View {
             if variable.hide != .hideLabel {
                 Text(variable.label ?? variable.name)
                     .font(.system(size: DS.fontCaption))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
 
             Menu {
@@ -601,6 +675,16 @@ struct DashboardView: View {
                                 current.text.removeAll { $0 == "All" }
                                 current.value.append(option.value)
                                 current.text.append(option.text)
+                            }
+                            // If all options selected → switch to "All"
+                            let allValues = Set(variable.options.map(\.value))
+                            let selectedValues = Set(current.value)
+                            if variable.includeAll && allValues == selectedValues {
+                                current = VariableSelection(text: ["All"], value: ["$__all"])
+                            }
+                            // If none selected → revert to "All"
+                            if current.value.isEmpty && variable.includeAll {
+                                current = VariableSelection(text: ["All"], value: ["$__all"])
                             }
                             viewModel.updateVariable(id: variable.id, selection: current)
                         } else {
