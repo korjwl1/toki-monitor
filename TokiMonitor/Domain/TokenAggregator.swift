@@ -40,6 +40,7 @@ final class TokenAggregator {
     private(set) var recentHistory: [Double] = []
     private(set) var perProviderHistory: [String: [Double]] = [:]
     private(set) var providerSummaries: [ProviderSummary] = []
+    private var isFetchingReport = false
     private(set) var totalSummary: TotalSummary?
 
     // MARK: - Config
@@ -132,11 +133,15 @@ final class TokenAggregator {
     // MARK: - PromQL Report
 
     private func fetchReportData() {
+        guard !isFetchingReport else { return }
+        isFetchingReport = true
+
         let bucket = graphTimeRange.promqlBucket
         let since = graphTimeRange.sinceTimestamp
         let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
 
         Task {
+            defer { self.isFetchingReport = false }
             guard let pointsByDate = try? await reportClient.queryPromQL(query: query) else { return }
             self.buildBins(from: pointsByDate)
             self.buildSummaries(from: pointsByDate)

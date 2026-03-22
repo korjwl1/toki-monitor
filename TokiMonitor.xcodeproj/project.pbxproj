@@ -57,6 +57,7 @@
 		96C312BC7B488E45DAB00737 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D82D563F2B758C1208E987E /* AppSettings.swift */; };
 		A5A0153D1AF63F11B4BE8133 /* TokiEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4247163632AC4A7FF3582B /* TokiEvent.swift */; };
 		B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */; };
+		TA10000000001 /* TokenAggregatorLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TA20000000001 /* TokenAggregatorLogicTests.swift */; };
 		BCE0DA81930B1736E9AB03A5 /* TokenFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B278895C8F3233433F88309 /* TokenFormatter.swift */; };
 		C33D79DB96B18D96790274FE /* DashboardWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530B806F812350D8094AA0EC /* DashboardWindow.swift */; };
 		C4E3FFDC972A212EEC371464 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B572F782B925386C0B035893 /* Assets.xcassets */; };
@@ -177,6 +178,7 @@
 		AB20000000001 /* AboutPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutPane.swift; sourceTree = "<group>"; };
 		C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsSettingsPane.swift; sourceTree = "<group>"; };
 		F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapperTests.swift; sourceTree = "<group>"; };
+		TA20000000001 /* TokenAggregatorLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregatorLogicTests.swift; sourceTree = "<group>"; };
 		G20000000001 /* DashboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfig.swift; sourceTree = "<group>"; };
 		G20000000002 /* DashboardConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfigStore.swift; sourceTree = "<group>"; };
 		G20000000003 /* PanelDataExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelDataExtractor.swift; sourceTree = "<group>"; };
@@ -360,6 +362,7 @@
 			isa = PBXGroup;
 			children = (
 				F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */,
+				TA20000000001 /* TokenAggregatorLogicTests.swift */,
 				472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */,
 				507FA6EFF17810ED320DE318 /* ProviderRegistryTests.swift */,
 			);
@@ -638,6 +641,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */,
+				TA10000000001 /* TokenAggregatorLogicTests.swift in Sources */,
 				4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */,
 				2FD39BD3817670D06BE68CEF /* ProviderRegistryTests.swift in Sources */,
 				EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */,

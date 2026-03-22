@@ -41,6 +41,7 @@ final class TokiEventStream {
     func stop() {
         tokiProcess?.terminate()
         tokiProcess = nil
+        removePidFile()
         listener.stop()
         buffer = Data()
     }
@@ -63,6 +64,7 @@ final class TokiEventStream {
         do {
             try process.run()
             tokiProcess = process
+            writePidFile(process.processIdentifier)
         } catch {
             onDisconnect?()
         }
@@ -93,7 +95,17 @@ final class TokiEventStream {
         onEvent?(event)
     }
 
+    private static let pidPath = "/tmp/toki-monitor-trace.pid"
+
     private func killStaleTokiTrace() {
+        // Try PID file first
+        if let pidStr = try? String(contentsOfFile: Self.pidPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+           let pid = Int32(pidStr) {
+            kill(pid, SIGTERM)
+            try? FileManager.default.removeItem(atPath: Self.pidPath)
+            return
+        }
+        // Fallback: pkill for processes from before PID file was introduced
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
         process.arguments = ["-f", "toki trace --sink uds:///tmp/toki-monitor.sock"]
@@ -101,6 +113,14 @@ final class TokiEventStream {
         process.standardError = FileHandle.nullDevice
         try? process.run()
         process.waitUntilExit()
+    }
+
+    private func writePidFile(_ pid: Int32) {
+        try? "\(pid)".write(toFile: Self.pidPath, atomically: true, encoding: .utf8)
+    }
+
+    private func removePidFile() {
+        try? FileManager.default.removeItem(atPath: Self.pidPath)
     }
 
     private func handleDisconnect() {
