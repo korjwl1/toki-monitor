@@ -23,6 +23,7 @@ enum L {
         static var menuBar: String { tr("메뉴바", "Menu Bar") }
         static var providers: String { tr("프로바이더", "Providers") }
         static var notifications: String { tr("알림", "Notifications") }
+        static var about: String { tr("정보", "About") }
     }
 
     // MARK: - General Settings

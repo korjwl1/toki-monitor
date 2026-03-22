@@ -110,6 +110,7 @@ final class StatusBarController {
         case .aggregated:
             let unit = StatusItemUnit(providerId: nil)
             unit.onClick = { [weak self] in self?.handleClick(from: unit) }
+            unit.onRightClick = { [weak self] in self?.showContextMenu(from: unit) }
             units.append(unit)
 
         case .perProvider:
@@ -119,12 +120,14 @@ final class StatusBarController {
             for provider in providers {
                 let unit = StatusItemUnit(providerId: provider.id)
                 unit.onClick = { [weak self] in self?.handleClick(from: unit) }
+                unit.onRightClick = { [weak self] in self?.showContextMenu(from: unit) }
                 units.append(unit)
             }
             // Fallback: at least one unit
             if units.isEmpty {
                 let unit = StatusItemUnit(providerId: nil)
                 unit.onClick = { [weak self] in self?.handleClick(from: unit) }
+                unit.onRightClick = { [weak self] in self?.showContextMenu(from: unit) }
                 units.append(unit)
             }
         }
@@ -168,6 +171,29 @@ final class StatusBarController {
                 )
             }
         }
+    }
+
+    // MARK: - Right Click → Context Menu
+
+    private func showContextMenu(from unit: StatusItemUnit) {
+        dismissPanel()
+        let menu = NSMenu()
+        menu.addItem(withTitle: L.panel.settings, action: #selector(openSettingsFromMenu), keyEquivalent: ",")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: L.tr("종료", "Quit"), action: #selector(quitApp), keyEquivalent: "q")
+        for item in menu.items { item.target = self }
+        unit.statusItem.menu = menu
+        unit.statusItem.button?.performClick(nil)
+        // Remove menu after showing so left-click works normally
+        DispatchQueue.main.async { unit.statusItem.menu = nil }
+    }
+
+    @objc private func openSettingsFromMenu() {
+        settingsController.show()
+    }
+
+    @objc private func quitApp() {
+        NSApp.terminate(nil)
     }
 
     // MARK: - Click → Panel

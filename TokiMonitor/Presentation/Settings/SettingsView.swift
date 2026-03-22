@@ -5,6 +5,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     case menuBar
     case providers
     case notifications
+    case about
 
     var id: String { rawValue }
 
@@ -14,6 +15,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .menuBar: L.cat.menuBar
         case .providers: L.cat.providers
         case .notifications: L.cat.notifications
+        case .about: L.cat.about
         }
     }
 
@@ -23,6 +25,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .menuBar: "menubar.rectangle"
         case .providers: "building.2"
         case .notifications: "bell"
+        case .about: "info.circle"
         }
     }
 }
@@ -59,6 +62,8 @@ struct SettingsView: View {
             ProvidersSettingsPane(settings: settings, oauthManager: oauthManager)
         case .notifications:
             NotificationsSettingsPane(settings: settings)
+        case .about:
+            AboutPane()
         case nil:
             Text(L.cat.menuBar)
                 .foregroundStyle(.secondary)

@@ -11,6 +11,7 @@ final class StatusItemUnit {
     private var currentStyle: AnimationStyle?
 
     var onClick: (() -> Void)?
+    var onRightClick: (() -> Void)?
 
     init(providerId: String? = nil) {
         self.providerId = providerId
@@ -33,11 +34,17 @@ final class StatusItemUnit {
         button.imagePosition = .imageTrailing
 
         button.target = self
-        button.action = #selector(handleClick)
+        button.action = #selector(handleClick(_:))
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
     }
 
-    @objc private func handleClick() {
-        onClick?()
+    @objc private func handleClick(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp {
+            onRightClick?()
+        } else {
+            onClick?()
+        }
     }
 
     /// Update display. tintColor: nil = template/white, non-nil = colored icon/text.

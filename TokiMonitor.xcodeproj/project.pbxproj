@@ -50,6 +50,7 @@
 		F6025160AAD4877579F832AF /* MenuBarSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5456D80A9A29DD053025629 /* MenuBarSettingsPane.swift */; };
 		BA0F0698EDB2F4EA706B2521 /* ProvidersSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */; };
 		138F9EECAD72724767DFF0E2 /* AccountsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */; };
+		AB10000000001 /* AboutPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB20000000001 /* AboutPane.swift */; };
 		87A60F7ED8DC50787541BF2F /* NotificationsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */; };
 		909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A27A6A118A446539806BB7 /* TokiReportModels.swift */; };
 		9449B23FF1F7AD404910F919 /* frame_04.png in Resources */ = {isa = PBXBuildFile; fileRef = 61DDA70E53ACA059A333371E /* frame_04.png */; };
@@ -173,6 +174,7 @@
 		F5456D80A9A29DD053025629 /* MenuBarSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarSettingsPane.swift; sourceTree = "<group>"; };
 		518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvidersSettingsPane.swift; sourceTree = "<group>"; };
 		1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsSettingsPane.swift; sourceTree = "<group>"; };
+		AB20000000001 /* AboutPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutPane.swift; sourceTree = "<group>"; };
 		C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsSettingsPane.swift; sourceTree = "<group>"; };
 		F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapperTests.swift; sourceTree = "<group>"; };
 		G20000000001 /* DashboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfig.swift; sourceTree = "<group>"; };
@@ -373,6 +375,7 @@
 				518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */,
 				1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */,
 				C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */,
+				AB20000000001 /* AboutPane.swift */,
 				D10000000009 /* ClaudeAccountSection.swift */,
 				BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */,
 			);
@@ -566,6 +569,7 @@
 				F6025160AAD4877579F832AF /* MenuBarSettingsPane.swift in Sources */,
 				BA0F0698EDB2F4EA706B2521 /* ProvidersSettingsPane.swift in Sources */,
 				138F9EECAD72724767DFF0E2 /* AccountsSettingsPane.swift in Sources */,
+				AB10000000001 /* AboutPane.swift in Sources */,
 				87A60F7ED8DC50787541BF2F /* NotificationsSettingsPane.swift in Sources */,
 				30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */,
 				CA53B87359FD3833598A2E5C /* SparklineView.swift in Sources */,
