@@ -35,9 +35,28 @@ final class DashboardWindowController {
         window.setFrameAutosaveName("TokiDashboard")
         window.minSize = NSSize(width: 800, height: 600)
         window.isReleasedWhenClosed = false
+        window.delegate = windowDelegate
         window.makeKeyAndOrderFront(nil)
+
+        // Show in Dock while dashboard is open
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
         self.window = window
     }
+
+    // MARK: - Window Delegate
+
+    private lazy var windowDelegate = DashboardWindowDelegate { [weak self] in
+        self?.window = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            NSApp.setActivationPolicy(.accessory)
+        }
+    }
+}
+
+private final class DashboardWindowDelegate: NSObject, NSWindowDelegate {
+    let onClose: () -> Void
+    init(onClose: @escaping () -> Void) { self.onClose = onClose }
+    func windowWillClose(_ notification: Notification) { onClose() }
 }

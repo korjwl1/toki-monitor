@@ -27,4 +27,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Request notification permission for usage alerts
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // When Dock icon is clicked to quit, just close windows and hide from Dock
+        // instead of terminating (menu bar app should keep running)
+        if NSApp.activationPolicy() == .regular {
+            for window in NSApp.windows where window.isVisible && !(window is NSPanel) {
+                window.close()
+            }
+            NSApp.setActivationPolicy(.accessory)
+            return .terminateCancel
+        }
+        return .terminateNow
+    }
 }
