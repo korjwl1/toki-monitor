@@ -202,7 +202,7 @@ final class AppSettings {
 
         // Sync with toki daemon when enabling
         if enabled, let tokiId = tokiProviderId {
-            TokiSettingsRunner().addProvider(tokiId) { _ in }
+            Task { try? await TokiSettingsRunner().addProvider(tokiId) }
         }
     }
 

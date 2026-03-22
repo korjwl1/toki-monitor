@@ -11,14 +11,7 @@ struct TimeSeriesChartView: View {
     @State private var hoveredDate: Date?
     @State private var hoverX: CGFloat = 0
     @State private var plotWidth: CGFloat = 1
-
-    private var modelData: [(model: String, points: [TimeSeriesData.ChartPoint])] {
-        PanelDataExtractor.allModelChartPoints(
-            for: metric,
-            viewModel: viewModel,
-            timeSeriesData: viewModel.timeSeriesData
-        )
-    }
+    @State private var modelData: [(model: String, points: [TimeSeriesData.ChartPoint])] = []
 
     var body: some View {
         Chart {
@@ -93,6 +86,19 @@ struct TimeSeriesChartView: View {
                     .offset(x: max(8, min(hoverX - 80, plotWidth - 170)), y: 4)
             }
         }
+        .onAppear { recalcModelData() }
+        .onChange(of: viewModel.dataVersion) { _, _ in recalcModelData() }
+        .onChange(of: viewModel.enabledModels) { _, _ in recalcModelData() }
+    }
+
+    // MARK: - Data
+
+    private func recalcModelData() {
+        modelData = PanelDataExtractor.allModelChartPoints(
+            for: metric,
+            viewModel: viewModel,
+            timeSeriesData: viewModel.timeSeriesData
+        )
     }
 
     // MARK: - Tooltip

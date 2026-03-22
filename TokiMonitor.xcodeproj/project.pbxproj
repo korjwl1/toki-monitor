@@ -66,6 +66,7 @@
 		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
 		AA1234567890ABCDEF123456 /* MenuContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1234567890ABCDEF123456 /* MenuContentView.swift */; };
 		CC1234567890ABCDEF123456 /* StatusItemUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1234567890ABCDEF123456 /* StatusItemUnit.swift */; };
+		DS10000000001 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS20000000001 /* DesignSystem.swift */; };
 		F7B06F96F0152C66001A51CB /* TokiReportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */; };
 		F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */; };
 		FAAE9290A0103A52B4EDDA4E /* frame_01.png in Resources */ = {isa = PBXBuildFile; fileRef = 140E82C9A015AA41CD3C0C1A /* frame_01.png */; };
@@ -128,6 +129,7 @@
 		B10000000008 /* EventsChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsChart.swift; sourceTree = "<group>"; };
 		L20000000001 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
+		DS20000000001 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		0C1FFE59530A1D2FC18F1651 /* frame_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00.png; sourceTree = "<group>"; };
 		CBF9D170A3A566C2BE2A2F70 /* frame_00_thin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00_thin.png; sourceTree = "<group>"; };
 		140E82C9A015AA41CD3C0C1A /* frame_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_01.png; sourceTree = "<group>"; };
@@ -395,6 +397,7 @@
 		EE3DFCBD1DA2E2C5ECCB7E9D /* Presentation */ = {
 			isa = PBXGroup;
 			children = (
+				DS20000000001 /* DesignSystem.swift */,
 				5952046CCD5E92A6AE3E38A5 /* ProviderColor.swift */,
 				5CB76EE9FE876C983A62E891 /* Dashboard */,
 				3CC06E198D87E843450910CE /* MenuBar */,
@@ -554,6 +557,7 @@
 				E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */,
 				F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */,
 				C33D79DB96B18D96790274FE /* DashboardWindow.swift in Sources */,
+				DS10000000001 /* DesignSystem.swift in Sources */,
 				27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */,
 				2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */,
 				46DF834236EAC2C92B2F93AE /* ProviderSummary.swift in Sources */,

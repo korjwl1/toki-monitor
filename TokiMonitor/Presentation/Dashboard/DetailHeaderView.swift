@@ -15,7 +15,7 @@ struct DetailHeaderView<Trailing: View>: View {
     }
 
     /// Fixed header height for consistent divider position across all pages
-    static var headerHeight: CGFloat { 36 }
+    static var headerHeight: CGFloat { 40 }
 
     var body: some View {
         VStack(spacing: 0) {

@@ -124,6 +124,13 @@ struct TimeSeriesPoint: Identifiable {
     let id = UUID()
     let date: Date
     var models: [TokiModelSummary]
+    let modelIndex: [String: TokiModelSummary]
+
+    init(date: Date, models: [TokiModelSummary]) {
+        self.date = date
+        self.models = models
+        self.modelIndex = Dictionary(models.map { ($0.model, $0) }, uniquingKeysWith: { _, new in new })
+    }
 
     var totalTokens: UInt64 {
         models.reduce(0) { $0 + $1.totalTokens }
@@ -141,15 +148,37 @@ struct TimeSeriesPoint: Identifiable {
 struct TimeSeriesData {
     let points: [TimeSeriesPoint]
     let granularity: TimeSeriesGranularity
+    let allModelNames: [String]
+    let topModel: String?
+    let totalTokens: UInt64
+    let totalCost: Double
+    let totalEvents: Int
 
-    var allModelNames: [String] {
+    init(points: [TimeSeriesPoint], granularity: TimeSeriesGranularity) {
+        self.points = points
+        self.granularity = granularity
+
         var names = Set<String>()
+        var modelTokens: [String: UInt64] = [:]
+        var tokens: UInt64 = 0
+        var cost: Double = 0
+        var events: Int = 0
+
         for point in points {
-            for model in point.models {
-                names.insert(model.model)
+            tokens += point.totalTokens
+            cost += point.totalCost
+            events += point.totalEvents
+            for m in point.models {
+                names.insert(m.model)
+                modelTokens[m.model, default: 0] += m.totalTokens
             }
         }
-        return names.sorted()
+
+        self.allModelNames = names.sorted()
+        self.topModel = modelTokens.max(by: { $0.value < $1.value })?.key
+        self.totalTokens = tokens
+        self.totalCost = cost
+        self.totalEvents = events
     }
 
     struct ChartPoint: Identifiable {
@@ -158,39 +187,14 @@ struct TimeSeriesData {
         let value: Double
     }
 
-    func tokensFor(model: String) -> [ChartPoint] {
+    func chartPoints(for model: String, extracting value: (TokiModelSummary) -> Double) -> [ChartPoint] {
         points.map { point in
-            let tokens = point.models.first { $0.model == model }?.totalTokens ?? 0
-            return ChartPoint(date: point.date, value: Double(tokens))
+            let v = point.modelIndex[model].map(value) ?? 0
+            return ChartPoint(date: point.date, value: v)
         }
     }
 
-    func costFor(model: String) -> [ChartPoint] {
-        points.map { point in
-            let cost = point.models.first { $0.model == model }?.costUsd ?? 0
-            return ChartPoint(date: point.date, value: cost)
-        }
-    }
-
-    func eventsFor(model: String) -> [ChartPoint] {
-        points.map { point in
-            let events = point.models.first { $0.model == model }?.events ?? 0
-            return ChartPoint(date: point.date, value: Double(events))
-        }
-    }
-
-    /// Summary stats across all points
-    var totalTokens: UInt64 { points.reduce(0) { $0 + $1.totalTokens } }
-    var totalCost: Double { points.reduce(0) { $0 + $1.totalCost } }
-    var totalEvents: Int { points.reduce(0) { $0 + $1.totalEvents } }
-
-    var topModel: String? {
-        var modelTokens: [String: UInt64] = [:]
-        for point in points {
-            for m in point.models {
-                modelTokens[m.model, default: 0] += m.totalTokens
-            }
-        }
-        return modelTokens.max(by: { $0.value < $1.value })?.key
-    }
+    func tokensFor(model: String) -> [ChartPoint] { chartPoints(for: model) { Double($0.totalTokens) } }
+    func costFor(model: String) -> [ChartPoint] { chartPoints(for: model) { $0.costUsd ?? 0 } }
+    func eventsFor(model: String) -> [ChartPoint] { chartPoints(for: model) { Double($0.events) } }
 }

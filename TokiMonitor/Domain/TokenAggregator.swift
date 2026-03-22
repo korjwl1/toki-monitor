@@ -136,14 +136,10 @@ final class TokenAggregator {
         let since = graphTimeRange.sinceTimestamp
         let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
 
-        reportClient.queryPromQL(query: query) { [weak self] result in
-            Task { @MainActor in
-                guard let self else { return }
-                if case .success(let pointsByDate) = result {
-                    self.buildBins(from: pointsByDate)
-                    self.buildSummaries(from: pointsByDate)
-                }
-            }
+        Task {
+            guard let pointsByDate = try? await reportClient.queryPromQL(query: query) else { return }
+            self.buildBins(from: pointsByDate)
+            self.buildSummaries(from: pointsByDate)
         }
     }
 

@@ -141,7 +141,7 @@ final class StatusBarController {
                 let colorName = settings.effectiveColorName(
                     for: ProviderRegistry.allProviders.first { $0.id == pid } ?? ProviderRegistry.unknown
                 )
-                let tint = Self.nsColor(from: colorName)
+                let tint = ProviderInfo.nsColorFromName( colorName)
                 unit.update(
                     tokensPerMinute: rate,
                     history: history,
@@ -153,7 +153,7 @@ final class StatusBarController {
                 )
             } else {
                 // Aggregated mode
-                let tint: NSColor? = settings.aggregatedColorName.map { Self.nsColor(from: $0) }
+                let tint: NSColor? = settings.aggregatedColorName.map { ProviderInfo.nsColorFromName( $0) }
                 unit.update(
                     tokensPerMinute: aggregator.tokensPerMinute,
                     history: aggregator.recentHistory,
@@ -164,25 +164,6 @@ final class StatusBarController {
                     tintColor: tint
                 )
             }
-        }
-    }
-
-    private static func nsColor(from colorName: String) -> NSColor {
-        switch colorName {
-        case "orange": .systemOrange
-        case "blue": .systemBlue
-        case "green": .systemGreen
-        case "purple": .systemPurple
-        case "red": .systemRed
-        case "pink": .systemPink
-        case "yellow": .systemYellow
-        case "teal": .systemTeal
-        case "indigo": .systemIndigo
-        case "mint": .systemMint
-        case "cyan": .systemCyan
-        case "brown": .systemBrown
-        case "gray": .systemGray
-        default: .labelColor
         }
     }
 
@@ -249,20 +230,6 @@ final class StatusBarController {
         panel.level = .statusBar
         panel.isMovable = false
         panel.hasShadow = true
-
-        // Debug: dump view hierarchy to verify safe area fix
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            func dmp(_ v: NSView, d: Int = 0) -> String {
-                let c = type(of: v).description()
-                let f = v.frame
-                var s = "\(String(repeating: "  ", count: d))\(c) \(Int(f.width))x\(Int(f.height))\n"
-                for sub in v.subviews { s += dmp(sub, d: d+1) }
-                return s
-            }
-            if let tf = panel.contentView?.superview {
-                try? dmp(tf).write(toFile: NSHomeDirectory() + "/.toki-view-dump.txt", atomically: true, encoding: .utf8)
-            }
-        }
         panel.becomesKeyOnlyIfNeeded = true
         panel.acceptsMouseMovedEvents = true
         panel.isFloatingPanel = true
@@ -295,30 +262,13 @@ final class StatusBarController {
         panel.orderFrontRegardless()
         menuPanel = panel
 
-        // Refresh panel content periodically (NSPanel + nonactivating doesn't auto-update SwiftUI)
-        panelRefreshTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        // Observation-driven refresh: update rootView only when data actually changes
+        scheduleObservationRefresh(for: unit)
+
+        // Safety-net fallback timer at low frequency
+        panelRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard let self, let hv = self.menuHostingView else { return }
-                hv.rootView = MenuContentView(
-                    aggregator: self.aggregator,
-                    connectionManager: self.connectionManager,
-                    usageMonitor: self.usageMonitor,
-                    filterProviderId: unit.providerId,
-                    settings: self.settings,
-                    onStartDaemon: { [weak self] in
-                        self?.dismissPanel()
-                        DispatchQueue.main.async { self?.connectionManager.startDaemonAndConnect() }
-                    },
-                    onOpenDashboard: { [weak self] in
-                        self?.dismissPanel()
-                        DispatchQueue.main.async { self?.dashboardController.show() }
-                    },
-                    onOpenSettings: { [weak self] in
-                        self?.dismissPanel()
-                        DispatchQueue.main.async { self?.settingsController.show() }
-                    },
-                    onQuit: { NSApp.terminate(nil) }
-                )
+                self?.refreshPanelContent(for: unit)
             }
         }
 
@@ -343,6 +293,48 @@ final class StatusBarController {
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             self?.dismissPanel()
         }
+    }
+
+    private func scheduleObservationRefresh(for unit: StatusItemUnit) {
+        withObservationTracking {
+            _ = self.aggregator.perProviderRates
+            _ = self.aggregator.perProviderHistory
+            _ = self.aggregator.perProviderSessionCount
+            _ = self.aggregator.providerSummaries
+            _ = self.connectionManager.state
+            _ = self.usageMonitor.currentUsage
+            _ = self.usageMonitor.lastError
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.menuHostingView != nil else { return }
+                self.refreshPanelContent(for: unit)
+                self.scheduleObservationRefresh(for: unit)
+            }
+        }
+    }
+
+    private func refreshPanelContent(for unit: StatusItemUnit) {
+        guard let hv = menuHostingView else { return }
+        hv.rootView = MenuContentView(
+            aggregator: aggregator,
+            connectionManager: connectionManager,
+            usageMonitor: usageMonitor,
+            filterProviderId: unit.providerId,
+            settings: settings,
+            onStartDaemon: { [weak self] in
+                self?.dismissPanel()
+                DispatchQueue.main.async { self?.connectionManager.startDaemonAndConnect() }
+            },
+            onOpenDashboard: { [weak self] in
+                self?.dismissPanel()
+                DispatchQueue.main.async { self?.dashboardController.show() }
+            },
+            onOpenSettings: { [weak self] in
+                self?.dismissPanel()
+                DispatchQueue.main.async { self?.settingsController.show() }
+            },
+            onQuit: { NSApp.terminate(nil) }
+        )
     }
 
     private func dismissPanel() {

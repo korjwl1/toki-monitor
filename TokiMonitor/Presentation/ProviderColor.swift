@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 extension ProviderInfo {
     /// Resolve colorName string to SwiftUI Color (Presentation layer only).
@@ -27,6 +28,25 @@ extension ProviderInfo {
         case "cyan": .cyan
         case "brown": .brown
         default: .secondary
+        }
+    }
+
+    static func nsColorFromName(_ name: String) -> NSColor {
+        switch name {
+        case "orange": .systemOrange
+        case "blue": .systemBlue
+        case "green": .systemGreen
+        case "gray": .systemGray
+        case "purple": .systemPurple
+        case "red": .systemRed
+        case "pink": .systemPink
+        case "yellow": .systemYellow
+        case "teal": .systemTeal
+        case "indigo": .systemIndigo
+        case "mint": .systemMint
+        case "cyan": .systemCyan
+        case "brown": .systemBrown
+        default: .labelColor
         }
     }
 

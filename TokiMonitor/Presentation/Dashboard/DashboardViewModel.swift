@@ -51,6 +51,7 @@ final class DashboardViewModel {
 
     // MARK: - Data State
     var timeSeriesData: TimeSeriesData?
+    var dataVersion: Int = 0
     var isLoading = false
     var errorMessage: String?
     var enabledModels: Set<String> = []
@@ -117,21 +118,20 @@ final class DashboardViewModel {
 
         let time = dashboardConfig.time
 
-        reportClient.queryTimeSeriesFromConfig(time: time) { [weak self] result in
-            Task { @MainActor in
-                guard let self else { return }
+        Task {
+            do {
+                let data = try await reportClient.queryTimeSeriesFromConfig(time: time)
                 self.isLoading = false
-                switch result {
-                case .success(let data):
-                    self.timeSeriesData = data
-                    if self.enabledModels.isEmpty {
-                        self.enabledModels = Set(data.allModelNames)
-                    } else {
-                        self.enabledModels.formUnion(data.allModelNames)
-                    }
-                case .failure(let error):
-                    self.errorMessage = error.localizedDescription
+                self.timeSeriesData = data
+                self.dataVersion += 1
+                if self.enabledModels.isEmpty {
+                    self.enabledModels = Set(data.allModelNames)
+                } else {
+                    self.enabledModels.formUnion(data.allModelNames)
                 }
+            } catch {
+                self.isLoading = false
+                self.errorMessage = error.localizedDescription
             }
         }
     }
@@ -493,18 +493,16 @@ final class DashboardViewModel {
         }
         saveExploreHistory()
 
-        reportClient.queryPromQL(query: exploreQuery) { [weak self] result in
-            Task { @MainActor in
-                guard let self else { return }
+        Task {
+            do {
+                let pointsByDate = try await reportClient.queryPromQL(query: exploreQuery)
                 self.isExploreLoading = false
-                switch result {
-                case .success(let pointsByDate):
-                    var points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
-                        .sorted { $0.date < $1.date }
-                    self.exploreResults = TimeSeriesData(points: points, granularity: .hourly)
-                case .failure:
-                    self.exploreResults = nil
-                }
+                let points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
+                    .sorted { $0.date < $1.date }
+                self.exploreResults = TimeSeriesData(points: points, granularity: .hourly)
+            } catch {
+                self.isExploreLoading = false
+                self.exploreResults = nil
             }
         }
     }

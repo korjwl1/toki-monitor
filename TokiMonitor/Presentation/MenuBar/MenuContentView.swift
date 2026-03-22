@@ -1,36 +1,6 @@
 import SwiftUI
 import Charts
 
-// Design system based on 8pt grid + golden ratio
-private enum DS {
-    // Spacing (8pt grid)
-    static let xs: CGFloat = 4
-    static let sm: CGFloat = 8
-    static let md: CGFloat = 12
-    static let lg: CGFloat = 16
-    static let xl: CGFloat = 24
-
-    // Typography (modular scale 1.125 — compact UI)
-    static let fontTitle: CGFloat = 14
-    static let fontBody: CGFloat = 12
-    static let fontCaption: CGFloat = 10
-    static let fontTiny: CGFloat = 9
-
-    // Layout
-    static let leftWidth: CGFloat = 200
-    static let rightWidth: CGFloat = 56
-    static let btnSize: CGFloat = 56      // square buttons
-
-    // Border radius (nested: inner = outer - padding)
-    static let panelRadius: CGFloat = 14
-    static let widgetRadius: CGFloat = 10  // 14 - 4(gap)
-    static let btnRadius: CGFloat = 8
-
-    // Chart
-    static let chartHeight: CGFloat = 32
-}
-
-private let divClr = Color.primary.opacity(0.1)
 
 struct MenuContentView: View {
     let aggregator: TokenAggregator
@@ -49,8 +19,8 @@ struct MenuContentView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            leftPanel.frame(width: DS.leftWidth)
-            rightPanel.frame(width: DS.rightWidth)
+            leftPanel.frame(width: DS.Menu.leftWidth)
+            rightPanel.frame(width: DS.Menu.rightWidth)
         }
         .padding(DS.sm)
         .modifier(GlassPanelModifier())
@@ -246,7 +216,7 @@ struct MenuContentView: View {
                     .font(.system(size: DS.fontTiny))
                     .foregroundStyle(.secondary)
             }
-            .frame(width: DS.btnSize, height: DS.btnSize)
+            .frame(width: DS.Menu.btnSize, height: DS.Menu.btnSize)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -270,7 +240,7 @@ struct MenuContentView: View {
         }
         .chartYScale(domain: 0...yMax)
         .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
-        .frame(height: DS.chartHeight)
+        .frame(height: DS.Menu.chartHeight)
     }
 
     // MARK: - Helpers
@@ -304,7 +274,7 @@ struct MenuContentView: View {
                     .font(.system(size: DS.fontTiny))
                     .foregroundStyle(.secondary)
             }
-            .frame(width: DS.btnSize, height: DS.btnSize)
+            .frame(width: DS.Menu.btnSize, height: DS.Menu.btnSize)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

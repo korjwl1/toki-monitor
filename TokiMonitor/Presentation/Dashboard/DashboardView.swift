@@ -1,25 +1,6 @@
 import SwiftUI
 import Charts
 
-// Dashboard design system — mirrors MenuContentView DS (8pt grid)
-private enum DS {
-    static let xs: CGFloat = 4
-    static let sm: CGFloat = 8
-    static let md: CGFloat = 12
-    static let lg: CGFloat = 16
-    static let xl: CGFloat = 24
-
-    static let fontTitle: CGFloat = 14
-    static let fontBody: CGFloat = 12
-    static let fontCaption: CGFloat = 10
-    static let fontTiny: CGFloat = 9
-
-    static let panelRadius: CGFloat = 14
-    static let widgetRadius: CGFloat = 10
-    static let btnRadius: CGFloat = 8
-}
-
-private let divClr = Color.primary.opacity(0.1)
 
 struct DashboardView: View {
     @State private var viewModel: DashboardViewModel
@@ -442,6 +423,7 @@ struct DashboardView: View {
             .modifier(ToolbarPillModifier())
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
         .popover(isPresented: $showTimeRangePicker) {
             TimeRangePickerPopover(viewModel: viewModel, isPresented: $showTimeRangePicker)
         }
@@ -488,6 +470,7 @@ struct DashboardView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .contentShape(Rectangle())
     }
 
     // MARK: - Model Filter Menu
@@ -518,6 +501,7 @@ struct DashboardView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .contentShape(Rectangle())
     }
 
     private var isFilterActive: Bool {
@@ -683,7 +667,7 @@ struct DashboardView: View {
         .padding(.vertical, DS.sm)
         .background(.ultraThinMaterial)
         .overlay(alignment: .bottom) {
-            Rectangle().fill(divClr).frame(height: 0.5)
+            Rectangle().fill(DS.dividerColor).frame(height: 0.5)
         }
     }
 
@@ -804,6 +788,7 @@ private struct ToolbarPillModifier: ViewModifier {
                 .frame(minHeight: 24)
                 .contentShape(Rectangle())
                 .glassEffect(.regular, in: .rect(cornerRadius: DS.btnRadius))
+                .contentShape(Rectangle())
                 .overlay {
                     if isActive {
                         RoundedRectangle(cornerRadius: DS.btnRadius, style: .continuous)

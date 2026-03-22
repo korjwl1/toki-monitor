@@ -129,6 +129,49 @@ final class TokiTraceListener {
     }
 }
 
+// MARK: - Shared CLI Process Runner
+
+enum CLIRunnerError: Error, LocalizedError {
+    case exitCode(Int)
+    var errorDescription: String? {
+        switch self {
+        case .exitCode(let code): "toki exited with code \(code)"
+        }
+    }
+}
+
+enum CLIProcessRunner {
+    /// Run a CLI process on a background queue, reading stdout before waitUntilExit
+    /// to avoid pipe buffer deadlock.
+    static func run(executable: String, arguments: [String]) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: executable)
+                process.arguments = arguments
+
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = FileHandle.nullDevice
+
+                do {
+                    try process.run()
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    process.waitUntilExit()
+
+                    if process.terminationStatus == 0 {
+                        continuation.resume(returning: data)
+                    } else {
+                        continuation.resume(throwing: CLIRunnerError.exitCode(Int(process.terminationStatus)))
+                    }
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+}
+
 /// Runs `toki report` CLI and returns JSON output.
 final class TokiReportRunner: Sendable {
     private let tokiPath: String
@@ -139,47 +182,10 @@ final class TokiReportRunner: Sendable {
 
     func runReport(
         reportOptions: [String] = [],
-        subcommandArgs: [String],
-        completion: @escaping @Sendable (Result<Data, Error>) -> Void
-    ) {
-        DispatchQueue.global(qos: .utility).async {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: self.tokiPath)
-            process.arguments = ["report", "--output-format", "json"]
-                + reportOptions + subcommandArgs
-
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-
-            do {
-                try process.run()
-
-                // Read stdout BEFORE waitUntilExit to avoid pipe buffer deadlock.
-                // If output exceeds ~64KB, the process blocks on write and
-                // waitUntilExit never returns.
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-
-                if process.terminationStatus == 0 {
-                    completion(.success(data))
-                } else {
-                    completion(.failure(RunnerError.exitCode(Int(process.terminationStatus))))
-                }
-            } catch {
-                completion(.failure(error))
-            }
-        }
-    }
-
-    enum RunnerError: Error, LocalizedError {
-        case exitCode(Int)
-
-        var errorDescription: String? {
-            switch self {
-            case .exitCode(let code): "toki report exited with code \(code)"
-            }
-        }
+        subcommandArgs: [String]
+    ) async throws -> Data {
+        let args = ["report", "--output-format", "json"] + reportOptions + subcommandArgs
+        return try await CLIProcessRunner.run(executable: tokiPath, arguments: args)
     }
 }
 
@@ -192,74 +198,37 @@ final class TokiSettingsRunner: Sendable {
     }
 
     /// Get current list of enabled provider IDs.
-    func getProviders(completion: @escaping @Sendable (Result<[String], Error>) -> Void) {
-        runCommand(["settings", "list"]) { result in
-            switch result {
-            case .success(let output):
-                // Parse "providers = ["claude_code","codex"]" line
-                let lines = output.components(separatedBy: "\n")
-                for line in lines {
-                    if line.contains("providers") && line.contains("=") {
-                        let parts = line.components(separatedBy: "=")
-                        if parts.count >= 2 {
-                            let raw = parts[1].trimmingCharacters(in: .whitespaces)
-                            // Parse ["claude_code","codex"] format
-                            let cleaned = raw
-                                .replacingOccurrences(of: "[", with: "")
-                                .replacingOccurrences(of: "]", with: "")
-                                .replacingOccurrences(of: "\"", with: "")
-                            let ids = cleaned.components(separatedBy: ",")
-                                .map { $0.trimmingCharacters(in: .whitespaces) }
-                                .filter { !$0.isEmpty }
-                            completion(.success(ids))
-                            return
-                        }
-                    }
+    func getProviders() async throws -> [String] {
+        let output = try await runCommand(["settings", "list"])
+        let lines = output.components(separatedBy: "\n")
+        for line in lines {
+            if line.contains("providers") && line.contains("=") {
+                let parts = line.components(separatedBy: "=")
+                if parts.count >= 2 {
+                    let raw = parts[1].trimmingCharacters(in: .whitespaces)
+                    let cleaned = raw
+                        .replacingOccurrences(of: "[", with: "")
+                        .replacingOccurrences(of: "]", with: "")
+                        .replacingOccurrences(of: "\"", with: "")
+                    return cleaned.components(separatedBy: ",")
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
                 }
-                completion(.success([]))
-            case .failure(let error):
-                completion(.failure(error))
             }
         }
+        return []
     }
 
-    /// Add a provider to toki settings.
-    func addProvider(_ id: String, completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
-        runCommand(["settings", "set", "providers", "--add", id]) { result in
-            completion(result.map { _ in () })
-        }
+    func addProvider(_ id: String) async throws {
+        _ = try await runCommand(["settings", "set", "providers", "--add", id])
     }
 
-    /// Remove a provider from toki settings.
-    func removeProvider(_ id: String, completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
-        runCommand(["settings", "set", "providers", "--remove", id]) { result in
-            completion(result.map { _ in () })
-        }
+    func removeProvider(_ id: String) async throws {
+        _ = try await runCommand(["settings", "set", "providers", "--remove", id])
     }
 
-    private func runCommand(_ args: [String], completion: @escaping @Sendable (Result<String, Error>) -> Void) {
-        DispatchQueue.global(qos: .utility).async {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: self.tokiPath)
-            process.arguments = args
-
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-
-            do {
-                try process.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                let output = String(data: data, encoding: .utf8) ?? ""
-                if process.terminationStatus == 0 {
-                    completion(.success(output))
-                } else {
-                    completion(.failure(TokiReportRunner.RunnerError.exitCode(Int(process.terminationStatus))))
-                }
-            } catch {
-                completion(.failure(error))
-            }
-        }
+    private func runCommand(_ args: [String]) async throws -> String {
+        let data = try await CLIProcessRunner.run(executable: tokiPath, arguments: args)
+        return String(data: data, encoding: .utf8) ?? ""
     }
 }

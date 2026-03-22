@@ -7,14 +7,11 @@ struct CustomDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
     var onEditPanel: ((PanelConfig) -> Void)?
 
-    // 8pt grid spacing
-    private let gridPadding: CGFloat = 16   // DS.lg
-    private let gridSpacing: CGFloat = 8    // DS.sm
 
     var body: some View {
         GeometryReader { geometry in
-            let containerWidth = geometry.size.width - (gridPadding * 2)
-            let containerHeight = geometry.size.height - (gridPadding * 2)
+            let containerWidth = geometry.size.width - (DS.Dashboard.gridPadding * 2)
+            let containerHeight = geometry.size.height - (DS.Dashboard.gridPadding * 2)
             let panels = viewModel.visiblePanels
             let rowHeight = DashboardGridLayout.dynamicRowHeight(
                 for: panels,
@@ -76,7 +73,7 @@ struct CustomDashboardView: View {
                         }
                     }
                 }
-                .padding(gridPadding)
+                .padding(DS.Dashboard.gridPadding)
             }
         }
     }
