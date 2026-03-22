@@ -4,12 +4,20 @@ import AppKit
 @MainActor
 final class CharacterAnimationRenderer {
     private var frames: [NSImage] = []
+    private var sleepFrames: [NSImage] = []
     private var currentFrame = 0
     private var frameTimer: Timer?
     private let mapper = AnimationStateMapper()
     private var currentInterval: TimeInterval = 0
     private var currentTintColor: NSColor?
     private var isStopped = false
+
+    /// Tracks when idle state began, to trigger sleep animation after threshold.
+    private var idleSince: Date?
+    private var isSleeping = false
+
+    /// Seconds of idle before sleep animation starts.
+    private let sleepDelay: TimeInterval = 180 // 3 minutes
 
     init() {
         loadFrames()
@@ -21,9 +29,35 @@ final class CharacterAnimationRenderer {
         let idle = mapper.isIdle(tokensPerMinute: tokensPerMinute)
 
         if idle {
-            stopAnimation()
-            applyFrame(0, to: button)
+            if idleSince == nil {
+                idleSince = Date()
+            }
+
+            let idleDuration = Date().timeIntervalSince(idleSince!)
+
+            if idleDuration >= sleepDelay, !sleepFrames.isEmpty {
+                if !isSleeping {
+                    isSleeping = true
+                    currentFrame = 0
+                    startSleepAnimation(button: button)
+                }
+            } else {
+                if isSleeping {
+                    isSleeping = false
+                    stopAnimation()
+                }
+                stopAnimation()
+                applyFrame(0, from: frames, to: button)
+            }
             return
+        }
+
+        // Active — reset idle/sleep state
+        idleSince = nil
+        if isSleeping {
+            isSleeping = false
+            stopAnimation()
+            currentFrame = 0
         }
 
         let newInterval = mapper.interval(for: tokensPerMinute)
@@ -31,6 +65,7 @@ final class CharacterAnimationRenderer {
         let threshold = 0.1
         if frameTimer != nil,
            currentInterval > 0,
+           !isSleeping,
            abs(newInterval - currentInterval) / currentInterval < threshold {
             return
         }
@@ -40,15 +75,17 @@ final class CharacterAnimationRenderer {
 
     func stop() {
         isStopped = true
+        isSleeping = false
+        idleSince = nil
         stopAnimation()
         currentFrame = 0
     }
 
     // MARK: - Private
 
-    private func applyFrame(_ index: Int, to button: NSStatusBarButton) {
-        guard index < frames.count else { return }
-        let frame = frames[index]
+    private func applyFrame(_ index: Int, from source: [NSImage], to button: NSStatusBarButton) {
+        guard index < source.count else { return }
+        let frame = source[index]
         if let tint = currentTintColor {
             button.image = tintedImage(frame, color: tint)
             button.image?.isTemplate = false
@@ -72,6 +109,25 @@ final class CharacterAnimationRenderer {
         frameTimer = timer
     }
 
+    private func startSleepAnimation(button: NSStatusBarButton) {
+        frameTimer?.invalidate()
+        let interval: TimeInterval = 0.8
+        currentInterval = interval
+
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                guard self.isSleeping, !self.sleepFrames.isEmpty, !self.isStopped else { return }
+                self.currentFrame = (self.currentFrame + 1) % self.sleepFrames.count
+                self.applyFrame(self.currentFrame, from: self.sleepFrames, to: button)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        frameTimer = timer
+
+        applyFrame(0, from: sleepFrames, to: button)
+    }
+
     private func stopAnimation() {
         frameTimer?.invalidate()
         frameTimer = nil
@@ -79,9 +135,9 @@ final class CharacterAnimationRenderer {
     }
 
     private func advanceFrame(button: NSStatusBarButton) {
-        guard !frames.isEmpty, !isStopped else { return }
+        guard !frames.isEmpty, !isStopped, !isSleeping else { return }
         currentFrame = (currentFrame + 1) % frames.count
-        applyFrame(currentFrame, to: button)
+        applyFrame(currentFrame, from: frames, to: button)
     }
 
     private func tintedImage(_ image: NSImage, color: NSColor) -> NSImage {
@@ -93,6 +149,8 @@ final class CharacterAnimationRenderer {
         }
         return tinted
     }
+
+    // MARK: - Frame Loading
 
     private func loadFrames() {
         let bundle = Bundle.main
@@ -109,6 +167,55 @@ final class CharacterAnimationRenderer {
 
         if frames.isEmpty {
             frames = generatePlaceholderFrames()
+        }
+
+        // Generate sleep frames from frame_00 + "z" overlay
+        generateSleepFrames()
+    }
+
+    /// Generates 4 sleep frames by compositing frame_00 with z text overlay.
+    /// Frame 0: rabbit only (same as idle)
+    /// Frame 1: rabbit + "z"
+    /// Frame 2: rabbit + "zZ"
+    /// Frame 3: rabbit + "zZZ"
+    private func generateSleepFrames() {
+        guard let baseFrame = frames.first else { return }
+
+        let zTexts = ["", "z", "zZ", "zZZ"]
+        // Canvas wider than base to accommodate z text without shifting rabbit
+        let canvasWidth: CGFloat = 30
+        let canvasHeight: CGFloat = 18
+        let canvasSize = NSSize(width: canvasWidth, height: canvasHeight)
+
+        // Rabbit drawn at left, z text at upper-right of rabbit
+        let rabbitX: CGFloat = 0.0
+        let rabbitRect = NSRect(origin: NSPoint(x: rabbitX, y: 0), size: baseFrame.size)
+
+        sleepFrames = zTexts.map { zText in
+            let image = NSImage(size: canvasSize, flipped: false) { rect in
+                // Draw the base rabbit
+                baseFrame.draw(in: rabbitRect)
+
+                if !zText.isEmpty {
+                    // Draw z text at upper-right, above rabbit's head
+                    let fontSize: CGFloat = 5.0
+                    let font = NSFont.systemFont(ofSize: fontSize, weight: .bold)
+                    let attrs: [NSAttributedString.Key: Any] = [
+                        .font: font,
+                        .foregroundColor: NSColor.labelColor,
+                    ]
+                    let attrStr = NSAttributedString(string: zText, attributes: attrs)
+                    let textSize = attrStr.size()
+                    // Position: right side of rabbit, top area
+                    let textX = rabbitRect.maxX - 2
+                    let textY = rect.maxY - textSize.height - 1
+                    attrStr.draw(at: NSPoint(x: textX, y: textY))
+                }
+
+                return true
+            }
+            image.isTemplate = true
+            return image
         }
     }
 
