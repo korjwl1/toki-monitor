@@ -280,16 +280,12 @@ struct CustomDashboardView: View {
 
     /// Compact date format based on current time range granularity
     private var chartDateFormat: Date.FormatStyle {
-        let granularity = viewModel.dashboardConfig.time.granularity
-        switch granularity {
-        case .oneMinute, .fiveMinute, .fifteenMinute, .thirtyMinute:
-            // "14:30"
+        let secs = viewModel.dashboardConfig.time.bucketSeconds
+        if secs < 3600 {
             return .dateTime.hour(.defaultDigits(amPM: .omitted)).minute(.twoDigits)
-        case .hourly, .threeHour, .sixHour:
-            // "3/21 6AM"
+        } else if secs < 86400 {
             return .dateTime.month(.defaultDigits).day(.defaultDigits).hour(.defaultDigits(amPM: .abbreviated))
-        case .daily:
-            // "3/21"
+        } else {
             return .dateTime.month(.defaultDigits).day(.defaultDigits)
         }
     }

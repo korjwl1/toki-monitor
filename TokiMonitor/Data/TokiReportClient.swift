@@ -45,9 +45,8 @@ final class TokiReportClient: Sendable {
             switch result {
             case .success(let data):
                 let pointsByDate = TokiReportParser.parseReport(data)
-                var points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
+                let points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
                     .sorted { $0.date < $1.date }
-                points = Self.gapFill(points: points, timeRange: timeRange)
                 let tsData = TimeSeriesData(points: points, granularity: timeRange.granularity)
                 completion(.success(tsData))
             case .failure(let error):
@@ -79,12 +78,12 @@ final class TokiReportClient: Sendable {
         time: TimeConfig,
         completion: @escaping @Sendable (Result<TimeSeriesData, Error>) -> Void
     ) {
-        let granularity: TimeSeriesGranularity = time.granularity
-        let bucket = granularity.bucket
+        let bucket = time.bucketString
         let sinceFmt = DateFormatter()
         sinceFmt.dateFormat = "yyyyMMddHHmmss"
         sinceFmt.timeZone = TimeZone(identifier: "UTC")
-        let sinceDate = time.fromDate.addingTimeInterval(-3600) // small buffer
+        let buffer = max(60, time.duration * 0.1) // proportional buffer (10%, min 1m)
+        let sinceDate = time.fromDate.addingTimeInterval(-buffer)
         let since = sinceFmt.string(from: sinceDate)
         let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
 
@@ -97,8 +96,8 @@ final class TokiReportClient: Sendable {
                 let pointsByDate = TokiReportParser.parseReport(data)
                 var points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
                     .sorted { $0.date < $1.date }
-                points = Self.gapFillFromConfig(points: points, time: time)
-                let tsData = TimeSeriesData(points: points, granularity: granularity)
+                points = Self.gapFillEpochAligned(points: points, time: time)
+                let tsData = TimeSeriesData(points: points, granularity: time.bucketSeconds < 3600 ? .fifteenMinute : time.bucketSeconds < 86400 ? .hourly : .daily)
                 completion(.success(tsData))
             case .failure(let error):
                 completion(.failure(error))
@@ -106,75 +105,33 @@ final class TokiReportClient: Sendable {
         }
     }
 
-    // MARK: - Gap Fill (TimeConfig)
+    // MARK: - Gap Fill (epoch-aligned, matches toki's bucket boundaries)
 
-    private static func gapFillFromConfig(
+    /// Gap-fill using same alignment as toki: floor(epoch / bucket) * bucket
+    private static func gapFillEpochAligned(
         points: [TimeSeriesPoint],
         time: TimeConfig
     ) -> [TimeSeriesPoint] {
-        var calendar = Calendar.current
-        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let step = TimeInterval(time.bucketSeconds)
+        guard step > 0 else { return points }
 
-        let now = Date()
-        let granularity = time.granularity
-        let step = granularity.stepInterval
-        let start: Date
-        switch granularity {
-        case .oneMinute, .fiveMinute, .fifteenMinute, .thirtyMinute:
-            let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now.addingTimeInterval(-time.duration))
-            start = calendar.date(from: c) ?? now.addingTimeInterval(-time.duration)
-        case .hourly, .threeHour, .sixHour:
-            let c = calendar.dateComponents([.year, .month, .day, .hour], from: now.addingTimeInterval(-time.duration))
-            start = calendar.date(from: c) ?? now.addingTimeInterval(-time.duration)
-        case .daily:
-            let c = calendar.dateComponents([.year, .month, .day], from: now.addingTimeInterval(-time.duration))
-            start = calendar.date(from: c) ?? now.addingTimeInterval(-time.duration)
-        }
+        let fromEpoch = time.fromDate.timeIntervalSince1970
+        let toEpoch = time.toDate.timeIntervalSince1970
 
-        let existingDates = Set(points.map(\.date))
+        // Align start to toki's bucket boundary: floor(epoch / bucket) * bucket
+        let alignedStart = floor(fromEpoch / step) * step
+        let alignedEnd = toEpoch
+
+        let existingDates = Set(points.map { Int(floor($0.date.timeIntervalSince1970 / step) * step) })
+
         var filled = points
-        var current = start
-        while current <= now {
-            if !existingDates.contains(current) {
-                filled.append(TimeSeriesPoint(date: current, models: []))
+        var current = alignedStart
+        while current <= alignedEnd {
+            let bucket = Int(current)
+            if !existingDates.contains(bucket) {
+                filled.append(TimeSeriesPoint(date: Date(timeIntervalSince1970: current), models: []))
             }
-            current = current.addingTimeInterval(step)
-        }
-        return filled.sorted { $0.date < $1.date }
-    }
-
-    // MARK: - Gap Fill
-
-    private static func gapFill(
-        points: [TimeSeriesPoint],
-        timeRange: DashboardTimeRange
-    ) -> [TimeSeriesPoint] {
-        var calendar = Calendar.current
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-
-        let now = Date()
-        let step = timeRange.granularity.stepInterval
-        let start: Date
-        switch timeRange.granularity {
-        case .oneMinute, .fiveMinute, .fifteenMinute, .thirtyMinute:
-            let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now.addingTimeInterval(-timeRange.duration))
-            start = calendar.date(from: c) ?? now.addingTimeInterval(-timeRange.duration)
-        case .hourly, .threeHour, .sixHour:
-            let c = calendar.dateComponents([.year, .month, .day, .hour], from: now.addingTimeInterval(-timeRange.duration))
-            start = calendar.date(from: c) ?? now.addingTimeInterval(-timeRange.duration)
-        case .daily:
-            let c = calendar.dateComponents([.year, .month, .day], from: now.addingTimeInterval(-timeRange.duration))
-            start = calendar.date(from: c) ?? now.addingTimeInterval(-timeRange.duration)
-        }
-
-        let existingDates = Set(points.map(\.date))
-        var filled = points
-        var current = start
-        while current <= now {
-            if !existingDates.contains(current) {
-                filled.append(TimeSeriesPoint(date: current, models: []))
-            }
-            current = current.addingTimeInterval(step)
+            current += step
         }
         return filled.sorted { $0.date < $1.date }
     }

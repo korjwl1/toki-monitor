@@ -75,18 +75,33 @@ struct TimeConfig: Codable, Equatable {
         }
     }
 
-    var granularity: TimeSeriesGranularity {
-        // Target ~25 data points regardless of time range
-        let idealBucket = duration / 15.0
-        let candidates: [(TimeSeriesGranularity, TimeInterval)] = [
-            (.oneMinute, 60), (.fiveMinute, 300), (.fifteenMinute, 900),
-            (.thirtyMinute, 1800), (.hourly, 3600), (.threeHour, 10800),
-            (.sixHour, 21600), (.daily, 86400)
-        ]
-        // Pick the bucket closest to idealBucket
-        return candidates.min(by: {
-            abs($0.1 - idealBucket) < abs($1.1 - idealBucket)
-        })?.0 ?? .hourly
+    /// Bucket size in seconds — duration ÷ 15, minimum 1s
+    var bucketSeconds: Int {
+        max(1, Int(duration / 15.0))
+    }
+
+    /// PromQL bucket string — converts seconds to compound duration (e.g. "4m", "12m30s", "1h20m")
+    var bucketString: String {
+        var secs = bucketSeconds
+        var parts: [String] = []
+
+        let hours = secs / 3600
+        if hours > 0 {
+            parts.append("\(hours)h")
+            secs %= 3600
+        }
+
+        let minutes = secs / 60
+        if minutes > 0 {
+            parts.append("\(minutes)m")
+            secs %= 60
+        }
+
+        if secs > 0 {
+            parts.append("\(secs)s")
+        }
+
+        return parts.isEmpty ? "1s" : parts.joined()
     }
 
     private func parseRelativeTime(_ str: String) -> TimeInterval {
