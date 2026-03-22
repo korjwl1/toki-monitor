@@ -150,7 +150,8 @@ final class StatusBarController {
                     showRateText: settings.showRateText,
                     textPosition: settings.textPosition,
                     tokenUnit: settings.tokenUnit,
-                    tintColor: tint
+                    tintColor: tint,
+                    sleepDelay: settings.sleepDelay.interval
                 )
             } else {
                 // Aggregated mode
@@ -162,7 +163,8 @@ final class StatusBarController {
                     showRateText: settings.showRateText,
                     textPosition: settings.textPosition,
                     tokenUnit: settings.tokenUnit,
-                    tintColor: tint
+                    tintColor: tint,
+                    sleepDelay: settings.sleepDelay.interval
                 )
             }
         }
@@ -389,6 +391,7 @@ final class StatusBarController {
             _ = settings.providerSettingsMap
             _ = settings.aggregatedColorName
             _ = settings.widgetOrder
+            _ = settings.sleepDelay
             _ = settings.pendingPopupRequest
         } onChange: { [weak self] in
             Task { @MainActor in

@@ -113,6 +113,31 @@ enum ProviderDisplayMode: String, CaseIterable, Codable {
     }
 }
 
+enum SleepDelay: String, CaseIterable, Codable {
+    case thirtySeconds
+    case oneMinute
+    case ninetySeconds
+    case twoMinutes
+
+    var displayName: String {
+        switch self {
+        case .thirtySeconds: L.tr("30초", "30s")
+        case .oneMinute: L.tr("1분", "1m")
+        case .ninetySeconds: L.tr("1분 30초", "1m 30s")
+        case .twoMinutes: L.tr("2분", "2m")
+        }
+    }
+
+    var interval: TimeInterval {
+        switch self {
+        case .thirtySeconds: 30
+        case .oneMinute: 60
+        case .ninetySeconds: 90
+        case .twoMinutes: 120
+        }
+    }
+}
+
 // MARK: - Per-Provider Settings
 
 struct ProviderSettings: Codable {
@@ -137,6 +162,9 @@ struct MenuWidgetItem: Codable, Identifiable, Equatable {
 @Observable
 final class AppSettings {
     var animationStyle: AnimationStyle {
+        didSet { save() }
+    }
+    var sleepDelay: SleepDelay {
         didSet { save() }
     }
     var defaultTimeRange: TimeRange {
@@ -197,6 +225,7 @@ final class AppSettings {
     init() {
         let ud = UserDefaults.standard
         animationStyle = Self.loadEnum(ud, key: "animationStyle") ?? .sparkline
+        sleepDelay = Self.loadEnum(ud, key: "sleepDelay") ?? .twoMinutes
         defaultTimeRange = Self.loadEnum(ud, key: "defaultTimeRange") ?? .oneHour
         showRateText = ud.bool(forKey: "showRateText")
         textPosition = Self.loadEnum(ud, key: "textPosition") ?? .trailing
@@ -241,6 +270,7 @@ final class AppSettings {
 
     private func save() {
         defaults.set(animationStyle.rawValue, forKey: "animationStyle")
+        defaults.set(sleepDelay.rawValue, forKey: "sleepDelay")
         defaults.set(defaultTimeRange.rawValue, forKey: "defaultTimeRange")
         defaults.set(showRateText, forKey: "showRateText")
         defaults.set(textPosition.rawValue, forKey: "textPosition")

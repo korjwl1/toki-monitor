@@ -34,6 +34,13 @@ struct MenuBarSettingsPane: View {
                     }
                 }
                 .pickerStyle(.segmented)
+
+                Picker(L.menuBar.sleepDelay, selection: $settings.sleepDelay) {
+                    ForEach(SleepDelay.allCases, id: \.self) { delay in
+                        Text(delay.displayName).tag(delay)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
 
             if settings.providerDisplayMode == .aggregated {

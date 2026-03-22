@@ -48,7 +48,8 @@ final class StatusItemUnit {
         showRateText: Bool,
         textPosition: TextPosition,
         tokenUnit: TokenUnit,
-        tintColor: NSColor? = nil
+        tintColor: NSColor? = nil,
+        sleepDelay: TimeInterval = 120
     ) {
         guard let button = statusItem.button else { return }
 
@@ -72,6 +73,7 @@ final class StatusItemUnit {
 
         switch effectiveStyle {
         case .character:
+            characterRenderer.sleepDelay = sleepDelay
             characterRenderer.update(
                 tokensPerMinute: tokensPerMinute,
                 button: button,

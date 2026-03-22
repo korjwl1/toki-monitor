@@ -16,8 +16,11 @@ final class CharacterAnimationRenderer {
     private var idleSince: Date?
     private var isSleeping = false
 
-    /// Seconds of idle before sleep animation starts.
-    private let sleepDelay: TimeInterval = 180 // 3 minutes
+    /// Resolved from AppSettings.sleepDelay
+    var sleepDelay: TimeInterval = 120
+
+    /// Shared canvas size for all frames (running + sleep)
+    private static let canvasSize = NSSize(width: 28, height: 18)
 
     init() {
         loadFrames()
@@ -156,13 +159,18 @@ final class CharacterAnimationRenderer {
         let bundle = Bundle.main
         let frameCount = 7
 
+        let rabbitSize = NSSize(width: 24, height: 18)
         frames = (0..<frameCount).compactMap { i in
             let name = String(format: "frame_%02d", i)
             guard let url = bundle.url(forResource: name, withExtension: "png"),
-                  let image = NSImage(contentsOf: url) else { return nil }
-            image.size = NSSize(width: 24, height: 18)
-            image.isTemplate = true
-            return image
+                  let src = NSImage(contentsOf: url) else { return nil }
+            src.size = rabbitSize
+            let canvas = NSImage(size: Self.canvasSize, flipped: false) { _ in
+                src.draw(in: NSRect(origin: .zero, size: rabbitSize))
+                return true
+            }
+            canvas.isTemplate = true
+            return canvas
         }
 
         if frames.isEmpty {
@@ -181,11 +189,9 @@ final class CharacterAnimationRenderer {
     private func generateSleepFrames() {
         guard let baseFrame = frames.first else { return }
 
-        let zTexts = ["", "z", "zZ", "zZZ"]
+        let zTexts = ["", "z", "zZ"]
         // Canvas wider than base to accommodate z text without shifting rabbit
-        let canvasWidth: CGFloat = 30
-        let canvasHeight: CGFloat = 18
-        let canvasSize = NSSize(width: canvasWidth, height: canvasHeight)
+        let canvasSize = Self.canvasSize
 
         // Rabbit drawn at left, z text at upper-right of rabbit
         let rabbitX: CGFloat = 0.0
@@ -207,7 +213,7 @@ final class CharacterAnimationRenderer {
                     let attrStr = NSAttributedString(string: zText, attributes: attrs)
                     let textSize = attrStr.size()
                     // Position: right side of rabbit, top area
-                    let textX = rabbitRect.maxX - 2
+                    let textX = rabbitRect.maxX - 7
                     let textY = rect.maxY - textSize.height - 1
                     attrStr.draw(at: NSPoint(x: textX, y: textY))
                 }

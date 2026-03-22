@@ -50,6 +50,7 @@ enum L {
         static var iconColor: String { tr("아이콘 색상", "Icon Color") }
         static var defaultWhite: String { tr("기본 (흰색)", "Default (White)") }
         static var widgetOrder: String { tr("위젯 순서", "Widget Order") }
+        static var sleepDelay: String { tr("수면 대기 시간", "Sleep Delay") }
         static var claudeUsage: String { tr("Claude 사용량", "Claude Usage") }
     }
 
@@ -231,6 +232,7 @@ enum L {
         // ProviderDisplayMode
         static var aggregated: String { tr("합산", "Aggregated") }
         static var perProvider: String { tr("개별", "Per Provider") }
+
 
         // DashboardTimeRange
         static var sixHours: String { tr("6시간", "6h") }
