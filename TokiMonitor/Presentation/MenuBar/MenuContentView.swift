@@ -32,24 +32,54 @@ struct MenuContentView: View {
     private var leftPanel: some View {
         VStack(alignment: .leading, spacing: DS.sm) {
             if isConnected {
-                let summaries = buildDisplaySummaries()
-                ForEach(Array(summaries.enumerated()), id: \.element.id) { i, s in
+                let items = orderedWidgetItems()
+                ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
                     if i > 0 { Divider().padding(.horizontal, DS.md) }
-                    providerWidget(s)
-                }
-                if let monitor = usageMonitor {
-                    if let usage = monitor.currentUsage {
-                        Divider().padding(.horizontal, DS.md)
-                        usageWidget(usage)
-                    } else if let err = monitor.lastError {
-                        errorWidget(err)
-                    }
+                    widgetView(for: item)
                 }
             } else {
                 disconnectedWidget
             }
         }
         .padding(0)
+    }
+
+    private func orderedWidgetItems() -> [MenuWidgetItem] {
+        let order: [MenuWidgetItem]
+        if let pid = filterProviderId {
+            order = settings.resolvedProviderWidgetOrder(for: pid)
+        } else {
+            order = settings.resolvedWidgetOrder()
+        }
+
+        let summaries = buildDisplaySummaries()
+        let summaryIds = Set(summaries.map(\.provider.id))
+
+        return order.filter { item in
+            guard item.visible else { return false }
+            if item.id == MenuWidgetItem.claudeUsageId {
+                return usageMonitor?.currentUsage != nil || usageMonitor?.lastError != nil
+            }
+            return summaryIds.contains(item.id)
+        }
+    }
+
+    @ViewBuilder
+    private func widgetView(for item: MenuWidgetItem) -> some View {
+        if item.id == MenuWidgetItem.claudeUsageId {
+            if let monitor = usageMonitor {
+                if let usage = monitor.currentUsage {
+                    usageWidget(usage)
+                } else if let err = monitor.lastError {
+                    errorWidget(err)
+                }
+            }
+        } else {
+            let summaries = buildDisplaySummaries()
+            if let s = summaries.first(where: { $0.provider.id == item.id }) {
+                providerWidget(s)
+            }
+        }
     }
 
     // MARK: - Provider Widget
@@ -197,10 +227,24 @@ struct MenuContentView: View {
             gridBtn(L.panel.dashboard, "chart.xyaxis.line", onOpenDashboard)
             gridBtn(L.panel.settings, "gearshape", onOpenSettings)
             styleToggleBtn {
-                switch settings.animationStyle {
-                case .character: settings.animationStyle = .numeric
-                case .numeric: settings.animationStyle = .sparkline
-                case .sparkline: settings.animationStyle = .character
+                if let pid = filterProviderId {
+                    // Per-provider: cycle this provider's style override
+                    var ps = settings.effectiveSettings(for: pid)
+                    let current = ps.animationStyle ?? settings.animationStyle
+                    let next: AnimationStyle = switch current {
+                    case .character: .numeric
+                    case .numeric: .sparkline
+                    case .sparkline: .character
+                    }
+                    ps.animationStyle = next
+                    settings.providerSettingsMap[pid] = ps
+                } else {
+                    // Aggregated: cycle global style
+                    switch settings.animationStyle {
+                    case .character: settings.animationStyle = .numeric
+                    case .numeric: settings.animationStyle = .sparkline
+                    case .sparkline: settings.animationStyle = .character
+                    }
                 }
             }
         }
@@ -245,11 +289,18 @@ struct MenuContentView: View {
 
     // MARK: - Helpers
 
+    private var currentStyle: AnimationStyle {
+        if let pid = filterProviderId {
+            return settings.effectiveSettings(for: pid).animationStyle ?? settings.animationStyle
+        }
+        return settings.animationStyle
+    }
+
     private func styleToggleBtn(_ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: DS.xs) {
                 Group {
-                    switch settings.animationStyle {
+                    switch currentStyle {
                     case .character:
                         if let url = Bundle.main.url(forResource: "frame_00_thin", withExtension: "png"),
                            let nsImage = NSImage(contentsOf: url) {
@@ -281,7 +332,7 @@ struct MenuContentView: View {
     }
 
     private var styleLabel: String {
-        switch settings.animationStyle {
+        switch currentStyle {
         case .character: L.menuBar.character
         case .numeric: L.menuBar.numeric
         case .sparkline: L.menuBar.graph

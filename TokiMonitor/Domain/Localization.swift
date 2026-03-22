@@ -49,6 +49,8 @@ enum L {
         static var mode: String { tr("모드", "Mode") }
         static var iconColor: String { tr("아이콘 색상", "Icon Color") }
         static var defaultWhite: String { tr("기본 (흰색)", "Default (White)") }
+        static var widgetOrder: String { tr("위젯 순서", "Widget Order") }
+        static var claudeUsage: String { tr("Claude 사용량", "Claude Usage") }
     }
 
     // MARK: - Provider Settings

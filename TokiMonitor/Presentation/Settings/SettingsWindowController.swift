@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController {
-    private var window: NSWindow?
+    private(set) var window: NSWindow?
     private let settings: AppSettings
     private let oauthManager: ClaudeOAuthManager?
 

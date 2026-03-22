@@ -119,6 +119,16 @@ struct ProviderSettings: Codable {
     var enabled: Bool = true
     var animationStyle: AnimationStyle? = nil   // nil = global default
     var customColorName: String? = nil          // nil = provider default
+    var widgetOrder: [MenuWidgetItem]? = nil    // nil = default order
+}
+
+// MARK: - Menu Bar Widget Order
+
+struct MenuWidgetItem: Codable, Identifiable, Equatable {
+    var id: String          // provider id or "claude_usage"
+    var visible: Bool = true
+
+    static let claudeUsageId = "claude_usage"
 }
 
 // MARK: - AppSettings
@@ -154,6 +164,18 @@ final class AppSettings {
     var aggregatedColorName: String? {
         didSet { save() }
     }
+    /// Menu bar widget order and visibility.
+    var widgetOrder: [MenuWidgetItem] {
+        didSet { save() }
+    }
+    /// Signal to request popup re-show from settings. Not persisted.
+    /// .mostActive = pick provider with most recent traces, .provider(id) = specific one
+    enum PopupRequest: Equatable {
+        case mostActive
+        case provider(String)
+    }
+    var pendingPopupRequest: PopupRequest?
+
     var claudeAlert75: Bool {
         didSet { save() }
     }
@@ -183,6 +205,7 @@ final class AppSettings {
         providerDisplayMode = Self.loadEnum(ud, key: "providerDisplayMode") ?? .aggregated
         providerSettingsMap = Self.loadProviderSettings(ud)
         aggregatedColorName = ud.string(forKey: "aggregatedColorName")
+        widgetOrder = Self.loadWidgetOrder(ud)
         claudeAlert75 = ud.object(forKey: "claudeAlert75") as? Bool ?? true
         claudeAlert90 = ud.object(forKey: "claudeAlert90") as? Bool ?? true
         language = Self.loadEnum(ud, key: "language") ?? .system
@@ -233,6 +256,9 @@ final class AppSettings {
         if let data = try? JSONEncoder().encode(providerSettingsMap) {
             defaults.set(data, forKey: "providerSettings")
         }
+        if let data = try? JSONEncoder().encode(widgetOrder) {
+            defaults.set(data, forKey: "widgetOrder")
+        }
     }
 
     private func updateLoginItem() {
@@ -254,6 +280,65 @@ final class AppSettings {
     ) -> T? where T.RawValue == String {
         guard let raw = ud.string(forKey: key) else { return nil }
         return T(rawValue: raw)
+    }
+
+    /// Returns resolved widget order for a specific provider's panel (per-provider mode).
+    func resolvedProviderWidgetOrder(for providerId: String) -> [MenuWidgetItem] {
+        let isAnthropic = providerId == "anthropic"
+        let ps = effectiveSettings(for: providerId)
+
+        var items: [MenuWidgetItem]
+        if let saved = ps.widgetOrder {
+            // Filter out claude_usage for non-anthropic providers
+            items = isAnthropic ? saved : saved.filter { $0.id != MenuWidgetItem.claudeUsageId }
+        } else {
+            items = [MenuWidgetItem(id: providerId)]
+            if isAnthropic {
+                items.append(MenuWidgetItem(id: MenuWidgetItem.claudeUsageId))
+            }
+        }
+
+        // Ensure provider itself is present
+        if !items.contains(where: { $0.id == providerId }) {
+            items.insert(MenuWidgetItem(id: providerId), at: 0)
+        }
+        // Ensure claude_usage for anthropic
+        if isAnthropic, !items.contains(where: { $0.id == MenuWidgetItem.claudeUsageId }) {
+            items.append(MenuWidgetItem(id: MenuWidgetItem.claudeUsageId))
+        }
+
+        return items
+    }
+
+    private static func loadWidgetOrder(_ ud: UserDefaults) -> [MenuWidgetItem] {
+        guard let data = ud.data(forKey: "widgetOrder"),
+              let items = try? JSONDecoder().decode([MenuWidgetItem].self, from: data)
+        else { return [] }
+        return items
+    }
+
+    /// Returns resolved widget order, filling in any missing providers/claude_usage.
+    func resolvedWidgetOrder() -> [MenuWidgetItem] {
+        let enabledProviderIds = ProviderRegistry.configurableProviders
+            .filter { effectiveSettings(for: $0.id).enabled }
+            .map(\.id)
+
+        var result = widgetOrder.filter { item in
+            if item.id == MenuWidgetItem.claudeUsageId { return true }
+            return enabledProviderIds.contains(item.id)
+        }
+
+        // Add missing enabled providers
+        for pid in enabledProviderIds where !result.contains(where: { $0.id == pid }) {
+            result.append(MenuWidgetItem(id: pid))
+        }
+
+        // Add claude_usage if missing
+        if !result.contains(where: { $0.id == MenuWidgetItem.claudeUsageId }) {
+            result.append(MenuWidgetItem(id: MenuWidgetItem.claudeUsageId))
+        }
+
+        return result
     }
 
     private static func loadProviderSettings(_ ud: UserDefaults) -> [String: ProviderSettings] {

@@ -35,6 +35,7 @@ final class StatusBarController {
     private var globalMonitor: Any?
     private var sleepObserver: Any?
     private var wakeObserver: Any?
+    private var lastPanelUnit: StatusItemUnit?
 
     init() {
         eventStream = TokiEventStream()
@@ -261,6 +262,7 @@ final class StatusBarController {
 
         panel.orderFrontRegardless()
         menuPanel = panel
+        lastPanelUnit = unit
 
         // Observation-driven refresh: update rootView only when data actually changes
         scheduleObservationRefresh(for: unit)
@@ -386,6 +388,8 @@ final class StatusBarController {
             _ = settings.providerDisplayMode
             _ = settings.providerSettingsMap
             _ = settings.aggregatedColorName
+            _ = settings.widgetOrder
+            _ = settings.pendingPopupRequest
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
@@ -400,8 +404,40 @@ final class StatusBarController {
                     self.updateAllDisplays()
                 }
 
+                // Handle popup request from settings
+                if let request = self.settings.pendingPopupRequest {
+                    self.settings.pendingPopupRequest = nil
+                    self.showPopupForRequest(request)
+                }
+
                 self.observeSettings()
             }
+        }
+    }
+
+    private func showPopupForRequest(_ request: AppSettings.PopupRequest) {
+        // Dismiss existing panel first
+        if menuPanel != nil { dismissPanel() }
+
+        let targetUnit: StatusItemUnit?
+        switch request {
+        case .mostActive:
+            if settings.providerDisplayMode == .aggregated {
+                targetUnit = units.first
+            } else {
+                // Fixed priority: anthropic > openai > others
+                let priority = ["anthropic", "openai"]
+                let match = priority.first { pid in
+                    units.contains { $0.providerId == pid }
+                }
+                targetUnit = match.flatMap { pid in units.first { $0.providerId == pid } } ?? units.first
+            }
+        case .provider(let pid):
+            targetUnit = units.first { $0.providerId == pid } ?? units.first
+        }
+
+        if let unit = targetUnit {
+            handleClick(from: unit)
         }
     }
 

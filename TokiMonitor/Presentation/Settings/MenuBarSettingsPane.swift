@@ -5,26 +5,13 @@ struct MenuBarSettingsPane: View {
 
     var body: some View {
         Form {
-            Section(L.menuBar.animation) {
-                Picker(L.menuBar.style, selection: $settings.animationStyle) {
-                    Text(L.menuBar.character).tag(AnimationStyle.character)
-                    Text(L.menuBar.numeric).tag(AnimationStyle.numeric)
-                    Text(L.menuBar.graph).tag(AnimationStyle.sparkline)
-                }
-                .pickerStyle(.segmented)
-
-                if settings.animationStyle == .character {
-                    Toggle(L.menuBar.showRateText, isOn: $settings.showRateText)
-
-                    if settings.showRateText {
-                        Picker(L.menuBar.textPosition, selection: $settings.textPosition) {
-                            ForEach(TextPosition.allCases, id: \.self) { pos in
-                                Text(pos.displayName).tag(pos)
-                            }
-                        }
-                        .pickerStyle(.segmented)
+            Section(L.menuBar.displayMode) {
+                Picker(L.menuBar.mode, selection: $settings.providerDisplayMode) {
+                    ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
                     }
                 }
+                .pickerStyle(.segmented)
 
                 if shouldShowTokenUnit {
                     Picker(L.menuBar.unit, selection: $settings.tokenUnit) {
@@ -35,7 +22,13 @@ struct MenuBarSettingsPane: View {
                     .pickerStyle(.segmented)
                 }
 
-                Picker(L.menuBar.sparklineTimeRange, selection: $settings.graphTimeRange) {
+                Picker(L.menuBar.sparklineTimeRange, selection: Binding(
+                    get: { settings.graphTimeRange },
+                    set: {
+                        settings.graphTimeRange = $0
+                        settings.pendingPopupRequest = .mostActive
+                    }
+                )) {
                     ForEach(GraphTimeRange.allCases, id: \.self) { range in
                         Text(range.displayName).tag(range)
                     }
@@ -43,29 +36,211 @@ struct MenuBarSettingsPane: View {
                 .pickerStyle(.segmented)
             }
 
-            Section(L.menuBar.displayMode) {
-                Picker(L.menuBar.mode, selection: $settings.providerDisplayMode) {
-                    ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                if settings.providerDisplayMode == .aggregated {
-                    HStack {
-                        Text(L.menuBar.iconColor)
-                        Spacer()
-                        colorPickerMenu(
-                            currentColor: settings.aggregatedColorName,
-                            defaultLabel: L.menuBar.defaultWhite
-                        ) { color in
-                            settings.aggregatedColorName = color
-                        }
-                    }
-                }
+            if settings.providerDisplayMode == .aggregated {
+                aggregatedSection
+                widgetOrderSection
+            } else {
+                perProviderSections
             }
         }
         .formStyle(.grouped)
+    }
+
+    // MARK: - Aggregated Mode
+
+    private var aggregatedSection: some View {
+        Section(L.menuBar.animation) {
+            animationControls(
+                style: $settings.animationStyle,
+                showRateText: $settings.showRateText,
+                textPosition: $settings.textPosition
+            )
+
+            HStack {
+                Text(L.menuBar.iconColor)
+                Spacer()
+                colorPickerMenu(
+                    currentColor: settings.aggregatedColorName,
+                    defaultLabel: L.menuBar.defaultWhite
+                ) { color in
+                    settings.aggregatedColorName = color
+                }
+            }
+        }
+    }
+
+    // MARK: - Per-Provider Mode
+
+    private var perProviderSections: some View {
+        ForEach(enabledProviders) { provider in
+            Section {
+                let ps = settings.effectiveSettings(for: provider.id)
+
+                animationControls(
+                    style: Binding(
+                        get: { ps.animationStyle ?? settings.animationStyle },
+                        set: { newVal in
+                            var updated = ps
+                            updated.animationStyle = newVal == settings.animationStyle ? nil : newVal
+                            settings.providerSettingsMap[provider.id] = updated
+                        }
+                    ),
+                    showRateText: $settings.showRateText,
+                    textPosition: $settings.textPosition
+                )
+
+                HStack {
+                    Text(L.provider.color)
+                    Spacer()
+                    colorPickerMenu(
+                        currentColor: ps.customColorName,
+                        defaultLabel: L.provider.defaultColor(provider.colorName)
+                    ) { color in
+                        var updated = ps
+                        updated.customColorName = color
+                        settings.providerSettingsMap[provider.id] = updated
+                    }
+                }
+
+            } header: {
+                Label(provider.name, systemImage: provider.icon)
+                    .foregroundStyle(provider.color)
+            }
+
+            // Per-provider widget order
+            providerWidgetOrderSection(for: provider)
+        }
+    }
+
+    // MARK: - Shared Animation Controls
+
+    @ViewBuilder
+    private func animationControls(
+        style: Binding<AnimationStyle>,
+        showRateText: Binding<Bool>,
+        textPosition: Binding<TextPosition>
+    ) -> some View {
+        Picker(L.menuBar.style, selection: style) {
+            Text(L.menuBar.character).tag(AnimationStyle.character)
+            Text(L.menuBar.numeric).tag(AnimationStyle.numeric)
+            Text(L.menuBar.graph).tag(AnimationStyle.sparkline)
+        }
+        .pickerStyle(.segmented)
+
+        if style.wrappedValue == .character {
+            Toggle(L.menuBar.showRateText, isOn: showRateText)
+
+            if showRateText.wrappedValue {
+                Picker(L.menuBar.textPosition, selection: textPosition) {
+                    ForEach(TextPosition.allCases, id: \.self) { pos in
+                        Text(pos.displayName).tag(pos)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    // MARK: - Widget Order
+
+    private var widgetOrderSection: some View {
+        Section(L.menuBar.widgetOrder) {
+            let items = settings.resolvedWidgetOrder()
+            ForEach(items) { item in
+                HStack {
+                    Image(systemName: item.visible ? "eye" : "eye.slash")
+                        .foregroundStyle(item.visible ? .primary : .tertiary)
+                        .frame(width: 20)
+                        .onTapGesture {
+                            toggleWidgetVisibility(item.id)
+                        }
+
+                    Image(systemName: "line.3.horizontal")
+                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 12))
+
+                    Text(widgetDisplayName(item.id))
+
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .onMove { from, to in
+                var order = settings.resolvedWidgetOrder()
+                order.move(fromOffsets: from, toOffset: to)
+                settings.widgetOrder = order
+                settings.pendingPopupRequest = .mostActive
+            }
+        }
+    }
+
+    private func providerWidgetOrderSection(for provider: ProviderInfo) -> some View {
+        Section(L.menuBar.widgetOrder) {
+            let items = settings.resolvedProviderWidgetOrder(for: provider.id)
+            ForEach(items) { item in
+                HStack {
+                    Image(systemName: item.visible ? "eye" : "eye.slash")
+                        .foregroundStyle(item.visible ? .primary : .tertiary)
+                        .frame(width: 20)
+                        .onTapGesture {
+                            toggleProviderWidgetVisibility(providerId: provider.id, widgetId: item.id)
+                        }
+
+                    Image(systemName: "line.3.horizontal")
+                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 12))
+
+                    Text(widgetDisplayName(item.id))
+                        .foregroundStyle(item.visible ? .primary : .tertiary)
+
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .onMove { from, to in
+                var ps = settings.effectiveSettings(for: provider.id)
+                var order = settings.resolvedProviderWidgetOrder(for: provider.id)
+                order.move(fromOffsets: from, toOffset: to)
+                ps.widgetOrder = order
+                settings.providerSettingsMap[provider.id] = ps
+                settings.pendingPopupRequest = .provider(provider.id)
+            }
+        }
+    }
+
+    private func toggleProviderWidgetVisibility(providerId: String, widgetId: String) {
+        var ps = settings.effectiveSettings(for: providerId)
+        var order = settings.resolvedProviderWidgetOrder(for: providerId)
+        if let idx = order.firstIndex(where: { $0.id == widgetId }) {
+            order[idx].visible.toggle()
+            ps.widgetOrder = order
+            settings.providerSettingsMap[providerId] = ps
+            settings.pendingPopupRequest = .provider(providerId)
+        }
+    }
+
+    private func toggleWidgetVisibility(_ id: String) {
+        var order = settings.resolvedWidgetOrder()
+        if let idx = order.firstIndex(where: { $0.id == id }) {
+            order[idx].visible.toggle()
+            settings.widgetOrder = order
+            settings.pendingPopupRequest = .mostActive
+        }
+    }
+
+    private func widgetDisplayName(_ id: String) -> String {
+        if id == MenuWidgetItem.claudeUsageId {
+            return L.menuBar.claudeUsage
+        }
+        return ProviderRegistry.allProviders.first { $0.id == id }?.name ?? id
+    }
+
+    private var enabledProviders: [ProviderInfo] {
+        ProviderRegistry.configurableProviders.filter {
+            settings.effectiveSettings(for: $0.id).enabled
+        }
     }
 
     private var shouldShowTokenUnit: Bool {

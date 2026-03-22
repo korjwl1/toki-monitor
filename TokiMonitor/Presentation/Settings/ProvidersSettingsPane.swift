@@ -17,11 +17,6 @@ struct ProvidersSettingsPane: View {
                         ClaudeAccountSection(oauthManager: oauthManager, settings: settings)
                     }
 
-                    // 개별 모드일 때 스타일 오버라이드
-                    if settings.providerDisplayMode == .perProvider,
-                       settings.effectiveSettings(for: provider.id).enabled {
-                        individualProviderOptions(provider)
-                    }
                 } header: {
                     Label(provider.name, systemImage: provider.icon)
                         .foregroundStyle(provider.color)
@@ -46,87 +41,4 @@ struct ProvidersSettingsPane: View {
         ))
     }
 
-    private func individualProviderOptions(_ provider: ProviderInfo) -> some View {
-        let ps = settings.effectiveSettings(for: provider.id)
-
-        return Group {
-            HStack {
-                Text(L.provider.color)
-                Spacer()
-                colorPickerMenu(
-                    currentColor: ps.customColorName,
-                    defaultLabel: L.provider.defaultColor(provider.colorName)
-                ) { color in
-                    var updated = ps
-                    updated.customColorName = color
-                    settings.providerSettingsMap[provider.id] = updated
-                }
-            }
-
-            Picker(L.menuBar.style, selection: Binding(
-                get: { ps.animationStyle ?? settings.animationStyle },
-                set: { newVal in
-                    var updated = ps
-                    updated.animationStyle = newVal == settings.animationStyle ? nil : newVal
-                    settings.providerSettingsMap[provider.id] = updated
-                }
-            )) {
-                Text(L.menuBar.character).tag(AnimationStyle.character)
-                Text(L.menuBar.numeric).tag(AnimationStyle.numeric)
-                Text(L.menuBar.graph).tag(AnimationStyle.sparkline)
-            }
-            .pickerStyle(.segmented)
-            .controlSize(.small)
-        }
-    }
-
-    private func colorPickerMenu(
-        currentColor: String?,
-        defaultLabel: String,
-        onSelect: @escaping (String?) -> Void
-    ) -> some View {
-        Menu {
-            Button(action: { onSelect(nil) }) {
-                HStack {
-                    Text(defaultLabel)
-                    if currentColor == nil {
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-            Divider()
-            ForEach(ProviderInfo.availableColors, id: \.name) { color in
-                Button(action: { onSelect(color.name) }) {
-                    HStack {
-                        Circle()
-                            .fill(ProviderInfo.colorFromName(color.name))
-                            .frame(width: 10, height: 10)
-                        Text(color.displayName)
-                        if currentColor == color.name {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(currentColor.map { ProviderInfo.colorFromName($0) } ?? .white)
-                    .frame(width: 12, height: 12)
-                    .overlay(Circle().stroke(.secondary.opacity(0.3), lineWidth: 1))
-                Text(colorDisplayName(currentColor, defaultLabel: defaultLabel))
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-    }
-
-    private func colorDisplayName(_ currentColor: String?, defaultLabel: String) -> String {
-        if let colorName = currentColor {
-            return ProviderInfo.availableColors.first { $0.name == colorName }?.displayName ?? colorName
-        }
-        return defaultLabel
-    }
 }
