@@ -49,6 +49,11 @@ Unlike proxy-based monitors (BurnRate):
 - 5-hour and 7-day usage bars with reset countdown
 - Usage threshold notifications (75%, 90%)
 
+### Codex integration
+- Reads OAuth token from ~/.codex/auth.json (no extra login)
+- 5-hour and weekly usage bars with localized countdown
+- Auto-detects Codex CLI login availability
+
 ### UX polish
 - Right-click context menu (Settings, Quit)
 - Widget order customization with drag-and-drop + show/hide

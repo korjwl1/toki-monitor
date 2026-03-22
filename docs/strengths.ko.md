@@ -49,6 +49,11 @@ Toki Monitor는 [toki](https://github.com/korjwl1/toki)의 macOS UI 레이어입
 - 5시간/7일 사용량 바 + 리셋 카운트다운
 - 사용량 임계값 알림 (75%, 90%)
 
+### Codex 연동
+- ~/.codex/auth.json에서 OAuth 토큰 자동 읽기 (추가 로그인 불필요)
+- 5시간/주간 사용량 바 + 지역화된 카운트다운
+- Codex CLI 로그인 여부 자동 감지
+
 ### UX 완성도
 - 우클릭 컨텍스트 메뉴 (설정, 종료)
 - 위젯 순서 커스텀 (드래그 드롭 + 표시/숨김)
