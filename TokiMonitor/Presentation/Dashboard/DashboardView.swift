@@ -54,7 +54,6 @@ struct DashboardView: View {
                     editingPanel = nil
                 }
             }
-            .transaction { $0.animation = nil }
             .sheet(isPresented: $showDashboardSettings) {
                 DashboardSettingsSheet(viewModel: viewModel)
             }
