@@ -40,9 +40,39 @@ struct TimeConfig: Codable, Equatable {
     var from: String = "now-24h"
     var to: String = "now"
 
-    /// Parsed duration in seconds from "now-Xh/d" format
+    /// Whether this is a relative time range (now-Xh) vs absolute (ISO date)
+    var isRelative: Bool {
+        from.hasPrefix("now")
+    }
+
+    /// Parsed duration in seconds
     var duration: TimeInterval {
-        parseRelativeTime(from)
+        if isRelative {
+            return parseRelativeTime(from)
+        } else {
+            // Absolute: parse ISO dates
+            guard let fromDate = parseAbsoluteTime(from),
+                  let toDate = parseAbsoluteTime(to) else { return 86400 }
+            return toDate.timeIntervalSince(fromDate)
+        }
+    }
+
+    /// Resolved start date
+    var fromDate: Date {
+        if isRelative {
+            return Date().addingTimeInterval(-parseRelativeTime(from))
+        } else {
+            return parseAbsoluteTime(from) ?? Date().addingTimeInterval(-86400)
+        }
+    }
+
+    /// Resolved end date
+    var toDate: Date {
+        if to == "now" || isRelative {
+            return Date()
+        } else {
+            return parseAbsoluteTime(to) ?? Date()
+        }
     }
 
     var granularity: TimeSeriesGranularity {
@@ -73,6 +103,19 @@ struct TimeConfig: Codable, Equatable {
             return n * 60
         }
         return 86400
+    }
+
+    private func parseAbsoluteTime(_ str: String) -> Date? {
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime]
+        return fmt.date(from: str)
+    }
+
+    /// Create absolute time config from dates
+    static func absolute(from: Date, to: Date) -> TimeConfig {
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime]
+        return TimeConfig(from: fmt.string(from: from), to: fmt.string(from: to))
     }
 }
 

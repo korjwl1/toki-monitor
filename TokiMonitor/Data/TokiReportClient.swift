@@ -84,7 +84,8 @@ final class TokiReportClient: Sendable {
         let sinceFmt = DateFormatter()
         sinceFmt.dateFormat = "yyyyMMddHHmmss"
         sinceFmt.timeZone = TimeZone(identifier: "UTC")
-        let since = sinceFmt.string(from: Date().addingTimeInterval(-time.duration - 3600))
+        let sinceDate = time.fromDate.addingTimeInterval(-3600) // small buffer
+        let since = sinceFmt.string(from: sinceDate)
         let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
 
         let reportOptions: [String] = ["-z", "UTC"]

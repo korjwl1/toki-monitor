@@ -77,6 +77,7 @@
 		G10000000006 /* PanelContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000006 /* PanelContainerView.swift */; };
 		G10000000007 /* StatPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000007 /* StatPanelView.swift */; };
 		G10000000025 /* TimeSeriesChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000025 /* TimeSeriesChartView.swift */; };
+		G10000000026 /* TimeRangePickerPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000026 /* TimeRangePickerPopover.swift */; };
 		G10000000008 /* DashboardEditOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000008 /* DashboardEditOverlay.swift */; };
 		G10000000009 /* PanelDragModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000009 /* PanelDragModifier.swift */; };
 		G10000000010 /* PanelResizeHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000010 /* PanelResizeHandle.swift */; };
@@ -180,6 +181,7 @@
 		G20000000006 /* PanelContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelContainerView.swift; sourceTree = "<group>"; };
 		G20000000007 /* StatPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatPanelView.swift; sourceTree = "<group>"; };
 		G20000000025 /* TimeSeriesChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesChartView.swift; sourceTree = "<group>"; };
+		G20000000026 /* TimeRangePickerPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeRangePickerPopover.swift; sourceTree = "<group>"; };
 		G20000000008 /* DashboardEditOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardEditOverlay.swift; sourceTree = "<group>"; };
 		G20000000009 /* PanelDragModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelDragModifier.swift; sourceTree = "<group>"; };
 		G20000000010 /* PanelResizeHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelResizeHandle.swift; sourceTree = "<group>"; };
@@ -293,6 +295,7 @@
 				G20000000021 /* ExploreView.swift */,
 				G20000000022 /* PlaylistView.swift */,
 				G20000000024 /* DetailHeaderView.swift */,
+				G20000000026 /* TimeRangePickerPopover.swift */,
 				G20000000019 /* VersionHistorySheet.swift */,
 				C10000000001 /* Charts */,
 				G30000000001 /* EditMode */,
@@ -601,6 +604,7 @@
 				G10000000006 /* PanelContainerView.swift in Sources */,
 				G10000000007 /* StatPanelView.swift in Sources */,
 				G10000000025 /* TimeSeriesChartView.swift in Sources */,
+				G10000000026 /* TimeRangePickerPopover.swift in Sources */,
 				G10000000008 /* DashboardEditOverlay.swift in Sources */,
 				G10000000009 /* PanelDragModifier.swift in Sources */,
 				G10000000010 /* PanelResizeHandle.swift in Sources */,

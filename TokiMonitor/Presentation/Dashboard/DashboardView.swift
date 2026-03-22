@@ -428,35 +428,21 @@ struct DashboardView: View {
     // MARK: - Time Range Button
 
     private var timeRangeButton: some View {
-        Menu {
-            Section(L.tr("빠른 범위", "Quick ranges")) {
-                ForEach(TimeRangePreset.presets) { preset in
-                    Button {
-                        viewModel.setTimeRangePreset(preset)
-                    } label: {
-                        HStack {
-                            Text(preset.label)
-                            if viewModel.dashboardConfig.time.from == preset.from {
-                                Spacer()
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            }
+        Button {
+            showTimeRangePicker.toggle()
         } label: {
             HStack(spacing: DS.xs) {
                 Image(systemName: "clock")
                     .font(.system(size: DS.fontCaption))
                 Text(viewModel.timeRangeLabel)
                     .font(.system(size: DS.fontCaption))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: DS.fontTiny))
             }
             .modifier(ToolbarPillModifier())
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
+        .buttonStyle(.plain)
+        .popover(isPresented: $showTimeRangePicker) {
+            TimeRangePickerPopover(viewModel: viewModel, isPresented: $showTimeRangePicker)
+        }
     }
 
     // MARK: - Unified Refresh Control

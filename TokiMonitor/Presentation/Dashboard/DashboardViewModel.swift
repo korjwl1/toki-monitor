@@ -148,12 +148,22 @@ final class DashboardViewModel {
 
     /// Current time range display label
     var timeRangeLabel: String {
-        let from = dashboardConfig.time.from
-        // Find matching preset
-        if let preset = TimeRangePreset.presets.first(where: { $0.from == from }) {
+        let time = dashboardConfig.time
+        // Check preset match
+        if let preset = TimeRangePreset.presets.first(where: { $0.from == time.from }) {
             return preset.label
         }
-        return from
+        // Absolute time range
+        if !time.isRelative {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "M/d HH:mm"
+            return "\(fmt.string(from: time.fromDate)) ~ \(fmt.string(from: time.toDate))"
+        }
+        return time.from
+    }
+
+    func setAbsoluteTimeRange(from: Date, to: Date) {
+        timeConfig = TimeConfig.absolute(from: from, to: to)
     }
 
     // MARK: - Auto-Refresh
