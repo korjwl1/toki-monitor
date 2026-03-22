@@ -119,10 +119,10 @@ final class TokiReportClient: Sendable {
         let step = granularity.stepInterval
         let start: Date
         switch granularity {
-        case .fiveMinute, .fifteenMinute:
+        case .oneMinute, .fiveMinute, .fifteenMinute, .thirtyMinute:
             let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now.addingTimeInterval(-time.duration))
             start = calendar.date(from: c) ?? now.addingTimeInterval(-time.duration)
-        case .hourly:
+        case .hourly, .threeHour, .sixHour:
             let c = calendar.dateComponents([.year, .month, .day, .hour], from: now.addingTimeInterval(-time.duration))
             start = calendar.date(from: c) ?? now.addingTimeInterval(-time.duration)
         case .daily:
@@ -155,10 +155,10 @@ final class TokiReportClient: Sendable {
         let step = timeRange.granularity.stepInterval
         let start: Date
         switch timeRange.granularity {
-        case .fiveMinute, .fifteenMinute:
+        case .oneMinute, .fiveMinute, .fifteenMinute, .thirtyMinute:
             let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now.addingTimeInterval(-timeRange.duration))
             start = calendar.date(from: c) ?? now.addingTimeInterval(-timeRange.duration)
-        case .hourly:
+        case .hourly, .threeHour, .sixHour:
             let c = calendar.dateComponents([.year, .month, .day, .hour], from: now.addingTimeInterval(-timeRange.duration))
             start = calendar.date(from: c) ?? now.addingTimeInterval(-timeRange.duration)
         case .daily:

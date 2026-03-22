@@ -46,10 +46,17 @@ struct TimeConfig: Codable, Equatable {
     }
 
     var granularity: TimeSeriesGranularity {
-        if duration <= 3600 { return .fiveMinute }       // <= 1h: 5m buckets
-        if duration <= 21600 { return .fifteenMinute }    // <= 6h: 15m buckets
-        if duration <= 86400 { return .hourly }           // <= 24h: 1h buckets
-        return .daily                                     // > 24h: 1d buckets
+        // Target ~25 data points regardless of time range
+        let idealBucket = duration / 15.0
+        let candidates: [(TimeSeriesGranularity, TimeInterval)] = [
+            (.oneMinute, 60), (.fiveMinute, 300), (.fifteenMinute, 900),
+            (.thirtyMinute, 1800), (.hourly, 3600), (.threeHour, 10800),
+            (.sixHour, 21600), (.daily, 86400)
+        ]
+        // Pick the bucket closest to idealBucket
+        return candidates.min(by: {
+            abs($0.1 - idealBucket) < abs($1.1 - idealBucket)
+        })?.0 ?? .hourly
     }
 
     private func parseRelativeTime(_ str: String) -> TimeInterval {

@@ -198,45 +198,11 @@ struct CustomDashboardView: View {
         if viewModel.filteredModelNames.isEmpty {
             noModelSelected
         } else {
-            let modelData = PanelDataExtractor.allModelChartPoints(
-                for: metric,
+            TimeSeriesChartView(
+                metric: metric,
                 viewModel: viewModel,
-                timeSeriesData: viewModel.timeSeriesData
+                dateFormat: chartDateFormat
             )
-            // Use monotone for sparse data (prevents overshoot), catmullRom for dense
-            let maxPoints = modelData.map(\.points.count).max() ?? 0
-            let useSmoothCurve = maxPoints > 48
-            Chart {
-                ForEach(modelData, id: \.model) { entry in
-                    let color = viewModel.colorForModel(entry.model)
-                    ForEach(entry.points) { point in
-                        AreaMark(
-                            x: .value(L.dash.axisTime, point.date),
-                            y: .value(L.dash.axisTokens, point.value)
-                        )
-                        .foregroundStyle(.linearGradient(
-                            colors: [color.opacity(0.35), color.opacity(0)],
-                            startPoint: .top, endPoint: .bottom))
-                        .interpolationMethod(useSmoothCurve ? .catmullRom : .monotone)
-
-                        LineMark(
-                            x: .value(L.dash.axisTime, point.date),
-                            y: .value(L.dash.axisTokens, point.value)
-                        )
-                        .foregroundStyle(color.opacity(0.8))
-                        .lineStyle(StrokeStyle(lineWidth: 1.5))
-                        .interpolationMethod(useSmoothCurve ? .catmullRom : .monotone)
-                    }
-                }
-
-                // Annotation markers
-                ForEach(viewModel.annotations) { annotation in
-                    RuleMark(x: .value("", annotation.timestamp))
-                        .foregroundStyle(.red.opacity(0.5))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 2]))
-                }
-            }
-            .chartYScale(domain: .automatic(includesZero: true))
         }
     }
 
@@ -263,6 +229,13 @@ struct CustomDashboardView: View {
             }
             .chartForegroundStyleScale { (model: String) in
                 viewModel.colorForModel(model)
+            }
+            .chartXAxis {
+                AxisMarks(preset: .aligned, values: .automatic) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: chartDateFormat)
+                        .font(.system(size: 9))
+                }
             }
         }
     }
@@ -303,6 +276,22 @@ struct CustomDashboardView: View {
                 .minimumScaleFactor(0.5)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Compact date format based on current time range granularity
+    private var chartDateFormat: Date.FormatStyle {
+        let granularity = viewModel.dashboardConfig.time.granularity
+        switch granularity {
+        case .oneMinute, .fiveMinute, .fifteenMinute, .thirtyMinute:
+            // "14:30"
+            return .dateTime.hour(.defaultDigits(amPM: .omitted)).minute(.twoDigits)
+        case .hourly, .threeHour, .sixHour:
+            // "3/21 6AM"
+            return .dateTime.month(.defaultDigits).day(.defaultDigits).hour(.defaultDigits(amPM: .abbreviated))
+        case .daily:
+            // "3/21"
+            return .dateTime.month(.defaultDigits).day(.defaultDigits)
+        }
     }
 
     private var noModelSelected: some View {

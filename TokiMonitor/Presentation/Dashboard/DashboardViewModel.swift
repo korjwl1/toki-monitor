@@ -513,18 +513,40 @@ final class DashboardViewModel {
 
     // MARK: - Color
 
+    /// Fixed model colors — known models get brand-consistent colors, unknown get auto-assigned
+    private static let knownModelColors: [(prefix: String, color: Color)] = [
+        // Anthropic/Claude: warm tones (orange/amber/red family)
+        ("claude-opus", Color(red: 0.93, green: 0.55, blue: 0.10)),     // bright orange
+        ("claude-sonnet", Color(red: 0.80, green: 0.40, blue: 0.60)),   // mauve/plum
+        ("claude-haiku", Color(red: 0.75, green: 0.20, blue: 0.20)),    // crimson
+        ("claude", Color(red: 0.90, green: 0.50, blue: 0.25)),          // fallback orange
+        // OpenAI: green family
+        ("gpt", Color(red: 0.20, green: 0.65, blue: 0.45)),             // teal green
+        ("o1", Color(red: 0.30, green: 0.75, blue: 0.40)),              // bright green
+        ("o3", Color(red: 0.15, green: 0.55, blue: 0.50)),              // dark teal
+        // Google: blue family
+        ("gemini", Color(red: 0.25, green: 0.50, blue: 0.85)),          // google blue
+    ]
+
+    private static let fallbackPalette: [Color] = [
+        .purple, .teal, .indigo, .mint, .pink, .brown, .cyan
+    ]
+
     func colorForModel(_ model: String) -> Color {
-        let provider = ProviderRegistry.resolve(model: model)
-        let modelsForProvider = filteredModelNames.filter {
-            ProviderRegistry.resolve(model: $0).id == provider.id
+        let lower = model.lowercased()
+        // Check known models first
+        for known in Self.knownModelColors {
+            if lower.contains(known.prefix) {
+                return known.color
+            }
         }
-        let index = modelsForProvider.firstIndex(of: model) ?? 0
-        let baseColor = provider.color
-        if modelsForProvider.count <= 1 {
-            return baseColor
+        // Fallback: stable index from ALL models
+        let allModels = (timeSeriesData?.allModelNames ?? []).sorted()
+        let unknownModels = allModels.filter { m in
+            !Self.knownModelColors.contains(where: { m.lowercased().contains($0.prefix) })
         }
-        let opacity = 1.0 - (Double(index) * 0.25)
-        return baseColor.opacity(max(opacity, 0.4))
+        let index = unknownModels.firstIndex(of: model) ?? 0
+        return Self.fallbackPalette[index % Self.fallbackPalette.count]
     }
 
     // MARK: - Data Links

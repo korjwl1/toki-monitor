@@ -82,22 +82,37 @@ enum DashboardTimeRange: String, CaseIterable, Identifiable {
 }
 
 enum TimeSeriesGranularity {
-    case fiveMinute, fifteenMinute, hourly, daily
+    case oneMinute       // 1m
+    case fiveMinute      // 5m
+    case fifteenMinute   // 15m
+    case thirtyMinute    // 30m
+    case hourly          // 1h
+    case threeHour       // 3h
+    case sixHour         // 6h
+    case daily           // 1d
 
     var stepInterval: TimeInterval {
         switch self {
+        case .oneMinute: 60
         case .fiveMinute: 300
         case .fifteenMinute: 900
+        case .thirtyMinute: 1800
         case .hourly: 3600
+        case .threeHour: 10800
+        case .sixHour: 21600
         case .daily: 86400
         }
     }
 
     var bucket: String {
         switch self {
+        case .oneMinute: "1m"
         case .fiveMinute: "5m"
         case .fifteenMinute: "15m"
+        case .thirtyMinute: "30m"
         case .hourly: "1h"
+        case .threeHour: "3h"
+        case .sixHour: "6h"
         case .daily: "1d"
         }
     }
