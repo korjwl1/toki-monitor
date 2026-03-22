@@ -10,26 +10,15 @@ struct PlaylistView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Image(systemName: "play.rectangle")
-                    .font(.title3)
-                Text(L.dash.playlists)
-                    .font(.headline)
-                Spacer()
+            DetailHeaderView(title: L.dash.playlists, icon: "play.rectangle") {
                 Button {
                     showCreatePlaylist = true
                 } label: {
                     Label(L.dash.newPlaylist, systemImage: "plus")
-                        .font(.caption)
+                        .font(.system(size: 10))
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.bar)
-
-            Divider()
 
             if viewModel.playlistManager.playlists.isEmpty {
                 ContentUnavailableView(

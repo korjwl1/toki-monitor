@@ -8,19 +8,7 @@ struct ExploreView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Image(systemName: "magnifyingglass.circle")
-                    .font(.title3)
-                Text(L.dash.explore)
-                    .font(.headline)
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.bar)
-
-            Divider()
+            DetailHeaderView(title: L.dash.explore, icon: "magnifyingglass.circle")
 
             // Query input
             HStack(spacing: 8) {

@@ -92,6 +92,7 @@
 		G10000000021 /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000021 /* ExploreView.swift */; };
 		G10000000022 /* PlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000022 /* PlaylistView.swift */; };
 		G10000000023 /* AlertListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000023 /* AlertListView.swift */; };
+		G10000000024 /* DetailHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000024 /* DetailHeaderView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -193,6 +194,7 @@
 		G20000000021 /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
 		G20000000022 /* PlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistView.swift; sourceTree = "<group>"; };
 		G20000000023 /* AlertListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertListView.swift; sourceTree = "<group>"; };
+		G20000000024 /* DetailHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailHeaderView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -288,6 +290,7 @@
 				530B806F812350D8094AA0EC /* DashboardWindow.swift */,
 				G20000000021 /* ExploreView.swift */,
 				G20000000022 /* PlaylistView.swift */,
+				G20000000024 /* DetailHeaderView.swift */,
 				G20000000019 /* VersionHistorySheet.swift */,
 				C10000000001 /* Charts */,
 				G30000000001 /* EditMode */,
@@ -610,6 +613,7 @@
 				G10000000021 /* ExploreView.swift in Sources */,
 				G10000000022 /* PlaylistView.swift in Sources */,
 				G10000000023 /* AlertListView.swift in Sources */,
+				G10000000024 /* DetailHeaderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

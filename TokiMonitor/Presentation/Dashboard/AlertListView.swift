@@ -8,26 +8,15 @@ struct AlertListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Image(systemName: "bell")
-                    .font(.title3)
-                Text(L.dash.alerts)
-                    .font(.headline)
-                Spacer()
+            DetailHeaderView(title: L.dash.alerts, icon: "bell") {
                 Button {
                     showAddAlert = true
                 } label: {
                     Label(L.dash.addAlert, systemImage: "plus")
-                        .font(.caption)
+                        .font(.system(size: 10))
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.bar)
-
-            Divider()
 
             let rules = viewModel.alertManager.allRules()
             if rules.isEmpty {

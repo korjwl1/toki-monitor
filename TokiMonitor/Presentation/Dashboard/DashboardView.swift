@@ -48,7 +48,7 @@ struct DashboardView: View {
             dashboardSidebar
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 260)
         } detail: {
-            VStack(spacing: 0) {
+            Group {
                 switch sidebarSelection {
                 case .explore:
                     ExploreView(viewModel: viewModel)
@@ -60,6 +60,9 @@ struct DashboardView: View {
                     dashboardContent
                 }
             }
+            .padding(.top, 28) // macOS title bar hit area height
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .ignoresSafeArea(.container, edges: .top)
         }
         .toolbar(removing: .sidebarToggle)
         .onAppear { viewModel.fetchData() }
@@ -185,13 +188,8 @@ struct DashboardView: View {
 
     private var dashboardContent: some View {
         VStack(spacing: 0) {
-            // Top toolbar bar
-            dashboardToolbar
-
-            // Variable bar (if variables exist)
-            if !viewModel.variables.isEmpty {
-                variableBar
-            }
+            // Unified controls bar: variables + toolbar controls
+            controlsBar
 
             // Playlist controls
             if viewModel.playlistManager.isPlaying {
@@ -270,51 +268,42 @@ struct DashboardView: View {
         .background(Color.accentColor.opacity(0.1))
     }
 
-    // MARK: - Dashboard Toolbar
+    // MARK: - Unified Controls Bar
 
-    private var dashboardToolbar: some View {
+    private var controlsBar: some View {
         HStack(spacing: DS.sm) {
-            // Dashboard title / switcher
+            // Dashboard title
             dashboardTitle
+
+            // Variables
+            ForEach(viewModel.variables) { variable in
+                if variable.hide != .hidden {
+                    variableControl(for: variable)
+                }
+            }
 
             Spacer()
 
-            // Model filter
+            // Controls (right side)
             modelFilterMenu
-
-            toolbarDivider
-
-            // Time range picker button
             timeRangeButton
-
-            // Auto-refresh picker
             refreshPicker
 
-            toolbarDivider
+            Button(action: { viewModel.fetchData() }) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: DS.fontCaption))
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isLoading)
 
-            // Refresh now
-            refreshButton
-
-            toolbarDivider
-
-            // Edit mode controls
             editModeControls
-
-            // More menu
             moreMenu
         }
-        .padding(.horizontal, DS.lg)
-        .padding(.vertical, DS.sm)
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, 16)
+        .frame(height: DetailHeaderView<EmptyView>.headerHeight)
         .overlay(alignment: .bottom) {
-            Rectangle().fill(divClr).frame(height: 0.5)
+            Rectangle().fill(Color.primary.opacity(0.1)).frame(height: 0.5)
         }
-    }
-
-    private var toolbarDivider: some View {
-        Rectangle()
-            .fill(divClr)
-            .frame(width: 0.5, height: DS.lg)
     }
 
     // MARK: - Dashboard Title
