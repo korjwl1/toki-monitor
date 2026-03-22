@@ -205,12 +205,24 @@ struct CustomDashboardView: View {
             )
             Chart {
                 ForEach(modelData, id: \.model) { entry in
+                    let color = viewModel.colorForModel(entry.model)
                     ForEach(entry.points) { point in
+                        AreaMark(
+                            x: .value(L.dash.axisTime, point.date),
+                            y: .value(L.dash.axisTokens, point.value)
+                        )
+                        .foregroundStyle(.linearGradient(
+                            colors: [color.opacity(0.35), color.opacity(0)],
+                            startPoint: .top, endPoint: .bottom))
+                        .interpolationMethod(.catmullRom)
+
                         LineMark(
                             x: .value(L.dash.axisTime, point.date),
                             y: .value(L.dash.axisTokens, point.value)
                         )
-                        .foregroundStyle(by: .value(L.dash.axisModel, entry.model))
+                        .foregroundStyle(color.opacity(0.8))
+                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                        .interpolationMethod(.catmullRom)
                     }
                 }
 
@@ -220,9 +232,6 @@ struct CustomDashboardView: View {
                         .foregroundStyle(.red.opacity(0.5))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 2]))
                 }
-            }
-            .chartForegroundStyleScale { (model: String) in
-                viewModel.colorForModel(model)
             }
         }
     }

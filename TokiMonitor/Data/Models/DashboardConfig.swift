@@ -46,7 +46,10 @@ struct TimeConfig: Codable, Equatable {
     }
 
     var granularity: TimeSeriesGranularity {
-        duration <= 86400 ? .hourly : .daily
+        if duration <= 3600 { return .fiveMinute }       // <= 1h: 5m buckets
+        if duration <= 21600 { return .fifteenMinute }    // <= 6h: 15m buckets
+        if duration <= 86400 { return .hourly }           // <= 24h: 1h buckets
+        return .daily                                     // > 24h: 1d buckets
     }
 
     private func parseRelativeTime(_ str: String) -> TimeInterval {
@@ -494,35 +497,19 @@ extension DashboardConfig {
     }
 
     static var defaultTemplating: TemplatingConfig {
-        TemplatingConfig(list: [
+        let providerOptions = ProviderRegistry.allProviders.map { provider in
+            VariableOption(text: provider.name, value: provider.id)
+        }
+        return TemplatingConfig(list: [
             DashboardVariable(
                 name: "provider",
                 label: L.tr("프로바이더", "Provider"),
                 type: .custom,
                 query: "all",
                 current: VariableSelection(text: ["All"], value: ["$__all"]),
-                options: [
-                    VariableOption(text: "All", value: "$__all", selected: true),
-                ],
+                options: providerOptions,
                 multi: true,
                 includeAll: true
-            ),
-            DashboardVariable(
-                name: "interval",
-                label: L.tr("간격", "Interval"),
-                type: .interval,
-                query: "1m,5m,15m,30m,1h,6h,12h,1d",
-                current: VariableSelection(text: ["1h"], value: ["1h"]),
-                options: [
-                    VariableOption(text: "1m", value: "1m"),
-                    VariableOption(text: "5m", value: "5m"),
-                    VariableOption(text: "15m", value: "15m"),
-                    VariableOption(text: "30m", value: "30m"),
-                    VariableOption(text: "1h", value: "1h", selected: true),
-                    VariableOption(text: "6h", value: "6h"),
-                    VariableOption(text: "12h", value: "12h"),
-                    VariableOption(text: "1d", value: "1d"),
-                ]
             ),
         ])
     }

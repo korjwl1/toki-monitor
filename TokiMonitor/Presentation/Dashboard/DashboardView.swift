@@ -30,10 +30,9 @@ struct DashboardView: View {
     @State private var showDashboardSettings = false
     @State private var showVersionHistory = false
     @State private var showAnnotationList = false
-    @State private var sidebarSelection: SidebarItem? = .dashboards
+    @State private var sidebarSelection: SidebarItem?
 
     enum SidebarItem: Hashable {
-        case dashboards
         case explore
         case playlists
         case alerts
@@ -56,7 +55,7 @@ struct DashboardView: View {
                     PlaylistView(viewModel: viewModel)
                 case .alerts:
                     AlertListView(viewModel: viewModel)
-                default:
+                case nil:
                     dashboardContent
                 }
             }
@@ -91,8 +90,6 @@ struct DashboardView: View {
     private var dashboardSidebar: some View {
         List(selection: $sidebarSelection) {
             Section {
-                Label(L.dash.dashboards, systemImage: "square.grid.2x2")
-                    .tag(SidebarItem.dashboards)
                 Label(L.dash.explore, systemImage: "magnifyingglass.circle")
                     .tag(SidebarItem.explore)
                 Label(L.dash.playlists, systemImage: "play.rectangle")
@@ -105,7 +102,7 @@ struct DashboardView: View {
                 ForEach(viewModel.filteredDashboardList, id: \.uid) { dashboard in
                     Button {
                         viewModel.switchDashboard(dashboard)
-                        sidebarSelection = .dashboards
+                        sidebarSelection = nil
                     } label: {
                         HStack(spacing: DS.sm) {
                             Image(systemName: "square.grid.2x2")
@@ -287,14 +284,7 @@ struct DashboardView: View {
             // Controls (right side)
             modelFilterMenu
             timeRangeButton
-            refreshPicker
-
-            Button(action: { viewModel.fetchData() }) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: DS.fontCaption))
-            }
-            .buttonStyle(.plain)
-            .disabled(viewModel.isLoading)
+            refreshControl
 
             editModeControls
             moreMenu
@@ -322,11 +312,6 @@ struct DashboardView: View {
             } else {
                 Text(viewModel.dashboardConfig.title)
                     .font(.system(size: DS.fontTitle, weight: .semibold))
-            }
-
-            if viewModel.isLoading {
-                ProgressView()
-                    .controlSize(.small)
             }
 
             // Alert indicator
@@ -379,10 +364,18 @@ struct DashboardView: View {
         .fixedSize()
     }
 
-    // MARK: - Auto-Refresh Picker
+    // MARK: - Unified Refresh Control
 
-    private var refreshPicker: some View {
+    private var refreshControl: some View {
         Menu {
+            Button {
+                viewModel.fetchData()
+            } label: {
+                Label(L.tr("지금 새로고침", "Refresh now"), systemImage: "arrow.clockwise")
+            }
+
+            Divider()
+
             ForEach(RefreshInterval.allCases, id: \.rawValue) { interval in
                 Button {
                     viewModel.refreshInterval = interval
@@ -440,17 +433,6 @@ struct DashboardView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-    }
-
-    // MARK: - Refresh Button
-
-    private var refreshButton: some View {
-        Button(action: { viewModel.fetchData() }) {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: DS.fontCaption))
-        }
-        .buttonStyle(.plain)
-        .disabled(viewModel.isLoading)
     }
 
     // MARK: - Edit Mode Controls
@@ -583,10 +565,10 @@ struct DashboardView: View {
     @ViewBuilder
     private func variableControl(for variable: DashboardVariable) -> some View {
         HStack(spacing: DS.xs) {
-            if variable.hide != .hideLabel, let label = variable.label ?? Optional(variable.name) {
-                Text(label)
+            if variable.hide != .hideLabel {
+                Text(variable.label ?? variable.name)
                     .font(.system(size: DS.fontCaption))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tertiary)
             }
 
             Menu {
@@ -637,14 +619,8 @@ struct DashboardView: View {
                     }
                 }
             } label: {
-                HStack(spacing: DS.xs) {
-                    Text(variable.current.text.joined(separator: ", "))
-                        .font(.system(size: DS.fontCaption))
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: DS.fontTiny))
-                }
-                .modifier(ToolbarPillModifier())
+                Text(variable.current.text.joined(separator: ", "))
+                    .font(.system(size: DS.fontCaption))
             }
             .menuStyle(.borderlessButton)
             .fixedSize()

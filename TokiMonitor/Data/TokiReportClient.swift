@@ -31,7 +31,7 @@ final class TokiReportClient: Sendable {
         timeRange: DashboardTimeRange,
         completion: @escaping @Sendable (Result<TimeSeriesData, Error>) -> Void
     ) {
-        let bucket = timeRange.granularity == .hourly ? "1h" : "1d"
+        let bucket = timeRange.granularity.bucket
         let sinceFmt = DateFormatter()
         sinceFmt.dateFormat = "yyyyMMddHHmmss"
         sinceFmt.timeZone = TimeZone(identifier: "UTC")
@@ -80,7 +80,7 @@ final class TokiReportClient: Sendable {
         completion: @escaping @Sendable (Result<TimeSeriesData, Error>) -> Void
     ) {
         let granularity: TimeSeriesGranularity = time.granularity
-        let bucket = granularity == .hourly ? "1h" : "1d"
+        let bucket = granularity.bucket
         let sinceFmt = DateFormatter()
         sinceFmt.dateFormat = "yyyyMMddHHmmss"
         sinceFmt.timeZone = TimeZone(identifier: "UTC")
@@ -118,10 +118,14 @@ final class TokiReportClient: Sendable {
         let granularity = time.granularity
         let step = granularity.stepInterval
         let start: Date
-        if granularity == .hourly {
+        switch granularity {
+        case .fiveMinute, .fifteenMinute:
+            let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now.addingTimeInterval(-time.duration))
+            start = calendar.date(from: c) ?? now.addingTimeInterval(-time.duration)
+        case .hourly:
             let c = calendar.dateComponents([.year, .month, .day, .hour], from: now.addingTimeInterval(-time.duration))
             start = calendar.date(from: c) ?? now.addingTimeInterval(-time.duration)
-        } else {
+        case .daily:
             let c = calendar.dateComponents([.year, .month, .day], from: now.addingTimeInterval(-time.duration))
             start = calendar.date(from: c) ?? now.addingTimeInterval(-time.duration)
         }
@@ -150,10 +154,14 @@ final class TokiReportClient: Sendable {
         let now = Date()
         let step = timeRange.granularity.stepInterval
         let start: Date
-        if timeRange.granularity == .hourly {
+        switch timeRange.granularity {
+        case .fiveMinute, .fifteenMinute:
+            let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now.addingTimeInterval(-timeRange.duration))
+            start = calendar.date(from: c) ?? now.addingTimeInterval(-timeRange.duration)
+        case .hourly:
             let c = calendar.dateComponents([.year, .month, .day, .hour], from: now.addingTimeInterval(-timeRange.duration))
             start = calendar.date(from: c) ?? now.addingTimeInterval(-timeRange.duration)
-        } else {
+        case .daily:
             let c = calendar.dateComponents([.year, .month, .day], from: now.addingTimeInterval(-timeRange.duration))
             start = calendar.date(from: c) ?? now.addingTimeInterval(-timeRange.duration)
         }

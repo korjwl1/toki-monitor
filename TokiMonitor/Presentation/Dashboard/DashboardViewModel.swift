@@ -84,9 +84,24 @@ final class DashboardViewModel {
         self.reportClient = reportClient
         self.dashboardConfig = DashboardConfigStore().load()
         self.dashboardList = DashboardConfigStore().loadDashboardList()
+        populateProviderOptions()
         loadAnnotations()
         loadExploreHistory()
         setupAutoRefresh()
+    }
+
+    /// Clean up stale variables and populate provider options
+    private func populateProviderOptions() {
+        // Remove stale interval variable (now auto-determined)
+        dashboardConfig.templating.list.removeAll { $0.name == "interval" }
+
+        // Populate provider options from supported providers only
+        guard let index = dashboardConfig.templating.list.firstIndex(where: { $0.name == "provider" }) else { return }
+        let providerOptions = ProviderRegistry.configurableProviders.map { provider in
+            VariableOption(text: provider.name, value: provider.id)
+        }
+        dashboardConfig.templating.list[index].options = providerOptions
+        saveDashboard()
     }
 
     nonisolated func cleanupTimer() {
@@ -352,6 +367,7 @@ final class DashboardViewModel {
 
     func switchDashboard(_ config: DashboardConfig) {
         dashboardConfig = config
+        populateProviderOptions()
         saveDashboard()
         configStore.activeDashboardUID = config.uid
         collapsedRows = Set(config.panels.filter(\.collapsed).map(\.id))
