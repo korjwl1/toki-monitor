@@ -241,6 +241,9 @@ struct MenuBarSettingsPane: View {
         if id == MenuWidgetItem.claudeUsageId {
             return L.menuBar.claudeUsage
         }
+        if id == MenuWidgetItem.codexUsageId {
+            return L.tr("Codex 사용량", "Codex Usage")
+        }
         return ProviderRegistry.allProviders.first { $0.id == id }?.name ?? id
     }
 

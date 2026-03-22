@@ -168,6 +168,7 @@ struct MenuWidgetItem: Codable, Identifiable, Equatable {
     var visible: Bool = true
 
     static let claudeUsageId = "claude_usage"
+    static let codexUsageId = "codex_usage"
 }
 
 // MARK: - AppSettings
@@ -371,16 +372,23 @@ final class AppSettings {
     /// Returns resolved widget order for a specific provider's panel (per-provider mode).
     func resolvedProviderWidgetOrder(for providerId: String) -> [MenuWidgetItem] {
         let isAnthropic = providerId == "anthropic"
+        let isOpenAI = providerId == "openai"
         let ps = effectiveSettings(for: providerId)
 
         var items: [MenuWidgetItem]
         if let saved = ps.widgetOrder {
-            // Filter out claude_usage for non-anthropic providers
-            items = isAnthropic ? saved : saved.filter { $0.id != MenuWidgetItem.claudeUsageId }
+            items = saved.filter { item in
+                if item.id == MenuWidgetItem.claudeUsageId { return isAnthropic }
+                if item.id == MenuWidgetItem.codexUsageId { return isOpenAI }
+                return true
+            }
         } else {
             items = [MenuWidgetItem(id: providerId)]
             if isAnthropic {
                 items.append(MenuWidgetItem(id: MenuWidgetItem.claudeUsageId))
+            }
+            if isOpenAI {
+                items.append(MenuWidgetItem(id: MenuWidgetItem.codexUsageId))
             }
         }
 
@@ -388,9 +396,11 @@ final class AppSettings {
         if !items.contains(where: { $0.id == providerId }) {
             items.insert(MenuWidgetItem(id: providerId), at: 0)
         }
-        // Ensure claude_usage for anthropic
         if isAnthropic, !items.contains(where: { $0.id == MenuWidgetItem.claudeUsageId }) {
             items.append(MenuWidgetItem(id: MenuWidgetItem.claudeUsageId))
+        }
+        if isOpenAI, !items.contains(where: { $0.id == MenuWidgetItem.codexUsageId }) {
+            items.append(MenuWidgetItem(id: MenuWidgetItem.codexUsageId))
         }
 
         return items
@@ -422,6 +432,11 @@ final class AppSettings {
         // Add claude_usage if missing
         if !result.contains(where: { $0.id == MenuWidgetItem.claudeUsageId }) {
             result.append(MenuWidgetItem(id: MenuWidgetItem.claudeUsageId))
+        }
+
+        // Add codex_usage if missing
+        if !result.contains(where: { $0.id == MenuWidgetItem.codexUsageId }) {
+            result.append(MenuWidgetItem(id: MenuWidgetItem.codexUsageId))
         }
 
         return result

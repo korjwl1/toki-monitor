@@ -17,7 +17,7 @@ enum AnimationStyle: String, CaseIterable, Codable {
 struct AnimationStateMapper {
     private let slowInterval: TimeInterval = 0.35   // slowest frame interval
     private let fastInterval: TimeInterval = 0.10   // fastest frame interval
-    private let maxRate: Double = 2000              // clamp ceiling
+    private let maxRate: Double = 10000             // clamp ceiling
     private let idleThreshold: Double = 1           // below = idle
 
     func isIdle(tokensPerMinute: Double) -> Bool {

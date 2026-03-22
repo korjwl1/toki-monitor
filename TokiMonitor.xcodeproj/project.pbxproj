@@ -29,6 +29,8 @@
 		0C102E5047654E452890DC1C /* frame_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 0C1FFE59530A1D2FC18F1651 /* frame_00.png */; };
 		540D40E5D9941CCBE4ECE130 /* frame_00_thin.png in Resources */ = {isa = PBXBuildFile; fileRef = CBF9D170A3A566C2BE2A2F70 /* frame_00_thin.png */; };
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
+		CX10000000001 /* CodexUsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CX20000000001 /* CodexUsageClient.swift */; };
+		CX10000000002 /* CodexUsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CX20000000002 /* CodexUsageMonitor.swift */; };
 		192041B631FA773F80879D97 /* TokenAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85595784F39710A1BF95BC51 /* TokenAggregator.swift */; };
 		1AF45302417CF14FE4E62098 /* frame_02.png in Resources */ = {isa = PBXBuildFile; fileRef = A56E6C47FB0555F57056DA13 /* frame_02.png */; };
 		27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5952046CCD5E92A6AE3E38A5 /* ProviderColor.swift */; };
@@ -117,6 +119,8 @@
 		D10000000003 /* OAuthCallbackServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthCallbackServer.swift; sourceTree = "<group>"; };
 		D10000000004 /* OAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthClient.swift; sourceTree = "<group>"; };
 		D10000000005 /* ClaudeUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageClient.swift; sourceTree = "<group>"; };
+		CX20000000001 /* CodexUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageClient.swift; sourceTree = "<group>"; };
+		CX20000000002 /* CodexUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageMonitor.swift; sourceTree = "<group>"; };
 		D10000000006 /* ClaudeOAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthManager.swift; sourceTree = "<group>"; };
 		D10000000007 /* ClaudeUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageMonitor.swift; sourceTree = "<group>"; };
 		D10000000008 /* ClaudeUsageSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageSection.swift; sourceTree = "<group>"; };
@@ -422,6 +426,7 @@
 				0103BDEAC6066E0274029149 /* ConnectionManager.swift */,
 				D10000000006 /* ClaudeOAuthManager.swift */,
 				D10000000007 /* ClaudeUsageMonitor.swift */,
+				CX20000000002 /* CodexUsageMonitor.swift */,
 				G20000000002 /* DashboardConfigStore.swift */,
 				G20000000014 /* DashboardVersionStore.swift */,
 				G20000000003 /* PanelDataExtractor.swift */,
@@ -456,6 +461,7 @@
 				D10000000003 /* OAuthCallbackServer.swift */,
 				D10000000004 /* OAuthClient.swift */,
 				D10000000005 /* ClaudeUsageClient.swift */,
+				CX20000000001 /* CodexUsageClient.swift */,
 			);
 			path = OAuth;
 			sourceTree = "<group>";
@@ -594,6 +600,8 @@
 				E10000000003 /* OAuthCallbackServer.swift in Sources */,
 				E10000000004 /* OAuthClient.swift in Sources */,
 				E10000000005 /* ClaudeUsageClient.swift in Sources */,
+				CX10000000001 /* CodexUsageClient.swift in Sources */,
+				CX10000000002 /* CodexUsageMonitor.swift in Sources */,
 				E10000000006 /* ClaudeOAuthManager.swift in Sources */,
 				E10000000007 /* ClaudeUsageMonitor.swift in Sources */,
 				E10000000008 /* ClaudeUsageSection.swift in Sources */,

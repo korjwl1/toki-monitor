@@ -6,6 +6,7 @@ struct MenuContentView: View {
     let aggregator: TokenAggregator
     let connectionManager: ConnectionManager
     let usageMonitor: ClaudeUsageMonitor?
+    let codexUsageMonitor: CodexUsageMonitor?
     let filterProviderId: String?
     @Bindable var settings: AppSettings
 
@@ -60,6 +61,10 @@ struct MenuContentView: View {
             if item.id == MenuWidgetItem.claudeUsageId {
                 return usageMonitor?.currentUsage != nil || usageMonitor?.lastError != nil
             }
+            if item.id == MenuWidgetItem.codexUsageId {
+                guard let monitor = codexUsageMonitor else { return false }
+                return monitor.isAvailable && (monitor.currentUsage != nil || monitor.lastError != nil)
+            }
             return summaryIds.contains(item.id)
         }
     }
@@ -70,6 +75,14 @@ struct MenuContentView: View {
             if let monitor = usageMonitor {
                 if let usage = monitor.currentUsage {
                     usageWidget(usage)
+                } else if let err = monitor.lastError {
+                    errorWidget(err)
+                }
+            }
+        } else if item.id == MenuWidgetItem.codexUsageId {
+            if let monitor = codexUsageMonitor {
+                if let usage = monitor.currentUsage {
+                    codexUsageWidget(usage)
                 } else if let err = monitor.lastError {
                     errorWidget(err)
                 }
@@ -146,7 +159,7 @@ struct MenuContentView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
-                .background(.cyan)
+                .background(Color(red: 0.90, green: 0.50, blue: 0.25))
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: DS.sm) {
@@ -183,6 +196,59 @@ struct MenuContentView: View {
                     RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(b.utilization >= 90 ? .red : b.utilization >= 75 ? .orange : b.utilization >= 50 ? .yellow : .green)
                         .frame(width: max(g.size.width * min(b.utilization / 100, 1), 3))
+                }
+            }
+            .frame(height: 4)
+        }
+    }
+
+    // MARK: - Codex Usage Widget
+
+    private func codexUsageWidget(_ usage: CodexUsageResponse) -> some View {
+        HStack(spacing: DS.md) {
+            Image(systemName: "gauge.with.dots.needle.50percent")
+                .font(.system(size: 14))
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(Color(red: 0.06, green: 0.64, blue: 0.50))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: DS.sm) {
+                Text(L.tr("Codex 사용량", "Codex Usage"))
+                    .font(.system(size: DS.fontTitle, weight: .semibold))
+
+                if let primary = usage.rateLimit.primaryWindow {
+                    codexUsageBar(primary.windowLabel, percent: primary.usedPercent, countdown: primary.resetCountdown)
+                }
+                if let secondary = usage.rateLimit.secondaryWindow {
+                    codexUsageBar(secondary.windowLabel, percent: secondary.usedPercent, countdown: secondary.resetCountdown)
+                }
+            }
+        }
+        .padding(.leading, DS.sm)
+        .padding(.trailing, DS.md)
+        .padding(.vertical, DS.md)
+    }
+
+    private func codexUsageBar(_ label: String, percent: Int, countdown: String) -> some View {
+        VStack(alignment: .leading, spacing: DS.xs) {
+            HStack {
+                Text(label)
+                    .font(.system(size: DS.fontCaption))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(percent)%")
+                    .font(.system(size: DS.fontCaption, weight: .semibold, design: .monospaced))
+                Text("· \(countdown)")
+                    .font(.system(size: DS.fontTiny))
+                    .foregroundStyle(.tertiary)
+            }
+            GeometryReader { g in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2, style: .continuous).fill(.quaternary)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(percent >= 90 ? .red : percent >= 75 ? .orange : percent >= 50 ? .yellow : .green)
+                        .frame(width: max(g.size.width * min(Double(percent) / 100, 1), 3))
                 }
             }
             .frame(height: 4)

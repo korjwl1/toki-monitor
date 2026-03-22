@@ -27,6 +27,9 @@ final class StatusBarController {
         settings: settings
     )
 
+    // Codex Usage
+    private lazy var codexUsageMonitor = CodexUsageMonitor(aggregator: aggregator)
+
     // Menu panel
     private var menuPanel: NSPanel?
     private var menuHostingView: NSHostingView<MenuContentView>?
@@ -50,6 +53,7 @@ final class StatusBarController {
         aggregator.graphTimeRange = settings.graphTimeRange
         aggregator.startSampling()
         usageMonitor.startPolling()
+        codexUsageMonitor.startPolling()
 
         // Check daemon status and auto-connect if running
         connectionManager.checkAndConnect()
@@ -217,6 +221,7 @@ final class StatusBarController {
             aggregator: aggregator,
             connectionManager: connectionManager,
             usageMonitor: usageMonitor,
+            codexUsageMonitor: codexUsageMonitor,
             filterProviderId: unit.providerId,
             settings: settings,
             onStartDaemon: { [weak self] in
@@ -358,6 +363,7 @@ final class StatusBarController {
             aggregator: aggregator,
             connectionManager: connectionManager,
             usageMonitor: usageMonitor,
+            codexUsageMonitor: codexUsageMonitor,
             filterProviderId: unit.providerId,
             settings: settings,
             onStartDaemon: { [weak self] in
