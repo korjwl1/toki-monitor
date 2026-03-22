@@ -144,22 +144,6 @@ struct DashboardSettingsSheet: View {
 
             Divider()
 
-            // Timezone
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L.dash.timezone)
-                    .font(.subheadline.bold())
-                Picker("", selection: Binding(
-                    get: { viewModel.dashboardConfig.timezone },
-                    set: { viewModel.dashboardConfig.timezone = $0; viewModel.saveDashboard() }
-                )) {
-                    Text("UTC").tag("UTC")
-                    Text(L.tr("시스템", "System")).tag(TimeZone.current.identifier)
-                }
-                .pickerStyle(.menu)
-            }
-
-            Divider()
-
             // Default time range
             VStack(alignment: .leading, spacing: 4) {
                 Text(L.dash.defaultTimeRange)

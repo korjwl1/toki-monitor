@@ -22,9 +22,6 @@ struct DashboardConfig: Codable, Equatable {
     // Annotations
     var annotations: [DashboardAnnotation] = []
 
-    // Timezone
-    var timezone: String = "UTC"
-
     // Settings
     var editable: Bool = true
 

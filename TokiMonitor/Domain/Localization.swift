@@ -165,7 +165,6 @@ enum L {
         static var dashboardSettings: String { tr("대시보드 설정", "Dashboard Settings") }
         static var description: String { tr("설명", "Description") }
         static var tags: String { tr("태그", "Tags") }
-        static var timezone: String { tr("시간대", "Timezone") }
         static var defaultTimeRange: String { tr("기본 시간 범위", "Default Time Range") }
         static var defaultRefresh: String { tr("기본 새로고침", "Default Refresh") }
         static var variables: String { tr("변수", "Variables") }
