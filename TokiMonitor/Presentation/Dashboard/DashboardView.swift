@@ -286,18 +286,6 @@ struct DashboardView: View {
                     emptyView
                 }
             }
-            .background {
-                // Dismiss title editing when clicking content area
-                if isEditingTitle {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            isEditingTitle = false
-                            viewModel.saveDashboard()
-                            viewModel.dashboardList = viewModel.configStore.loadDashboardList()
-                        }
-                }
-            }
         }
     }
 
@@ -565,6 +553,7 @@ struct DashboardView: View {
                     Text(L.dash.cancel)
                         .font(.system(size: DS.fontCaption))
                 }
+                .foregroundStyle(.red)
                 .modifier(ToolbarPillModifier())
             }
             .buttonStyle(.plain)
@@ -702,7 +691,7 @@ struct DashboardView: View {
     private func variableControl(for variable: DashboardVariable) -> some View {
         HStack(spacing: DS.xs) {
             if variable.hide != .hideLabel {
-                Text(variable.label ?? variable.name)
+                Text(localizedVariableLabel(variable))
                     .font(.system(size: DS.fontCaption))
                     .foregroundStyle(.secondary)
             }
@@ -775,6 +764,14 @@ struct DashboardView: View {
 
     // MARK: - States
 
+    /// Runtime-localized variable label (config stores creation-time label)
+    private func localizedVariableLabel(_ variable: DashboardVariable) -> String {
+        switch variable.name {
+        case "provider": L.tr("프로바이더", "Provider")
+        default: variable.label ?? variable.name
+        }
+    }
+
     private func errorView(_ message: String) -> some View {
         ContentUnavailableView {
             Label(L.dash.error, systemImage: "exclamationmark.triangle")
@@ -803,18 +800,23 @@ private struct ToolbarPillModifier: ViewModifier {
         if #available(macOS 26.0, *) {
             content
                 .padding(.horizontal, DS.sm)
-                .padding(.vertical, DS.xs)
+                .padding(.vertical, 6)
+                .frame(minHeight: 24)
+                .contentShape(Rectangle())
                 .glassEffect(.regular, in: .rect(cornerRadius: DS.btnRadius))
                 .overlay {
                     if isActive {
                         RoundedRectangle(cornerRadius: DS.btnRadius, style: .continuous)
                             .fill(Color.accentColor.opacity(0.15))
+                            .allowsHitTesting(false)
                     }
                 }
         } else {
             content
                 .padding(.horizontal, DS.sm)
-                .padding(.vertical, DS.xs)
+                .padding(.vertical, 6)
+                .frame(minHeight: 24)
+                .contentShape(Rectangle())
                 .background(
                     isActive
                         ? AnyShapeStyle(Color.accentColor.opacity(0.2))

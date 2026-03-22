@@ -180,7 +180,7 @@ struct TimeRangePreset: Identifiable, Equatable {
     let label: String
     let from: String
 
-    static let presets: [TimeRangePreset] = [
+    static var presets: [TimeRangePreset] { [
         TimeRangePreset(id: "5m", label: L.tr("최근 5분", "Last 5 minutes"), from: "now-5m"),
         TimeRangePreset(id: "15m", label: L.tr("최근 15분", "Last 15 minutes"), from: "now-15m"),
         TimeRangePreset(id: "30m", label: L.tr("최근 30분", "Last 30 minutes"), from: "now-30m"),
@@ -193,7 +193,7 @@ struct TimeRangePreset: Identifiable, Equatable {
         TimeRangePreset(id: "7d", label: L.tr("최근 7일", "Last 7 days"), from: "now-7d"),
         TimeRangePreset(id: "14d", label: L.tr("최근 14일", "Last 14 days"), from: "now-14d"),
         TimeRangePreset(id: "30d", label: L.tr("최근 30일", "Last 30 days"), from: "now-30d"),
-    ]
+    ] }
 }
 
 // MARK: - Templating / Variables
