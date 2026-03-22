@@ -33,6 +33,7 @@ struct DashboardView: View {
     @State private var sidebarSelection: SidebarItem?
     @State private var editableDashboardList: [DashboardConfig] = []
     @State private var dashboardToDelete: DashboardConfig?
+    @State private var isEditingTitle = false
 
     enum SidebarItem: Hashable {
         case explore
@@ -67,6 +68,9 @@ struct DashboardView: View {
         }
         .toolbar(removing: .sidebarToggle)
         .onAppear { viewModel.fetchData() }
+        .onChange(of: sidebarSelection) { _, _ in
+            isEditingTitle = false
+        }
         .popover(isPresented: $showAddPanel) {
             AddPanelPopover(viewModel: viewModel)
         }
@@ -185,6 +189,7 @@ struct DashboardView: View {
                                     .frame(width: 6, height: 6)
                             }
                         }
+                        .frame(minHeight: 28)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             viewModel.switchDashboard(dashboard)
@@ -270,6 +275,13 @@ struct DashboardView: View {
                     })
                 } else {
                     emptyView
+                }
+            }
+            .onTapGesture {
+                if isEditingTitle {
+                    isEditingTitle = false
+                    viewModel.saveDashboard()
+                    viewModel.dashboardList = viewModel.configStore.loadDashboardList()
                 }
             }
         }
@@ -362,17 +374,39 @@ struct DashboardView: View {
 
     private var dashboardTitle: some View {
         HStack(spacing: DS.xs) {
-            if viewModel.isEditing {
+            if isEditingTitle {
                 TextField(L.dash.title, text: Binding(
                     get: { viewModel.dashboardConfig.title },
-                    set: { viewModel.dashboardConfig.title = $0; viewModel.saveDashboard() }
+                    set: { viewModel.dashboardConfig.title = $0 }
                 ))
-                .textFieldStyle(.plain)
+                .textFieldStyle(.roundedBorder)
                 .font(.system(size: DS.fontTitle, weight: .semibold))
                 .frame(maxWidth: 200)
+                .onSubmit {
+                    isEditingTitle = false
+                    viewModel.saveDashboard()
+                    viewModel.dashboardList = viewModel.configStore.loadDashboardList()
+                }
+                .onExitCommand {
+                    isEditingTitle = false
+                }
             } else {
                 Text(viewModel.dashboardConfig.title)
                     .font(.system(size: DS.fontTitle, weight: .semibold))
+                    .onTapGesture(count: 2) {
+                        isEditingTitle = true
+                    }
+
+                Button {
+                    isEditingTitle = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
 
             // Alert indicator
