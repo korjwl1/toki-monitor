@@ -25,8 +25,6 @@
   <img src="docs/images/demo.gif" alt="Toki Monitor demo — rabbit animation and dashboard" width="640" />
 </p>
 
----
-
 <p align="center">
   <img src="docs/images/rabbit-run.gif" alt="Running rabbit" height="36" />
   &nbsp;&nbsp;&nbsp;

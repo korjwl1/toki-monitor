@@ -25,8 +25,6 @@
   <img src="docs/images/demo.gif" alt="Toki Monitor 데모 — 토끼 애니메이션과 대시보드" width="640" />
 </p>
 
----
-
 <p align="center">
   <img src="docs/images/rabbit-run.gif" alt="달리는 토끼" height="36" />
   &nbsp;&nbsp;&nbsp;
