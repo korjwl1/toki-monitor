@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇺🇸 English</a> · <a href="#설치">설치</a> · <a href="#기능">기능</a> · <a href="#작동-원리">작동 원리</a>
+  <a href="README.md">🇺🇸 English</a> · <a href="#설치">설치</a> · <a href="#기능">기능</a> · <a href="#작동-원리">작동 원리</a> · <a href="#후원">후원</a>
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@ brew tap korjwl1/tap
 brew install --cask toki-monitor
 ```
 
-[toki](https://github.com/korjwl1/toki)가 자동으로 함께 설치됩니다. 앱을 실행하면 데몬이 자동으로 시작됩니다.
+[toki](https://github.com/korjwl1/toki)가 자동으로 함께 설치됩니다. 앱을 실행하면 데몬이 자동으로 시작됩니다. 첫 실행 시 toki의 프로바이더 설정이 자동으로 동기화됩니다.
 
 <details>
 <summary>소스에서 빌드</summary>
@@ -80,7 +80,7 @@ open /Applications/TokiMonitor.app
 
 | 모드 | 표시 내용 |
 |------|----------|
-| **캐릭터** | 토큰 속도에 비례해서 빨라지는 토끼. 대기 시 수면 (zZ). |
+| **캐릭터** | 토큰 속도에 비례해서 빨라지는 토끼. 시그모이드 속도 커브 (500–3,000 tok/m 구간 가속). 대기 시 수면 (zZ). |
 | **수치** | `1.2K/m` — 텍스트로 토큰 속도 표시 |
 | **스파크라인** | 최근 히스토리 미니 그래프 |
 
@@ -112,7 +112,7 @@ open /Applications/TokiMonitor.app
 
 기존 CLI 인증 정보를 그대로 사용 — 추가 로그인 불필요. 색상 코드 바: 초록 → 노랑 → 주황 → 빨강.
 
-로그인 안 됐으면? 위젯이 숨겨지는 대신 로그인 안내를 보여줍니다.
+로그인 안 됐으면? 위젯이 숨겨지는 대신 로그인 안내를 보여줍니다 — Claude는 설정으로 안내, Codex는 `codex --login` 명령어 표시.
 
 ### 이상 감지
 
@@ -125,7 +125,9 @@ open /Applications/TokiMonitor.app
 
 - 합산 또는 개별 프로바이더 표시 (독립 스타일 설정)
 - 위젯 순서 변경 (위/아래 버튼 + 표시/숨김)
-- 수면 대기 시간, 사용량 알림, 애니메이션 속도
+- 수면 대기 시간 (30초 / 1분 / 1분 30초 / 2분)
+- 사용량 알림 (Claude 75%, 90%)
+- 정보 페이지: toki CLI 버전 표시, Homebrew 업데이트 확인
 - 한국어 / 영어 완전 지역화
 - macOS Tahoe에서 Liquid Glass 지원
 
@@ -156,6 +158,14 @@ toki (Rust)                     Toki Monitor (Swift/SwiftUI)
 대시보드: 패널 쿼리 → interpolate → toki report → PanelDataState → 차트
 사용량:   Claude OAuth / Codex OAuth → Monitor → 위젯
 ```
+
+---
+
+### 개인 정보
+
+- 모든 데이터는 로컬에 남습니다 — 텔레메트리 없음, 클라우드 없음
+- 사용량 API는 리밋 상태만 조회 — 프롬프트나 응답 내용에 접근하지 않음
+- toki는 세션 파일을 읽기 전용으로 접근 — AI 도구 데이터를 수정하지 않음
 
 ---
 
@@ -196,6 +206,18 @@ xcodebuild test -scheme TokiMonitor -destination 'platform=macOS'
 - **커스텀 애니메이션** — 나만의 캐릭터 프레임 사용
 - **멀티 디바이스 동기화** — toki-sync를 통한 기기 간 사용량 데이터 공유
 - **사용량 보고서** — 주간/월간 요약, 전주 대비 및 전월 대비 분석
+
+---
+
+## 후원
+
+<a href="https://github.com/sponsors/korjwl1">
+  <img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?style=for-the-badge&logo=github" alt="Sponsor" />
+</a>
+
+Toki Monitor가 유용하다면 후원을 통해 개발을 지원해주세요.
+
+유료 제품에서의 상업적 사용은 후원 또는 [문의](mailto:korjwl1@gmail.com)를 부탁드립니다.
 
 ---
 

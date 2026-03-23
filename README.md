@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="README.ko.md">🇰🇷 한국어</a> · <a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#how-it-works">How it works</a>
+  <a href="README.ko.md">🇰🇷 한국어</a> · <a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#how-it-works">How it works</a> · <a href="#sponsor">Sponsor</a>
 </p>
 
 <p align="center">
@@ -60,6 +60,8 @@ open /Applications/TokiMonitor.app
 # Click the rabbit for details. Right-click for settings.
 ```
 
+The app auto-starts the toki daemon if it's not running. On first launch, provider settings are synced from toki automatically.
+
 ---
 
 ## Who is this for?
@@ -80,9 +82,9 @@ open /Applications/TokiMonitor.app
 
 | Mode | What you see |
 |------|-------------|
-| **Character** | Rabbit that runs faster as token rate increases. Sleeps (zZ) when idle. |
-| **Numeric** | `1.2K/m` — token rate as text |
-| **Sparkline** | Mini graph of recent history |
+| **Character** | Rabbit that runs faster as token rate increases. Sigmoid speed curve — steep in the 500–3,000 tok/m range. Sleeps (zZ) when idle. |
+| **Numeric** | `1.2K/m` — token rate as text (per minute / per second / raw) |
+| **Sparkline** | Mini graph of recent history (configurable: 5m / 10m / 30m / 1h) |
 
 Switch modes per provider. Right-click for Settings / Quit.
 
@@ -94,10 +96,12 @@ Switch modes per provider. Right-click for Settings / Quit.
 
 Each panel runs its own PromQL query. Identical queries are deduplicated automatically.
 
-- Time series, bar chart, pie chart, stat, gauge, table
-- Provider filter, model filter, time range picker
-- Project-level token breakdown
+- Time series, bar chart, **pie chart**, stat, gauge, table
+- Provider filter via PromQL `{provider="..."}` — applied per panel
+- Project-level token breakdown with smart path recovery
+- Time range picker with presets and absolute dates
 - Dashboard versioning and annotations
+- Shows in Dock when open, hides when closed
 
 <p align="center">
   <img src="docs/images/dashboard.png" alt="Dashboard" width="640" />
@@ -112,20 +116,23 @@ Each panel runs its own PromQL query. Identical queries are deduplicated automat
 
 Reads existing CLI credentials — no extra login. Color-coded bars: green → yellow → orange → red.
 
-Not logged in? The widget shows a login prompt instead of hiding.
+Not logged in? The widget shows a login prompt instead of hiding — Claude links to Settings, Codex shows the `codex --login` command.
 
 ### Anomaly detection
 
 - **Velocity alert** — icon color changes when $/min exceeds your threshold
-- **Historical baseline** — compares against your 24-hour average
+- **Historical baseline** — compares against your 24-hour average via PromQL
 - Choose: icon color change, system notification, or both
+- Custom alert colors per type
 - Off by default. Configure in Settings → Notifications.
 
 ### Settings
 
 - Aggregated or per-provider display with independent style overrides
-- Widget order (up/down buttons + show/hide)
-- Sleep delay, usage alerts, animation speed
+- Widget order (up/down buttons + show/hide per provider)
+- Sleep delay (30s / 1m / 1m 30s / 2m)
+- Usage alerts (Claude 75%, 90%)
+- About page with toki CLI version and Homebrew update check
 - Full Korean / English localization
 - Liquid Glass on macOS Tahoe
 
@@ -153,9 +160,15 @@ toki (Rust)                     Toki Monitor (Swift/SwiftUI)
 └─ UDS server
 
 Real-time:  daemon → trace → UDS → EventStream → Aggregator → Menu Bar
-Dashboard:  Panel query → interpolate → toki report → PanelDataState → Chart
+Dashboard:  Panel query → interpolate($__from, $provider) → toki report → PanelDataState → Chart
 Usage:      Claude OAuth / Codex OAuth → Monitor → Widget
 ```
+
+### Privacy
+
+- All data stays on your machine — no telemetry, no cloud
+- Usage APIs read only rate limit status, never prompts or responses
+- toki reads session files read-only — never modifies your AI tool data
 
 ---
 
@@ -196,6 +209,18 @@ Contributions welcome!
 - **Custom animations** — bring your own character frames
 - **Multi-device sync** — share usage data across machines via toki-sync
 - **Usage reports** — weekly/monthly summaries with week-over-week and month-over-month comparisons
+
+---
+
+## Sponsor
+
+<a href="https://github.com/sponsors/korjwl1">
+  <img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?style=for-the-badge&logo=github" alt="Sponsor" />
+</a>
+
+If Toki Monitor is useful to you, consider sponsoring to support development.
+
+For commercial use in paid products, please sponsor or [reach out](mailto:korjwl1@gmail.com).
 
 ---
 
