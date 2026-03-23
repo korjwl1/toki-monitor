@@ -62,10 +62,11 @@ final class CodexUsageMonitor {
         } catch let error as CodexAuthError {
             switch error {
             case .fetchFailed(401), .fetchFailed(403):
-                // Token expired or invalid — can't auto-refresh without OAuth client
-                // User needs to run `codex --login` again
-                lastError = L.tr("Codex 재로그인 필요", "Codex re-login required")
+                // Might be transient — only show error after 3 consecutive failures
                 consecutiveFailures += 1
+                if consecutiveFailures >= 3 {
+                    lastError = L.tr("Codex 재로그인 필요", "Codex re-login required")
+                }
             case .fetchFailed(429):
                 // Rate limited — back off silently
                 lastError = nil
