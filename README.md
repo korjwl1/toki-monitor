@@ -27,7 +27,9 @@
 
 ---
 
-> **toki** = **to**ken **i**nspector — sounds like *tokki* (토끼, rabbit in Korean). Toki Monitor is the macOS visual companion to [toki](https://github.com/korjwl1/toki), a Rust daemon that indexes your AI tool session files into a local time-series database ([fjall](https://github.com/fjall-rs/fjall)). The monitor stays lightweight because heavy parsing, indexing, and cost calculation live in the daemon.
+> Powered by [**toki**](https://github.com/korjwl1/toki) — Rust daemon. 5 MB idle. Reports in 7 ms.
+>
+> <sub>**toki** = **to**ken **i**nspector — sounds like *tokki* (토끼, rabbit in Korean). Fast and light, just like one.</sub>
 
 ---
 

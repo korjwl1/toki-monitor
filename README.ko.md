@@ -27,7 +27,9 @@
 
 ---
 
-> **toki** = **to**ken **i**nspector — 한국어로 *토끼*와 발음이 같습니다. Toki Monitor는 [toki](https://github.com/korjwl1/toki)의 macOS 시각적 동반자입니다. toki는 AI 도구의 세션 파일을 로컬 시계열 데이터베이스([fjall](https://github.com/fjall-rs/fjall))에 인덱싱하는 Rust 데몬입니다. 무거운 파싱, 인덱싱, 비용 계산은 데몬이 담당하므로 모니터 앱은 가볍게 유지됩니다.
+> [**toki**](https://github.com/korjwl1/toki) 기반 — Rust 데몬. 대기 5 MB. 리포트 7 ms.
+>
+> <sub>**toki** = **to**ken **i**nspector — 토끼와 발음이 같습니다. 빠르고 가볍습니다.</sub>
 
 ---
 
