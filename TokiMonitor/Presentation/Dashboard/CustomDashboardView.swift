@@ -192,9 +192,17 @@ struct CustomDashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var hasNoData: Bool {
+        viewModel.timeSeriesData == nil
+        || viewModel.timeSeriesData!.points.isEmpty
+        || viewModel.timeSeriesData!.allModelNames.isEmpty
+    }
+
     @ViewBuilder
     private func timeSeriesContent(for metric: PanelMetric) -> some View {
-        if viewModel.filteredModelNames.isEmpty {
+        if hasNoData {
+            emptyDataView
+        } else if viewModel.filteredModelNames.isEmpty {
             noModelSelected
         } else {
             TimeSeriesChartView(
@@ -207,7 +215,9 @@ struct CustomDashboardView: View {
 
     @ViewBuilder
     private func barChartContent(for metric: PanelMetric) -> some View {
-        if viewModel.filteredModelNames.isEmpty {
+        if hasNoData {
+            emptyDataView
+        } else if viewModel.filteredModelNames.isEmpty {
             noModelSelected
         } else {
             let modelData = PanelDataExtractor.allModelChartPoints(
@@ -265,12 +275,12 @@ struct CustomDashboardView: View {
     private func pieChartContent(for metric: PanelMetric) -> some View {
         if metric == .tokensByProject {
             projectPieChart
+        } else if hasNoData {
+            emptyDataView
         } else if let data = viewModel.timeSeriesData {
             let rows = PanelDataExtractor.tableRows(from: data)
             if rows.isEmpty {
-                Text("-")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                emptyDataView
             } else {
                 Chart(rows, id: \.model) { row in
                     SectorMark(
@@ -296,7 +306,9 @@ struct CustomDashboardView: View {
 
     private var projectPieChart: some View {
         Group {
-            if viewModel.projectTokens.isEmpty {
+            if hasNoData && viewModel.projectTokens.isEmpty {
+                emptyDataView
+            } else if viewModel.projectTokens.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 150)
             } else {
@@ -335,7 +347,7 @@ struct CustomDashboardView: View {
     private var chartDateFormat: Date.FormatStyle {
         let secs = viewModel.dashboardConfig.time.bucketSeconds
         if secs < 3600 {
-            return .dateTime.hour(.defaultDigits(amPM: .omitted)).minute(.twoDigits)
+            return .dateTime.hour(.defaultDigits(amPM: .abbreviated)).minute(.twoDigits)
         } else if secs < 86400 {
             return .dateTime.month(.defaultDigits).day(.defaultDigits).hour(.defaultDigits(amPM: .abbreviated))
         } else {
@@ -349,6 +361,15 @@ struct CustomDashboardView: View {
             systemImage: "line.3.horizontal.decrease.circle",
             description: Text(L.dash.selectModelDesc)
         )
-        .frame(minHeight: 80)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var emptyDataView: some View {
+        ContentUnavailableView(
+            L.tr("데이터 없음", "No Data"),
+            systemImage: "chart.line.downtrend.xyaxis",
+            description: Text(L.tr("해당 기간에 데이터가 없습니다", "No data for this period"))
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

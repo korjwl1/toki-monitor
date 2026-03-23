@@ -56,6 +56,11 @@ final class TokiReportClient: Sendable {
         let since = sinceFmt.string(from: sinceDate)
 
         var filters = "since=\"\(since)\""
+        // Add until for absolute time ranges
+        if !time.isRelative {
+            let until = sinceFmt.string(from: time.toDate)
+            filters += ", until=\"\(until)\""
+        }
         if let provider {
             filters += ", provider=\"\(provider)\""
         }

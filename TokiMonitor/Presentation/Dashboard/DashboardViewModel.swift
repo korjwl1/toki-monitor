@@ -142,11 +142,8 @@ final class DashboardViewModel {
                 self.isLoading = false
                 self.timeSeriesData = data
                 self.dataVersion += 1
-                if self.enabledModels.isEmpty {
-                    self.enabledModels = Set(data.allModelNames)
-                } else {
-                    self.enabledModels.formUnion(data.allModelNames)
-                }
+                // Reset enabled models to match current data
+                self.enabledModels = Set(data.allModelNames)
             } catch {
                 self.isLoading = false
                 self.errorMessage = error.localizedDescription
@@ -161,6 +158,10 @@ final class DashboardViewModel {
             sinceFmt.timeZone = TimeZone(identifier: "UTC")
             let since = sinceFmt.string(from: time.fromDate)
             var filters = "since=\"\(since)\""
+            if !time.isRelative {
+                let until = sinceFmt.string(from: time.toDate)
+                filters += ", until=\"\(until)\""
+            }
             if let selectedProvider {
                 filters += ", provider=\"\(selectedProvider)\""
             }
