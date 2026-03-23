@@ -29,6 +29,12 @@
 
 > Powered by [**toki**](https://github.com/korjwl1/toki) (**to**ken **i**nspector, *tokki* = 토끼) — a fast, lightweight Rust daemon for tracking AI token usage.
 
+<p align="center">
+  <img src="docs/images/rabbit-run.gif" alt="Running rabbit" height="36" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/images/rabbit-sleep.gif" alt="Sleeping rabbit" height="36" />
+</p>
+
 ---
 
 ## Install
