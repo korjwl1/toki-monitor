@@ -8,7 +8,7 @@ final class ClaudeUsageMonitor {
     private(set) var currentUsage: ClaudeUsageResponse?
     private(set) var lastError: String?
 
-    private let oauthManager: ClaudeOAuthManager
+    let oauthManager: ClaudeOAuthManager
     private let aggregator: TokenAggregator
     private let settings: AppSettings
     private var pollingTask: Task<Void, Never>?

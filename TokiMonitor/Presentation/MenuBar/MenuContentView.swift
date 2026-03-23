@@ -58,13 +58,8 @@ struct MenuContentView: View {
 
         return order.filter { item in
             guard item.visible else { return false }
-            if item.id == MenuWidgetItem.claudeUsageId {
-                return usageMonitor?.currentUsage != nil || usageMonitor?.lastError != nil
-            }
-            if item.id == MenuWidgetItem.codexUsageId {
-                guard let monitor = codexUsageMonitor else { return false }
-                return monitor.isAvailable && (monitor.currentUsage != nil || monitor.lastError != nil)
-            }
+            if item.id == MenuWidgetItem.claudeUsageId { return true }
+            if item.id == MenuWidgetItem.codexUsageId { return true }
             return summaryIds.contains(item.id)
         }
     }
@@ -77,6 +72,10 @@ struct MenuContentView: View {
                     usageWidget(usage)
                 } else if let err = monitor.lastError {
                     errorWidget(err)
+                } else if monitor.oauthManager.authState != .loggedIn {
+                    claudeLoginPrompt
+                } else {
+                    usageLoadingWidget(L.panel.claudeUsage, color: Color(red: 0.90, green: 0.50, blue: 0.25))
                 }
             }
         } else if item.id == MenuWidgetItem.codexUsageId {
@@ -85,6 +84,10 @@ struct MenuContentView: View {
                     codexUsageWidget(usage)
                 } else if let err = monitor.lastError {
                     errorWidget(err)
+                } else if !monitor.isAvailable {
+                    codexLoginPrompt
+                } else {
+                    usageLoadingWidget(L.tr("Codex 사용량", "Codex Usage"), color: Color(red: 0.06, green: 0.64, blue: 0.50))
                 }
             }
         } else {
@@ -93,6 +96,67 @@ struct MenuContentView: View {
                 providerWidget(s)
             }
         }
+    }
+
+    // MARK: - Login Prompts
+
+    private var claudeLoginPrompt: some View {
+        HStack(spacing: DS.md) {
+            Image(systemName: "person.crop.circle.badge.questionmark")
+                .font(.system(size: 14))
+                .foregroundStyle(Color(red: 0.90, green: 0.50, blue: 0.25))
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: DS.xs) {
+                Text(L.panel.claudeUsage)
+                    .font(.system(size: DS.fontTitle, weight: .semibold))
+                Button {
+                    onOpenSettings()
+                } label: {
+                    Text(L.tr("로그인 필요", "Login required"))
+                        .font(.system(size: DS.fontCaption))
+                        .foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, DS.sm)
+        .padding(.trailing, DS.md)
+        .padding(.vertical, DS.md)
+    }
+
+    private var codexLoginPrompt: some View {
+        HStack(spacing: DS.md) {
+            Image(systemName: "person.crop.circle.badge.questionmark")
+                .font(.system(size: 14))
+                .foregroundStyle(Color(red: 0.06, green: 0.64, blue: 0.50))
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: DS.xs) {
+                Text(L.tr("Codex 사용량", "Codex Usage"))
+                    .font(.system(size: DS.fontTitle, weight: .semibold))
+                Text(L.tr("codex --login 실행 필요", "Run codex --login in terminal"))
+                    .font(.system(size: DS.fontCaption))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.leading, DS.sm)
+        .padding(.trailing, DS.md)
+        .padding(.vertical, DS.md)
+    }
+
+    private func usageLoadingWidget(_ title: String, color: Color) -> some View {
+        HStack(spacing: DS.md) {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 28, height: 28)
+
+            Text(title)
+                .font(.system(size: DS.fontTitle, weight: .semibold))
+        }
+        .padding(.leading, DS.sm)
+        .padding(.trailing, DS.md)
+        .padding(.vertical, DS.md)
     }
 
     // MARK: - Provider Widget
