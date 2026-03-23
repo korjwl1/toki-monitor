@@ -27,9 +27,7 @@
 
 ---
 
-> [**toki**](https://github.com/korjwl1/toki) 기반 — Rust 데몬. 대기 5 MB. 리포트 7 ms.
->
-> <sub>**toki** = **to**ken **i**nspector — 토끼와 발음이 같습니다. 빠르고 가볍습니다.</sub>
+> [**toki**](https://github.com/korjwl1/toki) 기반 (**to**ken **i**nspector, *tokki* = 토끼) — 빠르고 가벼운 Rust 데몬으로 AI 토큰 사용량을 추적합니다.
 
 ---
 

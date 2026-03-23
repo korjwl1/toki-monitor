@@ -27,9 +27,7 @@
 
 ---
 
-> Powered by [**toki**](https://github.com/korjwl1/toki) — Rust daemon. 5 MB idle. Reports in 7 ms.
->
-> <sub>**toki** = **to**ken **i**nspector — sounds like *tokki* (토끼, rabbit in Korean). Fast and light, just like one.</sub>
+> Powered by [**toki**](https://github.com/korjwl1/toki) (**to**ken **i**nspector, *tokki* = 토끼) — a fast, lightweight Rust daemon for tracking AI token usage.
 
 ---
 
