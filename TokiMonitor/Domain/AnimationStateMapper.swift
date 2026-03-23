@@ -32,9 +32,15 @@ struct AnimationStateMapper {
         let clamped = min(tokensPerMinute, maxRate)
         let t = (clamped - idleThreshold) / (maxRate - idleThreshold)
 
-        // Ease-out curve so it ramps up quickly at low rates
-        // then flattens toward sprint speed
-        let eased = 1 - pow(1 - t, 2)
+        // Sigmoid curve centered at midpoint (~2000 tok/m)
+        // Steep transition in the 500-2000 range where most usage happens
+        let steepness = 8.0
+        let midpoint = 0.2  // 20% of maxRate = ~2000 tok/m
+        let sigmoid = 1.0 / (1.0 + exp(-steepness * (t - midpoint)))
+        // Normalize sigmoid to 0...1 range
+        let sigMin = 1.0 / (1.0 + exp(-steepness * (0 - midpoint)))
+        let sigMax = 1.0 / (1.0 + exp(-steepness * (1 - midpoint)))
+        let eased = (sigmoid - sigMin) / (sigMax - sigMin)
 
         // Lerp between slow and fast
         return slowInterval - eased * (slowInterval - fastInterval)
