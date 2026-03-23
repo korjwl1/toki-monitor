@@ -53,7 +53,12 @@ final class StatusBarController {
         aggregator.graphTimeRange = settings.graphTimeRange
         aggregator.startSampling()
         usageMonitor.startPolling()
-        codexUsageMonitor.startPolling()
+
+        // Resolve codex root from toki settings, then start codex polling
+        Task {
+            await CodexAuthReader.resolveCodexRoot()
+            codexUsageMonitor.startPolling()
+        }
 
         // Check daemon status and auto-connect if running
         connectionManager.checkAndConnect()

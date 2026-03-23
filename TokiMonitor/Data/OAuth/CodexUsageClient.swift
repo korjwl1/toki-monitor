@@ -98,14 +98,30 @@ enum CodexAuthError: Error, LocalizedError {
 }
 
 struct CodexAuthReader {
-    private static var authPath: String {
-        if let home = ProcessInfo.processInfo.environment["CODEX_HOME"] {
-            return home + "/auth.json"
-        }
-        return NSHomeDirectory() + "/.codex/auth.json"
+    /// Resolved codex root from toki settings. Set once at app startup.
+    @MainActor static var codexRoot: String = NSHomeDirectory() + "/.codex"
+
+    @MainActor private static var authPath: String {
+        codexRoot + "/auth.json"
     }
 
-    static func readAccessToken() throws -> String {
+    /// Query toki settings for codex_root and cache it.
+    @MainActor static func resolveCodexRoot() async {
+        do {
+            let data = try await CLIProcessRunner.run(
+                executable: TokiPath.resolved,
+                arguments: ["settings", "get", "codex_root"]
+            )
+            if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !path.isEmpty {
+                codexRoot = path
+            }
+        } catch {
+            // Fall back to default
+        }
+    }
+
+    @MainActor static func readAccessToken() throws -> String {
         let url = URL(fileURLWithPath: authPath)
         guard FileManager.default.fileExists(atPath: authPath) else {
             throw CodexAuthError.authFileNotFound
@@ -122,7 +138,7 @@ struct CodexAuthReader {
         return accessToken
     }
 
-    static func readRefreshToken() throws -> String {
+    @MainActor static func readRefreshToken() throws -> String {
         let url = URL(fileURLWithPath: authPath)
         let data = try Data(contentsOf: url)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -136,7 +152,7 @@ struct CodexAuthReader {
     }
 
     /// Check if auth.json exists (user has logged in to Codex at least once).
-    static var isAvailable: Bool {
+    @MainActor static var isAvailable: Bool {
         FileManager.default.fileExists(atPath: authPath)
     }
 }
