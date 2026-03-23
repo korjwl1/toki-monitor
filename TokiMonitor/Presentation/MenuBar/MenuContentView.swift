@@ -59,11 +59,20 @@ struct MenuContentView: View {
         let summaries = buildDisplaySummaries()
         let summaryIds = Set(summaries.map(\.provider.id))
 
+        // All widgets for enabled providers should show, regardless of data availability
+        let enabledIds = Set(ProviderRegistry.configurableProviders
+            .filter { settings.effectiveSettings(for: $0.id).enabled }
+            .map(\.id))
+
         return order.filter { item in
             guard item.visible else { return false }
-            if item.id == MenuWidgetItem.claudeUsageId { return true }
-            if item.id == MenuWidgetItem.codexUsageId { return true }
-            return summaryIds.contains(item.id)
+            if item.id == MenuWidgetItem.claudeUsageId {
+                return enabledIds.contains("anthropic")
+            }
+            if item.id == MenuWidgetItem.codexUsageId {
+                return enabledIds.contains("openai")
+            }
+            return enabledIds.contains(item.id)
         }
     }
 

@@ -94,15 +94,15 @@ final class StatusBarController {
                 executable: TokiPath.resolved,
                 arguments: ["settings", "get", "providers"]
             )
-            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            // Parse ["claude_code","codex"] format
-            let cleaned = output
-                .replacingOccurrences(of: "[", with: "")
-                .replacingOccurrences(of: "]", with: "")
-                .replacingOccurrences(of: "\"", with: "")
-            let tokiProviders = cleaned.components(separatedBy: ",")
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.isEmpty }
+            let output = String(data: data, encoding: .utf8) ?? ""
+            // Parse table format: lines with "[enabled]" contain provider IDs in first column
+            let tokiProviders = output.components(separatedBy: "\n")
+                .filter { $0.contains("[enabled]") }
+                .compactMap { line -> String? in
+                    let id = line.trimmingCharacters(in: .whitespaces)
+                        .components(separatedBy: .whitespaces).first
+                    return id?.isEmpty == false ? id : nil
+                }
 
             // Map toki provider IDs to app provider IDs and enable only those
             let allProviders = ProviderRegistry.configurableProviders
