@@ -27,6 +27,10 @@
 
 ---
 
+> **toki** = **to**ken **i**nspector — 한국어로 *토끼*와 발음이 같습니다. Toki Monitor는 [toki](https://github.com/korjwl1/toki)의 macOS 시각적 동반자입니다. toki는 AI 도구의 세션 파일을 로컬 시계열 데이터베이스([fjall](https://github.com/fjall-rs/fjall))에 인덱싱하는 Rust 데몬입니다. 무거운 파싱, 인덱싱, 비용 계산은 데몬이 담당하므로 모니터 앱은 가볍게 유지됩니다.
+
+---
+
 ## 설치
 
 ```bash
@@ -218,13 +222,6 @@ xcodebuild test -scheme TokiMonitor -destination 'platform=macOS'
 Toki Monitor가 유용하다면 후원을 통해 개발을 지원해주세요.
 
 유료 제품에서의 상업적 사용은 후원 또는 [문의](mailto:korjwl1@gmail.com)를 부탁드립니다.
-
----
-
-## 관련 프로젝트
-
-- **[toki](https://github.com/korjwl1/toki)** — Toki Monitor를 구동하는 Rust 엔진
-- **[강점 & 포지셔닝](docs/strengths.ko.md)** — 아키텍처 비교 및 상세 분석
 
 ---
 

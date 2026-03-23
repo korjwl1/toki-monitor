@@ -3,3 +3,8 @@ xcuserdata/
 DerivedData/
 *.xcscmblueprint
 *.profraw
+
+# Personal/local docs
+.claude/
+.spec-mix/
+specs/

@@ -27,6 +27,10 @@
 
 ---
 
+> **toki** = **to**ken **i**nspector — sounds like *tokki* (토끼, rabbit in Korean). Toki Monitor is the macOS visual companion to [toki](https://github.com/korjwl1/toki), a Rust daemon that indexes your AI tool session files into a local time-series database ([fjall](https://github.com/fjall-rs/fjall)). The monitor stays lightweight because heavy parsing, indexing, and cost calculation live in the daemon.
+
+---
+
 ## Install
 
 ```bash
@@ -140,8 +144,6 @@ Not logged in? The widget shows a login prompt instead of hiding — Claude link
 
 ## How it works (and why it's fast)
 
-Toki Monitor is the visual companion to [toki](https://github.com/korjwl1/toki), a Rust daemon that indexes your AI tool session files into a local time-series database.
-
 Other menu bar apps rescan files on every poll. Toki queries an indexed database — instant at any range, zero CPU at idle.
 
 | | toki | File-polling tools |
@@ -221,13 +223,6 @@ Contributions welcome!
 If Toki Monitor is useful to you, consider sponsoring to support development.
 
 For commercial use in paid products, please sponsor or [reach out](mailto:korjwl1@gmail.com).
-
----
-
-## Related
-
-- **[toki](https://github.com/korjwl1/toki)** — the Rust engine behind Toki Monitor
-- **[Strengths & Positioning](docs/strengths.md)** — architecture comparison and detailed analysis
 
 ---
 
