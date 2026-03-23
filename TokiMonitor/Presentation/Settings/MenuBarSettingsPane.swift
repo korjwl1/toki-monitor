@@ -155,8 +155,8 @@ struct MenuBarSettingsPane: View {
     private var widgetOrderSection: some View {
         Section(L.menuBar.widgetOrder) {
             let items = settings.resolvedWidgetOrder()
-            ForEach(items) { item in
-                HStack {
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                HStack(spacing: DS.sm) {
                     Image(systemName: item.visible ? "eye" : "eye.slash")
                         .foregroundStyle(item.visible ? .primary : .tertiary)
                         .frame(width: 20)
@@ -164,21 +164,29 @@ struct MenuBarSettingsPane: View {
                             toggleWidgetVisibility(item.id)
                         }
 
-                    Image(systemName: "line.3.horizontal")
-                        .foregroundStyle(.tertiary)
-                        .font(.system(size: 12))
-
                     Text(widgetDisplayName(item.id))
 
                     Spacer()
+
+                    Button {
+                        moveWidget(at: idx, direction: -1, global: true)
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(idx == 0)
+
+                    Button {
+                        moveWidget(at: idx, direction: 1, global: true)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(idx == items.count - 1)
                 }
                 .contentShape(Rectangle())
-            }
-            .onMove { from, to in
-                var order = settings.resolvedWidgetOrder()
-                order.move(fromOffsets: from, toOffset: to)
-                settings.widgetOrder = order
-                settings.pendingPopupRequest = .mostActive
             }
         }
     }
@@ -186,8 +194,8 @@ struct MenuBarSettingsPane: View {
     private func providerWidgetOrderSection(for provider: ProviderInfo) -> some View {
         Section(L.menuBar.widgetOrder) {
             let items = settings.resolvedProviderWidgetOrder(for: provider.id)
-            ForEach(items) { item in
-                HStack {
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                HStack(spacing: DS.sm) {
                     Image(systemName: item.visible ? "eye" : "eye.slash")
                         .foregroundStyle(item.visible ? .primary : .tertiary)
                         .frame(width: 20)
@@ -195,24 +203,30 @@ struct MenuBarSettingsPane: View {
                             toggleProviderWidgetVisibility(providerId: provider.id, widgetId: item.id)
                         }
 
-                    Image(systemName: "line.3.horizontal")
-                        .foregroundStyle(.tertiary)
-                        .font(.system(size: 12))
-
                     Text(widgetDisplayName(item.id))
                         .foregroundStyle(item.visible ? .primary : .tertiary)
 
                     Spacer()
+
+                    Button {
+                        moveProviderWidget(providerId: provider.id, at: idx, direction: -1)
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(idx == 0)
+
+                    Button {
+                        moveProviderWidget(providerId: provider.id, at: idx, direction: 1)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(idx == items.count - 1)
                 }
                 .contentShape(Rectangle())
-            }
-            .onMove { from, to in
-                var ps = settings.effectiveSettings(for: provider.id)
-                var order = settings.resolvedProviderWidgetOrder(for: provider.id)
-                order.move(fromOffsets: from, toOffset: to)
-                ps.widgetOrder = order
-                settings.providerSettingsMap[provider.id] = ps
-                settings.pendingPopupRequest = .provider(provider.id)
             }
         }
     }
@@ -226,6 +240,26 @@ struct MenuBarSettingsPane: View {
             settings.providerSettingsMap[providerId] = ps
             settings.pendingPopupRequest = .provider(providerId)
         }
+    }
+
+    private func moveWidget(at index: Int, direction: Int, global: Bool) {
+        var order = settings.resolvedWidgetOrder()
+        let newIndex = index + direction
+        guard newIndex >= 0, newIndex < order.count else { return }
+        order.swapAt(index, newIndex)
+        settings.widgetOrder = order
+        settings.pendingPopupRequest = .mostActive
+    }
+
+    private func moveProviderWidget(providerId: String, at index: Int, direction: Int) {
+        var ps = settings.effectiveSettings(for: providerId)
+        var order = settings.resolvedProviderWidgetOrder(for: providerId)
+        let newIndex = index + direction
+        guard newIndex >= 0, newIndex < order.count else { return }
+        order.swapAt(index, newIndex)
+        ps.widgetOrder = order
+        settings.providerSettingsMap[providerId] = ps
+        settings.pendingPopupRequest = .provider(providerId)
     }
 
     private func toggleWidgetVisibility(_ id: String) {
