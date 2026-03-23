@@ -476,20 +476,20 @@ enum PanelMetric: String, Codable, CaseIterable {
     }
 
     /// Default PromQL template for this metric
+    /// PromQL query template. toki supports: usage, events, sessions, projects.
+    /// Cost, topModel, cacheHitRate, reasoning are computed client-side from usage data.
     var defaultQuery: String {
         switch self {
-        case .totalTokens: "sum(usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval]) by (model)"
-        case .totalCost: "sum(cost{since=\"$__from\", until=\"$__to\", $provider}[$__interval]) by (model)"
-        case .apiCalls: "count(usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval]) by (model)"
-        case .topModel: "topk(1, sum(usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval]) by (model))"
-        case .tokensByModel: "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .costByModel: "cost{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .eventsByModel: "events{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .inputVsOutput: "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .cacheHitRate: "rate(cache_read{since=\"$__from\", until=\"$__to\"}[$__interval]) / rate(input{since=\"$__from\"}[$__interval])"
-        case .reasoningTokens: "reasoning{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .modelBreakdown: "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .tokensByProject: "sum(usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval]) by (project)"
+        case .totalTokens, .totalCost, .topModel, .cacheHitRate, .reasoningTokens:
+            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
+        case .tokensByModel, .costByModel, .modelBreakdown, .inputVsOutput:
+            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
+        case .apiCalls:
+            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
+        case .eventsByModel:
+            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
+        case .tokensByProject:
+            "sum(usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval]) by (project)"
         }
     }
 }

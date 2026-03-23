@@ -138,9 +138,13 @@ final class DashboardViewModel {
         errorMessage = nil
 
         Task {
+            // Separate project panels (need special parsing) from regular panels
+            let projectPanels = panels.filter { $0.effectiveMetric == .tokensByProject }
+            let regularPanels = panels.filter { $0.effectiveMetric != .tokensByProject }
+
             // Build interpolated queries and group by unique query string
             var queryGroups: [String: [PanelConfig]] = [:]
-            for panel in panels {
+            for panel in regularPanels {
                 let template = panel.effectiveQuery ?? panel.effectiveMetric.defaultQuery
                 let interpolated = interpolateQuery(template, time: time)
                 queryGroups[interpolated, default: []].append(panel)
@@ -174,8 +178,13 @@ final class DashboardViewModel {
                 }
             }
 
-            // Backward compatibility: set global timeSeriesData from first loaded panel
-            if let firstLoaded = panels.first(where: { panelData[$0.id]?.timeSeriesData != nil }) {
+            // Fetch project panels separately (toki returns project in period field)
+            if !projectPanels.isEmpty {
+                await fetchProjectPanels(projectPanels, time: time)
+            }
+
+            // Backward compatibility: set global timeSeriesData from first loaded regular panel
+            if let firstLoaded = regularPanels.first(where: { panelData[$0.id]?.timeSeriesData != nil }) {
                 let data = panelData[firstLoaded.id]!.timeSeriesData!
                 self.timeSeriesData = data
                 self.enabledModels = Set(data.allModelNames)
@@ -227,6 +236,68 @@ final class DashboardViewModel {
         }
 
         return query
+    }
+
+    /// Fetch project-grouped data. toki returns "date|project" in period field.
+    private func fetchProjectPanels(_ panels: [PanelConfig], time: TimeConfig) async {
+        let template = PanelMetric.tokensByProject.defaultQuery
+        let query = interpolateQuery(template, time: time)
+
+        do {
+            let rawData = try await CLIProcessRunner.run(
+                executable: TokiPath.resolved,
+                arguments: ["report", "-z", "UTC", "--output-format", "json", "query", query]
+            )
+
+            struct ProjectReport: Codable {
+                let providers: [String: [ProjectPeriod]]?
+            }
+            struct ProjectPeriod: Codable {
+                let period: String
+                struct ModelUsage: Codable {
+                    let input_tokens: UInt64
+                    let output_tokens: UInt64
+                }
+                let usage_per_models: [ModelUsage]?
+            }
+
+            guard let report = try? JSONDecoder().decode(ProjectReport.self, from: rawData) else {
+                for panel in panels { panelData[panel.id] = .error("Parse error") }
+                return
+            }
+
+            // Build TimeSeriesData where "model" is actually the project name
+            var projectTotals: [String: UInt64] = [:]
+            for (_, periods) in report.providers ?? [:] {
+                for period in periods {
+                    let parts = period.period.split(separator: "|", maxSplits: 1)
+                    let project = parts.count > 1 ? String(parts[1]) : period.period
+                    let tokens = period.usage_per_models?.reduce(UInt64(0)) { $0 + $1.input_tokens + $1.output_tokens } ?? 0
+                    projectTotals[project, default: 0] += tokens
+                }
+            }
+
+            // Create synthetic TimeSeriesData with projects as "models"
+            let summaries = projectTotals.map { project, tokens in
+                TokiModelSummary(
+                    model: project,
+                    inputTokens: tokens, outputTokens: 0, totalTokens: tokens,
+                    events: 0, costUsd: nil,
+                    cacheCreationInputTokens: nil, cacheReadInputTokens: nil,
+                    cachedInputTokens: nil, reasoningOutputTokens: nil
+                )
+            }
+            let point = TimeSeriesPoint(date: Date(), models: summaries)
+            let data = TimeSeriesData(points: [point], granularity: .daily)
+
+            for panel in panels {
+                panelData[panel.id] = .loaded(data)
+            }
+        } catch {
+            for panel in panels {
+                panelData[panel.id] = .error(error.localizedDescription)
+            }
+        }
     }
 
     /// Extract last folder name from toki project paths.

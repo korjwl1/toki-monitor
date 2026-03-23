@@ -150,15 +150,19 @@ struct CustomDashboardView: View {
         }
     }
 
-    /// Dispatch panel content by type. PanelContainerView handles loading/error/empty states.
+    /// Dispatch panel content by type. PanelContainerView handles loading/error states.
+    /// Chart panels show "데이터 없음" for empty data. Stat/gauge show "-" or "0" naturally.
     @ViewBuilder
     private func panelContent(for panel: PanelConfig) -> some View {
         let data = viewModel.dataState(for: panel.id).timeSeriesData
+        let isEmpty = data == nil || data!.allModelNames.isEmpty
         switch panel.panelType {
         case .stat:
             statContent(for: panel.effectiveMetric, data: data)
         case .timeSeries:
-            if viewModel.filteredModelNames.isEmpty {
+            if isEmpty {
+                emptyDataView
+            } else if viewModel.filteredModelNames.isEmpty {
                 noModelSelected
             } else {
                 TimeSeriesChartView(
@@ -168,15 +172,17 @@ struct CustomDashboardView: View {
                 )
             }
         case .barChart:
-            if viewModel.filteredModelNames.isEmpty {
+            if isEmpty {
+                emptyDataView
+            } else if viewModel.filteredModelNames.isEmpty {
                 noModelSelected
             } else {
                 barChartContent(for: panel.effectiveMetric, data: data)
             }
         case .pieChart:
-            pieChartContent(for: panel.effectiveMetric, data: data)
+            if isEmpty { emptyDataView } else { pieChartContent(for: panel.effectiveMetric, data: data) }
         case .table:
-            tableContent(data: data)
+            if isEmpty { emptyDataView } else { tableContent(data: data) }
         case .gauge:
             gaugeContent(for: panel.effectiveMetric, data: data)
         case .rowPanel:
@@ -306,6 +312,15 @@ struct CustomDashboardView: View {
         } else {
             return .dateTime.month(.defaultDigits).day(.defaultDigits)
         }
+    }
+
+    private var emptyDataView: some View {
+        ContentUnavailableView(
+            L.tr("데이터 없음", "No Data"),
+            systemImage: "chart.line.downtrend.xyaxis",
+            description: Text(L.tr("해당 기간에 데이터가 없습니다", "No data for this period"))
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var noModelSelected: some View {

@@ -95,13 +95,6 @@ struct PanelContainerView<Content: View>: View {
                 case .idle, .loading:
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .loaded(let data) where data.points.isEmpty || data.allModelNames.isEmpty:
-                    ContentUnavailableView(
-                        L.tr("데이터 없음", "No Data"),
-                        systemImage: "chart.line.downtrend.xyaxis",
-                        description: Text(L.tr("해당 기간에 데이터가 없습니다", "No data for this period"))
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .loaded:
                     content
                 case .error(let message):
