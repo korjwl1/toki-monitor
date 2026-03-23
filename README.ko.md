@@ -27,13 +27,13 @@
 
 ---
 
-> [**toki**](https://github.com/korjwl1/toki) 기반 (**to**ken **i**nspector, *tokki* = 토끼) — 빠르고 가벼운 Rust 데몬으로 AI 토큰 사용량을 추적합니다.
-
 <p align="center">
   <img src="docs/images/rabbit-run.gif" alt="달리는 토끼" height="36" />
   &nbsp;&nbsp;&nbsp;
   <img src="docs/images/rabbit-sleep.gif" alt="자는 토끼" height="36" />
 </p>
+
+> [**toki**](https://github.com/korjwl1/toki) 기반 (**to**ken **i**nspector, *tokki* = 토끼) — 빠르고 가벼운 Rust 데몬으로 AI 토큰 사용량을 추적합니다.
 
 ---
 
