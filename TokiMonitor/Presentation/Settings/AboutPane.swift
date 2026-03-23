@@ -6,6 +6,10 @@ struct AboutPane: View {
     private let repoURL = "https://github.com/korjwl1/toki-monitor"
     private let tokiRepoURL = "https://github.com/korjwl1/toki"
 
+    @State private var tokiVersion: String?
+    @State private var monitorUpdate: String?
+    @State private var tokiUpdate: String?
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -29,10 +33,34 @@ struct AboutPane: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Version
-            Text("v\(version) (\(build))")
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.tertiary)
+            // Versions
+            VStack(spacing: 4) {
+                Text("Toki Monitor v\(version) (\(build))")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+
+                if let tokiVer = tokiVersion {
+                    Text("toki CLI v\(tokiVer)")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            // Update notices
+            VStack(spacing: 4) {
+                if let monitorVer = monitorUpdate {
+                    updateBadge(
+                        L.tr("Toki Monitor \(monitorVer) 업데이트 가능", "Toki Monitor \(monitorVer) available"),
+                        command: "brew update && brew upgrade --cask toki-monitor"
+                    )
+                }
+                if let tokiVer = tokiUpdate {
+                    updateBadge(
+                        L.tr("toki CLI \(tokiVer) 업데이트 가능", "toki CLI \(tokiVer) available"),
+                        command: "brew update && brew upgrade toki"
+                    )
+                }
+            }
 
             // Links
             VStack(spacing: 8) {
@@ -62,12 +90,88 @@ struct AboutPane: View {
             }
 
             // License
-            Text("MIT License")
+            Text("FSL-1.1-Apache-2.0")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task { await checkVersions() }
+    }
+
+    // MARK: - Update Badge
+
+    private func updateBadge(_ text: String, command: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.up.circle.fill")
+                .foregroundStyle(.blue)
+                .font(.system(size: 12))
+            Text(text)
+                .font(.system(size: 11))
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(command, forType: .string)
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(L.tr("명령어 복사", "Copy command"))
+        }
+    }
+
+    // MARK: - Version Check
+
+    private func checkVersions() async {
+        // Get installed toki version
+        if let data = try? await CLIProcessRunner.run(
+            executable: TokiPath.resolved,
+            arguments: ["--version"]
+        ) {
+            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            // "toki 1.1.4" → "1.1.4"
+            tokiVersion = output.replacingOccurrences(of: "toki ", with: "")
+        }
+
+        // Check brew for latest versions
+        await checkBrewUpdate(formula: "korjwl1/tap/toki-monitor", cask: true) { latest in
+            if latest != version { monitorUpdate = latest }
+        }
+        await checkBrewUpdate(formula: "korjwl1/tap/toki", cask: false) { latest in
+            if let installed = tokiVersion, latest != installed { tokiUpdate = latest }
+        }
+    }
+
+    private func checkBrewUpdate(formula: String, cask: Bool, onResult: @MainActor (String) -> Void) async {
+        let args = cask
+            ? ["info", "--cask", formula, "--json=v2"]
+            : ["info", "--formula", formula, "--json=v2"]
+        do {
+            let data = try await CLIProcessRunner.run(
+                executable: "/opt/homebrew/bin/brew",
+                arguments: args
+            )
+            // Parse version from brew JSON
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if cask {
+                    if let casks = json["casks"] as? [[String: Any]],
+                       let first = casks.first,
+                       let ver = first["version"] as? String {
+                        await onResult(ver)
+                    }
+                } else {
+                    if let formulae = json["formulae"] as? [[String: Any]],
+                       let first = formulae.first,
+                       let versions = first["versions"] as? [String: Any],
+                       let stable = versions["stable"] as? String {
+                        await onResult(stable)
+                    }
+                }
+            }
+        } catch {
+            // brew not available or formula not found — skip
+        }
     }
 }

@@ -1,0 +1,70 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+      placeholder: Describe the bug clearly and concisely.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Open Toki Monitor
+        2. Click ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: input
+    id: monitor-version
+    attributes:
+      label: Toki Monitor version
+      description: Settings → About
+      placeholder: "0.1.0-alpha4"
+    validations:
+      required: true
+  - type: input
+    id: toki-version
+    attributes:
+      label: toki CLI version
+      description: Output of `toki --version`
+      placeholder: "1.1.4"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: macOS version
+      options:
+        - macOS 15 Sequoia (Apple Silicon)
+        - macOS 15 Sequoia (Intel)
+        - macOS 14 Sonoma (Apple Silicon)
+        - macOS 14 Sonoma (Intel)
+        - macOS 26 Tahoe (Apple Silicon)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the problem.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Additional context
+      description: Any relevant logs, error messages, or context.
+      render: shell
