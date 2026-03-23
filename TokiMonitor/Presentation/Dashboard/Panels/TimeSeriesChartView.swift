@@ -23,7 +23,7 @@ struct TimeSeriesChartView: View {
                     )
                     .foregroundStyle(by: .value(L.dash.axisModel, entry.model))
                     .lineStyle(StrokeStyle(lineWidth: 1.5))
-                    .interpolationMethod(.linear)
+                    .interpolationMethod(.monotone)
 
                     PointMark(
                         x: .value(L.dash.axisTime, point.date),

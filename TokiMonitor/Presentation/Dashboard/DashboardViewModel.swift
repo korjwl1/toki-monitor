@@ -205,24 +205,70 @@ final class DashboardViewModel {
     }
 
     /// Extract last folder name from toki project paths.
-    /// Claude Code: "-Users-korjwl1-Documents-toki-monitor" → "toki-monitor"
-    /// Codex: "/Users/korjwl1/Documents/toki_monitor" → "toki_monitor"
+    /// Claude Code encodes paths with - instead of /. Recover by splitting on -
+    /// then greedily rebuilding the path, trying / then - then _ as joiners.
     private static func cleanProjectName(_ raw: String) -> String {
-        // Codex style: normal path with /
         if raw.contains("/") {
             return URL(fileURLWithPath: raw).lastPathComponent
         }
-        // Claude Code style: dashes replacing /
-        // Pattern: -Users-{user}-Documents-{project} or -Users-{user}-{project}
-        if let range = raw.range(of: #"-Documents-"#) {
-            return String(raw[range.upperBound...])
+
+        let segments = raw.split(separator: "-", omittingEmptySubsequences: true).map(String.init)
+        guard segments.count > 1 else { return raw }
+
+        let fm = FileManager.default
+        var basePath = ""
+        var projectStartIdx = 0
+
+        // Build base path by consuming segments as directory levels
+        for (i, segment) in segments.enumerated() {
+            let candidate = basePath.isEmpty ? "/" + segment : basePath + "/" + segment
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: candidate, isDirectory: &isDir), isDir.boolValue {
+                basePath = candidate
+                projectStartIdx = i + 1
+            } else {
+                break
+            }
         }
-        // Fallback: strip -Users-{user}- prefix
-        let parts = raw.split(separator: "-", omittingEmptySubsequences: true)
-        if parts.count > 2, parts[0] == "Users" {
-            return parts.dropFirst(2).joined(separator: "-")
+
+        // Remaining segments form the project name — try to find it on disk
+        guard projectStartIdx < segments.count else {
+            return URL(fileURLWithPath: basePath).lastPathComponent
         }
-        return raw
+
+        let remaining = Array(segments[projectStartIdx...])
+
+        // Greedily accumulate remaining segments, trying -, _ joiners to match a real folder
+        var projectName = remaining[0]
+        for seg in remaining.dropFirst() {
+            // Try extending the project folder name with different joiners
+            let candidates = [
+                (basePath + "/" + projectName + "-" + seg, projectName + "-" + seg),
+                (basePath + "/" + projectName + "_" + seg, projectName + "_" + seg),
+            ]
+            var found = false
+            for (path, name) in candidates {
+                var isDir: ObjCBool = false
+                if fm.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
+                    projectName = name
+                    found = true
+                    break
+                }
+            }
+            if !found {
+                // This segment is a subdirectory — use what we have as base, reset project
+                let subPath = basePath + "/" + projectName
+                var isDir: ObjCBool = false
+                if fm.fileExists(atPath: subPath, isDirectory: &isDir), isDir.boolValue {
+                    basePath = subPath
+                    projectName = seg
+                } else {
+                    projectName += "-" + seg
+                }
+            }
+        }
+
+        return projectName
     }
 
     // MARK: - Time Range

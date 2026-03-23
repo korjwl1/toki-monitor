@@ -59,7 +59,9 @@ final class DashboardConfigStore {
 
     func addDashboard(_ config: DashboardConfig) {
         var list = loadDashboardList()
-        list.append(config)
+        var newConfig = config
+        newConfig.title = uniqueTitle(config.title, in: list)
+        list.append(newConfig)
         saveDashboardList(list)
     }
 
@@ -74,7 +76,7 @@ final class DashboardConfigStore {
         guard var original = list.first(where: { $0.uid == uid }) else { return nil }
         original.id = UUID()
         original.uid = DashboardConfig.generateUID()
-        original.title = original.title + " (Copy)"
+        original.title = uniqueTitle(original.title, in: list)
         original.version = 1
         addDashboard(original)
         return original
@@ -82,16 +84,27 @@ final class DashboardConfigStore {
 
     func updateDashboardInList(_ config: DashboardConfig) {
         var list = loadDashboardList()
-        if let idx = list.firstIndex(where: { $0.uid == config.uid }) {
+        // Match by title (unique key) or uid
+        if let idx = list.firstIndex(where: { $0.title == config.title || $0.uid == config.uid }) {
             list[idx] = config
-        } else {
-            list.append(config)
         }
+        // Don't append if not found — prevents duplication
         saveDashboardList(list)
     }
 
     func dashboard(for uid: String) -> DashboardConfig? {
         loadDashboardList().first { $0.uid == uid }
+    }
+
+    /// Generate unique title by appending number if needed
+    private func uniqueTitle(_ base: String, in list: [DashboardConfig]) -> String {
+        let existingTitles = Set(list.map(\.title))
+        if !existingTitles.contains(base) { return base }
+        for i in 1... {
+            let candidate = "\(base) \(i)"
+            if !existingTitles.contains(candidate) { return candidate }
+        }
+        return base
     }
 
     // MARK: - JSON File Import/Export
