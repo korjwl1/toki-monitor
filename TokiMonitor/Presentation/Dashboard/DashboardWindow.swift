@@ -21,8 +21,14 @@ final class DashboardWindowController {
         let dashboardView = DashboardView(reportClient: reportClient)
         let hostingController = NSHostingController(rootView: dashboardView)
 
+        // Size to ~55% of screen area (√0.55 ≈ 74% each dimension)
+        let screen = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let scale: CGFloat = 0.84
+        let initialWidth = max(800, screen.width * scale)
+        let initialHeight = max(600, screen.height * scale)
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
+            contentRect: NSRect(x: 0, y: 0, width: initialWidth, height: initialHeight),
             styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -31,9 +37,13 @@ final class DashboardWindowController {
         window.titleVisibility = .hidden
         window.title = "TokiMonitor"
         window.contentViewController = hostingController
-        window.center()
-        window.setFrameAutosaveName("TokiDashboard")
         window.minSize = NSSize(width: 800, height: 600)
+        window.setFrameAutosaveName("TokiDashboard")
+        // setFrameAutosaveName restores saved frame. If no saved frame, apply computed size.
+        if UserDefaults.standard.string(forKey: "NSWindow Frame TokiDashboard") == nil {
+            window.setContentSize(NSSize(width: initialWidth, height: initialHeight))
+        }
+        window.center()
         window.isReleasedWhenClosed = false
         window.delegate = windowDelegate
         window.makeKeyAndOrderFront(nil)
