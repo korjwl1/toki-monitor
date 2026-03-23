@@ -144,6 +144,10 @@ Not logged in? The widget shows a login prompt instead of hiding — Claude link
 - Full Korean / English localization
 - Liquid Glass on macOS Tahoe
 
+<p align="center">
+  <img src="docs/images/settings.png" alt="Settings" width="480" />
+</p>
+
 ---
 
 ## How it works (and why it's fast)

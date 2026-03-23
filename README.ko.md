@@ -139,6 +139,10 @@ open /Applications/TokiMonitor.app
 - 한국어 / 영어 완전 지역화
 - macOS Tahoe에서 Liquid Glass 지원
 
+<p align="center">
+  <img src="docs/images/settings.png" alt="설정" width="480" />
+</p>
+
 ---
 
 ## 작동 원리
