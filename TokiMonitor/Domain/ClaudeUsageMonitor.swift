@@ -26,6 +26,30 @@ final class ClaudeUsageMonitor {
 
     func startPolling() {
         stopPolling()
+        if oauthManager.authState == .loggedIn {
+            beginPollingLoop()
+        } else {
+            observeLogin()
+        }
+    }
+
+    private func observeLogin() {
+        withObservationTracking {
+            _ = oauthManager.authState
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if self.oauthManager.authState == .loggedIn {
+                    self.beginPollingLoop()
+                } else {
+                    self.observeLogin()
+                }
+            }
+        }
+    }
+
+    private func beginPollingLoop() {
+        stopPolling()
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
@@ -44,11 +68,6 @@ final class ClaudeUsageMonitor {
     // MARK: - Polling
 
     private func pollOnce() async {
-        guard oauthManager.authState == .loggedIn else {
-            currentUsage = nil
-            return
-        }
-
         do {
             let token = try await oauthManager.getValidAccessToken()
             let usage = try await ClaudeUsageClient.fetchUsage(accessToken: token)
@@ -82,17 +101,19 @@ final class ClaudeUsageMonitor {
     // MARK: - Adaptive Interval
 
     private func computeInterval() -> TimeInterval {
-        // Usage API is severely rate-limited (~5 requests per access token).
-        // Minimum 120s between polls to stay under limit.
+        // No data yet (first fetch failed or pending) — retry quickly
+        if currentUsage == nil {
+            return 15
+        }
         // Near limit (>75%) → 120s (minimum safe interval)
-        // Active → 180s
-        // Default → 300s
         if let usage = currentUsage, usage.maxUtilization > 75 {
             return 120
         }
+        // Active → 180s
         if aggregator.tokensPerMinute > 0 {
             return 180
         }
+        // Default → 300s
         return 300
     }
 
