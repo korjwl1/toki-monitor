@@ -1,159 +1,205 @@
-# Toki Monitor
+<p align="center">
+  <img src="TokiMonitor/Resources/AppIcon_1024.png" alt="Toki Monitor logo" width="160" />
+</p>
 
-AI 토큰 사용량을 실시간으로 모니터링하는 macOS 메뉴바 앱.
+<h1 align="center">Toki Monitor</h1>
 
-[toki](https://github.com/user/toki) 데몬과 연동하여 Claude Code, Gemini CLI 등 AI 코딩 도구의 토큰 소모율과 비용을 한눈에 보여줍니다.
+<p align="center">
+  <b>macOS menu bar AI token monitor powered by toki's Rust TSDB engine</b><br>
+  No proxy. No cloud. Your data stays local.
+</p>
+
+<p align="center">
+  <sub>The visual companion to <a href="https://github.com/korjwl1/toki"><b>toki</b></a> — the Rust-based token usage tracker.</sub>
+</p>
+
+<p align="center">
+  <a href="docs/strengths.ko.md">🇰🇷 한국어</a>
+</p>
+
+---
+
+> **Built on a real TSDB, not a file scanner.** While other menu bar apps poll JSON files every few seconds, Toki Monitor queries toki's fjall time-series database — instant responses at any time range, zero CPU when idle.
+
+---
+
+## Who is this for?
+
+- **Want to see your AI spend at a glance?** A rabbit runs in your menu bar — faster when you're burning tokens. Idle for 3 minutes? It falls asleep. Your spend rate is always visible without opening anything.
+
+- **Need more than "total tokens used"?** Open the Grafana-style dashboard — customizable panels, PromQL queries, time-series charts, annotations. Drill down by model, time range, or provider.
+
+- **Using Claude Code AND Codex?** Toki Monitor shows both side-by-side with independent usage bars, rate limit countdowns, and per-provider cost tracking. Switch between aggregated and per-provider views in one click.
+
+- **Worried about runaway costs?** Set a $/min threshold — the icon turns red when you're spending too fast. Or compare against your 24-hour average and get alerted on unusual spikes.
+
+---
+
+## Why toki's architecture wins
+
+Unlike direct file-polling tools (TokenBar, Tokscale, SessionWatcher), toki uses a **daemon + TSDB** architecture:
+
+| | toki (ours) | Direct polling (competitors) |
+|---|---|---|
+| **Data collection** | Rust daemon, event-driven — 0% CPU idle | Periodic file scanning — scales with data |
+| **Storage** | fjall TSDB (~2.2 MB binary) — indexed | None — lost when app closes |
+| **Query** | PromQL instant response (~7 ms) | Full rescan every time |
+| **Memory** | ~5 MB idle (Rust, no GC) | 30-50 MB+ (Node.js) |
+| **Multi-client** | CLI + menu bar share same daemon | Each tool scans independently |
+
+No proxy required. No TLS interception. No tool reconfiguration. toki reads session files directly — your workflow never changes.
+
+---
 
 ## Features
 
-### Menu Bar Animation
+### Always-visible feedback
 
-토큰 소모 속도에 따라 메뉴바 아이콘이 반응합니다. 3종 스타일 지원:
+| Mode | Description |
+|------|-------------|
+| **Character** | RunCat-style rabbit — speed proportional to token rate. Sleeps (zZ) when idle. |
+| **Numeric** | `1.2K/m` text display |
+| **Sparkline** | Mini graph of recent token history |
 
-| Style | Description |
-|-------|-------------|
-| **Sparkline** | 미니 그래프로 최근 토큰 추이 표시 (기본값) |
-| **Numeric** | `1.2K/m` 형태의 수치 표시 |
-| **Character** | RunCat 스타일 프레임 애니메이션 |
+Per-provider or aggregated. Right-click for quick Settings/Quit.
 
-### Provider Summary Popover
+### Grafana-style dashboard
 
-메뉴바 클릭 시 팝오버에서:
-- 프로바이더별(Claude, Gemini, OpenAI) 토큰 사용량 + 추정 비용
-- 2개 이상 프로바이더 사용 시 전체 합산 행
-- 시간 범위 전환 (30분 / 1시간 / 오늘)
+- Drag-and-drop panel layout (time series, bar chart, stat, gauge, table)
+- PromQL-powered queries via toki CLI
+- Variable system, time range picker, annotations
+- Dashboard versioning
+- Shows in Dock when open, hides when closed
 
-### Dashboard
+### Usage monitoring
 
-팝오버에서 대시보드 버튼 클릭 시:
-- 기간별(일간/주간/월간) 리포트
-- 모델별 토큰 분포 Swift Charts
-- 모델 드릴다운 (세션별/프로젝트별)
+| Provider | Method | Data |
+|----------|--------|------|
+| **Claude** | OAuth API (`/api/oauth/usage`) | 5-hour & 7-day windows, reset countdown |
+| **Codex** | OAuth API (`/backend-api/wham/usage`) | Weekly & 5-hour windows, reset countdown |
 
-### Connection Management
+No extra login — reads existing CLI credentials. Color-coded bars (green → yellow → orange → red).
 
-- toki 데몬 미실행 시 "연결 끊김" 상태 표시
-- 원클릭 데몬 시작
-- 자동 재연결 (최대 3회, 5초 간격)
+### Anomaly detection
 
-## Requirements
+- **Velocity alert** — icon color changes when $/min exceeds threshold
+- **Historical baseline** — compares against 24-hour average via PromQL
+- Alert method: icon color, system notification, or both
+- Custom alert colors, configurable thresholds
 
-- **macOS 14+ (Sonoma)**
-- **Xcode 15.2+** (빌드 시)
-- **toki** CLI 설치 필요
+### Settings
+
+- Display mode (aggregated / per-provider) with per-provider style overrides
+- Widget order customization (drag-and-drop + show/hide)
+- Sleep delay (30s / 1m / 1m30s / 2m)
+- Claude usage alerts (75%, 90%)
+- Full Korean/English localization
+- Liquid Glass support (macOS Tahoe)
+
+---
 
 ## Install
 
-### Homebrew (예정)
+### Homebrew
 
 ```bash
-brew tap <user>/toki-monitor
+brew tap korjwl1/tap
 brew install --cask toki-monitor
 ```
 
-### Build from Source
+This automatically installs [toki](https://github.com/korjwl1/toki) as a dependency.
+
+### Build from source
 
 ```bash
-# Clone
-git clone https://github.com/<user>/toki-monitor.git
-cd toki-monitor
-
-# xcodegen 필요 (프로젝트 생성)
-brew install xcodegen
-xcodegen generate
-
-# Xcode에서 빌드 & 실행
-open TokiMonitor.xcodeproj
-# Cmd+R
+git clone https://github.com/korjwl1/toki_dashboard.git
+cd toki_dashboard
+xcodebuild build -scheme TokiMonitor -configuration Release
 ```
 
-또는 CLI에서:
+---
+
+## Quick Start
 
 ```bash
-xcodebuild build -project TokiMonitor.xcodeproj -scheme TokiMonitor -destination 'platform=macOS'
-```
-
-## Usage
-
-### 1. toki 데몬 시작
-
-```bash
+# 1. Start toki daemon
 toki daemon start
+
+# 2. Launch Toki Monitor
+open /Applications/TokiMonitor.app
+# Or launch from menu bar after installation
+
+# 3. Use your AI tools as usual
+# Claude Code, Codex CLI — token usage appears in real time
 ```
 
-### 2. 앱 실행
+The menu bar icon reacts immediately. Click for provider summary, right-click for settings.
 
-Xcode에서 `Cmd+R` 또는 빌드된 `.app`을 실행합니다.
-
-### 3. AI 도구 사용
-
-Claude Code, Gemini CLI 등을 사용하면 메뉴바에서 실시간으로 토큰 소모가 반영됩니다.
+---
 
 ## Architecture
 
 ```
-TokiMonitor/
-├── Data/               # toki UDS 통신
-│   ├── TokiConnection  # NWConnection UDS 클라이언트
-│   ├── TokiEventStream # NDJSON 실시간 이벤트 파서
-│   └── TokiReportClient # Report 쿼리 클라이언트
-├── Domain/             # 비즈니스 로직
-│   ├── ConnectionManager    # 연결 상태 머신
-│   ├── TokenAggregator      # Rate 계산, 프로바이더 집계
-│   ├── ProviderRegistry     # 모델명 → 프로바이더 매핑
-│   └── AnimationStateMapper # 토큰율 → 애니메이션 상태
-└── Presentation/       # SwiftUI + AppKit 뷰
-    ├── MenuBar/        # NSStatusItem, 3종 렌더러
-    ├── Popover/        # 프로바이더 요약, 연결 상태
-    ├── Dashboard/      # 리포트 윈도우, Swift Charts
-    └── Settings/       # 스타일, 시간 범위, Login at Boot
+toki (Rust daemon)              Toki Monitor (Swift/SwiftUI)
+├─ fjall TSDB                   ├─ Data        // UDS trace, CLI report, OAuth
+├─ File watchers (kqueue)       ├─ Domain      // Aggregation, alerts, settings
+├─ PromQL engine                └─ Presentation// Menu bar, dashboard, settings
+└─ UDS server
+
+Data flow:
+  toki daemon → toki trace → UDS → TokiEventStream → TokenAggregator → Menu Bar
+  toki report (PromQL) → TokiReportClient → DashboardViewModel → Charts
+  Claude OAuth → ClaudeUsageMonitor → Usage Widget
+  Codex OAuth → CodexUsageMonitor → Usage Widget
 ```
 
-**의존성 방향**: Presentation → Domain → Data
+Toki Monitor is the **presentation layer** for toki. Heavy lifting — parsing, indexing, storage, cost calculation — happens in the Rust daemon. The Swift app focuses on display and interaction.
 
-toki 데몬과의 통신은 Unix Domain Socket(UDS)으로 이루어지며, 실시간 이벤트는 NDJSON 스트리밍, 리포트 쿼리는 JSON 요청/응답 방식입니다.
+---
 
-## toki Integration
+## Supported Providers
 
-Toki Monitor는 [toki](https://github.com/user/toki) 데몬의 프레젠테이션 레이어입니다.
+| Provider | CLI Tool | Usage API | Status |
+|----------|---------|-----------|--------|
+| Anthropic | [Claude Code](https://claude.ai/code) | OAuth (`/api/oauth/usage`) | ✅ Supported |
+| OpenAI | [Codex CLI](https://github.com/openai/codex) | OAuth (`/backend-api/wham/usage`) | ✅ Supported |
+| Google | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | — | ⏳ Planned |
 
-- **실시간 이벤트**: `~/.config/toki/daemon.sock`에 연결, 200ms 무응답 → trace 클라이언트로 분류
-- **리포트 쿼리**: 동일 소켓에 JSON 요청 전송 → report 클라이언트로 분류
-- **가격 데이터**: toki가 LiteLLM에서 가져온 가격 데이터를 사용
+Adding a new provider requires only a toki parser — Toki Monitor picks it up automatically.
 
-## Settings
-
-| 설정 | 옵션 | 기본값 |
-|------|------|--------|
-| 메뉴바 스타일 | 캐릭터 / 수치 / 그래프 | 그래프 |
-| 시간 범위 | 30분 / 1시간 / 오늘 | 1시간 |
-| 로그인 시 시작 | On / Off | Off |
+---
 
 ## Testing
 
 ```bash
-xcodebuild test -project TokiMonitor.xcodeproj -scheme TokiMonitor -destination 'platform=macOS'
+xcodebuild test -scheme TokiMonitor -destination 'platform=macOS'
 ```
 
-34개 테스트 (7 suites):
-- NDJSON 이벤트 파싱 (Claude + Codex 필드)
-- Report 응답 디코딩 (per-provider schema 태깅)
-- ConnectionState 상태 전이
-- AnimationStateMapper 임계값
-- TokenFormatter 포맷팅
-- ProviderRegistry 모델/schema 매핑
-- ProviderSummary 집계
+36 tests across 8 suites: NDJSON parsing, report decoding, state transitions, animation mapping, token formatting, provider registry, data aggregation.
 
-## Supported Providers
+---
 
-| Provider | toki Schema | Model Prefix | Status |
-|----------|------------|-------------|--------|
-| Anthropic (Claude) | `claude_code` | `claude-` | ✅ Supported |
-| OpenAI (Codex CLI) | `codex` | `gpt-`, `o1-`, `o3-` | ✅ Supported |
-| Google (Gemini) | `gemini_cli` | `gemini-` | ⏳ Ready (toki parser 필요) |
+## Competitive Landscape
 
-새 프로바이더 추가: toki에 `LogParser` 구현 → Toki Monitor UI 변경 불필요.
+9+ macOS menu bar apps exist in this space (March 2026). Toki Monitor's unique advantages that **no competitor replicates**:
+
+1. **TSDB-backed history** — query any time range instantly
+2. **PromQL query language** — entirely unique among menu bar apps
+3. **Grafana-style dashboard** — the only menu bar app with customizable panels
+4. **Animated status icon** — speed proportional to token rate
+5. **Open source + free** — feature depth comparable to $2-5 paid apps
+
+See [competitive analysis](specs/strategy/competitive-analysis-2026-03.md) for details.
+
+---
+
+## Related
+
+- **[toki](https://github.com/korjwl1/toki)** — the Rust TSDB engine that powers Toki Monitor
+- **[docs/strengths.md](docs/strengths.md)** — detailed positioning and architecture comparison
+
+---
 
 ## License
 
-MIT
+[MIT](LICENSE)
