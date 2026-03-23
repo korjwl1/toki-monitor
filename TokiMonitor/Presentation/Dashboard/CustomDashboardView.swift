@@ -158,6 +158,8 @@ struct CustomDashboardView: View {
             timeSeriesContent(for: panel.effectiveMetric)
         case .barChart:
             barChartContent(for: panel.effectiveMetric)
+        case .pieChart:
+            pieChartContent(for: panel.effectiveMetric)
         case .table:
             tableContent(for: panel.effectiveMetric)
         case .gauge:
@@ -255,6 +257,60 @@ struct CustomDashboardView: View {
                     Text(TokenFormatter.formatCost(row.cost))
                         .monospacedDigit()
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func pieChartContent(for metric: PanelMetric) -> some View {
+        if metric == .tokensByProject {
+            projectPieChart
+        } else if let data = viewModel.timeSeriesData {
+            let rows = PanelDataExtractor.tableRows(from: data)
+            if rows.isEmpty {
+                Text("-")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Chart(rows, id: \.model) { row in
+                    SectorMark(
+                        angle: .value(L.dash.axisTokens, row.tokens),
+                        innerRadius: .ratio(0.5),
+                        angularInset: 1
+                    )
+                    .foregroundStyle(by: .value(L.dash.axisModel, row.model))
+                    .cornerRadius(3)
+                }
+                .chartForegroundStyleScale(
+                    domain: rows.map(\.model),
+                    range: rows.map { viewModel.colorForModel($0.model) }
+                )
+                .chartLegend(position: .trailing, spacing: 8)
+                .frame(minHeight: 150)
+            }
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity, minHeight: 150)
+        }
+    }
+
+    private var projectPieChart: some View {
+        Group {
+            if viewModel.projectTokens.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 150)
+            } else {
+                Chart(viewModel.projectTokens, id: \.project) { item in
+                    SectorMark(
+                        angle: .value(L.dash.axisTokens, item.tokens),
+                        innerRadius: .ratio(0.5),
+                        angularInset: 1
+                    )
+                    .foregroundStyle(by: .value(L.tr("프로젝트", "Project"), item.project))
+                    .cornerRadius(3)
+                }
+                .chartLegend(position: .trailing, spacing: 8)
+                .frame(minHeight: 150)
             }
         }
     }

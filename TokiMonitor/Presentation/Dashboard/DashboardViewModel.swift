@@ -55,6 +55,7 @@ final class DashboardViewModel {
     var isLoading = false
     var errorMessage: String?
     var enabledModels: Set<String> = []
+    var projectTokens: [(project: String, tokens: UInt64)] = []
 
     // MARK: - Annotations
     var annotations: [DashboardAnnotation] = []
@@ -99,10 +100,19 @@ final class DashboardViewModel {
 
         // Populate provider options from supported providers only
         guard let index = dashboardConfig.templating.list.firstIndex(where: { $0.name == "provider" }) else { return }
-        let providerOptions = ProviderRegistry.configurableProviders.map { provider in
-            VariableOption(text: provider.name, value: provider.id)
+        let providerOptions = ProviderRegistry.configurableProviders.compactMap { provider -> VariableOption? in
+            guard let tokiId = provider.tokiProviderId else { return nil }
+            return VariableOption(text: provider.name, value: tokiId)
         }
         dashboardConfig.templating.list[index].options = providerOptions
+
+        // Migrate stale current selection values (e.g. "anthropic" → "claude_code")
+        let validValues = Set(providerOptions.map(\.value) + ["$__all", ""])
+        let currentValues = dashboardConfig.templating.list[index].current.value
+        let hasStale = currentValues.contains { !validValues.contains($0) }
+        if hasStale {
+            dashboardConfig.templating.list[index].current = VariableSelection(text: ["All"], value: ["$__all"])
+        }
         saveDashboard()
     }
 
@@ -118,9 +128,17 @@ final class DashboardViewModel {
 
         let time = dashboardConfig.time
 
+        // Get selected provider filter (nil = all)
+        let selectedProvider: String? = {
+            let raw = variableValue(named: "provider")
+            let filtered = raw.filter { !$0.isEmpty && $0 != "All" && $0 != "all" && $0 != "$__all" }
+            let result: String? = filtered.first(where: { ["claude_code", "codex"].contains($0) })
+            return result
+        }()
+
         Task {
             do {
-                let data = try await reportClient.queryTimeSeriesFromConfig(time: time)
+                let data = try await reportClient.queryTimeSeriesFromConfig(time: time, provider: selectedProvider)
                 self.isLoading = false
                 self.timeSeriesData = data
                 self.dataVersion += 1
@@ -134,6 +152,77 @@ final class DashboardViewModel {
                 self.errorMessage = error.localizedDescription
             }
         }
+
+        // Fetch project breakdown
+        // toki returns "date|project" in period field, model is "(total)"
+        Task {
+            let sinceFmt = DateFormatter()
+            sinceFmt.dateFormat = "yyyyMMddHHmmss"
+            sinceFmt.timeZone = TimeZone(identifier: "UTC")
+            let since = sinceFmt.string(from: time.fromDate)
+            var filters = "since=\"\(since)\""
+            if let selectedProvider {
+                filters += ", provider=\"\(selectedProvider)\""
+            }
+            let query = "sum(usage{\(filters)}[30d]) by (project)"
+
+            let data = try? await CLIProcessRunner.run(
+                executable: TokiPath.resolved,
+                arguments: ["report", "-z", "UTC", "--output-format", "json", "query", query]
+            )
+            guard let data else { return }
+
+            struct ProjectReport: Codable {
+                let providers: [String: [ProjectPeriod]]?
+            }
+            struct ProjectPeriod: Codable {
+                let period: String
+                // swiftlint:disable:next nesting
+                struct ModelUsage: Codable {
+                    let input_tokens: UInt64
+                    let output_tokens: UInt64
+                }
+                let usage_per_models: [ModelUsage]?
+            }
+
+            guard let report = try? JSONDecoder().decode(ProjectReport.self, from: data) else { return }
+
+            var totals: [String: UInt64] = [:]
+            for (_, periods) in report.providers ?? [:] {
+                for period in periods {
+                    // period format: "2026-03-22|-Users-korjwl1-Documents-toki-monitor"
+                    let parts = period.period.split(separator: "|", maxSplits: 1)
+                    let project = parts.count > 1 ? String(parts[1]) : period.period
+                    let tokens = period.usage_per_models?.reduce(UInt64(0)) { $0 + $1.input_tokens + $1.output_tokens } ?? 0
+                    totals[project, default: 0] += tokens
+                }
+            }
+
+            self.projectTokens = totals
+                .map { (project: Self.cleanProjectName($0.key), tokens: $0.value) }
+                .sorted { $0.tokens > $1.tokens }
+        }
+    }
+
+    /// Extract last folder name from toki project paths.
+    /// Claude Code: "-Users-korjwl1-Documents-toki-monitor" → "toki-monitor"
+    /// Codex: "/Users/korjwl1/Documents/toki_monitor" → "toki_monitor"
+    private static func cleanProjectName(_ raw: String) -> String {
+        // Codex style: normal path with /
+        if raw.contains("/") {
+            return URL(fileURLWithPath: raw).lastPathComponent
+        }
+        // Claude Code style: dashes replacing /
+        // Pattern: -Users-{user}-Documents-{project} or -Users-{user}-{project}
+        if let range = raw.range(of: #"-Documents-"#) {
+            return String(raw[range.upperBound...])
+        }
+        // Fallback: strip -Users-{user}- prefix
+        let parts = raw.split(separator: "-", omittingEmptySubsequences: true)
+        if parts.count > 2, parts[0] == "Users" {
+            return parts.dropFirst(2).joined(separator: "-")
+        }
+        return raw
     }
 
     // MARK: - Time Range

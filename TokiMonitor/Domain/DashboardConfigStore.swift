@@ -174,13 +174,13 @@ final class DashboardConfigStore {
                     gridPosition: GridPosition(column: 0, row: 1, width: 24, height: 3),
                     targets: [PanelTarget(refId: "A", metric: .tokensByModel)]
                 ),
-                // Row 4-6: cost trend (left half) + API trend (right half)
+                // Row 4-6: project distribution pie (left half) + API trend (right half)
                 PanelConfig(
-                    title: L.dash.costTrend,
-                    panelType: .timeSeries,
-                    metric: .costByModel,
+                    title: L.tr("프로젝트별 사용량", "Usage by Project"),
+                    panelType: .pieChart,
+                    metric: .tokensByProject,
                     gridPosition: GridPosition(column: 0, row: 4, width: 12, height: 3),
-                    targets: [PanelTarget(refId: "A", metric: .costByModel)]
+                    targets: [PanelTarget(refId: "A", metric: .tokensByProject)]
                 ),
                 PanelConfig(
                     title: L.dash.apiTrend,

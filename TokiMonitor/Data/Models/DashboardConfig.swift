@@ -347,13 +347,14 @@ enum PanelType: String, Codable, CaseIterable {
     case stat
     case timeSeries
     case barChart
+    case pieChart
     case table
     case gauge
     case rowPanel
 
     /// Panel types available for user creation (excludes rowPanel from general picker)
     static var creatableTypes: [PanelType] {
-        [.stat, .timeSeries, .barChart, .table, .gauge]
+        [.stat, .timeSeries, .barChart, .pieChart, .table, .gauge]
     }
 
     var displayName: String {
@@ -361,6 +362,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .stat: L.dash.statPanel
         case .timeSeries: L.dash.timeSeriesPanel
         case .barChart: L.dash.barChartPanel
+        case .pieChart: L.tr("파이 차트", "Pie Chart")
         case .table: L.dash.tablePanel
         case .gauge: L.dash.gaugePanel
         case .rowPanel: L.tr("행", "Row")
@@ -372,6 +374,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .stat: 4
         case .timeSeries: 6
         case .barChart: 6
+        case .pieChart: 6
         case .table: 8
         case .gauge: 4
         case .rowPanel: 24
@@ -383,6 +386,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .stat: 1
         case .timeSeries: 3
         case .barChart: 3
+        case .pieChart: 3
         case .table: 3
         case .gauge: 2
         case .rowPanel: 1
@@ -394,6 +398,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .stat: "number.square"
         case .timeSeries: "chart.xyaxis.line"
         case .barChart: "chart.bar"
+        case .pieChart: "chart.pie"
         case .table: "tablecells"
         case .gauge: "gauge.open.with.lines.needle.33percent"
         case .rowPanel: "rectangle.split.1x2"
@@ -415,6 +420,7 @@ enum PanelMetric: String, Codable, CaseIterable {
     case cacheHitRate
     case reasoningTokens
     case modelBreakdown
+    case tokensByProject
 
     var displayName: String {
         switch self {
@@ -429,6 +435,7 @@ enum PanelMetric: String, Codable, CaseIterable {
         case .cacheHitRate: L.dash.metricCacheHitRate
         case .reasoningTokens: L.dash.metricReasoningTokens
         case .modelBreakdown: L.dash.metricModelBreakdown
+        case .tokensByProject: L.tr("프로젝트별 토큰", "Tokens by Project")
         }
     }
 
@@ -437,7 +444,7 @@ enum PanelMetric: String, Codable, CaseIterable {
         case .totalTokens, .totalCost, .apiCalls, .topModel:
             return [.stat, .gauge]
         case .tokensByModel, .costByModel, .eventsByModel:
-            return [.timeSeries, .barChart]
+            return [.timeSeries, .barChart, .pieChart]
         case .inputVsOutput:
             return [.barChart, .timeSeries]
         case .cacheHitRate:
@@ -446,6 +453,8 @@ enum PanelMetric: String, Codable, CaseIterable {
             return [.stat, .timeSeries, .barChart]
         case .modelBreakdown:
             return [.table, .barChart]
+        case .tokensByProject:
+            return [.pieChart, .barChart, .table]
         }
     }
 
@@ -462,6 +471,7 @@ enum PanelMetric: String, Codable, CaseIterable {
         case .cacheHitRate: "memorychip"
         case .reasoningTokens: "brain"
         case .modelBreakdown: "tablecells"
+        case .tokensByProject: "chart.pie"
         }
     }
 
@@ -479,6 +489,7 @@ enum PanelMetric: String, Codable, CaseIterable {
         case .cacheHitRate: "rate(cache_read{since=\"$__from\"}[$__interval]) / rate(input{since=\"$__from\"}[$__interval])"
         case .reasoningTokens: "reasoning{since=\"$__from\"}[$__interval] by (model)"
         case .modelBreakdown: "usage{since=\"$__from\"}[$__interval] by (model)"
+        case .tokensByProject: "sum(usage{since=\"$__from\"}[$__interval]) by (project)"
         }
     }
 }
@@ -559,8 +570,9 @@ extension DashboardConfig {
     }
 
     static var defaultTemplating: TemplatingConfig {
-        let providerOptions = ProviderRegistry.allProviders.map { provider in
-            VariableOption(text: provider.name, value: provider.id)
+        let providerOptions = ProviderRegistry.configurableProviders.compactMap { provider -> VariableOption? in
+            guard let tokiId = provider.tokiProviderId else { return nil }
+            return VariableOption(text: provider.name, value: tokiId)
         }
         return TemplatingConfig(list: [
             DashboardVariable(

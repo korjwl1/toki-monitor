@@ -46,7 +46,7 @@ final class TokiReportClient: Sendable {
     }
 
     /// Time-series data from TimeConfig (Grafana-style relative time).
-    func queryTimeSeriesFromConfig(time: TimeConfig) async throws -> TimeSeriesData {
+    func queryTimeSeriesFromConfig(time: TimeConfig, provider: String? = nil) async throws -> TimeSeriesData {
         let bucket = time.bucketString
         let sinceFmt = DateFormatter()
         sinceFmt.dateFormat = "yyyyMMddHHmmss"
@@ -54,7 +54,12 @@ final class TokiReportClient: Sendable {
         let buffer = max(60, time.duration * 0.1)
         let sinceDate = time.fromDate.addingTimeInterval(-buffer)
         let since = sinceFmt.string(from: sinceDate)
-        let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
+
+        var filters = "since=\"\(since)\""
+        if let provider {
+            filters += ", provider=\"\(provider)\""
+        }
+        let query = "usage{\(filters)}[\(bucket)] by (model)"
 
         let data = try await runner.runReport(
             reportOptions: ["-z", "UTC"],

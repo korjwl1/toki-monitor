@@ -193,7 +193,7 @@ struct PanelEditorView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
-        case .timeSeries, .barChart, .gauge, .rowPanel:
+        case .timeSeries, .barChart, .pieChart, .gauge, .rowPanel:
             Text(L.tr("미리보기", "Preview"))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -371,6 +371,8 @@ struct PanelEditorView: View {
                 tableDisplayOptions
             case .gauge:
                 gaugeDisplayOptions
+            case .pieChart:
+                EmptyView()
             case .rowPanel:
                 EmptyView()
             }
