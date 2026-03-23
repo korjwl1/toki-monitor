@@ -23,7 +23,7 @@ final class DashboardWindowController {
 
         // Size to ~55% of screen area (√0.55 ≈ 74% each dimension)
         let screen = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let scale: CGFloat = 0.84
+        let scale: CGFloat = 0.74
         let initialWidth = max(800, screen.width * scale)
         let initialHeight = max(600, screen.height * scale)
 

@@ -54,14 +54,23 @@ final class StatusBarController {
         aggregator.startSampling()
         usageMonitor.startPolling()
 
-        // Resolve codex root from toki settings, then start codex polling
+        // Startup sequence: daemon → settings sync → codex root → connect
         Task {
+            // Ensure daemon is running (start if not)
+            if !(await connectionManager.isDaemonRunningPublic()) {
+                connectionManager.startDaemonAndConnect()
+                // Wait for daemon to be ready
+                for _ in 0..<5 {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    if await connectionManager.isDaemonRunningPublic() { break }
+                }
+            } else {
+                connectionManager.checkAndConnect()
+            }
+            await syncProvidersOnFirstLaunch()
             await CodexAuthReader.resolveCodexRoot()
             codexUsageMonitor.startPolling()
         }
-
-        // Check daemon status and auto-connect if running
-        connectionManager.checkAndConnect()
 
         // Build initial status items
         rebuildStatusItems()
@@ -69,6 +78,42 @@ final class StatusBarController {
         // Observe
         observeTokenRate()
         observeSettings()
+    }
+
+    // MARK: - First Launch & Daemon
+
+    private static let hasLaunchedKey = "hasLaunchedBefore"
+
+    private func syncProvidersOnFirstLaunch() async {
+        guard !UserDefaults.standard.bool(forKey: Self.hasLaunchedKey) else { return }
+        UserDefaults.standard.set(true, forKey: Self.hasLaunchedKey)
+
+        // Read providers from toki settings
+        do {
+            let data = try await CLIProcessRunner.run(
+                executable: TokiPath.resolved,
+                arguments: ["settings", "get", "providers"]
+            )
+            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            // Parse ["claude_code","codex"] format
+            let cleaned = output
+                .replacingOccurrences(of: "[", with: "")
+                .replacingOccurrences(of: "]", with: "")
+                .replacingOccurrences(of: "\"", with: "")
+            let tokiProviders = cleaned.components(separatedBy: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+
+            // Map toki provider IDs to app provider IDs and enable only those
+            let allProviders = ProviderRegistry.configurableProviders
+            for provider in allProviders {
+                let isInToki = provider.schemas.contains { tokiProviders.contains($0) }
+                settings.setProviderEnabled(provider.id, enabled: isInToki, tokiProviderId: provider.tokiProviderId)
+            }
+            rebuildStatusItems()
+        } catch {
+            // toki not available — keep defaults (all enabled)
+        }
     }
 
     // StatusBarController lives for app lifetime — no deinit cleanup needed.

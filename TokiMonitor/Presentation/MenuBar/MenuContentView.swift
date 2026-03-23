@@ -32,13 +32,16 @@ struct MenuContentView: View {
 
     private var leftPanel: some View {
         VStack(alignment: .leading, spacing: DS.sm) {
-            if isConnected {
+            switch connectionManager.state {
+            case .connected:
                 let items = orderedWidgetItems()
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
                     if i > 0 { Divider().padding(.horizontal, DS.md) }
                     widgetView(for: item)
                 }
-            } else {
+            case .starting:
+                startingWidget
+            case .disconnected:
                 disconnectedWidget
             }
         }
@@ -331,6 +334,18 @@ struct MenuContentView: View {
         .padding(DS.md)
     }
 
+    private var startingWidget: some View {
+        VStack(spacing: DS.md) {
+            ProgressView()
+                .controlSize(.small)
+            Text(L.tr("toki 데몬 시작 중...", "Starting toki daemon..."))
+                .font(.system(size: DS.fontBody, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, DS.xl)
+    }
+
     private var disconnectedWidget: some View {
         VStack(spacing: DS.md) {
             Image(systemName: "bolt.slash")
@@ -432,6 +447,7 @@ struct MenuContentView: View {
                         if let url = Bundle.main.url(forResource: "frame_00_thin", withExtension: "png"),
                            let nsImage = NSImage(contentsOf: url) {
                             Image(nsImage: nsImage)
+                                .renderingMode(.template)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(height: 24)

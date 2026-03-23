@@ -3,6 +3,7 @@ import Foundation
 enum ConnectionState: Equatable {
     case connected
     case disconnected
+    case starting
 
     var isConnected: Bool {
         self == .connected
@@ -73,6 +74,7 @@ final class ConnectionManager {
 
     /// Start daemon, then verify it's running before connecting.
     func startDaemonAndConnect() {
+        state = .starting
         Task {
             _ = await runToki(args: ["daemon", "start"])
             // Verify daemon actually started via status check
@@ -92,6 +94,12 @@ final class ConnectionManager {
             disconnect()
             _ = await runToki(args: ["daemon", "stop"])
         }
+    }
+
+    // MARK: - Public accessors for StatusBarController
+
+    func isDaemonRunningPublic() async -> Bool {
+        await isDaemonRunning()
     }
 
     // MARK: - toki CLI
