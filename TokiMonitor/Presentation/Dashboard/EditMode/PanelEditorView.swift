@@ -181,8 +181,7 @@ struct PanelEditorView: View {
         case .stat:
             let stat = PanelDataExtractor.statValue(
                 for: panel.effectiveMetric,
-                timeSeriesData: viewModel.timeSeriesData,
-                viewModel: viewModel
+                data: viewModel.timeSeriesData
             )
             VStack(alignment: .leading, spacing: 4) {
                 Text(stat.value)

@@ -45,6 +45,21 @@ final class TokiReportClient: Sendable {
         return TokiReportParser.parseReport(data)
     }
 
+    /// Run a pre-interpolated PromQL query and return TimeSeriesData with gap-fill.
+    func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
+        let data = try await runner.runReport(
+            reportOptions: ["-z", "UTC"],
+            subcommandArgs: ["query", query]
+        )
+        let pointsByDate = TokiReportParser.parseReport(data)
+        var points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
+            .sorted { $0.date < $1.date }
+        points = Self.gapFillEpochAligned(points: points, time: time)
+        let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
+            : time.bucketSeconds < 86400 ? .hourly : .daily
+        return TimeSeriesData(points: points, granularity: granularity)
+    }
+
     /// Time-series data from TimeConfig (Grafana-style relative time).
     func queryTimeSeriesFromConfig(time: TimeConfig, provider: String? = nil) async throws -> TimeSeriesData {
         let bucket = time.bucketString

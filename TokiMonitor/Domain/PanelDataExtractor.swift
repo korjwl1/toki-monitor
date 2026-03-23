@@ -1,6 +1,7 @@
 import Foundation
 
-/// Extracts display-ready values from a PanelMetric, given the current data sources.
+/// Extracts display-ready values from TimeSeriesData for panel rendering.
+/// Stateless — takes data in, returns display values. No ViewModel dependency.
 @MainActor
 enum PanelDataExtractor {
 
@@ -13,42 +14,24 @@ enum PanelDataExtractor {
 
     static func statValue(
         for metric: PanelMetric,
-        timeSeriesData: TimeSeriesData?,
-        viewModel: DashboardViewModel
+        data: TimeSeriesData?
     ) -> StatValue {
+        guard let data else { return StatValue(value: "-", subtitle: nil) }
         switch metric {
         case .totalTokens:
-            return StatValue(
-                value: TokenFormatter.formatTokens(viewModel.totalTokens),
-                subtitle: nil
-            )
+            return StatValue(value: TokenFormatter.formatTokens(data.totalTokens), subtitle: nil)
         case .totalCost:
-            return StatValue(
-                value: TokenFormatter.formatCost(viewModel.totalCost),
-                subtitle: nil
-            )
+            return StatValue(value: TokenFormatter.formatCost(data.totalCost), subtitle: nil)
         case .apiCalls:
-            return StatValue(
-                value: "\(viewModel.totalEvents)",
-                subtitle: nil
-            )
+            return StatValue(value: "\(data.totalEvents)", subtitle: nil)
         case .topModel:
-            return StatValue(
-                value: viewModel.topModel ?? "-",
-                subtitle: nil
-            )
+            return StatValue(value: data.topModel ?? "-", subtitle: nil)
         case .cacheHitRate:
-            let rate = computeCacheHitRate(from: timeSeriesData)
-            return StatValue(
-                value: String(format: "%.1f%%", rate * 100),
-                subtitle: nil
-            )
+            let rate = computeCacheHitRate(from: data)
+            return StatValue(value: String(format: "%.1f%%", rate * 100), subtitle: nil)
         case .reasoningTokens:
-            let total = computeReasoningTokens(from: timeSeriesData)
-            return StatValue(
-                value: TokenFormatter.formatTokens(total),
-                subtitle: nil
-            )
+            let total = computeReasoningTokens(from: data)
+            return StatValue(value: TokenFormatter.formatTokens(total), subtitle: nil)
         default:
             return StatValue(value: "-", subtitle: nil)
         }
@@ -59,9 +42,9 @@ enum PanelDataExtractor {
     static func chartPoints(
         for metric: PanelMetric,
         model: String,
-        timeSeriesData: TimeSeriesData?
+        data: TimeSeriesData?
     ) -> [TimeSeriesData.ChartPoint] {
-        guard let data = timeSeriesData else { return [] }
+        guard let data else { return [] }
         switch metric {
         case .tokensByModel, .totalTokens:
             return data.tokensFor(model: model)
@@ -79,11 +62,13 @@ enum PanelDataExtractor {
     /// Returns chart point arrays keyed by model name for all enabled models.
     static func allModelChartPoints(
         for metric: PanelMetric,
-        viewModel: DashboardViewModel,
-        timeSeriesData: TimeSeriesData?
+        enabledModels: Set<String>,
+        data: TimeSeriesData?
     ) -> [(model: String, points: [TimeSeriesData.ChartPoint])] {
-        viewModel.filteredModelNames.map { model in
-            (model: model, points: chartPoints(for: metric, model: model, timeSeriesData: timeSeriesData))
+        guard let data else { return [] }
+        let filtered = data.allModelNames.filter { enabledModels.contains($0) }
+        return filtered.map { model in
+            (model: model, points: chartPoints(for: metric, model: model, data: data))
         }
     }
 
@@ -97,10 +82,8 @@ enum PanelDataExtractor {
         let events: Int
     }
 
-    static func tableRows(
-        from timeSeriesData: TimeSeriesData?
-    ) -> [ModelRow] {
-        guard let data = timeSeriesData else { return [] }
+    static func tableRows(from data: TimeSeriesData?) -> [ModelRow] {
+        guard let data else { return [] }
         var aggregated: [String: (tokens: UInt64, cost: Double, events: Int)] = [:]
 
         for point in data.points {
@@ -116,6 +99,21 @@ enum PanelDataExtractor {
         return aggregated.map { key, val in
             ModelRow(id: key, model: key, tokens: val.tokens, cost: val.cost, events: val.events)
         }.sorted { $0.tokens > $1.tokens }
+    }
+
+    // MARK: - Project Breakdown
+
+    static func projectBreakdown(from data: TimeSeriesData?) -> [(project: String, tokens: UInt64)] {
+        guard let data else { return [] }
+        var totals: [String: UInt64] = [:]
+        for point in data.points {
+            for model in point.models {
+                totals[model.model, default: 0] += model.totalTokens
+            }
+        }
+        return totals
+            .map { (project: DashboardViewModel.cleanProjectName($0.key), tokens: $0.value) }
+            .sorted { $0.tokens > $1.tokens }
     }
 
     // MARK: - Helpers

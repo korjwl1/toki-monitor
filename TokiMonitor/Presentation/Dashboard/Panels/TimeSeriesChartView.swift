@@ -96,8 +96,8 @@ struct TimeSeriesChartView: View {
     private func recalcModelData() {
         modelData = PanelDataExtractor.allModelChartPoints(
             for: metric,
-            viewModel: viewModel,
-            timeSeriesData: viewModel.timeSeriesData
+            enabledModels: viewModel.enabledModels,
+            data: viewModel.timeSeriesData
         )
     }
 

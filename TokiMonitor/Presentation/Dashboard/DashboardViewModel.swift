@@ -55,7 +55,7 @@ final class DashboardViewModel {
     var isLoading = false
     var errorMessage: String?
     var enabledModels: Set<String> = []
-    var projectTokens: [(project: String, tokens: UInt64)] = []
+    var panelData: [UUID: PanelDataState] = [:]
 
     // MARK: - Annotations
     var annotations: [DashboardAnnotation] = []
@@ -122,93 +122,117 @@ final class DashboardViewModel {
 
     // MARK: - Data Fetching
 
+    func dataState(for panelID: UUID) -> PanelDataState {
+        panelData[panelID] ?? .idle
+    }
+
     func fetchData() {
+        let panels = dashboardConfig.panels.filter { $0.panelType != .rowPanel }
+        let time = dashboardConfig.time
+
+        // Mark all panels as loading
+        for panel in panels {
+            panelData[panel.id] = .loading
+        }
         isLoading = true
         errorMessage = nil
 
-        let time = dashboardConfig.time
+        Task {
+            // Build interpolated queries and group by unique query string
+            var queryGroups: [String: [PanelConfig]] = [:]
+            for panel in panels {
+                let template = panel.effectiveQuery ?? panel.effectiveMetric.defaultQuery
+                let interpolated = interpolateQuery(template, time: time)
+                queryGroups[interpolated, default: []].append(panel)
+            }
 
-        // Get selected provider filter (nil = all)
+            // Execute each unique query once
+            await withTaskGroup(of: (String, Result<TimeSeriesData, Error>).self) { group in
+                for (query, _) in queryGroups {
+                    group.addTask { [reportClient] in
+                        do {
+                            let result = try await reportClient.queryPromQLAsTimeSeries(query: query, time: time)
+                            return (query, .success(result))
+                        } catch {
+                            return (query, .failure(error))
+                        }
+                    }
+                }
+
+                for await (query, result) in group {
+                    let affectedPanels = queryGroups[query] ?? []
+                    switch result {
+                    case .success(let data):
+                        for panel in affectedPanels {
+                            self.panelData[panel.id] = .loaded(data)
+                        }
+                    case .failure(let error):
+                        for panel in affectedPanels {
+                            self.panelData[panel.id] = .error(error.localizedDescription)
+                        }
+                    }
+                }
+            }
+
+            // Backward compatibility: set global timeSeriesData from first loaded panel
+            if let firstLoaded = panels.first(where: { panelData[$0.id]?.timeSeriesData != nil }) {
+                let data = panelData[firstLoaded.id]!.timeSeriesData!
+                self.timeSeriesData = data
+                self.enabledModels = Set(data.allModelNames)
+                self.dataVersion += 1
+            }
+
+            self.isLoading = false
+        }
+    }
+
+    // MARK: - Query Interpolation
+
+    func interpolateQuery(_ template: String, time: TimeConfig? = nil) -> String {
+        let t = time ?? dashboardConfig.time
+        let sinceFmt = DateFormatter()
+        sinceFmt.dateFormat = "yyyyMMddHHmmss"
+        sinceFmt.timeZone = TimeZone(identifier: "UTC")
+
+        let buffer = max(60, t.duration * 0.1)
+        let sinceDate = t.fromDate.addingTimeInterval(-buffer)
+
+        var query = template
+        query = query.replacingOccurrences(of: "$__from", with: sinceFmt.string(from: sinceDate))
+        if !t.isRelative {
+            query = query.replacingOccurrences(of: "$__to", with: sinceFmt.string(from: t.toDate))
+        } else {
+            // Remove until clause for relative time
+            query = query.replacingOccurrences(of: ", until=\"$__to\"", with: "")
+        }
+        query = query.replacingOccurrences(of: "$__interval", with: t.bucketString)
+
+        // Provider variable
         let selectedProvider: String? = {
             let raw = variableValue(named: "provider")
             let filtered = raw.filter { !$0.isEmpty && $0 != "All" && $0 != "all" && $0 != "$__all" }
-            let result: String? = filtered.first(where: { ["claude_code", "codex"].contains($0) })
-            return result
+            return filtered.first(where: { ["claude_code", "codex"].contains($0) })
         }()
-
-        Task {
-            do {
-                let data = try await reportClient.queryTimeSeriesFromConfig(time: time, provider: selectedProvider)
-                self.isLoading = false
-                self.timeSeriesData = data
-                self.dataVersion += 1
-                // Reset enabled models to match current data
-                self.enabledModels = Set(data.allModelNames)
-            } catch {
-                self.isLoading = false
-                self.errorMessage = error.localizedDescription
-            }
+        if let provider = selectedProvider {
+            query = query.replacingOccurrences(of: "$provider", with: "provider=\"\(provider)\"")
+        } else {
+            query = query.replacingOccurrences(of: ", $provider", with: "")
+            query = query.replacingOccurrences(of: "$provider", with: "")
         }
 
-        // Fetch project breakdown
-        // toki returns "date|project" in period field, model is "(total)"
-        Task {
-            let sinceFmt = DateFormatter()
-            sinceFmt.dateFormat = "yyyyMMddHHmmss"
-            sinceFmt.timeZone = TimeZone(identifier: "UTC")
-            let since = sinceFmt.string(from: time.fromDate)
-            var filters = "since=\"\(since)\""
-            if !time.isRelative {
-                let until = sinceFmt.string(from: time.toDate)
-                filters += ", until=\"\(until)\""
-            }
-            if let selectedProvider {
-                filters += ", provider=\"\(selectedProvider)\""
-            }
-            let query = "sum(usage{\(filters)}[30d]) by (project)"
-
-            let data = try? await CLIProcessRunner.run(
-                executable: TokiPath.resolved,
-                arguments: ["report", "-z", "UTC", "--output-format", "json", "query", query]
-            )
-            guard let data else { return }
-
-            struct ProjectReport: Codable {
-                let providers: [String: [ProjectPeriod]]?
-            }
-            struct ProjectPeriod: Codable {
-                let period: String
-                // swiftlint:disable:next nesting
-                struct ModelUsage: Codable {
-                    let input_tokens: UInt64
-                    let output_tokens: UInt64
-                }
-                let usage_per_models: [ModelUsage]?
-            }
-
-            guard let report = try? JSONDecoder().decode(ProjectReport.self, from: data) else { return }
-
-            var totals: [String: UInt64] = [:]
-            for (_, periods) in report.providers ?? [:] {
-                for period in periods {
-                    // period format: "2026-03-22|-Users-korjwl1-Documents-toki-monitor"
-                    let parts = period.period.split(separator: "|", maxSplits: 1)
-                    let project = parts.count > 1 ? String(parts[1]) : period.period
-                    let tokens = period.usage_per_models?.reduce(UInt64(0)) { $0 + $1.input_tokens + $1.output_tokens } ?? 0
-                    totals[project, default: 0] += tokens
-                }
-            }
-
-            self.projectTokens = totals
-                .map { (project: Self.cleanProjectName($0.key), tokens: $0.value) }
-                .sorted { $0.tokens > $1.tokens }
+        // Generic variable interpolation
+        for variable in dashboardConfig.templating.list {
+            let value = variable.current.value.first ?? ""
+            query = query.replacingOccurrences(of: "${\(variable.name)}", with: value)
         }
+
+        return query
     }
 
     /// Extract last folder name from toki project paths.
     /// Claude Code encodes paths with - instead of /. Recover by splitting on -
     /// then greedily rebuilding the path, trying / then - then _ as joiners.
-    private static func cleanProjectName(_ raw: String) -> String {
+    static func cleanProjectName(_ raw: String) -> String {
         if raw.contains("/") {
             return URL(fileURLWithPath: raw).lastPathComponent
         }

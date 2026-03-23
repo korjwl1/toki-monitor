@@ -7,6 +7,7 @@ struct PanelContainerView<Content: View>: View {
     let title: String
     let isEditing: Bool
     var alertState: AlertState?
+    var dataState: PanelDataState?
     let onDelete: () -> Void
     let onEdit: () -> Void
     @ViewBuilder let content: Content
@@ -17,6 +18,7 @@ struct PanelContainerView<Content: View>: View {
         title: String,
         isEditing: Bool,
         alertState: AlertState? = nil,
+        dataState: PanelDataState? = nil,
         onDelete: @escaping () -> Void,
         onEdit: @escaping () -> Void,
         @ViewBuilder content: () -> Content
@@ -24,6 +26,7 @@ struct PanelContainerView<Content: View>: View {
         self.title = title
         self.isEditing = isEditing
         self.alertState = alertState
+        self.dataState = dataState
         self.onDelete = onDelete
         self.onEdit = onEdit
         self.content = content()
@@ -86,8 +89,32 @@ struct PanelContainerView<Content: View>: View {
                 .fill(Color.primary.opacity(0.1))
                 .frame(height: 0.5)
 
-            // Content
-            content
+            // Content — with centralized data state handling
+            if let state = dataState {
+                switch state {
+                case .idle, .loading:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .loaded(let data) where data.points.isEmpty || data.allModelNames.isEmpty:
+                    ContentUnavailableView(
+                        L.tr("데이터 없음", "No Data"),
+                        systemImage: "chart.line.downtrend.xyaxis",
+                        description: Text(L.tr("해당 기간에 데이터가 없습니다", "No data for this period"))
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .loaded:
+                    content
+                case .error(let message):
+                    ContentUnavailableView(
+                        L.tr("오류", "Error"),
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(message)
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else {
+                content
+            }
         }
         .padding(DS.md)
         .modifier(PanelCardModifier(isHovered: isHovered))

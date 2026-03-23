@@ -142,6 +142,7 @@ struct CustomDashboardView: View {
             title: panel.title,
             isEditing: viewModel.isEditing,
             alertState: alertState,
+            dataState: viewModel.dataState(for: panel.id),
             onDelete: { viewModel.removePanel(id: panel.id) },
             onEdit: { onEditPanel?(panel) }
         ) {
@@ -149,36 +150,45 @@ struct CustomDashboardView: View {
         }
     }
 
+    /// Dispatch panel content by type. PanelContainerView handles loading/error/empty states.
     @ViewBuilder
     private func panelContent(for panel: PanelConfig) -> some View {
+        let data = viewModel.dataState(for: panel.id).timeSeriesData
         switch panel.panelType {
         case .stat:
-            statContent(for: panel.effectiveMetric)
+            statContent(for: panel.effectiveMetric, data: data)
         case .timeSeries:
-            timeSeriesContent(for: panel.effectiveMetric)
+            if viewModel.filteredModelNames.isEmpty {
+                noModelSelected
+            } else {
+                TimeSeriesChartView(
+                    metric: panel.effectiveMetric,
+                    viewModel: viewModel,
+                    dateFormat: chartDateFormat
+                )
+            }
         case .barChart:
-            barChartContent(for: panel.effectiveMetric)
+            if viewModel.filteredModelNames.isEmpty {
+                noModelSelected
+            } else {
+                barChartContent(for: panel.effectiveMetric, data: data)
+            }
         case .pieChart:
-            pieChartContent(for: panel.effectiveMetric)
+            pieChartContent(for: panel.effectiveMetric, data: data)
         case .table:
-            tableContent(for: panel.effectiveMetric)
+            tableContent(data: data)
         case .gauge:
-            gaugeContent(for: panel.effectiveMetric)
+            gaugeContent(for: panel.effectiveMetric, data: data)
         case .rowPanel:
             EmptyView()
         }
     }
 
-    // MARK: - Panel Content Renderers
+    // MARK: - Pure Panel Renderers (data passed in, no global state reads)
 
-    @ViewBuilder
-    private func statContent(for metric: PanelMetric) -> some View {
-        let stat = PanelDataExtractor.statValue(
-            for: metric,
-            timeSeriesData: viewModel.timeSeriesData,
-            viewModel: viewModel
-        )
-        VStack(alignment: .leading, spacing: 4) {
+    private func statContent(for metric: PanelMetric, data: TimeSeriesData?) -> some View {
+        let stat = PanelDataExtractor.statValue(for: metric, data: data)
+        return VStack(alignment: .leading, spacing: 4) {
             Text(stat.value)
                 .font(.system(size: 20, weight: .semibold, design: .monospaced))
                 .lineLimit(1)
@@ -192,66 +202,39 @@ struct CustomDashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var hasNoData: Bool {
-        viewModel.timeSeriesData == nil
-        || viewModel.timeSeriesData!.points.isEmpty
-        || viewModel.timeSeriesData!.allModelNames.isEmpty
-    }
-
     @ViewBuilder
-    private func timeSeriesContent(for metric: PanelMetric) -> some View {
-        if hasNoData {
-            emptyDataView
-        } else if viewModel.filteredModelNames.isEmpty {
-            noModelSelected
-        } else {
-            TimeSeriesChartView(
-                metric: metric,
-                viewModel: viewModel,
-                dateFormat: chartDateFormat
-            )
+    private func barChartContent(for metric: PanelMetric, data: TimeSeriesData?) -> some View {
+        let modelData = PanelDataExtractor.allModelChartPoints(
+            for: metric,
+            enabledModels: viewModel.enabledModels,
+            data: data
+        )
+        Chart {
+            ForEach(modelData, id: \.model) { entry in
+                ForEach(entry.points) { point in
+                    BarMark(
+                        x: .value(L.dash.axisTime, point.date),
+                        y: .value(L.dash.axisCalls, point.value)
+                    )
+                    .foregroundStyle(by: .value(L.dash.axisModel, entry.model))
+                }
+            }
         }
-    }
-
-    @ViewBuilder
-    private func barChartContent(for metric: PanelMetric) -> some View {
-        if hasNoData {
-            emptyDataView
-        } else if viewModel.filteredModelNames.isEmpty {
-            noModelSelected
-        } else {
-            let modelData = PanelDataExtractor.allModelChartPoints(
-                for: metric,
-                viewModel: viewModel,
-                timeSeriesData: viewModel.timeSeriesData
-            )
-            Chart {
-                ForEach(modelData, id: \.model) { entry in
-                    ForEach(entry.points) { point in
-                        BarMark(
-                            x: .value(L.dash.axisTime, point.date),
-                            y: .value(L.dash.axisCalls, point.value)
-                        )
-                        .foregroundStyle(by: .value(L.dash.axisModel, entry.model))
-                    }
-                }
-            }
-            .chartForegroundStyleScale { (model: String) in
-                viewModel.colorForModel(model)
-            }
-            .chartXAxis {
-                AxisMarks(preset: .aligned, values: .automatic) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: chartDateFormat)
-                        .font(.system(size: 9))
-                }
+        .chartForegroundStyleScale { (model: String) in
+            viewModel.colorForModel(model)
+        }
+        .chartXAxis {
+            AxisMarks(preset: .aligned, values: .automatic) { _ in
+                AxisGridLine()
+                AxisValueLabel(format: chartDateFormat)
+                    .font(.system(size: 9))
             }
         }
     }
 
     @ViewBuilder
-    private func tableContent(for metric: PanelMetric) -> some View {
-        let rows = PanelDataExtractor.tableRows(from: viewModel.timeSeriesData)
+    private func tableContent(data: TimeSeriesData?) -> some View {
+        let rows = PanelDataExtractor.tableRows(from: data)
         if rows.isEmpty {
             Text("-")
                 .foregroundStyle(.secondary)
@@ -272,69 +255,40 @@ struct CustomDashboardView: View {
     }
 
     @ViewBuilder
-    private func pieChartContent(for metric: PanelMetric) -> some View {
+    private func pieChartContent(for metric: PanelMetric, data: TimeSeriesData?) -> some View {
         if metric == .tokensByProject {
-            projectPieChart
-        } else if hasNoData {
-            emptyDataView
-        } else if let data = viewModel.timeSeriesData {
-            let rows = PanelDataExtractor.tableRows(from: data)
-            if rows.isEmpty {
-                emptyDataView
+            let projects = PanelDataExtractor.projectBreakdown(from: data)
+            if projects.isEmpty {
+                Text("-").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Chart(rows, id: \.model) { row in
-                    SectorMark(
-                        angle: .value(L.dash.axisTokens, row.tokens),
-                        innerRadius: .ratio(0.5),
-                        angularInset: 1
-                    )
-                    .foregroundStyle(by: .value(L.dash.axisModel, row.model))
-                    .cornerRadius(3)
+                Chart(projects, id: \.project) { item in
+                    SectorMark(angle: .value(L.dash.axisTokens, item.tokens), innerRadius: .ratio(0.5), angularInset: 1)
+                        .foregroundStyle(by: .value(L.tr("프로젝트", "Project"), item.project))
+                        .cornerRadius(3)
                 }
-                .chartForegroundStyleScale(
-                    domain: rows.map(\.model),
-                    range: rows.map { viewModel.colorForModel($0.model) }
-                )
                 .chartLegend(position: .trailing, spacing: 8)
                 .frame(minHeight: 150)
             }
         } else {
-            ProgressView()
-                .frame(maxWidth: .infinity, minHeight: 150)
-        }
-    }
-
-    private var projectPieChart: some View {
-        Group {
-            if hasNoData && viewModel.projectTokens.isEmpty {
-                emptyDataView
-            } else if viewModel.projectTokens.isEmpty {
-                ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 150)
+            let rows = PanelDataExtractor.tableRows(from: data)
+            if rows.isEmpty {
+                Text("-").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Chart(viewModel.projectTokens, id: \.project) { item in
-                    SectorMark(
-                        angle: .value(L.dash.axisTokens, item.tokens),
-                        innerRadius: .ratio(0.5),
-                        angularInset: 1
-                    )
-                    .foregroundStyle(by: .value(L.tr("프로젝트", "Project"), item.project))
-                    .cornerRadius(3)
+                Chart(rows, id: \.model) { row in
+                    SectorMark(angle: .value(L.dash.axisTokens, row.tokens), innerRadius: .ratio(0.5), angularInset: 1)
+                        .foregroundStyle(by: .value(L.dash.axisModel, row.model))
+                        .cornerRadius(3)
                 }
+                .chartForegroundStyleScale(domain: rows.map(\.model), range: rows.map { viewModel.colorForModel($0.model) })
                 .chartLegend(position: .trailing, spacing: 8)
                 .frame(minHeight: 150)
             }
         }
     }
 
-    @ViewBuilder
-    private func gaugeContent(for metric: PanelMetric) -> some View {
-        let stat = PanelDataExtractor.statValue(
-            for: metric,
-            timeSeriesData: viewModel.timeSeriesData,
-            viewModel: viewModel
-        )
-        VStack {
+    private func gaugeContent(for metric: PanelMetric, data: TimeSeriesData?) -> some View {
+        let stat = PanelDataExtractor.statValue(for: metric, data: data)
+        return VStack {
             Text(stat.value)
                 .font(.system(size: 24, weight: .bold, design: .monospaced))
                 .lineLimit(1)
@@ -343,7 +297,6 @@ struct CustomDashboardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// Compact date format based on current time range granularity
     private var chartDateFormat: Date.FormatStyle {
         let secs = viewModel.dashboardConfig.time.bucketSeconds
         if secs < 3600 {
@@ -360,15 +313,6 @@ struct CustomDashboardView: View {
             L.dash.selectModel,
             systemImage: "line.3.horizontal.decrease.circle",
             description: Text(L.dash.selectModelDesc)
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var emptyDataView: some View {
-        ContentUnavailableView(
-            L.tr("데이터 없음", "No Data"),
-            systemImage: "chart.line.downtrend.xyaxis",
-            description: Text(L.tr("해당 기간에 데이터가 없습니다", "No data for this period"))
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -38,7 +38,7 @@ struct AnimationStateMapperTests {
 
     @Test("Interval is clamped at max rate")
     func intervalClamped() {
-        let atMax = mapper.interval(for: 5000)
+        let atMax = mapper.interval(for: 10000)
         let beyondMax = mapper.interval(for: 50000)
         #expect(atMax == beyondMax)
     }

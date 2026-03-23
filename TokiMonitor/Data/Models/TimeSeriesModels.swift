@@ -198,3 +198,27 @@ struct TimeSeriesData {
     func costFor(model: String) -> [ChartPoint] { chartPoints(for: model) { $0.costUsd ?? 0 } }
     func eventsFor(model: String) -> [ChartPoint] { chartPoints(for: model) { Double($0.events) } }
 }
+
+// MARK: - Per-Panel Data State
+
+enum PanelDataState {
+    case idle
+    case loading
+    case loaded(TimeSeriesData)
+    case error(String)
+
+    var timeSeriesData: TimeSeriesData? {
+        if case .loaded(let data) = self { return data }
+        return nil
+    }
+
+    var isLoading: Bool {
+        if case .loading = self { return true }
+        return false
+    }
+
+    var isEmpty: Bool {
+        guard let data = timeSeriesData else { return true }
+        return data.points.isEmpty || data.allModelNames.isEmpty
+    }
+}
