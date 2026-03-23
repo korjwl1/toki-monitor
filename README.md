@@ -112,8 +112,8 @@ This automatically installs [toki](https://github.com/korjwl1/toki) as a depende
 ### Build from source
 
 ```bash
-git clone https://github.com/korjwl1/toki_dashboard.git
-cd toki_dashboard
+git clone https://github.com/korjwl1/toki-monitor.git
+cd toki-monitor
 xcodebuild build -scheme TokiMonitor -configuration Release
 ```
 

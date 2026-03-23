@@ -3,7 +3,7 @@ import SwiftUI
 struct AboutPane: View {
     private let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
     private let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
-    private let repoURL = "https://github.com/korjwl1/toki_dashboard"
+    private let repoURL = "https://github.com/korjwl1/toki-monitor"
     private let tokiRepoURL = "https://github.com/korjwl1/toki"
 
     var body: some View {
