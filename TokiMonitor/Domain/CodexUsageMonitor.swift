@@ -94,7 +94,10 @@ final class CodexUsageMonitor {
     // MARK: - Adaptive Interval
 
     private func computeInterval() -> TimeInterval {
-        // Codex usage API rate limits are unknown — be conservative
+        // Retry faster on failure (30s), but not too aggressively
+        if consecutiveFailures > 0 {
+            return 30
+        }
         if let usage = currentUsage,
            let primary = usage.rateLimit.primaryWindow,
            primary.usedPercent > 75 {
