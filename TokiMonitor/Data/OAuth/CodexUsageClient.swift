@@ -168,7 +168,9 @@ struct CodexUsageClient: Sendable {
         request.setValue("toki-monitor/1.0", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        let httpResponse = response as! HTTPURLResponse
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw CodexAuthError.fetchFailed(0)
+        }
 
         guard httpResponse.statusCode == 200 else {
             throw CodexAuthError.fetchFailed(httpResponse.statusCode)

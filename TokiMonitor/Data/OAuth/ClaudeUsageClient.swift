@@ -12,7 +12,9 @@ struct ClaudeUsageClient: Sendable {
         request.setValue("toki-monitor/1.0", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        let httpResponse = response as! HTTPURLResponse
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OAuthError.usageFetchFailed(0)
+        }
 
         guard httpResponse.statusCode == 200 else {
             throw OAuthError.usageFetchFailed(httpResponse.statusCode)

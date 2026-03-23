@@ -85,7 +85,7 @@ final class ClaudeUsageMonitor {
                     checkThresholds(usage)
                 } catch {
                     // Refresh retry also failed — wait for next poll
-                    lastError = "사용량 조회 제한 — 잠시 후 재시도"
+                    lastError = L.tr("사용량 조회 제한 — 잠시 후 재시도", "Rate limited — retrying shortly")
                 }
             } else if case .permanentAuthFailure = error {
                 currentUsage = nil
@@ -133,14 +133,14 @@ final class ClaudeUsageMonitor {
         if max >= 90 && !hasNotified90 && settings.claudeAlert90 {
             hasNotified90 = true
             sendNotification(
-                title: "Claude 사용량 90% 도달",
-                body: "5시간 세션 사용량이 90%를 넘었습니다. 속도가 제한될 수 있습니다."
+                title: L.tr("Claude 사용량 90% 도달", "Claude usage reached 90%"),
+                body: L.tr("5시간 세션 사용량이 90%를 넘었습니다. 속도가 제한될 수 있습니다.", "5-hour session usage exceeded 90%. Rate limiting may apply.")
             )
         } else if max >= 75 && !hasNotified75 && settings.claudeAlert75 {
             hasNotified75 = true
             sendNotification(
-                title: "Claude 사용량 75% 도달",
-                body: "5시간 세션 사용량이 75%를 넘었습니다."
+                title: L.tr("Claude 사용량 75% 도달", "Claude usage reached 75%"),
+                body: L.tr("5시간 세션 사용량이 75%를 넘었습니다.", "5-hour session usage exceeded 75%.")
             )
         }
     }

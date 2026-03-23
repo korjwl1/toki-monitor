@@ -70,9 +70,11 @@ final class StatusBarController {
             await syncProvidersOnFirstLaunch()
             await CodexAuthReader.resolveCodexRoot()
             codexUsageMonitor.startPolling()
+            // Rebuild after sync so status items reflect actual provider state
+            rebuildStatusItems()
         }
 
-        // Build initial status items
+        // Build initial status items (will be rebuilt after sync completes)
         rebuildStatusItems()
 
         // Observe
@@ -394,7 +396,9 @@ final class StatusBarController {
             _ = self.aggregator.perProviderRates
             _ = self.aggregator.perProviderHistory
             _ = self.aggregator.perProviderSessionCount
+            _ = self.aggregator.perProviderCostPerMinute
             _ = self.aggregator.providerSummaries
+            _ = self.aggregator.spendAlert
             _ = self.connectionManager.state
             _ = self.usageMonitor.currentUsage
             _ = self.usageMonitor.lastError

@@ -7,9 +7,9 @@ enum ReportPeriod: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .daily: "일간"
-        case .weekly: "주간"
-        case .monthly: "월간"
+        case .daily: L.tr("일간", "Daily")
+        case .weekly: L.tr("주간", "Weekly")
+        case .monthly: L.tr("월간", "Monthly")
         }
     }
 
