@@ -353,6 +353,8 @@ final class StatusBarController {
             _ = self.connectionManager.state
             _ = self.usageMonitor.currentUsage
             _ = self.usageMonitor.lastError
+            _ = self.codexUsageMonitor.currentUsage
+            _ = self.codexUsageMonitor.lastError
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, self.menuHostingView != nil else { return }
