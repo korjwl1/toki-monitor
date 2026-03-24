@@ -135,13 +135,31 @@ struct AboutPane: View {
             tokiVersion = output.replacingOccurrences(of: "toki ", with: "")
         }
 
-        // Check brew for latest versions
+        // Check brew for latest versions (ignore pre-release like alpha/beta/rc)
         await checkBrewUpdate(formula: "korjwl1/tap/toki-monitor", cask: true) { latest in
-            if latest != version { monitorUpdate = latest }
+            if isNewerStable(latest: latest, current: version) { monitorUpdate = latest }
         }
         await checkBrewUpdate(formula: "korjwl1/tap/toki", cask: false) { latest in
-            if let installed = tokiVersion, latest != installed { tokiUpdate = latest }
+            if let installed = tokiVersion, isNewerStable(latest: latest, current: installed) { tokiUpdate = latest }
         }
+    }
+
+    /// Returns true only if `latest` is a stable release newer than `current`.
+    /// Ignores pre-release tags (alpha, beta, rc).
+    private func isNewerStable(latest: String, current: String) -> Bool {
+        let preReleaseSuffixes = ["alpha", "beta", "rc", "dev", "pre"]
+        let lower = latest.lowercased()
+        if preReleaseSuffixes.contains(where: { lower.contains($0) }) { return false }
+        // Semantic version comparison
+        let lParts = latest.split(separator: ".").compactMap { Int($0) }
+        let cParts = current.split(separator: ".").compactMap { Int($0) }
+        for i in 0..<max(lParts.count, cParts.count) {
+            let l = i < lParts.count ? lParts[i] : 0
+            let c = i < cParts.count ? cParts[i] : 0
+            if l > c { return true }
+            if l < c { return false }
+        }
+        return false
     }
 
     private func checkBrewUpdate(formula: String, cask: Bool, onResult: @MainActor (String) -> Void) async {
