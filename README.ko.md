@@ -5,8 +5,8 @@
 <h1 align="center">Toki Monitor</h1>
 
 <p align="center">
-  <b>메뉴바에서 토끼가 뛰어다닙니다 — 토큰을 많이 쓸수록 빨라집니다.</b><br>
-  macOS 메뉴바 AI 토큰 모니터. 프록시 없음. 클라우드 없음. 데이터는 로컬에 남습니다.
+  <b>토큰을 태울수록 토끼가 빨라집니다.</b><br>
+  macOS 메뉴바 AI 토큰 모니터. <a href="https://github.com/korjwl1/toki">toki</a> 기반 — 유휴 시 CPU 0%, 즉시 쿼리, 존재감 없이 항상 실행.
 </p>
 
 <p align="center">
@@ -148,31 +148,37 @@ open /Applications/TokiMonitor.app
 
 ## 작동 원리
 
-Toki Monitor는 [toki](https://github.com/korjwl1/toki)의 시각적 동반자입니다. toki는 AI 도구의 세션 파일을 로컬 시계열 데이터베이스에 인덱싱하는 Rust 데몬입니다.
+### 왜 toki인가?
 
-다른 메뉴바 앱은 매번 파일을 다시 스캔합니다. Toki는 인덱싱된 데이터베이스에 쿼리합니다 — 어떤 시간 범위든 즉시 응답, 대기 시 CPU 0%.
+다른 AI 사용량 모니터는 전부 같은 방식입니다: 타이머로 파일을 폴링하고, 전부 다시 파싱하고, 결과를 보여주고, 버립니다. 시간 범위를 바꾸면? 다시 스캔. 앱을 닫으면? 데이터 소실.
 
-| | toki | 파일 폴링 도구 |
+[**toki**](https://github.com/korjwl1/toki)는 다릅니다. kqueue로 AI 도구의 세션 파일을 감시하는 Rust 데몬입니다 — 폴링이 아니라 이벤트 기반. 토큰이 발생하면 즉시 내장 시계열 데이터베이스(fjall TSDB)에 저장합니다. 아무 일도 없으면 CPU 사용량은 문자 그대로 0%입니다.
+
+결과: 전체 토큰 히스토리가 인덱싱되어 있고 어떤 시간 범위든 PromQL로 ~7ms에 쿼리 가능합니다 — 파일 재스캔 없이, 대기 없이, 렉 없이. 그리고 이 모든 게 ~5MB 메모리에서 동작합니다.
+
+| | toki | 다른 모든 도구 |
 |---|---|---|
-| **수집** | Rust 데몬, 이벤트 기반 — 대기 시 CPU 0% | 주기적 스캔, 데이터에 비례 |
-| **저장** | fjall TSDB, 인덱싱 | 없음 — 앱 종료 시 소실 |
-| **쿼리** | ~7 ms (PromQL) | 매번 전체 재스캔 |
-| **메모리** | ~5 MB 대기 | 30–50 MB+ |
-| **클라이언트** | CLI + 메뉴바 앱이 하나의 데몬 공유 | 각 도구가 독립 스캔 |
+| **수집 방식** | kqueue 파일 감시 — 즉시, 유휴 시 CPU 0% | 타이머 기반 재스캔 (30초~5분 간격) |
+| **저장** | 내장 TSDB — 영구 저장, 인덱싱 | 없음 — 앱 종료 시 소실 |
+| **쿼리** | PromQL 엔진 — 어떤 범위든 ~7ms | 매번 전체 파일 재스캔 |
+| **메모리** | ~5 MB | 20~100 MB+ |
+| **아키텍처** | 하나의 데몬이 CLI + 메뉴바 + 대시보드 지원 | 각 앱이 독립적으로 재스캔 |
+
+toki는 백그라운드에서 조용히 실행됩니다 — 필요할 때까지 존재를 느끼지 못합니다. 설정 파일도, 데이터베이스 관리도 필요 없습니다. 그냥 동작합니다.
+
+### 아키텍처
 
 ```
-toki (Rust)                     Toki Monitor (Swift/SwiftUI)
+toki (Rust 데몬)                Toki Monitor (Swift/SwiftUI)
 ├─ fjall TSDB                   ├─ Data        // UDS, CLI, Keychain
 ├─ kqueue 파일 감시             ├─ Domain      // 집계, 알림
 ├─ PromQL 엔진                  └─ Presentation// 메뉴바, 대시보드
 └─ UDS 서버
 
 실시간:   daemon → trace → UDS → EventStream → Aggregator → 메뉴바
-대시보드: 패널 쿼리 → interpolate → toki report → PanelDataState → 차트
+대시보드: 패널 쿼리 → interpolate → toki report → 차트
 사용량:   Claude Keychain / Codex auth.json → Monitor → 위젯
 ```
-
----
 
 ### 개인 정보
 

@@ -5,8 +5,8 @@
 <h1 align="center">Toki Monitor</h1>
 
 <p align="center">
-  <b>A rabbit runs in your menu bar — faster when you're burning tokens.</b><br>
-  macOS menu bar AI token monitor. No proxy. No cloud. Your data stays local.
+  <b>A rabbit that runs as fast as you burn tokens.</b><br>
+  macOS menu bar AI token monitor. Powered by <a href="https://github.com/korjwl1/toki">toki</a> — zero CPU at idle, instant queries, always running in the background without you noticing.
 </p>
 
 <p align="center">
@@ -151,27 +151,37 @@ Not logged in? The widget shows a prompt instead of hiding — Claude shows "Cla
 
 ---
 
-## How it works (and why it's fast)
+## How it works
 
-Other menu bar apps rescan files on every poll. Toki queries an indexed database — instant at any range, zero CPU at idle.
+### Why toki?
 
-| | toki | File-polling tools |
+Every other AI usage monitor works the same way: poll files on a timer, reparse everything, show the result, throw it away. Switch to a different time range? Rescan. Close the app? Data gone.
+
+[**toki**](https://github.com/korjwl1/toki) is different. It's a Rust daemon that watches your AI tool session files via kqueue — event-driven, not polling. When tokens flow, toki captures them instantly into an embedded time-series database (fjall TSDB). When nothing happens, CPU usage is literally 0%.
+
+The result: your entire token history is indexed and queryable at any time range in ~7ms via PromQL — no rescanning, no waiting, no lag. And it all runs in ~5MB of memory, lighter than most menu bar icons.
+
+| | toki | Every other tool |
 |---|---|---|
-| **Collection** | Rust daemon, event-driven — 0% CPU idle | Periodic scan, scales with data |
-| **Storage** | fjall TSDB, indexed | None — lost when app closes |
-| **Query** | ~7 ms (PromQL) | Full rescan each time |
-| **Memory** | ~5 MB idle | 30–50 MB+ |
-| **Clients** | CLI + menu bar share one daemon | Each tool scans on its own |
+| **How it collects** | kqueue file watcher — instant, 0% CPU idle | Timer-based rescan (30s–5min intervals) |
+| **Where it stores** | Embedded TSDB — persistent, indexed | Nowhere — lost when app closes |
+| **How it queries** | PromQL engine — ~7ms any range | Full file rescan each time |
+| **Memory** | ~5 MB | 20–100 MB+ |
+| **Architecture** | One daemon serves CLI + menu bar + dashboard | Each app rescans independently |
+
+toki runs silently in the background — you won't notice it until you need it. No setup, no config files, no database to manage. It just works.
+
+### Architecture
 
 ```
-toki (Rust)                     Toki Monitor (Swift/SwiftUI)
+toki (Rust daemon)              Toki Monitor (Swift/SwiftUI)
 ├─ fjall TSDB                   ├─ Data        // UDS, CLI, Keychain
 ├─ kqueue file watchers         ├─ Domain      // Aggregation, alerts
 ├─ PromQL engine                └─ Presentation// Menu bar, dashboard
 └─ UDS server
 
 Real-time:  daemon → trace → UDS → EventStream → Aggregator → Menu Bar
-Dashboard:  Panel query → interpolate($__from, $provider) → toki report → PanelDataState → Chart
+Dashboard:  Panel query → interpolate($__from, $provider) → toki report → Chart
 Usage:      Claude Keychain / Codex auth.json → Monitor → Widget
 ```
 
