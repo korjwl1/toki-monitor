@@ -8,6 +8,8 @@ struct CustomDashboardView: View {
     var onEditPanel: ((PanelConfig) -> Void)?
 
     @State private var barHoverState = BarHoverState()
+    @State private var barModelData: [(model: String, points: [TimeSeriesData.ChartPoint])] = []
+    @State private var barAnimated = false
 
 
     var body: some View {
@@ -201,6 +203,8 @@ struct CustomDashboardView: View {
                 .font(.system(size: 20, weight: .semibold, design: .monospaced))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
+                .animation(.easeOut(duration: 0.5), value: stat.value)
             if let subtitle = stat.subtitle {
                 Text(subtitle)
                     .font(.system(size: 10))
@@ -212,14 +216,9 @@ struct CustomDashboardView: View {
 
     @ViewBuilder
     private func barChartContent(for metric: PanelMetric, data: TimeSeriesData?) -> some View {
-        let modelData = PanelDataExtractor.allModelChartPoints(
-            for: metric,
-            enabledModels: viewModel.enabledModels,
-            data: data
-        )
         let bucketSecs = viewModel.dashboardConfig.time.bucketSeconds
-        Chart {
-            ForEach(modelData, id: \.model) { entry in
+        return Chart {
+            ForEach(barModelData, id: \.model) { entry in
                 ForEach(entry.points) { point in
                     BarMark(
                         x: .value(L.dash.axisTime, point.date),
@@ -242,7 +241,6 @@ struct CustomDashboardView: View {
         .chartOverlay { proxy in
             GeometryReader { geo in
                 ZStack(alignment: .topLeading) {
-                    // Crosshair line — clipped to plot area only
                     if barHoverState.date != nil, let plotFrame = proxy.plotFrame {
                         let plotRect = geo[plotFrame]
                         Rectangle()
@@ -258,7 +256,7 @@ struct CustomDashboardView: View {
                         .onContinuousHover { phase in
                             switch phase {
                             case .active(let location):
-                                barHoverState.date = snapToNearestBar(at: location, proxy: proxy, geo: geo, modelData: modelData)
+                                barHoverState.date = snapToNearestBar(at: location, proxy: proxy, geo: geo, modelData: barModelData)
                                 barHoverState.position = location
                             case .ended:
                                 barHoverState.date = nil
@@ -270,11 +268,42 @@ struct CustomDashboardView: View {
         .overlay(alignment: .topLeading) {
             BarChartTooltipOverlay(
                 state: barHoverState,
-                modelData: modelData,
+                modelData: barModelData,
                 bucketSecs: bucketSecs,
                 colorForModel: { viewModel.colorForModel($0) },
                 formatDate: { formatBarDate($0) }
             )
+        }
+        .onAppear { barAnimateIn(metric: metric, data: data) }
+        .onChange(of: viewModel.dataVersion) { _, _ in barAnimateIn(metric: metric, data: data) }
+        .onChange(of: viewModel.isLoading) { _, loading in
+            if loading { barCollapseToZero() }
+        }
+    }
+
+    private func barAnimateIn(metric: PanelMetric, data: TimeSeriesData?) {
+        let real = PanelDataExtractor.allModelChartPoints(
+            for: metric,
+            enabledModels: viewModel.enabledModels,
+            data: data
+        )
+        barModelData = real.map { entry in
+            (model: entry.model, points: entry.points.map {
+                TimeSeriesData.ChartPoint(date: $0.date, value: 0)
+            })
+        }
+        withAnimation(.easeOut(duration: 0.3)) {
+            barModelData = real
+        }
+    }
+
+    private func barCollapseToZero() {
+        withAnimation(.easeIn(duration: 0.15)) {
+            barModelData = barModelData.map { entry in
+                (model: entry.model, points: entry.points.map {
+                    TimeSeriesData.ChartPoint(date: $0.date, value: 0)
+                })
+            }
         }
     }
 

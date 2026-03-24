@@ -19,6 +19,7 @@ struct PieChartView: View {
     ]
 
     @State private var hoveredLabel: String?
+    @State private var animationProgress: Double = 0
 
     private var total: Double { entries.reduce(0) { $0 + $1.value } }
 
@@ -69,6 +70,18 @@ struct PieChartView: View {
         }
         .frame(minHeight: 150)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            animationProgress = 0
+            withAnimation(.easeOut(duration: 0.4)) {
+                animationProgress = 1
+            }
+        }
+        .onChange(of: entries.map(\.value)) { _, _ in
+            animationProgress = 0
+            withAnimation(.easeOut(duration: 0.4)) {
+                animationProgress = 1
+            }
+        }
     }
 
     // MARK: - Chart
@@ -78,7 +91,7 @@ struct PieChartView: View {
         return ZStack {
             Chart(displayEntries) { entry in
                 SectorMark(
-                    angle: .value("value", entry.value),
+                    angle: .value("value", entry.value * animationProgress),
                     innerRadius: .ratio(hoveredLabel == entry.label ? 0.45 : 0.5),
                     outerRadius: .ratio(hoveredLabel == entry.label ? 1.0 : 0.92),
                     angularInset: 1

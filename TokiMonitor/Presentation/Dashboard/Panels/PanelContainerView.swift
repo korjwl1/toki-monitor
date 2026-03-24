@@ -92,10 +92,11 @@ struct PanelContainerView<Content: View>: View {
             // Content — with centralized data state handling
             if let state = dataState {
                 switch state {
-                case .idle, .loading:
+                case .idle:
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .loaded:
+                case .loading, .loaded:
+                    // Show content during loading too (animation handles the transition)
                     content
                 case .error(let message):
                     ContentUnavailableView(

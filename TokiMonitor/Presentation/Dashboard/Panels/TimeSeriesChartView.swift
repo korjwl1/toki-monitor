@@ -86,19 +86,50 @@ struct TimeSeriesChartView: View {
                     .offset(x: max(8, min(hoverX - 80, plotWidth - 170)), y: 4)
             }
         }
-        .onAppear { recalcModelData() }
-        .onChange(of: viewModel.dataVersion) { _, _ in recalcModelData() }
-        .onChange(of: viewModel.enabledModels) { _, _ in recalcModelData() }
+        .onAppear { animateIn() }
+        .onChange(of: viewModel.dataVersion) { _, _ in animateIn() }
+        .onChange(of: viewModel.enabledModels) { _, _ in
+            withAnimation(.easeOut(duration: 0.3)) {
+                modelData = PanelDataExtractor.allModelChartPoints(
+                    for: metric,
+                    enabledModels: viewModel.enabledModels,
+                    data: viewModel.timeSeriesData
+                )
+            }
+        }
+        .onChange(of: viewModel.isLoading) { _, loading in
+            if loading { collapseToZero() }
+        }
     }
 
     // MARK: - Data
 
-    private func recalcModelData() {
-        modelData = PanelDataExtractor.allModelChartPoints(
+    private func animateIn() {
+        let real = PanelDataExtractor.allModelChartPoints(
             for: metric,
             enabledModels: viewModel.enabledModels,
             data: viewModel.timeSeriesData
         )
+        // Start from zero
+        modelData = real.map { entry in
+            (model: entry.model, points: entry.points.map {
+                TimeSeriesData.ChartPoint(date: $0.date, value: 0)
+            })
+        }
+        // Animate to real values
+        withAnimation(.easeOut(duration: 0.3)) {
+            modelData = real
+        }
+    }
+
+    private func collapseToZero() {
+        withAnimation(.easeIn(duration: 0.15)) {
+            modelData = modelData.map { entry in
+                (model: entry.model, points: entry.points.map {
+                    TimeSeriesData.ChartPoint(date: $0.date, value: 0)
+                })
+            }
+        }
     }
 
     // MARK: - Tooltip

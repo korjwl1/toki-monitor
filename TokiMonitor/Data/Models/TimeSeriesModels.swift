@@ -182,7 +182,7 @@ struct TimeSeriesData {
     }
 
     struct ChartPoint: Identifiable {
-        let id = UUID()
+        var id: Date { date }
         let date: Date
         let value: Double
     }
