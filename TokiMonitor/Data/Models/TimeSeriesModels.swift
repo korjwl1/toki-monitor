@@ -203,13 +203,16 @@ struct TimeSeriesData {
 
 enum PanelDataState {
     case idle
-    case loading
+    case loading(previous: TimeSeriesData?)
     case loaded(TimeSeriesData)
     case error(String)
 
     var timeSeriesData: TimeSeriesData? {
-        if case .loaded(let data) = self { return data }
-        return nil
+        switch self {
+        case .loaded(let data): return data
+        case .loading(let prev): return prev
+        default: return nil
+        }
     }
 
     var isLoading: Bool {

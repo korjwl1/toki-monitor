@@ -130,9 +130,10 @@ final class DashboardViewModel {
         let panels = dashboardConfig.panels.filter { $0.panelType != .rowPanel }
         let time = dashboardConfig.time
 
-        // Mark all panels as loading
+        // Mark all panels as loading, preserving previous data
         for panel in panels {
-            panelData[panel.id] = .loading
+            let previous = panelData[panel.id]?.timeSeriesData
+            panelData[panel.id] = .loading(previous: previous)
         }
         isLoading = true
         errorMessage = nil
@@ -150,7 +151,8 @@ final class DashboardViewModel {
                 queryGroups[interpolated, default: []].append(panel)
             }
 
-            // Execute each unique query once
+            // Execute all queries concurrently, collect results
+            var queryResults: [(String, Result<TimeSeriesData, Error>)] = []
             await withTaskGroup(of: (String, Result<TimeSeriesData, Error>).self) { group in
                 for (query, _) in queryGroups {
                     group.addTask { [reportClient] in
@@ -163,24 +165,29 @@ final class DashboardViewModel {
                     }
                 }
 
-                for await (query, result) in group {
-                    let affectedPanels = queryGroups[query] ?? []
-                    switch result {
-                    case .success(let data):
-                        for panel in affectedPanels {
-                            self.panelData[panel.id] = .loaded(data)
-                        }
-                    case .failure(let error):
-                        for panel in affectedPanels {
-                            self.panelData[panel.id] = .error(error.localizedDescription)
-                        }
-                    }
+                for await result in group {
+                    queryResults.append(result)
                 }
             }
 
-            // Fetch project panels separately (toki returns project in period field)
+            // Fetch project panels concurrently
             if !projectPanels.isEmpty {
                 await fetchProjectPanels(projectPanels, time: time)
+            }
+
+            // Apply all results in one batch (single UI update)
+            for (query, result) in queryResults {
+                let affectedPanels = queryGroups[query] ?? []
+                switch result {
+                case .success(let data):
+                    for panel in affectedPanels {
+                        self.panelData[panel.id] = .loaded(data)
+                    }
+                case .failure(let error):
+                    for panel in affectedPanels {
+                        self.panelData[panel.id] = .error(error.localizedDescription)
+                    }
+                }
             }
 
             // Backward compatibility: set global timeSeriesData from first loaded regular panel
