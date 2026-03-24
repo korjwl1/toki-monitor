@@ -118,9 +118,9 @@ open /Applications/TokiMonitor.app
 | **Claude** | 5시간 및 7일 윈도우 + 리셋 카운트다운 |
 | **Codex** | 주간 및 5시간 윈도우 + 리셋 카운트다운 |
 
-기존 CLI 인증 정보를 그대로 사용 — 추가 로그인 불필요. 색상 코드 바: 초록 → 노랑 → 주황 → 빨강.
+각 CLI의 로컬 인증 정보를 직접 읽습니다 — 추가 로그인 불필요. Claude는 macOS 키체인(`Claude Code-credentials`)에서, Codex는 `~/.codex/auth.json`에서 토큰을 읽습니다. 색상 코드 바: 초록 → 노랑 → 주황 → 빨강.
 
-로그인 안 됐으면? 위젯이 숨겨지는 대신 로그인 안내를 보여줍니다 — Claude는 설정으로 안내, Codex는 `codex --login` 명령어 표시.
+로그인 안 됐으면? 위젯이 숨겨지는 대신 안내를 보여줍니다 — Claude는 "Claude Code 로그인 필요", Codex는 `codex --login` 명령어 표시.
 
 ### 이상 감지
 
@@ -212,10 +212,63 @@ xcodebuild test -scheme TokiMonitor -destination 'platform=macOS'
 
 ---
 
+## 커스텀 애니메이션
+
+메뉴바에 나만의 캐릭터를 추가할 수 있습니다. `Resources/Animations/` 아래에 폴더를 만드세요:
+
+```
+Resources/Animations/
+  rabbit/              ← 기본 내장
+    theme.json
+    run_00.png
+    ...
+  my-character/        ← 직접 추가
+    theme.json
+    run_00.png ~ run_XX.png
+    sleep_00.png ~ sleep_XX.png   (선택)
+```
+
+### 프레임 사양
+
+- **크기**: 28×18 px (또는 `theme.json`에서 지정한 크기)
+- **포맷**: 투명 배경 PNG, 검정(`#000000`)만 사용
+- **템플릿**: macOS 템플릿 이미지로 렌더링 (시스템이 자동 틴팅)
+- **이름**: `run_00.png`, `run_01.png`, ... (순번, 0-패딩)
+- **프레임 수**: 자유 — 자동 감지
+
+### theme.json
+
+```json
+{
+  "id": "my-character",
+  "name": "English Name",
+  "nameKo": "한국어 이름",
+  "frameSize": [28, 18],
+  "canvasSize": [28, 18],
+  "sleep": {
+    "mode": "overlay",
+    "textOffset": [-7, -1],
+    "fontSize": 5,
+    "interval": 0.8
+  }
+}
+```
+
+| 필드 | 설명 |
+|------|------|
+| `frameSize` | 캐릭터 그리기 크기 (pt 단위, [너비, 높이]) |
+| `canvasSize` | 마진 포함 전체 캔버스 크기 |
+| `sleep.mode` | `"overlay"` = zZ 텍스트 자동 생성, `"frames"` = `sleep_XX.png` 파일 사용 |
+| `sleep.textOffset` | zZ 텍스트 위치 오프셋 (캐릭터 우상단 기준, overlay 모드) |
+| `sleep.interval` | 수면 애니메이션 프레임당 초 |
+
+테마는 앱 시작 시 자동 탐색됩니다. 설정 → 메뉴바 → 캐릭터에서 선택.
+
+---
+
 ## 예정된 기능
 
 - **Gemini CLI 지원** — Google Gemini 프로바이더 연동
-- **커스텀 애니메이션** — 나만의 캐릭터 프레임 사용
 - **멀티 디바이스 동기화** — toki-sync를 통한 기기 간 사용량 데이터 공유
 - **사용량 보고서** — 주간/월간 요약, 전주 대비 및 전월 대비 분석
 

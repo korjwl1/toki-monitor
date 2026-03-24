@@ -122,9 +122,9 @@ Each panel runs its own PromQL query. Identical queries are deduplicated automat
 | **Claude** | 5-hour and 7-day windows with reset countdown |
 | **Codex** | Weekly and 5-hour windows with reset countdown |
 
-Reads existing CLI credentials — no extra login. Color-coded bars: green → yellow → orange → red.
+Reads credentials directly from each CLI's local storage — no extra login required. Claude reads from the macOS Keychain (`Claude Code-credentials`), Codex from `~/.codex/auth.json`. Color-coded bars: green → yellow → orange → red.
 
-Not logged in? The widget shows a login prompt instead of hiding — Claude links to Settings, Codex shows the `codex --login` command.
+Not logged in? The widget shows a prompt instead of hiding — Claude shows "Claude Code login required", Codex shows the `codex --login` command.
 
 ### Anomaly detection
 
@@ -213,10 +213,64 @@ Contributions welcome!
 
 ---
 
+## Custom Animations
+
+Add your own character to the menu bar. Each theme is a folder under `Resources/Animations/`:
+
+```
+Resources/Animations/
+  rabbit/              ← built-in default
+    theme.json
+    run_00.png
+    run_01.png
+    ...
+  your-character/      ← add your own
+    theme.json
+    run_00.png ~ run_XX.png
+    sleep_00.png ~ sleep_XX.png   (optional)
+```
+
+### Frame specs
+
+- **Size**: 28×18 px (or any size — set in `theme.json`)
+- **Format**: transparent background PNG, black only (`#000000`)
+- **Template**: frames are rendered as macOS template images (system tints automatically)
+- **Naming**: `run_00.png`, `run_01.png`, ... (sequential, zero-padded)
+- **Count**: any number of frames — detected automatically
+
+### theme.json
+
+```json
+{
+  "id": "your-character",
+  "name": "Display Name",
+  "nameKo": "한국어 이름",
+  "frameSize": [28, 18],
+  "canvasSize": [28, 18],
+  "sleep": {
+    "mode": "overlay",
+    "textOffset": [-7, -1],
+    "fontSize": 5,
+    "interval": 0.8
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `frameSize` | Character draw size in pt (width, height) |
+| `canvasSize` | Total canvas size including margins |
+| `sleep.mode` | `"overlay"` = auto-generate zZ text, `"frames"` = use `sleep_XX.png` files |
+| `sleep.textOffset` | zZ position offset from top-right of character (overlay mode) |
+| `sleep.interval` | Seconds per frame during sleep animation |
+
+Themes are discovered at launch. Select in Settings → Menu Bar → Character.
+
+---
+
 ## Upcoming
 
 - **Gemini CLI support** — Google Gemini provider integration
-- **Custom animations** — bring your own character frames
 - **Multi-device sync** — share usage data across machines via toki-sync
 - **Usage reports** — weekly/monthly summaries with week-over-week and month-over-month comparisons
 
