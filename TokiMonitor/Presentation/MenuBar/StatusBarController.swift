@@ -28,6 +28,9 @@ final class StatusBarController {
     // Codex Usage
     private lazy var codexUsageMonitor = CodexUsageMonitor(aggregator: aggregator)
 
+    // Update Checker
+    private let updateChecker = UpdateChecker()
+
     // Menu panel
     private var menuPanel: NSPanel?
     private var menuHostingView: NSHostingView<MenuContentView>?
@@ -68,6 +71,7 @@ final class StatusBarController {
             await syncProvidersOnFirstLaunch()
             await CodexAuthReader.resolveCodexRoot()
             codexUsageMonitor.startPolling()
+            updateChecker.checkOnLaunch()
             // Rebuild after sync so status items reflect actual provider state
             rebuildStatusItems()
         }
