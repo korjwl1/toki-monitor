@@ -303,10 +303,22 @@ final class DashboardViewModel {
         }
     }
 
+    /// Cache for resolved project names to avoid repeated FileManager.fileExists calls.
+    private static var projectNameCache: [String: String] = [:]
+
     /// Extract last folder name from toki project paths.
     /// Claude Code encodes paths with - instead of /. Recover by splitting on -
     /// then greedily rebuilding the path, trying / then - then _ as joiners.
     static func cleanProjectName(_ raw: String) -> String {
+        if let cached = projectNameCache[raw] {
+            return cached
+        }
+        let result = resolveProjectName(raw)
+        projectNameCache[raw] = result
+        return result
+    }
+
+    private static func resolveProjectName(_ raw: String) -> String {
         if raw.contains("/") {
             return URL(fileURLWithPath: raw).lastPathComponent
         }

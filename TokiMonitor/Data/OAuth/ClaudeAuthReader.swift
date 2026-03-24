@@ -34,31 +34,44 @@ enum ClaudeAuthReader {
     // MARK: - Private
 
     private static func readCredentialsJSON() -> [String: Any]? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        process.arguments = ["find-generic-password", "-s", service, "-w"]
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: [String: Any]?
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+            process.arguments = ["find-generic-password", "-s", service, "-w"]
 
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            return nil
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+
+            do {
+                try process.run()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+
+                guard process.terminationStatus == 0, !data.isEmpty else {
+                    semaphore.signal()
+                    return
+                }
+
+                if let jsonData = String(data: data, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .data(using: .utf8) {
+                    result = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
+                }
+            } catch {
+                // Process failed to launch
+            }
+            semaphore.signal()
         }
 
-        guard process.terminationStatus == 0 else { return nil }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard !data.isEmpty else { return nil }
-
-        // The output is the password value (JSON string) followed by a newline
-        guard let jsonData = String(data: data, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .data(using: .utf8) else { return nil }
-
-        return try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
+        // Timeout after 5 seconds to avoid blocking indefinitely
+        let timeout = semaphore.wait(timeout: .now() + 5)
+        if timeout == .timedOut {
+            return nil
+        }
+        return result
     }
 }

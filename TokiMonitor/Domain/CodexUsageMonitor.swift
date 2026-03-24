@@ -101,6 +101,12 @@ final class CodexUsageMonitor {
             queue: .main
         )
 
+        // Set cancel handler first to ensure fd is always closed,
+        // even if we bail out before resume().
+        source.setCancelHandler {
+            close(fd)
+        }
+
         source.setEventHandler { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -119,10 +125,6 @@ final class CodexUsageMonitor {
 
                 await self.pollOnce()
             }
-        }
-
-        source.setCancelHandler {
-            close(fd)
         }
 
         source.resume()

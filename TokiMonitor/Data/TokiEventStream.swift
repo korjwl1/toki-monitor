@@ -77,15 +77,18 @@ final class TokiEventStream {
 
         while let newlineIndex = buffer.firstIndex(of: UInt8(ascii: "\n")) {
             let lineData = buffer[buffer.startIndex..<newlineIndex]
-            buffer = Data(buffer[buffer.index(after: newlineIndex)...])
+            let removeEnd = buffer.index(after: newlineIndex)
 
-            guard !lineData.isEmpty else { continue }
-            parseLine(Data(lineData))
+            if !lineData.isEmpty {
+                parseLine(lineData)
+            }
+
+            buffer.removeSubrange(buffer.startIndex..<removeEnd)
         }
     }
 
-    private func parseLine(_ data: Data) {
-        guard let envelope = try? decoder.decode(TokiEventEnvelope.self, from: data),
+    private func parseLine(_ data: some DataProtocol) {
+        guard let envelope = try? decoder.decode(TokiEventEnvelope.self, from: Data(data)),
               envelope.type == "event" else {
             return
         }

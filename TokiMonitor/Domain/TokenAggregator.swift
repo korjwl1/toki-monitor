@@ -186,8 +186,14 @@ final class TokenAggregator {
     }
 
     private var lastNotifiedAlert: SpendAlert = .normal
+    private var lastAlertCheckTime: Date = .distantPast
+    private let alertCheckInterval: TimeInterval = 30
 
     private func updateSpendAlert() {
+        let now = Date()
+        guard now.timeIntervalSince(lastAlertCheckTime) >= alertCheckInterval else { return }
+        lastAlertCheckTime = now
+
         guard let s = settings else { spendAlert = .normal; return }
 
         let newAlert: SpendAlert
@@ -258,25 +264,24 @@ final class TokenAggregator {
         let binWidth = graphTimeRange.sampleInterval
         let totalDuration = Double(historyBins) * binWidth
         let windowStart = now.addingTimeInterval(-totalDuration)
+        let rateScale = 1.0 / (binWidth / 60.0)
 
         var globalBins = [Double](repeating: 0, count: historyBins)
+        // Pre-allocate provider bins using known providers to avoid repeated nil checks
         var providerBins: [String: [Double]] = [:]
+        providerBins.reserveCapacity(8)
 
         for (date, models) in pointsByDate {
             guard date >= windowStart else { continue }
-            let age = now.timeIntervalSince(date)
-            let binIndex = historyBins - 1 - Int(age / binWidth)
+            let binIndex = historyBins - 1 - Int(now.timeIntervalSince(date) / binWidth)
             guard binIndex >= 0 && binIndex < historyBins else { continue }
 
             for model in models {
-                let rate = Double(model.totalTokens) / (binWidth / 60.0)
+                let rate = Double(model.totalTokens) * rateScale
                 globalBins[binIndex] += rate
 
                 let pid = ProviderRegistry.resolve(model: model.model).id
-                if providerBins[pid] == nil {
-                    providerBins[pid] = [Double](repeating: 0, count: historyBins)
-                }
-                providerBins[pid]?[binIndex] += rate
+                providerBins[pid, default: [Double](repeating: 0, count: historyBins)][binIndex] += rate
             }
         }
 

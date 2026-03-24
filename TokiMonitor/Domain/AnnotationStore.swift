@@ -1,8 +1,10 @@
 import Foundation
+import os.log
 
 /// Persists dashboard annotations per dashboard UID.
 @MainActor
 final class AnnotationStore {
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "TokiMonitor", category: "AnnotationStore")
     private static let storeKey = "dashboardAnnotations"
 
     func annotations(for dashboardUID: String) -> [DashboardAnnotation] {
@@ -39,14 +41,21 @@ final class AnnotationStore {
     // MARK: - Persistence
 
     private func loadAll() -> [DashboardAnnotation] {
-        guard let data = UserDefaults.standard.data(forKey: Self.storeKey),
-              let items = try? JSONDecoder().decode([DashboardAnnotation].self, from: data)
-        else { return [] }
-        return items
+        guard let data = UserDefaults.standard.data(forKey: Self.storeKey) else { return [] }
+        do {
+            return try JSONDecoder().decode([DashboardAnnotation].self, from: data)
+        } catch {
+            Self.logger.error("Failed to decode annotations from key '\(Self.storeKey)': \(error.localizedDescription)")
+            return []
+        }
     }
 
     private func saveAll(_ items: [DashboardAnnotation]) {
-        guard let data = try? JSONEncoder().encode(items) else { return }
-        UserDefaults.standard.set(data, forKey: Self.storeKey)
+        do {
+            let data = try JSONEncoder().encode(items)
+            UserDefaults.standard.set(data, forKey: Self.storeKey)
+        } catch {
+            Self.logger.error("Failed to encode \(items.count) annotations for key '\(Self.storeKey)': \(error.localizedDescription)")
+        }
     }
 }

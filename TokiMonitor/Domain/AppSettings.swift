@@ -265,6 +265,7 @@ final class AppSettings {
     }
 
     private let defaults = UserDefaults.standard
+    private var pendingSave: DispatchWorkItem?
 
     init() {
         let ud = UserDefaults.standard
@@ -322,6 +323,17 @@ final class AppSettings {
     // MARK: - Persistence
 
     private func save() {
+        pendingSave?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.performSave()
+            }
+        }
+        pendingSave = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
+    private func performSave() {
         defaults.set(animationThemeId, forKey: "animationThemeId")
         defaults.set(animationStyle.rawValue, forKey: "animationStyle")
         defaults.set(sleepDelay.rawValue, forKey: "sleepDelay")

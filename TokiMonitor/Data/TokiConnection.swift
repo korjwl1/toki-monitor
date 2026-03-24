@@ -134,9 +134,11 @@ final class TokiTraceListener {
 
 enum CLIRunnerError: Error, LocalizedError {
     case exitCode(Int)
+    case timeout
     var errorDescription: String? {
         switch self {
         case .exitCode(let code): "toki exited with code \(code)"
+        case .timeout: "toki CLI timed out"
         }
     }
 }
@@ -144,7 +146,8 @@ enum CLIRunnerError: Error, LocalizedError {
 enum CLIProcessRunner {
     /// Run a CLI process on a background queue, reading stdout before waitUntilExit
     /// to avoid pipe buffer deadlock.
-    static func run(executable: String, arguments: [String]) async throws -> Data {
+    /// - Parameter timeout: Maximum time in seconds before the process is killed (default 30s).
+    static func run(executable: String, arguments: [String], timeout: TimeInterval = 30) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 let process = Process()
@@ -155,21 +158,59 @@ enum CLIProcessRunner {
                 process.standardOutput = pipe
                 process.standardError = FileHandle.nullDevice
 
+                // Track whether continuation has been resumed
+                let resumed = LockedFlag()
+
                 do {
                     try process.run()
+
+                    // Schedule a timeout that kills the process
+                    let timeoutItem = DispatchWorkItem {
+                        if process.isRunning {
+                            process.terminate()
+                        }
+                        if resumed.setIfUnset() {
+                            continuation.resume(throwing: CLIRunnerError.timeout)
+                        }
+                    }
+                    DispatchQueue.global(qos: .utility).asyncAfter(
+                        deadline: .now() + timeout,
+                        execute: timeoutItem
+                    )
+
                     let data = pipe.fileHandleForReading.readDataToEndOfFile()
                     process.waitUntilExit()
+                    timeoutItem.cancel()
 
-                    if process.terminationStatus == 0 {
-                        continuation.resume(returning: data)
-                    } else {
-                        continuation.resume(throwing: CLIRunnerError.exitCode(Int(process.terminationStatus)))
+                    if resumed.setIfUnset() {
+                        if process.terminationStatus == 0 {
+                            continuation.resume(returning: data)
+                        } else {
+                            continuation.resume(throwing: CLIRunnerError.exitCode(Int(process.terminationStatus)))
+                        }
                     }
                 } catch {
-                    continuation.resume(throwing: error)
+                    if resumed.setIfUnset() {
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
         }
+    }
+}
+
+/// Thread-safe one-shot flag to prevent double-resume of continuations.
+private final class LockedFlag: @unchecked Sendable {
+    private var _value = false
+    private let lock = NSLock()
+
+    /// Returns `true` if this call set the flag (i.e., first caller wins).
+    func setIfUnset() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if _value { return false }
+        _value = true
+        return true
     }
 }
 

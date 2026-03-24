@@ -22,6 +22,7 @@ final class ConnectionManager {
     private let eventStream: TokiEventStream
     private var reconnectAttempts = 0
     private let maxReconnectAttempts = 3
+    private var reconnectTask: Task<Void, Never>?
 
     init(eventStream: TokiEventStream) {
         self.eventStream = eventStream
@@ -43,10 +44,12 @@ final class ConnectionManager {
         }
         reconnectAttempts += 1
         let delay = Double(reconnectAttempts) * 3.0 // 3s, 6s, 9s
-        Task {
+        reconnectTask?.cancel()
+        reconnectTask = Task {
             try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
             let running = await isDaemonRunning()
-            if running {
+            if running, !Task.isCancelled {
                 connect()
             }
         }
@@ -68,6 +71,8 @@ final class ConnectionManager {
     }
 
     func disconnect() {
+        reconnectTask?.cancel()
+        reconnectTask = nil
         eventStream.stop()
         state = .disconnected
     }
@@ -116,14 +121,37 @@ final class ConnectionManager {
                 process.standardOutput = pipe
                 process.standardError = FileHandle.nullDevice
 
+                let resumed = NSLock()
+                var didResume = false
+
+                func resumeOnce(value: Bool) {
+                    resumed.lock()
+                    defer { resumed.unlock() }
+                    guard !didResume else { return }
+                    didResume = true
+                    continuation.resume(returning: value)
+                }
+
                 do {
                     try process.run()
+
+                    // Timeout: kill the process after 10 seconds
+                    let timeoutItem = DispatchWorkItem {
+                        if process.isRunning { process.terminate() }
+                        resumeOnce(value: false)
+                    }
+                    DispatchQueue.global(qos: .utility).asyncAfter(
+                        deadline: .now() + 10, execute: timeoutItem
+                    )
+
                     let data = pipe.fileHandleForReading.readDataToEndOfFile()
                     process.waitUntilExit()
+                    timeoutItem.cancel()
+
                     let output = String(data: data, encoding: .utf8) ?? ""
-                    continuation.resume(returning: output.contains("is running"))
+                    resumeOnce(value: output.contains("is running"))
                 } catch {
-                    continuation.resume(returning: false)
+                    resumeOnce(value: false)
                 }
             }
         }

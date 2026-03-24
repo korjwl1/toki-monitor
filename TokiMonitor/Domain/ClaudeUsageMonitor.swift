@@ -91,6 +91,10 @@ final class ClaudeUsageMonitor {
 
     private func computeInterval() -> TimeInterval {
         if !isAvailable { return 60 }
+        // Exponential backoff on consecutive failures: 15s, 30s, 60s, 120s, max 300s
+        if consecutiveFailures > 0 {
+            return min(15 * pow(2, Double(consecutiveFailures - 1)), 300)
+        }
         if currentUsage == nil { return 15 }
         if let usage = currentUsage, usage.maxUtilization > 75 { return 120 }
         if aggregator.tokensPerMinute > 0 { return 180 }
