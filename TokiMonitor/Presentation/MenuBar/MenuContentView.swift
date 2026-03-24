@@ -508,7 +508,7 @@ private struct GlassPanelModifier: ViewModifier {
         if #available(macOS 26.0, *) {
             content.glassEffect(.regular, in: .rect(cornerRadius: DS.panelRadius))
         } else {
-            content
+            content.background(.thinMaterial, in: RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous))
         }
     }
 }
@@ -529,6 +529,7 @@ private struct GlassContainerModifier: ViewModifier {
             GlassEffectContainer { content }
         } else {
             content
+                .background(.ultraThinMaterial)
         }
     }
 }
