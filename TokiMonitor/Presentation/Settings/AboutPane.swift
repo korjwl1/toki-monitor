@@ -150,9 +150,10 @@ struct AboutPane: View {
         let preReleaseSuffixes = ["alpha", "beta", "rc", "dev", "pre"]
         let lower = latest.lowercased()
         if preReleaseSuffixes.contains(where: { lower.contains($0) }) { return false }
-        // Semantic version comparison
-        let lParts = latest.split(separator: ".").compactMap { Int($0) }
-        let cParts = current.split(separator: ".").compactMap { Int($0) }
+        let cleanLatest = latest.split(separator: "_").first.map(String.init) ?? latest
+        let cleanCurrent = current.split(separator: "_").first.map(String.init) ?? current
+        let lParts = cleanLatest.split(separator: ".").compactMap { Int($0) }
+        let cParts = cleanCurrent.split(separator: ".").compactMap { Int($0) }
         for i in 0..<max(lParts.count, cParts.count) {
             let l = i < lParts.count ? lParts[i] : 0
             let c = i < cParts.count ? cParts[i] : 0
@@ -162,13 +163,20 @@ struct AboutPane: View {
         return false
     }
 
+    private static let brewPath: String = {
+        for path in ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] {
+            if FileManager.default.fileExists(atPath: path) { return path }
+        }
+        return "/opt/homebrew/bin/brew"
+    }()
+
     private func checkBrewUpdate(formula: String, cask: Bool, onResult: @MainActor (String) -> Void) async {
         let args = cask
             ? ["info", "--cask", formula, "--json=v2"]
             : ["info", "--formula", formula, "--json=v2"]
         do {
             let data = try await CLIProcessRunner.run(
-                executable: "/opt/homebrew/bin/brew",
+                executable: Self.brewPath,
                 arguments: args
             )
             // Parse version from brew JSON
