@@ -47,6 +47,8 @@ final class StatusItemUnit {
         }
     }
 
+    private var currentThemeId: String?
+
     /// Update display. tintColor: nil = template/white, non-nil = colored icon/text.
     func update(
         tokensPerMinute: Double,
@@ -56,8 +58,14 @@ final class StatusItemUnit {
         textPosition: TextPosition,
         tokenUnit: TokenUnit,
         tintColor: NSColor? = nil,
-        sleepDelay: TimeInterval = 120
+        sleepDelay: TimeInterval = 120,
+        themeId: String = "rabbit"
     ) {
+        // Switch theme if needed
+        if currentThemeId != themeId {
+            currentThemeId = themeId
+            characterRenderer.setTheme(themeId)
+        }
         guard let button = statusItem.button else { return }
 
         let effectiveStyle: AnimationStyle

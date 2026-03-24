@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarSettingsPane: View {
     @Bindable var settings: AppSettings
+    private let availableThemes = AnimationTheme.discoverAll()
 
     var body: some View {
         Form {
@@ -135,6 +136,12 @@ struct MenuBarSettingsPane: View {
         .pickerStyle(.segmented)
 
         if style.wrappedValue == .character {
+            Picker(L.tr("캐릭터", "Character"), selection: $settings.animationThemeId) {
+                ForEach(availableThemes, id: \.config.id) { theme in
+                    Text(theme.config.localizedName).tag(theme.config.id)
+                }
+            }
+
             Toggle(L.menuBar.showRateText, isOn: showRateText)
 
             if showRateText.wrappedValue {

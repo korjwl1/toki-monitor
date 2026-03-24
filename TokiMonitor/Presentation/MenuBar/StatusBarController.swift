@@ -217,7 +217,8 @@ final class StatusBarController {
                     textPosition: settings.textPosition,
                     tokenUnit: settings.tokenUnit,
                     tintColor: tint,
-                    sleepDelay: settings.sleepDelay.interval
+                    sleepDelay: settings.sleepDelay.interval,
+                    themeId: settings.animationThemeId
                 )
             } else {
                 let baseTint: NSColor? = settings.aggregatedColorName.map { ProviderInfo.nsColorFromName($0) }
@@ -230,7 +231,8 @@ final class StatusBarController {
                     textPosition: settings.textPosition,
                     tokenUnit: settings.tokenUnit,
                     tintColor: tint,
-                    sleepDelay: settings.sleepDelay.interval
+                    sleepDelay: settings.sleepDelay.interval,
+                    themeId: settings.animationThemeId
                 )
             }
         }
@@ -479,6 +481,7 @@ final class StatusBarController {
     private func observeSettings() {
         withObservationTracking {
             _ = settings.animationStyle
+            _ = settings.animationThemeId
             _ = settings.defaultTimeRange
             _ = settings.showRateText
             _ = settings.textPosition

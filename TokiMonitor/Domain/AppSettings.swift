@@ -176,6 +176,9 @@ struct MenuWidgetItem: Codable, Identifiable, Equatable {
 @MainActor
 @Observable
 final class AppSettings {
+    var animationThemeId: String {
+        didSet { save() }
+    }
     var animationStyle: AnimationStyle {
         didSet { save() }
     }
@@ -265,6 +268,7 @@ final class AppSettings {
 
     init() {
         let ud = UserDefaults.standard
+        animationThemeId = ud.string(forKey: "animationThemeId") ?? "rabbit"
         animationStyle = Self.loadEnum(ud, key: "animationStyle") ?? .sparkline
         sleepDelay = Self.loadEnum(ud, key: "sleepDelay") ?? .twoMinutes
         defaultTimeRange = Self.loadEnum(ud, key: "defaultTimeRange") ?? .oneHour
@@ -318,6 +322,7 @@ final class AppSettings {
     // MARK: - Persistence
 
     private func save() {
+        defaults.set(animationThemeId, forKey: "animationThemeId")
         defaults.set(animationStyle.rawValue, forKey: "animationStyle")
         defaults.set(sleepDelay.rawValue, forKey: "sleepDelay")
         defaults.set(defaultTimeRange.rawValue, forKey: "defaultTimeRange")

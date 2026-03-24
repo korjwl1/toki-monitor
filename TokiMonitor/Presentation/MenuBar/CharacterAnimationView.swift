@@ -1,10 +1,10 @@
 import AppKit
 
 /// Renders frame-based character animation in the menu bar.
+/// Loads frames from the active AnimationTheme.
 @MainActor
 final class CharacterAnimationRenderer {
-    private var frames: [NSImage] = []
-    private var sleepFrames: [NSImage] = []
+    private var theme: AnimationTheme?
     private var currentFrame = 0
     private var frameTimer: Timer?
     private let mapper = AnimationStateMapper()
@@ -12,18 +12,25 @@ final class CharacterAnimationRenderer {
     private var currentTintColor: NSColor?
     private var isStopped = false
 
-    /// Tracks when idle state began, to trigger sleep animation after threshold.
     private var idleSince: Date?
     private var isSleeping = false
 
-    /// Resolved from AppSettings.sleepDelay
     var sleepDelay: TimeInterval = 120
 
-    /// Shared canvas size for all frames (running + sleep)
-    private static let canvasSize = NSSize(width: 28, height: 18)
+    private var frames: [NSImage] { theme?.runFrames ?? [] }
+    private var sleepFrames: [NSImage] { theme?.sleepFrames ?? [] }
 
     init() {
-        loadFrames()
+        loadDefaultTheme()
+    }
+
+    /// Switch to a different animation theme by ID.
+    func setTheme(_ themeId: String) {
+        let themes = AnimationTheme.discoverAll()
+        if let match = themes.first(where: { $0.config.id == themeId }) {
+            theme = match
+            currentFrame = 0
+        }
     }
 
     func update(tokensPerMinute: Double, button: NSStatusBarButton, tintColor: NSColor? = nil) {
@@ -32,12 +39,9 @@ final class CharacterAnimationRenderer {
         let idle = mapper.isIdle(tokensPerMinute: tokensPerMinute)
 
         if idle {
-            if idleSince == nil {
-                idleSince = Date()
-            }
+            if idleSince == nil { idleSince = Date() }
 
             let idleDuration = Date().timeIntervalSince(idleSince!)
-
             if idleDuration >= sleepDelay, !sleepFrames.isEmpty {
                 if !isSleeping {
                     isSleeping = true
@@ -45,17 +49,13 @@ final class CharacterAnimationRenderer {
                     startSleepAnimation(button: button)
                 }
             } else {
-                if isSleeping {
-                    isSleeping = false
-                    stopAnimation()
-                }
+                if isSleeping { isSleeping = false; stopAnimation() }
                 stopAnimation()
                 applyFrame(0, from: frames, to: button)
             }
             return
         }
 
-        // Active — reset idle/sleep state
         idleSince = nil
         if isSleeping {
             isSleeping = false
@@ -64,7 +64,6 @@ final class CharacterAnimationRenderer {
         }
 
         let newInterval = mapper.interval(for: tokensPerMinute)
-
         let threshold = 0.1
         if frameTimer != nil,
            currentInterval > 0,
@@ -86,6 +85,61 @@ final class CharacterAnimationRenderer {
 
     // MARK: - Private
 
+    private func loadDefaultTheme() {
+        let themes = AnimationTheme.discoverAll()
+        // Default to "rabbit", fallback to first available
+        theme = themes.first(where: { $0.config.id == "rabbit" }) ?? themes.first
+
+        // Fallback: load from legacy CharacterFrames location
+        if theme == nil {
+            loadLegacyFrames()
+        }
+    }
+
+    private func loadLegacyFrames() {
+        let bundle = Bundle.main
+        let frameSize = NSSize(width: 24, height: 18)
+        let canvasSize = NSSize(width: 28, height: 18)
+
+        var runFrames: [NSImage] = []
+        for i in 0..<7 {
+            let name = String(format: "frame_%02d", i)
+            guard let url = bundle.url(forResource: name, withExtension: "png"),
+                  let src = NSImage(contentsOf: url) else { continue }
+            src.size = frameSize
+            let canvas = NSImage(size: canvasSize, flipped: false) { _ in
+                src.draw(in: NSRect(origin: .zero, size: frameSize))
+                return true
+            }
+            canvas.isTemplate = true
+            runFrames.append(canvas)
+        }
+
+        guard !runFrames.isEmpty else {
+            // Ultimate fallback: placeholder circles
+            let placeholderConfig = AnimationThemeConfig(
+                id: "placeholder", name: "Placeholder",
+                frameSize: [18, 18], canvasSize: [18, 18],
+                sleep: .init(mode: "overlay")
+            )
+            let placeholders = generatePlaceholderFrames()
+            theme = AnimationTheme(
+                config: placeholderConfig,
+                runFrames: placeholders,
+                sleepFrames: []
+            )
+            return
+        }
+
+        let config = AnimationThemeConfig(
+            id: "rabbit", name: "Rabbit",
+            frameSize: [24, 18], canvasSize: [28, 18],
+            sleep: .init(mode: "overlay", textOffset: [-7, -1], fontSize: 5, interval: 0.8)
+        )
+        let sleepFrames = AnimationTheme.generateOverlaySleepFrames(base: runFrames[0], config: config)
+        theme = AnimationTheme(config: config, runFrames: runFrames, sleepFrames: sleepFrames)
+    }
+
     private func applyFrame(_ index: Int, from source: [NSImage], to button: NSStatusBarButton) {
         guard index < source.count else { return }
         let frame = source[index]
@@ -104,9 +158,7 @@ final class CharacterAnimationRenderer {
 
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             guard let self else { return }
-            Task { @MainActor in
-                self.advanceFrame(button: button)
-            }
+            Task { @MainActor in self.advanceFrame(button: button) }
         }
         RunLoop.main.add(timer, forMode: .common)
         frameTimer = timer
@@ -114,7 +166,7 @@ final class CharacterAnimationRenderer {
 
     private func startSleepAnimation(button: NSStatusBarButton) {
         frameTimer?.invalidate()
-        let interval: TimeInterval = 0.8
+        let interval = theme?.config.sleepInterval ?? 0.8
         currentInterval = interval
 
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
@@ -127,7 +179,6 @@ final class CharacterAnimationRenderer {
         }
         RunLoop.main.add(timer, forMode: .common)
         frameTimer = timer
-
         applyFrame(0, from: sleepFrames, to: button)
     }
 
@@ -144,102 +195,22 @@ final class CharacterAnimationRenderer {
     }
 
     private func tintedImage(_ image: NSImage, color: NSColor) -> NSImage {
-        let tinted = NSImage(size: image.size, flipped: false) { rect in
+        NSImage(size: image.size, flipped: false) { rect in
             image.draw(in: rect)
             color.set()
             rect.fill(using: .sourceAtop)
             return true
         }
-        return tinted
-    }
-
-    // MARK: - Frame Loading
-
-    private func loadFrames() {
-        let bundle = Bundle.main
-        let frameCount = 7
-
-        let rabbitSize = NSSize(width: 24, height: 18)
-        frames = (0..<frameCount).compactMap { i in
-            let name = String(format: "frame_%02d", i)
-            guard let url = bundle.url(forResource: name, withExtension: "png"),
-                  let src = NSImage(contentsOf: url) else { return nil }
-            src.size = rabbitSize
-            let canvas = NSImage(size: Self.canvasSize, flipped: false) { _ in
-                src.draw(in: NSRect(origin: .zero, size: rabbitSize))
-                return true
-            }
-            canvas.isTemplate = true
-            return canvas
-        }
-
-        if frames.isEmpty {
-            frames = generatePlaceholderFrames()
-        }
-
-        // Generate sleep frames from frame_00 + "z" overlay
-        generateSleepFrames()
-    }
-
-    /// Generates 4 sleep frames by compositing frame_00 with z text overlay.
-    /// Frame 0: rabbit only (same as idle)
-    /// Frame 1: rabbit + "z"
-    /// Frame 2: rabbit + "zZ"
-    /// Frame 3: rabbit + "zZZ"
-    private func generateSleepFrames() {
-        guard let baseFrame = frames.first else { return }
-
-        let zTexts = ["", "z", "zZ"]
-        // Canvas wider than base to accommodate z text without shifting rabbit
-        let canvasSize = Self.canvasSize
-
-        // Rabbit drawn at left, z text at upper-right of rabbit
-        let rabbitX: CGFloat = 0.0
-        let rabbitRect = NSRect(origin: NSPoint(x: rabbitX, y: 0), size: baseFrame.size)
-
-        sleepFrames = zTexts.map { zText in
-            let image = NSImage(size: canvasSize, flipped: false) { rect in
-                // Draw the base rabbit
-                baseFrame.draw(in: rabbitRect)
-
-                if !zText.isEmpty {
-                    // Draw z text at upper-right, above rabbit's head
-                    let fontSize: CGFloat = 5.0
-                    let font = NSFont.systemFont(ofSize: fontSize, weight: .bold)
-                    let attrs: [NSAttributedString.Key: Any] = [
-                        .font: font,
-                        .foregroundColor: NSColor.labelColor,
-                    ]
-                    let attrStr = NSAttributedString(string: zText, attributes: attrs)
-                    let textSize = attrStr.size()
-                    // Position: right side of rabbit, top area
-                    let textX = rabbitRect.maxX - 7
-                    let textY = rect.maxY - textSize.height - 1
-                    attrStr.draw(at: NSPoint(x: textX, y: textY))
-                }
-
-                return true
-            }
-            image.isTemplate = true
-            return image
-        }
     }
 
     private func generatePlaceholderFrames() -> [NSImage] {
         let size = NSSize(width: 18, height: 18)
-        let radii: [CGFloat] = [3, 4, 5, 6, 7, 6, 5, 4]
-
-        return radii.map { radius in
+        return [3, 4, 5, 6, 7, 6, 5, 4].map { radius in
+            let r = CGFloat(radius)
             let image = NSImage(size: size, flipped: false) { rect in
-                let center = NSPoint(x: rect.midX, y: rect.midY)
-                let path = NSBezierPath(
-                    ovalIn: NSRect(
-                        x: center.x - radius,
-                        y: center.y - radius,
-                        width: radius * 2,
-                        height: radius * 2
-                    )
-                )
+                let path = NSBezierPath(ovalIn: NSRect(
+                    x: rect.midX - r, y: rect.midY - r, width: r * 2, height: r * 2
+                ))
                 NSColor.labelColor.setFill()
                 path.fill()
                 return true

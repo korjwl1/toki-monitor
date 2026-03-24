@@ -1,0 +1,13 @@
+{
+  "id": "rabbit",
+  "name": "Toki",
+  "nameKo": "토끼",
+  "frameSize": [24, 18],
+  "canvasSize": [28, 18],
+  "sleep": {
+    "mode": "overlay",
+    "textOffset": [-7, -1],
+    "fontSize": 5,
+    "interval": 0.8
+  }
+}
