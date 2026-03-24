@@ -59,22 +59,18 @@ final class UpdateChecker {
     // MARK: - Version Checks
 
     private func checkMonitor() async -> UpdateInfo? {
-        guard let latest = await fetchLatestBrewVersion(
-            formula: "korjwl1/tap/toki-monitor", cask: true
-        ) else { return nil }
-        guard isNewerStable(latest: latest, current: currentVersion) else { return nil }
+        guard let release = await fetchLatestGitHubRelease(repo: "korjwl1/toki-monitor") else { return nil }
+        guard isNewerStable(latest: release.version, current: currentVersion) else { return nil }
 
-        let notes = await fetchReleaseNotes(repo: "korjwl1/toki-monitor", tag: "v\(latest)")
         return UpdateInfo(
             name: "Toki Monitor",
-            version: latest,
-            releaseNotes: notes,
+            version: release.version,
+            releaseNotes: release.notes,
             brewCommand: "brew update && brew upgrade --cask toki-monitor"
         )
     }
 
     private func checkToki() async -> UpdateInfo? {
-        // Get installed toki version
         guard let data = try? await CLIProcessRunner.run(
             executable: TokiPath.resolved, arguments: ["--version"]
         ) else { return nil }
@@ -83,16 +79,13 @@ final class UpdateChecker {
             .replacingOccurrences(of: "toki ", with: "") ?? ""
         guard !installed.isEmpty else { return nil }
 
-        guard let latest = await fetchLatestBrewVersion(
-            formula: "korjwl1/tap/toki", cask: false
-        ) else { return nil }
-        guard isNewerStable(latest: latest, current: installed) else { return nil }
+        guard let release = await fetchLatestGitHubRelease(repo: "korjwl1/toki") else { return nil }
+        guard isNewerStable(latest: release.version, current: installed) else { return nil }
 
-        let notes = await fetchReleaseNotes(repo: "korjwl1/toki", tag: "v\(latest)")
         return UpdateInfo(
             name: "toki CLI",
-            version: latest,
-            releaseNotes: notes,
+            version: release.version,
+            releaseNotes: release.notes,
             brewCommand: "brew update && brew upgrade toki"
         )
     }
@@ -121,9 +114,20 @@ final class UpdateChecker {
         )
         window.contentViewController = hostingController
         window.title = L.tr("업데이트 가능", "Updates Available")
-        window.center()
+        window.setFrameAutosaveName("")
         window.isReleasedWhenClosed = false
         window.level = .floating
+
+        // Center on screen before showing (use contentRect to get final size)
+        let contentSize = hostingController.view.fittingSize
+        let finalWidth = max(contentSize.width, 480)
+        let finalHeight = min(max(contentSize.height, 200), 400)
+        if let screen = NSScreen.main {
+            let sf = screen.frame
+            let x = sf.origin.x + (sf.width - finalWidth) / 2
+            let y = sf.origin.y + (sf.height - finalHeight) / 2
+            window.setFrame(NSRect(x: x, y: y, width: finalWidth, height: finalHeight), display: true)
+        }
 
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -150,20 +154,26 @@ final class UpdateChecker {
 
     private func runBrewCommands(_ commands: [String]) {
         let combined = commands.joined(separator: " && ")
-        let script = "tell application \"Terminal\" to do script \"\(combined)\""
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
-            if let error {
-                print("[UpdateChecker] AppleScript error: \(error)")
-            }
-        }
+        // Write a temp script and open it in Terminal
+        let scriptPath = NSTemporaryDirectory() + "toki-update.command"
+        let scriptContent = "#!/bin/bash\n\(combined)\nosascript -e 'tell application \"Terminal\" to close front window' &\nexit 0\n"
+        try? scriptContent.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+        // Make executable
+        chmod(scriptPath, 0o755)
+        // Open .command file — macOS opens it in Terminal automatically
+        NSWorkspace.shared.open(URL(fileURLWithPath: scriptPath))
     }
 
-    // MARK: - GitHub Release Notes
+    // MARK: - GitHub API
 
-    private func fetchReleaseNotes(repo: String, tag: String) async -> String? {
-        guard let url = URL(string: "https://api.github.com/repos/\(repo)/releases/tags/\(tag)") else {
+    private struct GitHubRelease {
+        let version: String
+        let notes: String?
+    }
+
+    /// Fetch latest stable release from GitHub API (skips pre-releases).
+    private func fetchLatestGitHubRelease(repo: String) async -> GitHubRelease? {
+        guard let url = URL(string: "https://api.github.com/repos/\(repo)/releases") else {
             return nil
         }
         var request = URLRequest(url: url)
@@ -173,48 +183,23 @@ final class UpdateChecker {
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let body = json["body"] as? String else {
-            return nil
-        }
-        return body
-    }
+              let releases = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return nil }
 
-    // MARK: - Brew Check
+        // Find first non-prerelease, non-draft release
+        for release in releases {
+            let prerelease = release["prerelease"] as? Bool ?? false
+            let draft = release["draft"] as? Bool ?? false
+            if prerelease || draft { continue }
 
-    private static let brewPath: String = {
-        // Apple Silicon: /opt/homebrew/bin/brew, Intel: /usr/local/bin/brew
-        for path in ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] {
-            if FileManager.default.fileExists(atPath: path) { return path }
+            guard let tagName = release["tag_name"] as? String else { continue }
+            // Strip "v" prefix: "v0.1.2" → "0.1.2"
+            let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+            let notes = release["body"] as? String
+            return GitHubRelease(version: version, notes: notes)
         }
-        return "/opt/homebrew/bin/brew"
-    }()
 
-    private func fetchLatestBrewVersion(formula: String, cask: Bool) async -> String? {
-        let args = cask
-            ? ["info", "--cask", formula, "--json=v2"]
-            : ["info", "--formula", formula, "--json=v2"]
-        do {
-            let data = try await CLIProcessRunner.run(
-                executable: Self.brewPath, arguments: args
-            )
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return nil
-            }
-            if cask {
-                if let casks = json["casks"] as? [[String: Any]],
-                   let first = casks.first,
-                   let ver = first["version"] as? String { return ver }
-            } else {
-                if let formulae = json["formulae"] as? [[String: Any]],
-                   let first = formulae.first,
-                   let versions = first["versions"] as? [String: Any],
-                   let stable = versions["stable"] as? String { return stable }
-            }
-            return nil
-        } catch {
-            return nil
-        }
+        return nil
     }
 
     private func isNewerStable(latest: String, current: String) -> Bool {
@@ -278,7 +263,7 @@ private struct UpdateDialogView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxHeight: 250)
+            .frame(minHeight: 80, maxHeight: 250)
 
             Divider()
 
@@ -312,8 +297,9 @@ private struct UpdateDialogView: View {
             if let notes, !notes.isEmpty {
                 Text(notes)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary.opacity(0.7))
                     .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text(L.tr("릴리스 노트 없음", "No release notes available"))
                     .font(.system(size: 11))
