@@ -152,7 +152,11 @@ final class UpdateChecker {
         let combined = commands.joined(separator: " && ")
         let script = "tell application \"Terminal\" to do script \"\(combined)\""
         if let appleScript = NSAppleScript(source: script) {
-            appleScript.executeAndReturnError(nil)
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+            if let error {
+                print("[UpdateChecker] AppleScript error: \(error)")
+            }
         }
     }
 

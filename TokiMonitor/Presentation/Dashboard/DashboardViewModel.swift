@@ -116,10 +116,6 @@ final class DashboardViewModel {
         saveDashboard()
     }
 
-    nonisolated func cleanupTimer() {
-        // Timer cleanup is handled by setupAutoRefresh setting nil
-    }
-
     // MARK: - Data Fetching
 
     func dataState(for panelID: UUID) -> PanelDataState {

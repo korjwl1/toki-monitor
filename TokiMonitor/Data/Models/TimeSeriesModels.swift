@@ -21,8 +21,8 @@ enum ReportPeriod: String, CaseIterable {
         let date: Date
         switch self {
         case .daily: date = Date()
-        case .weekly: date = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
-        case .monthly: date = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
+        case .weekly: date = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        case .monthly: date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
         }
         return formatter.string(from: date)
     }

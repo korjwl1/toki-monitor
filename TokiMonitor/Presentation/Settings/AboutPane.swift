@@ -64,28 +64,34 @@ struct AboutPane: View {
 
             // Links
             VStack(spacing: 8) {
-                Link(destination: URL(string: repoURL)!) {
+                if let url = URL(string: repoURL) {
+                Link(destination: url) {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.left.forwardslash.chevron.right")
                         Text("Toki Monitor — GitHub")
                     }
                     .font(.system(size: 12))
                 }
+                }
 
-                Link(destination: URL(string: tokiRepoURL)!) {
+                if let url = URL(string: tokiRepoURL) {
+                Link(destination: url) {
                     HStack(spacing: 6) {
                         Image(systemName: "terminal")
                         Text("toki CLI — GitHub")
                     }
                     .font(.system(size: 12))
                 }
+                }
 
-                Link(destination: URL(string: repoURL + "/issues")!) {
+                if let url = URL(string: repoURL + "/issues") {
+                Link(destination: url) {
                     HStack(spacing: 6) {
                         Image(systemName: "ladybug")
                         Text(L.tr("버그 리포트", "Report a Bug"))
                     }
                     .font(.system(size: 12))
+                }
                 }
             }
 

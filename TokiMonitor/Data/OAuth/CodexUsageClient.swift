@@ -170,7 +170,8 @@ struct CodexUsageClient: Sendable {
     private static let usageURL = "https://chatgpt.com/backend-api/wham/usage"
 
     static func fetchUsage(accessToken: String, accountId: String? = nil) async throws -> CodexUsageResponse {
-        var request = URLRequest(url: URL(string: usageURL)!)
+        guard let url = URL(string: usageURL) else { throw CodexAuthError.fetchFailed(0) }
+        var request = URLRequest(url: url)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("toki-monitor/1.0", forHTTPHeaderField: "User-Agent")
         if let accountId {
