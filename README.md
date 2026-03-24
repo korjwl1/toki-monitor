@@ -164,14 +164,14 @@ Other menu bar apps rescan files on every poll. Toki queries an indexed database
 
 ```
 toki (Rust)                     Toki Monitor (Swift/SwiftUI)
-├─ fjall TSDB                   ├─ Data        // UDS, CLI, OAuth
+├─ fjall TSDB                   ├─ Data        // UDS, CLI, Keychain
 ├─ kqueue file watchers         ├─ Domain      // Aggregation, alerts
 ├─ PromQL engine                └─ Presentation// Menu bar, dashboard
 └─ UDS server
 
 Real-time:  daemon → trace → UDS → EventStream → Aggregator → Menu Bar
 Dashboard:  Panel query → interpolate($__from, $provider) → toki report → PanelDataState → Chart
-Usage:      Claude OAuth / Codex OAuth → Monitor → Widget
+Usage:      Claude Keychain / Codex auth.json → Monitor → Widget
 ```
 
 ### Privacy
