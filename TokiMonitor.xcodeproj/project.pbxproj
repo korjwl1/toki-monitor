@@ -9,14 +9,10 @@
 /* Begin PBXBuildFile section */
 		F20000000001 /* GlassWorkaround.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000001 /* GlassWorkaround.swift */; };
 		E10000000001 /* OAuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000001 /* OAuthModels.swift */; };
-		E10000000002 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000002 /* KeychainTokenStore.swift */; };
-		E10000000003 /* OAuthCallbackServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000003 /* OAuthCallbackServer.swift */; };
-		E10000000004 /* OAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000004 /* OAuthClient.swift */; };
+		E10000000010 /* ClaudeAuthReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000010 /* ClaudeAuthReader.swift */; };
 		E10000000005 /* ClaudeUsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000005 /* ClaudeUsageClient.swift */; };
-		E10000000006 /* ClaudeOAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000006 /* ClaudeOAuthManager.swift */; };
 		E10000000007 /* ClaudeUsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000007 /* ClaudeUsageMonitor.swift */; };
 		E10000000008 /* ClaudeUsageSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000008 /* ClaudeUsageSection.swift */; };
-		E10000000009 /* ClaudeAccountSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000009 /* ClaudeAccountSection.swift */; };
 		A10000000001 /* TimeSeriesModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000001 /* TimeSeriesModels.swift */; };
 		A10000000002 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000002 /* DashboardViewModel.swift */; };
 		A10000000003 /* DashboardToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000003 /* DashboardToolbar.swift */; };
@@ -51,7 +47,6 @@
 		DB66B79DC58248F3D46EF942 /* GeneralSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537DA1DEC2EB51E719C23F4A /* GeneralSettingsPane.swift */; };
 		F6025160AAD4877579F832AF /* MenuBarSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5456D80A9A29DD053025629 /* MenuBarSettingsPane.swift */; };
 		BA0F0698EDB2F4EA706B2521 /* ProvidersSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */; };
-		138F9EECAD72724767DFF0E2 /* AccountsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */; };
 		AB10000000001 /* AboutPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB20000000001 /* AboutPane.swift */; };
 		87A60F7ED8DC50787541BF2F /* NotificationsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */; };
 		909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A27A6A118A446539806BB7 /* TokiReportModels.swift */; };
@@ -115,16 +110,12 @@
 /* Begin PBXFileReference section */
 		F30000000001 /* GlassWorkaround.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWorkaround.swift; sourceTree = "<group>"; };
 		D10000000001 /* OAuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthModels.swift; sourceTree = "<group>"; };
-		D10000000002 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
-		D10000000003 /* OAuthCallbackServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthCallbackServer.swift; sourceTree = "<group>"; };
-		D10000000004 /* OAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthClient.swift; sourceTree = "<group>"; };
+		D10000000010 /* ClaudeAuthReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAuthReader.swift; sourceTree = "<group>"; };
 		D10000000005 /* ClaudeUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageClient.swift; sourceTree = "<group>"; };
 		CX20000000001 /* CodexUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageClient.swift; sourceTree = "<group>"; };
 		CX20000000002 /* CodexUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageMonitor.swift; sourceTree = "<group>"; };
-		D10000000006 /* ClaudeOAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthManager.swift; sourceTree = "<group>"; };
 		D10000000007 /* ClaudeUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageMonitor.swift; sourceTree = "<group>"; };
 		D10000000008 /* ClaudeUsageSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageSection.swift; sourceTree = "<group>"; };
-		D10000000009 /* ClaudeAccountSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAccountSection.swift; sourceTree = "<group>"; };
 		B10000000001 /* TimeSeriesModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesModels.swift; sourceTree = "<group>"; };
 		B10000000002 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		B10000000003 /* DashboardToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardToolbar.swift; sourceTree = "<group>"; };
@@ -178,7 +169,6 @@
 		537DA1DEC2EB51E719C23F4A /* GeneralSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsPane.swift; sourceTree = "<group>"; };
 		F5456D80A9A29DD053025629 /* MenuBarSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarSettingsPane.swift; sourceTree = "<group>"; };
 		518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvidersSettingsPane.swift; sourceTree = "<group>"; };
-		1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsSettingsPane.swift; sourceTree = "<group>"; };
 		AB20000000001 /* AboutPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutPane.swift; sourceTree = "<group>"; };
 		C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsSettingsPane.swift; sourceTree = "<group>"; };
 		F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapperTests.swift; sourceTree = "<group>"; };
@@ -380,10 +370,8 @@
 				537DA1DEC2EB51E719C23F4A /* GeneralSettingsPane.swift */,
 				F5456D80A9A29DD053025629 /* MenuBarSettingsPane.swift */,
 				518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */,
-				1BD719D4915F90E0902BCE39 /* AccountsSettingsPane.swift */,
 				C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */,
 				AB20000000001 /* AboutPane.swift */,
-				D10000000009 /* ClaudeAccountSection.swift */,
 				BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */,
 			);
 			path = Settings;
@@ -424,7 +412,6 @@
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				5D82D563F2B758C1208E987E /* AppSettings.swift */,
 				0103BDEAC6066E0274029149 /* ConnectionManager.swift */,
-				D10000000006 /* ClaudeOAuthManager.swift */,
 				D10000000007 /* ClaudeUsageMonitor.swift */,
 				CX20000000002 /* CodexUsageMonitor.swift */,
 				G20000000002 /* DashboardConfigStore.swift */,
@@ -457,9 +444,7 @@
 			isa = PBXGroup;
 			children = (
 				D10000000001 /* OAuthModels.swift */,
-				D10000000002 /* KeychainTokenStore.swift */,
-				D10000000003 /* OAuthCallbackServer.swift */,
-				D10000000004 /* OAuthClient.swift */,
+				D10000000010 /* ClaudeAuthReader.swift */,
 				D10000000005 /* ClaudeUsageClient.swift */,
 				CX20000000001 /* CodexUsageClient.swift */,
 			);
@@ -577,7 +562,6 @@
 				DB66B79DC58248F3D46EF942 /* GeneralSettingsPane.swift in Sources */,
 				F6025160AAD4877579F832AF /* MenuBarSettingsPane.swift in Sources */,
 				BA0F0698EDB2F4EA706B2521 /* ProvidersSettingsPane.swift in Sources */,
-				138F9EECAD72724767DFF0E2 /* AccountsSettingsPane.swift in Sources */,
 				AB10000000001 /* AboutPane.swift in Sources */,
 				87A60F7ED8DC50787541BF2F /* NotificationsSettingsPane.swift in Sources */,
 				30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */,
@@ -596,16 +580,12 @@
 				CC1234567890ABCDEF123456 /* StatusItemUnit.swift in Sources */,
 				F20000000001 /* GlassWorkaround.swift in Sources */,
 				E10000000001 /* OAuthModels.swift in Sources */,
-				E10000000002 /* KeychainTokenStore.swift in Sources */,
-				E10000000003 /* OAuthCallbackServer.swift in Sources */,
-				E10000000004 /* OAuthClient.swift in Sources */,
+				E10000000010 /* ClaudeAuthReader.swift in Sources */,
 				E10000000005 /* ClaudeUsageClient.swift in Sources */,
 				CX10000000001 /* CodexUsageClient.swift in Sources */,
 				CX10000000002 /* CodexUsageMonitor.swift in Sources */,
-				E10000000006 /* ClaudeOAuthManager.swift in Sources */,
 				E10000000007 /* ClaudeUsageMonitor.swift in Sources */,
 				E10000000008 /* ClaudeUsageSection.swift in Sources */,
-				E10000000009 /* ClaudeAccountSection.swift in Sources */,
 				A10000000001 /* TimeSeriesModels.swift in Sources */,
 				A10000000002 /* DashboardViewModel.swift in Sources */,
 				A10000000003 /* DashboardToolbar.swift in Sources */,

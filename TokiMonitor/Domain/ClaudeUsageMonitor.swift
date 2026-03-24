@@ -2,53 +2,31 @@ import Foundation
 import UserNotifications
 
 /// Adaptive polling monitor for Claude usage/rate-limit data.
+/// Reads authentication from Claude Code's Keychain entry.
 @MainActor
 @Observable
 final class ClaudeUsageMonitor {
     private(set) var currentUsage: ClaudeUsageResponse?
     private(set) var lastError: String?
+    private(set) var isAvailable: Bool = false
 
-    let oauthManager: ClaudeOAuthManager
     private let aggregator: TokenAggregator
     private let settings: AppSettings
     private var pollingTask: Task<Void, Never>?
     private var hasNotified75 = false
     private var hasNotified90 = false
-    private var lastResetId: String?  // track reset period changes
+    private var lastResetId: String?
+    private var consecutiveFailures = 0
 
-    init(oauthManager: ClaudeOAuthManager, aggregator: TokenAggregator, settings: AppSettings) {
-        self.oauthManager = oauthManager
+    init(aggregator: TokenAggregator, settings: AppSettings) {
         self.aggregator = aggregator
         self.settings = settings
+        self.isAvailable = ClaudeAuthReader.isAvailable
     }
 
     // MARK: - Start/Stop
 
     func startPolling() {
-        stopPolling()
-        if oauthManager.authState == .loggedIn {
-            beginPollingLoop()
-        } else {
-            observeLogin()
-        }
-    }
-
-    private func observeLogin() {
-        withObservationTracking {
-            _ = oauthManager.authState
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if self.oauthManager.authState == .loggedIn {
-                    self.beginPollingLoop()
-                } else {
-                    self.observeLogin()
-                }
-            }
-        }
-    }
-
-    private func beginPollingLoop() {
         stopPolling()
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -68,52 +46,58 @@ final class ClaudeUsageMonitor {
     // MARK: - Polling
 
     private func pollOnce() async {
+        // Re-check availability each poll (user may install/login to Claude Code later)
+        isAvailable = ClaudeAuthReader.isAvailable
+
+        guard let token = ClaudeAuthReader.readAccessToken() else {
+            print("[ClaudeUsage] No token available, isAvailable=\(isAvailable)")
+            if isAvailable {
+                lastError = nil
+            }
+            return
+        }
+
+        print("[ClaudeUsage] Token read OK, fetching usage...")
         do {
-            let token = try await oauthManager.getValidAccessToken()
             let usage = try await ClaudeUsageClient.fetchUsage(accessToken: token)
+            print("[ClaudeUsage] Usage fetched OK")
             currentUsage = usage
             lastError = nil
+            consecutiveFailures = 0
             checkThresholds(usage)
         } catch let error as OAuthError {
-            if case .usageFetchFailed(429) = error {
-                // Rate limited — refresh token to get a new ~5-request window
-                lastError = nil // Don't show 429 to user, handle silently
-                do {
-                    let newToken = try await oauthManager.forceRefreshToken()
-                    let usage = try await ClaudeUsageClient.fetchUsage(accessToken: newToken)
-                    currentUsage = usage
-                    checkThresholds(usage)
-                } catch {
-                    // Refresh retry also failed — wait for next poll
-                    lastError = L.tr("사용량 조회 제한 — 잠시 후 재시도", "Rate limited — retrying shortly")
-                }
-            } else if case .permanentAuthFailure = error {
-                currentUsage = nil
-                lastError = error.localizedDescription
+            if case .usageFetchFailed(401) = error {
+                // Token invalid/expired — Claude Code will refresh it
+                lastError = nil
+            } else if case .usageFetchFailed(429) = error {
+                lastError = nil // Rate limited — retry on next poll
             } else {
-                lastError = error.localizedDescription
+                consecutiveFailures += 1
+                if consecutiveFailures >= 3 {
+                    lastError = error.localizedDescription
+                }
+            }
+        } catch let error as DecodingError {
+            print("[ClaudeUsage] DecodingError: \(error)")
+            consecutiveFailures += 1
+            if consecutiveFailures >= 3 {
+                lastError = L.tr("응답 형식 오류", "Response format error")
             }
         } catch {
-            lastError = error.localizedDescription
+            consecutiveFailures += 1
+            if consecutiveFailures >= 3 {
+                lastError = error.localizedDescription
+            }
         }
     }
 
     // MARK: - Adaptive Interval
 
     private func computeInterval() -> TimeInterval {
-        // No data yet (first fetch failed or pending) — retry quickly
-        if currentUsage == nil {
-            return 15
-        }
-        // Near limit (>75%) → 120s (minimum safe interval)
-        if let usage = currentUsage, usage.maxUtilization > 75 {
-            return 120
-        }
-        // Active → 180s
-        if aggregator.tokensPerMinute > 0 {
-            return 180
-        }
-        // Default → 300s
+        if !isAvailable { return 60 }
+        if currentUsage == nil { return 15 }
+        if let usage = currentUsage, usage.maxUtilization > 75 { return 120 }
+        if aggregator.tokensPerMinute > 0 { return 180 }
         return 300
     }
 
@@ -122,7 +106,6 @@ final class ClaudeUsageMonitor {
     private func checkThresholds(_ usage: ClaudeUsageResponse) {
         let max = usage.maxUtilization
 
-        // Track reset period to clear notification flags
         let resetId = usage.fiveHour?.resetsAt ?? ""
         if resetId != lastResetId {
             hasNotified75 = false

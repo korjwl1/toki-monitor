@@ -84,8 +84,8 @@ struct MenuContentView: View {
                     usageWidget(usage)
                 } else if let err = monitor.lastError {
                     errorWidget(err)
-                } else if monitor.oauthManager.authState != .loggedIn {
-                    claudeLoginPrompt
+                } else if !monitor.isAvailable {
+                    claudeCodePrompt
                 } else {
                     usageLoadingWidget(L.panel.claudeUsage, color: Color(red: 0.90, green: 0.50, blue: 0.25))
                 }
@@ -112,9 +112,9 @@ struct MenuContentView: View {
 
     // MARK: - Login Prompts
 
-    private var claudeLoginPrompt: some View {
+    private var claudeCodePrompt: some View {
         HStack(spacing: DS.md) {
-            Image(systemName: "person.crop.circle.badge.questionmark")
+            Image(systemName: "terminal")
                 .font(.system(size: 14))
                 .foregroundStyle(Color(red: 0.90, green: 0.50, blue: 0.25))
                 .frame(width: 28, height: 28)
@@ -122,14 +122,9 @@ struct MenuContentView: View {
             VStack(alignment: .leading, spacing: DS.xs) {
                 Text(L.panel.claudeUsage)
                     .font(.system(size: DS.fontTitle, weight: .semibold))
-                Button {
-                    onOpenSettings()
-                } label: {
-                    Text(L.tr("로그인 필요", "Login required"))
-                        .font(.system(size: DS.fontCaption))
-                        .foregroundStyle(.blue)
-                }
-                .buttonStyle(.plain)
+                Text(L.tr("Claude Code 로그인 필요", "Claude Code login required"))
+                    .font(.system(size: DS.fontCaption))
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.leading, DS.sm)

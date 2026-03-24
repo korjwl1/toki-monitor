@@ -32,7 +32,6 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @Bindable var settings: AppSettings
-    let oauthManager: ClaudeOAuthManager?
     var onClose: (() -> Void)?
 
     @State private var selectedCategory: SettingsCategory? = .menuBar
@@ -59,7 +58,7 @@ struct SettingsView: View {
         case .menuBar:
             MenuBarSettingsPane(settings: settings)
         case .providers:
-            ProvidersSettingsPane(settings: settings, oauthManager: oauthManager)
+            ProvidersSettingsPane(settings: settings)
         case .notifications:
             NotificationsSettingsPane(settings: settings)
         case .about:

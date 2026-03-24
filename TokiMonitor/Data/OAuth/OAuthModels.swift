@@ -1,45 +1,5 @@
 import Foundation
 
-// MARK: - OAuth Tokens
-
-struct OAuthTokens: Codable {
-    let accessToken: String
-    let refreshToken: String
-    let expiresAt: Date
-
-    var isExpired: Bool { Date() >= expiresAt }
-    var needsProactiveRefresh: Bool { Date() >= expiresAt.addingTimeInterval(-300) }
-
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-        case refreshToken = "refresh_token"
-        case expiresAt = "expires_at"
-    }
-}
-
-/// Raw token response from Anthropic's OAuth token endpoint.
-struct OAuthTokenResponse: Codable {
-    let accessToken: String
-    let refreshToken: String
-    let expiresIn: Int
-    let tokenType: String
-
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-        case refreshToken = "refresh_token"
-        case expiresIn = "expires_in"
-        case tokenType = "token_type"
-    }
-
-    func toTokens() -> OAuthTokens {
-        OAuthTokens(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-            expiresAt: Date().addingTimeInterval(Double(expiresIn))
-        )
-    }
-}
-
 // MARK: - Claude Usage Response
 
 struct ClaudeUsageResponse: Codable {
@@ -65,7 +25,7 @@ struct ClaudeUsageResponse: Codable {
 
 struct UsageBucket: Codable {
     let utilization: Double   // 0-100
-    let resetsAt: String      // ISO 8601
+    let resetsAt: String?     // ISO 8601, null when unused
 
     enum CodingKeys: String, CodingKey {
         case utilization
@@ -74,6 +34,7 @@ struct UsageBucket: Codable {
 
     /// Parse reset time to Date.
     var resetDate: Date? {
+        guard let resetsAt else { return nil }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: resetsAt)
@@ -113,35 +74,11 @@ struct ExtraUsage: Codable {
 // MARK: - OAuth Errors
 
 enum OAuthError: Error, LocalizedError {
-    case callbackFailed(String)
-    case tokenExchangeFailed(Int, String)
-    case tokenRefreshFailed(Int, String)
     case usageFetchFailed(Int)
-    case noTokens
-    case permanentAuthFailure
 
     var errorDescription: String? {
         switch self {
-        case .callbackFailed(let msg): "OAuth callback failed: \(msg)"
-        case .tokenExchangeFailed(let code, let msg): "Token exchange failed (\(code)): \(msg)"
-        case .tokenRefreshFailed(let code, let msg): "Token refresh failed (\(code)): \(msg)"
         case .usageFetchFailed(let code): "Usage fetch failed (\(code))"
-        case .noTokens: "No OAuth tokens available"
-        case .permanentAuthFailure: "Authentication permanently failed"
-        }
-    }
-
-    /// Whether this error is transient (worth retrying) vs permanent.
-    var isTransient: Bool {
-        switch self {
-        case .tokenRefreshFailed(let code, _):
-            return code == 429 || code >= 500
-        case .usageFetchFailed(let code):
-            return code == 429 || code >= 500
-        case .callbackFailed, .tokenExchangeFailed:
-            return false
-        case .noTokens, .permanentAuthFailure:
-            return false
         }
     }
 }

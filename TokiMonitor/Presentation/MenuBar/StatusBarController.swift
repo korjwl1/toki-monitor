@@ -17,12 +17,10 @@ final class StatusBarController {
         L.settings = s
         return s
     }()
-    private lazy var settingsController = SettingsWindowController(settings: settings, oauthManager: oauthManager)
+    private lazy var settingsController = SettingsWindowController(settings: settings)
 
-    // Claude OAuth + Usage
-    private let oauthManager = ClaudeOAuthManager()
+    // Claude Usage (reads auth from Claude Code's Keychain)
     private lazy var usageMonitor = ClaudeUsageMonitor(
-        oauthManager: oauthManager,
         aggregator: aggregator,
         settings: settings
     )
@@ -402,6 +400,7 @@ final class StatusBarController {
             _ = self.connectionManager.state
             _ = self.usageMonitor.currentUsage
             _ = self.usageMonitor.lastError
+            _ = self.usageMonitor.isAvailable
             _ = self.codexUsageMonitor.currentUsage
             _ = self.codexUsageMonitor.lastError
         } onChange: { [weak self] in
