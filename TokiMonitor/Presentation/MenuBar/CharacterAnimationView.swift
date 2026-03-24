@@ -14,6 +14,7 @@ final class CharacterAnimationRenderer {
 
     private var idleSince: Date?
     private var isSleeping = false
+    private var sleepCheckTimer: Timer?
 
     var sleepDelay: TimeInterval = 120
 
@@ -52,11 +53,16 @@ final class CharacterAnimationRenderer {
                 if isSleeping { isSleeping = false; stopAnimation() }
                 stopAnimation()
                 applyFrame(0, from: frames, to: button)
+                // Schedule a one-shot timer to transition to sleep
+                // (in case update() isn't called again while idle)
+                scheduleSleepCheck(button: button)
             }
             return
         }
 
         idleSince = nil
+        sleepCheckTimer?.invalidate()
+        sleepCheckTimer = nil
         if isSleeping {
             isSleeping = false
             stopAnimation()
@@ -79,6 +85,8 @@ final class CharacterAnimationRenderer {
         isStopped = true
         isSleeping = false
         idleSince = nil
+        sleepCheckTimer?.invalidate()
+        sleepCheckTimer = nil
         stopAnimation()
         currentFrame = 0
     }
@@ -186,6 +194,22 @@ final class CharacterAnimationRenderer {
         frameTimer?.invalidate()
         frameTimer = nil
         currentInterval = 0
+    }
+
+    private func scheduleSleepCheck(button: NSStatusBarButton) {
+        sleepCheckTimer?.invalidate()
+        guard let idleSince, !isSleeping else { return }
+        let remaining = sleepDelay - Date().timeIntervalSince(idleSince)
+        guard remaining > 0 else { return }
+
+        sleepCheckTimer = Timer.scheduledTimer(withTimeInterval: remaining + 0.1, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, !self.isStopped, !self.isSleeping, !self.sleepFrames.isEmpty else { return }
+                self.isSleeping = true
+                self.currentFrame = 0
+                self.startSleepAnimation(button: button)
+            }
+        }
     }
 
     private func advanceFrame(button: NSStatusBarButton) {
