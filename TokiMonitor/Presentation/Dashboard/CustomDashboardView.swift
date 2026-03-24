@@ -267,27 +267,20 @@ struct CustomDashboardView: View {
             if projects.isEmpty {
                 Text("-").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Chart(projects, id: \.project) { item in
-                    SectorMark(angle: .value(L.dash.axisTokens, item.tokens), innerRadius: .ratio(0.5), angularInset: 1)
-                        .foregroundStyle(by: .value(L.tr("프로젝트", "Project"), item.project))
-                        .cornerRadius(3)
-                }
-                .chartLegend(position: .trailing, spacing: 8)
-                .frame(minHeight: 150)
+                PieChartView(
+                    entries: projects.map { .init(label: $0.project, value: Double($0.tokens)) },
+                    colors: nil
+                )
             }
         } else {
             let rows = PanelDataExtractor.tableRows(from: data)
             if rows.isEmpty {
                 Text("-").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Chart(rows, id: \.model) { row in
-                    SectorMark(angle: .value(L.dash.axisTokens, row.tokens), innerRadius: .ratio(0.5), angularInset: 1)
-                        .foregroundStyle(by: .value(L.dash.axisModel, row.model))
-                        .cornerRadius(3)
-                }
-                .chartForegroundStyleScale(domain: rows.map(\.model), range: rows.map { viewModel.colorForModel($0.model) })
-                .chartLegend(position: .trailing, spacing: 8)
-                .frame(minHeight: 150)
+                PieChartView(
+                    entries: rows.map { .init(label: $0.model, value: Double($0.tokens)) },
+                    colors: rows.map { viewModel.colorForModel($0.model) }
+                )
             }
         }
     }
