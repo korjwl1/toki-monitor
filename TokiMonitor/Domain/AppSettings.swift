@@ -152,6 +152,32 @@ enum AlertMode: String, CaseIterable, Codable {
     }
 }
 
+// MARK: - HP Bar Source
+
+enum HPBarSource: String, CaseIterable, Codable {
+    case none
+    case claudeFiveHour
+    case claudeSevenDay
+    case codexSevenDay
+
+    var displayName: String {
+        switch self {
+        case .none: L.tr("없음", "None")
+        case .claudeFiveHour: L.tr("Claude 5시간", "Claude 5h")
+        case .claudeSevenDay: L.tr("Claude 7일", "Claude 7d")
+        case .codexSevenDay: L.tr("Codex 7일", "Codex 7d")
+        }
+    }
+
+    var providerId: String? {
+        switch self {
+        case .none: nil
+        case .claudeFiveHour, .claudeSevenDay: "anthropic"
+        case .codexSevenDay: "openai"
+        }
+    }
+}
+
 // MARK: - Per-Provider Settings
 
 struct ProviderSettings: Codable {
@@ -159,6 +185,7 @@ struct ProviderSettings: Codable {
     var animationStyle: AnimationStyle? = nil   // nil = global default
     var customColorName: String? = nil          // nil = provider default
     var widgetOrder: [MenuWidgetItem]? = nil    // nil = default order
+    var hpBarSource: HPBarSource? = nil         // nil = global default
 }
 
 // MARK: - Menu Bar Widget Order
@@ -180,6 +207,9 @@ final class AppSettings {
         didSet { save() }
     }
     var animationStyle: AnimationStyle {
+        didSet { save() }
+    }
+    var hpBarSource: HPBarSource {
         didSet { save() }
     }
     var sleepDelay: SleepDelay {
@@ -271,6 +301,7 @@ final class AppSettings {
         let ud = UserDefaults.standard
         animationThemeId = ud.string(forKey: "animationThemeId") ?? "rabbit"
         animationStyle = Self.loadEnum(ud, key: "animationStyle") ?? .sparkline
+        hpBarSource = Self.loadEnum(ud, key: "hpBarSource") ?? .none
         sleepDelay = Self.loadEnum(ud, key: "sleepDelay") ?? .twoMinutes
         defaultTimeRange = Self.loadEnum(ud, key: "defaultTimeRange") ?? .oneHour
         showRateText = ud.bool(forKey: "showRateText")
@@ -336,6 +367,7 @@ final class AppSettings {
     private func performSave() {
         defaults.set(animationThemeId, forKey: "animationThemeId")
         defaults.set(animationStyle.rawValue, forKey: "animationStyle")
+        defaults.set(hpBarSource.rawValue, forKey: "hpBarSource")
         defaults.set(sleepDelay.rawValue, forKey: "sleepDelay")
         defaults.set(defaultTimeRange.rawValue, forKey: "defaultTimeRange")
         defaults.set(showRateText, forKey: "showRateText")

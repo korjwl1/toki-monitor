@@ -94,7 +94,8 @@ struct MenuBarSettingsPane: View {
                         }
                     ),
                     showRateText: $settings.showRateText,
-                    textPosition: $settings.textPosition
+                    textPosition: $settings.textPosition,
+                    providerId: provider.id
                 )
 
                 HStack {
@@ -126,7 +127,8 @@ struct MenuBarSettingsPane: View {
     private func animationControls(
         style: Binding<AnimationStyle>,
         showRateText: Binding<Bool>,
-        textPosition: Binding<TextPosition>
+        textPosition: Binding<TextPosition>,
+        providerId: String? = nil
     ) -> some View {
         Picker(L.menuBar.style, selection: style) {
             Text(L.menuBar.character).tag(AnimationStyle.character)
@@ -151,6 +153,52 @@ struct MenuBarSettingsPane: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            }
+
+            // HP Bar source
+            hpBarPicker(providerId: providerId)
+        }
+    }
+
+    @ViewBuilder
+    private func hpBarPicker(providerId: String?) -> some View {
+        let enabledProviders = Set(
+            ProviderRegistry.configurableProviders
+                .filter { settings.effectiveSettings(for: $0.id).enabled }
+                .map(\.id)
+        )
+
+        let options: [HPBarSource] = {
+            if let pid = providerId {
+                // Per-provider mode: only sources for this provider
+                return [.none] + HPBarSource.allCases.filter { $0.providerId == pid }
+            } else {
+                // Aggregated mode: sources for all enabled providers
+                return HPBarSource.allCases.filter { source in
+                    source == .none || enabledProviders.contains(source.providerId ?? "")
+                }
+            }
+        }()
+
+        if providerId != nil {
+            let ps = settings.effectiveSettings(for: providerId!)
+            Picker(L.tr("HP 바", "HP Bar"), selection: Binding(
+                get: { ps.hpBarSource ?? settings.hpBarSource },
+                set: { newVal in
+                    var updated = ps
+                    updated.hpBarSource = newVal == settings.hpBarSource ? nil : newVal
+                    settings.providerSettingsMap[providerId!] = updated
+                }
+            )) {
+                ForEach(options, id: \.self) { source in
+                    Text(source.displayName).tag(source)
+                }
+            }
+        } else {
+            Picker(L.tr("HP 바", "HP Bar"), selection: $settings.hpBarSource) {
+                ForEach(options, id: \.self) { source in
+                    Text(source.displayName).tag(source)
+                }
             }
         }
     }

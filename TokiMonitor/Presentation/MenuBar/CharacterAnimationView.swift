@@ -18,6 +18,9 @@ final class CharacterAnimationRenderer {
 
     var sleepDelay: TimeInterval = 120
 
+    /// 0.0–1.0, set externally. Draws a thin bar at the top of the canvas.
+    var hpBarValue: Double = 0
+
     private var frames: [NSImage] { theme?.runFrames ?? [] }
     private var sleepFrames: [NSImage] { theme?.sleepFrames ?? [] }
 
@@ -148,9 +151,12 @@ final class CharacterAnimationRenderer {
         theme = AnimationTheme(config: config, runFrames: runFrames, sleepFrames: sleepFrames)
     }
 
+    private weak var hpBarView: HPBarView?
+
     private func applyFrame(_ index: Int, from source: [NSImage], to button: NSStatusBarButton) {
         guard index < source.count else { return }
         let frame = source[index]
+
         if let tint = currentTintColor {
             button.image = tintedImage(frame, color: tint)
             button.image?.isTemplate = false
@@ -158,6 +164,49 @@ final class CharacterAnimationRenderer {
             button.image = frame
             button.image?.isTemplate = true
         }
+
+        // Update HP bar overlay (native NSView, not image composite)
+        // hpBarValue < 0 means no data / source is none
+        updateHPBar(on: button)
+    }
+
+    private func updateHPBar(on button: NSStatusBarButton) {
+        if hpBarValue < 0 {
+            hpBarView?.removeFromSuperview()
+            return
+        }
+
+        let bar: HPBarView
+        if let existing = hpBarView {
+            bar = existing
+        } else {
+            bar = HPBarView()
+            button.addSubview(bar)
+            hpBarView = bar
+        }
+
+        let config = theme?.config
+        let charWidth = CGFloat(config?.frameSize[0] ?? 24)
+        let barHeight = config?.hpBarHeight ?? 2
+        let widthRatio = config?.hpBarWidthRatio ?? 0.7
+        let yOffset = config?.hpBarYOffset ?? 1
+        let xOffset = config?.hpBarXOffset ?? 0
+
+        let barWidth = charWidth * widthRatio
+        let imgWidth = button.image?.size.width ?? charWidth
+        let btnWidth = button.bounds.width
+        let imgX = (btnWidth - imgWidth) / 2
+        let charCenterX = imgX + charWidth / 2
+        let barX = charCenterX - barWidth / 2 + xOffset
+
+        bar.frame = NSRect(
+            x: barX,
+            y: yOffset,
+            width: barWidth,
+            height: barHeight
+        )
+        bar.value = hpBarValue
+        bar.needsDisplay = true
     }
 
     private func startAnimation(interval: TimeInterval, button: NSStatusBarButton) {
@@ -242,5 +291,39 @@ final class CharacterAnimationRenderer {
             image.isTemplate = true
             return image
         }
+    }
+}
+
+// MARK: - HP Bar View (drawn as native NSView to bypass template image tinting)
+
+private class HPBarView: NSView {
+    var value: Double = 0
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        let v = CGFloat(min(max(value, 0), 1))
+        let r = bounds.height / 2
+
+        // Track background
+        NSColor.labelColor.withAlphaComponent(0.2).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: r, yRadius: r).fill()
+
+        // Fill — HP style: green=healthy, red=critical
+        let color: NSColor
+        if v > 0.5 { color = .systemGreen }
+        else if v > 0.25 { color = .systemYellow }
+        else if v > 0.1 { color = .systemOrange }
+        else { color = .systemRed }
+
+        let fillRect = NSRect(x: 0, y: 0, width: bounds.width * v, height: bounds.height)
+        color.setFill()
+        NSBezierPath(roundedRect: fillRect, xRadius: r, yRadius: r).fill()
     }
 }

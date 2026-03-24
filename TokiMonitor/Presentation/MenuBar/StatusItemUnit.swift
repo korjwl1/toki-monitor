@@ -59,7 +59,8 @@ final class StatusItemUnit {
         tokenUnit: TokenUnit,
         tintColor: NSColor? = nil,
         sleepDelay: TimeInterval = 120,
-        themeId: String = "rabbit"
+        themeId: String = "rabbit",
+        hpBarValue: Double = 0
     ) {
         // Switch theme if needed
         if currentThemeId != themeId {
@@ -89,6 +90,7 @@ final class StatusItemUnit {
         switch effectiveStyle {
         case .character:
             characterRenderer.sleepDelay = sleepDelay
+            characterRenderer.hpBarValue = hpBarValue
             characterRenderer.update(
                 tokensPerMinute: tokensPerMinute,
                 button: button,

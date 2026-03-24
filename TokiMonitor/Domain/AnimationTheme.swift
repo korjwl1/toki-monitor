@@ -8,7 +8,19 @@ struct AnimationThemeConfig: Codable {
     var nameKo: String? = nil
     let frameSize: [CGFloat]   // [width, height]
     let canvasSize: [CGFloat]  // [width, height]
+    var hpBar: HPBarConfig? = nil
     let sleep: SleepConfig
+
+    struct HPBarConfig: Codable {
+        /// Bar width as ratio of character width (0.0–1.0, default 0.7)
+        var widthRatio: CGFloat? = nil
+        /// Bar height in pt (default 2)
+        var height: CGFloat? = nil
+        /// Y offset from top of button (default 1)
+        var yOffset: CGFloat? = nil
+        /// X offset from calculated center (default 0)
+        var xOffset: CGFloat? = nil
+    }
 
     struct SleepConfig: Codable {
         /// "overlay" = auto-generate zZ frames, "frames" = use sleep_XX.png files
@@ -25,6 +37,10 @@ struct AnimationThemeConfig: Codable {
         if let ko = nameKo { return L.tr(ko, name) }
         return name
     }
+    var hpBarWidthRatio: CGFloat { hpBar?.widthRatio ?? 0.7 }
+    var hpBarHeight: CGFloat { hpBar?.height ?? 2 }
+    var hpBarYOffset: CGFloat { hpBar?.yOffset ?? 1 }
+    var hpBarXOffset: CGFloat { hpBar?.xOffset ?? 0 }
     var frameSizeNS: NSSize { NSSize(width: frameSize[0], height: frameSize[1]) }
     var canvasSizeNS: NSSize { NSSize(width: canvasSize[0], height: canvasSize[1]) }
     var sleepInterval: TimeInterval { sleep.interval ?? 0.8 }

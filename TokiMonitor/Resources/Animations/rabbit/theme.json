@@ -4,6 +4,12 @@
   "nameKo": "토끼",
   "frameSize": [24, 18],
   "canvasSize": [28, 18],
+  "hpBar": {
+    "widthRatio": 0.7,
+    "height": 2,
+    "yOffset": 1,
+    "xOffset": 0
+  },
   "sleep": {
     "mode": "overlay",
     "textOffset": [-7, -1],

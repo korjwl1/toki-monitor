@@ -90,7 +90,7 @@ The app auto-starts the toki daemon if it's not running. On first launch, provid
 
 | Mode | What you see |
 |------|-------------|
-| **Character** | Rabbit that runs faster as token rate increases. Sigmoid speed curve — steep in the 500–3,000 tok/m range. Sleeps (zZ) when idle. |
+| **Character** | Rabbit that runs faster as token rate increases. Sigmoid speed curve — steep in the 500–3,000 tok/m range. Sleeps (zZ) when idle. Optional HP bar shows remaining usage. |
 | **Numeric** | `1.2K/m` — token rate as text (per minute / per second / raw) |
 | **Sparkline** | Mini graph of recent history (configurable: 5m / 10m / 30m / 1h) |
 
@@ -138,6 +138,7 @@ Not logged in? The widget shows a prompt instead of hiding — Claude shows "Cla
 
 - Aggregated or per-provider display with independent style overrides
 - Widget order (up/down buttons + show/hide per provider)
+- HP bar — thin bar above character showing remaining Claude/Codex usage (green → yellow → orange → red)
 - Sleep delay (30s / 1m / 1m 30s / 2m)
 - Usage alerts (Claude 75%, 90%)
 - About page with toki CLI version and Homebrew update check
@@ -247,6 +248,12 @@ Resources/Animations/
   "nameKo": "한국어 이름",
   "frameSize": [28, 18],
   "canvasSize": [28, 18],
+  "hpBar": {
+    "widthRatio": 0.7,
+    "height": 2,
+    "yOffset": 1,
+    "xOffset": 0
+  },
   "sleep": {
     "mode": "overlay",
     "textOffset": [-7, -1],
@@ -260,6 +267,10 @@ Resources/Animations/
 |-------|-------------|
 | `frameSize` | Character draw size in pt (width, height) |
 | `canvasSize` | Total canvas size including margins |
+| `hpBar.widthRatio` | Bar width as ratio of character width (0.0–1.0) |
+| `hpBar.height` | Bar height in pt |
+| `hpBar.yOffset` | Distance from top in pt |
+| `hpBar.xOffset` | Horizontal offset from center in pt |
 | `sleep.mode` | `"overlay"` = auto-generate zZ text, `"frames"` = use `sleep_XX.png` files |
 | `sleep.textOffset` | zZ position offset from top-right of character (overlay mode) |
 | `sleep.interval` | Seconds per frame during sleep animation |

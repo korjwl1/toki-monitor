@@ -213,6 +213,15 @@ final class StatusBarController {
                     for: ProviderRegistry.allProviders.first { $0.id == pid } ?? ProviderRegistry.unknown
                 )
                 let tint = alertTint ?? ProviderInfo.nsColorFromName(colorName)
+                let ps = settings.effectiveSettings(for: pid)
+                let effectiveHPSource: HPBarSource = {
+                    if let explicit = ps.hpBarSource { return explicit }
+                    // Fallback to global only if it matches this provider
+                    let global = settings.hpBarSource
+                    if global.providerId == pid { return global }
+                    return .none
+                }()
+                let perProviderHP = resolveHPBar(source: effectiveHPSource)
                 unit.update(
                     tokensPerMinute: rate,
                     history: history,
@@ -222,11 +231,13 @@ final class StatusBarController {
                     tokenUnit: settings.tokenUnit,
                     tintColor: tint,
                     sleepDelay: settings.sleepDelay.interval,
-                    themeId: settings.animationThemeId
+                    themeId: settings.animationThemeId,
+                    hpBarValue: perProviderHP
                 )
             } else {
                 let baseTint: NSColor? = settings.aggregatedColorName.map { ProviderInfo.nsColorFromName($0) }
                 let tint = alertTint ?? baseTint
+                let aggregatedHP = resolveHPBar(source: settings.hpBarSource)
                 unit.update(
                     tokensPerMinute: aggregator.tokensPerMinute,
                     history: aggregator.recentHistory,
@@ -236,7 +247,8 @@ final class StatusBarController {
                     tokenUnit: settings.tokenUnit,
                     tintColor: tint,
                     sleepDelay: settings.sleepDelay.interval,
-                    themeId: settings.animationThemeId
+                    themeId: settings.animationThemeId,
+                    hpBarValue: aggregatedHP
                 )
             }
         }
@@ -486,6 +498,7 @@ final class StatusBarController {
         withObservationTracking {
             _ = settings.animationStyle
             _ = settings.animationThemeId
+            _ = settings.hpBarSource
             _ = settings.defaultTimeRange
             _ = settings.showRateText
             _ = settings.textPosition
@@ -545,6 +558,23 @@ final class StatusBarController {
 
         if let unit = targetUnit {
             handleClick(from: unit)
+        }
+    }
+
+    /// Returns remaining HP (1.0 = full, 0.0 = empty). Negative = no data.
+    private func resolveHPBar(source: HPBarSource) -> Double {
+        switch source {
+        case .none:
+            return -1
+        case .claudeFiveHour:
+            guard let u = usageMonitor.currentUsage?.fiveHour?.utilization else { return -1 }
+            return max(0, 1.0 - u / 100)
+        case .claudeSevenDay:
+            guard let u = usageMonitor.currentUsage?.sevenDay?.utilization else { return -1 }
+            return max(0, 1.0 - u / 100)
+        case .codexSevenDay:
+            guard let primary = codexUsageMonitor.currentUsage?.rateLimit.primaryWindow else { return -1 }
+            return max(0, 1.0 - Double(primary.usedPercent) / 100)
         }
     }
 

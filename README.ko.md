@@ -88,7 +88,7 @@ open /Applications/TokiMonitor.app
 
 | 모드 | 표시 내용 |
 |------|----------|
-| **캐릭터** | 토큰 속도에 비례해서 빨라지는 토끼. 시그모이드 속도 커브 (500–3,000 tok/m 구간 가속). 대기 시 수면 (zZ). |
+| **캐릭터** | 토큰 속도에 비례해서 빨라지는 토끼. 시그모이드 속도 커브 (500–3,000 tok/m 구간 가속). 대기 시 수면 (zZ). HP 바로 잔여 사용량 표시 가능. |
 | **수치** | `1.2K/m` — 텍스트로 토큰 속도 표시 |
 | **스파크라인** | 최근 히스토리 미니 그래프 |
 
@@ -133,6 +133,7 @@ open /Applications/TokiMonitor.app
 
 - 합산 또는 개별 프로바이더 표시 (독립 스타일 설정)
 - 위젯 순서 변경 (위/아래 버튼 + 표시/숨김)
+- HP 바 — 캐릭터 위 얇은 바로 Claude/Codex 잔여 사용량 표시 (초록 → 노랑 → 주황 → 빨강)
 - 수면 대기 시간 (30초 / 1분 / 1분 30초 / 2분)
 - 사용량 알림 (Claude 75%, 90%)
 - 정보 페이지: toki CLI 버전 표시, Homebrew 업데이트 확인
@@ -245,6 +246,12 @@ Resources/Animations/
   "nameKo": "한국어 이름",
   "frameSize": [28, 18],
   "canvasSize": [28, 18],
+  "hpBar": {
+    "widthRatio": 0.7,
+    "height": 2,
+    "yOffset": 1,
+    "xOffset": 0
+  },
   "sleep": {
     "mode": "overlay",
     "textOffset": [-7, -1],
@@ -258,6 +265,10 @@ Resources/Animations/
 |------|------|
 | `frameSize` | 캐릭터 그리기 크기 (pt 단위, [너비, 높이]) |
 | `canvasSize` | 마진 포함 전체 캔버스 크기 |
+| `hpBar.widthRatio` | 캐릭터 너비 대비 바 너비 비율 (0.0–1.0) |
+| `hpBar.height` | 바 높이 (pt) |
+| `hpBar.yOffset` | 상단에서의 거리 (pt) |
+| `hpBar.xOffset` | 중앙에서의 좌우 보정 (pt) |
 | `sleep.mode` | `"overlay"` = zZ 텍스트 자동 생성, `"frames"` = `sleep_XX.png` 파일 사용 |
 | `sleep.textOffset` | zZ 텍스트 위치 오프셋 (캐릭터 우상단 기준, overlay 모드) |
 | `sleep.interval` | 수면 애니메이션 프레임당 초 |
