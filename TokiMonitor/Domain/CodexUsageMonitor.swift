@@ -2,6 +2,7 @@ import Foundation
 
 /// Polls Codex (OpenAI) usage/rate-limit data from ChatGPT backend API.
 /// Reads OAuth token from ~/.codex/auth.json (written by Codex CLI login).
+/// Watches auth.json for changes via DispatchSource to recover from token expiry.
 @MainActor
 @Observable
 final class CodexUsageMonitor {
@@ -12,7 +13,7 @@ final class CodexUsageMonitor {
     private var pollingTask: Task<Void, Never>?
     private let aggregator: TokenAggregator
     private var consecutiveFailures = 0
-    private let maxConsecutiveFailures = 5
+    private var fileWatcher: DispatchSourceFileSystemObject?
 
     init(aggregator: TokenAggregator) {
         self.aggregator = aggregator
@@ -28,6 +29,7 @@ final class CodexUsageMonitor {
         }
         isAvailable = true
         stopPolling()
+        startFileWatcher()
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
@@ -41,6 +43,7 @@ final class CodexUsageMonitor {
     func stopPolling() {
         pollingTask?.cancel()
         pollingTask = nil
+        stopFileWatcher()
     }
 
     // MARK: - Polling
@@ -55,20 +58,19 @@ final class CodexUsageMonitor {
 
         do {
             let token = try CodexAuthReader.readAccessToken()
-            let usage = try await CodexUsageClient.fetchUsage(accessToken: token)
+            let accountId = CodexAuthReader.readAccountId()
+            let usage = try await CodexUsageClient.fetchUsage(accessToken: token, accountId: accountId)
             currentUsage = usage
             lastError = nil
             consecutiveFailures = 0
         } catch let error as CodexAuthError {
             switch error {
             case .fetchFailed(401), .fetchFailed(403):
-                // Might be transient — only show error after 3 consecutive failures
                 consecutiveFailures += 1
                 if consecutiveFailures >= 3 {
                     lastError = L.tr("Codex 재로그인 필요", "Codex re-login required")
                 }
             case .fetchFailed(429):
-                // Rate limited — back off silently
                 lastError = nil
                 consecutiveFailures += 1
             case .authFileNotFound, .tokenMissing:
@@ -83,20 +85,61 @@ final class CodexUsageMonitor {
             lastError = error.localizedDescription
             consecutiveFailures += 1
         }
+    }
 
-        // Stop polling after too many consecutive failures
-        if consecutiveFailures >= maxConsecutiveFailures {
-            lastError = L.tr("Codex 사용량 조회 실패 — 폴링 중단", "Codex usage check failed — polling stopped")
-            stopPolling()
+    // MARK: - File Watcher (auth.json change detection)
+
+    private func startFileWatcher() {
+        stopFileWatcher()
+        let path = CodexAuthReader.authFilePath
+        let fd = open(path, O_EVTONLY)
+        guard fd >= 0 else { return }
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .rename, .delete],
+            queue: .main
+        )
+
+        source.setEventHandler { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                // Token was refreshed — reset failures and retry immediately
+                self.consecutiveFailures = 0
+                self.lastError = nil
+
+                // If polling was in a long backoff, restart it
+                if self.pollingTask == nil || CodexAuthReader.isAvailable != self.isAvailable {
+                    self.isAvailable = CodexAuthReader.isAvailable
+                    if self.isAvailable && self.pollingTask == nil {
+                        self.startPolling()
+                        return
+                    }
+                }
+
+                await self.pollOnce()
+            }
         }
+
+        source.setCancelHandler {
+            close(fd)
+        }
+
+        source.resume()
+        fileWatcher = source
+    }
+
+    private func stopFileWatcher() {
+        fileWatcher?.cancel()
+        fileWatcher = nil
     }
 
     // MARK: - Adaptive Interval
 
     private func computeInterval() -> TimeInterval {
-        // Retry faster on failure (30s), but not too aggressively
         if consecutiveFailures > 0 {
-            return 30
+            // Exponential backoff: 30s, 60s, 120s, max 300s
+            return min(30 * pow(2, Double(consecutiveFailures - 1)), 300)
         }
         if let usage = currentUsage,
            let primary = usage.rateLimit.primaryWindow,

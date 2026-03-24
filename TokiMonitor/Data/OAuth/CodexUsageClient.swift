@@ -101,7 +101,7 @@ struct CodexAuthReader {
     /// Resolved codex root from toki settings. Set once at app startup.
     @MainActor static var codexRoot: String = NSHomeDirectory() + "/.codex"
 
-    @MainActor private static var authPath: String {
+    @MainActor static var authFilePath: String {
         codexRoot + "/auth.json"
     }
 
@@ -122,8 +122,8 @@ struct CodexAuthReader {
     }
 
     @MainActor static func readAccessToken() throws -> String {
-        let url = URL(fileURLWithPath: authPath)
-        guard FileManager.default.fileExists(atPath: authPath) else {
+        let url = URL(fileURLWithPath: authFilePath)
+        guard FileManager.default.fileExists(atPath: authFilePath) else {
             throw CodexAuthError.authFileNotFound
         }
 
@@ -139,7 +139,7 @@ struct CodexAuthReader {
     }
 
     @MainActor static func readRefreshToken() throws -> String {
-        let url = URL(fileURLWithPath: authPath)
+        let url = URL(fileURLWithPath: authFilePath)
         let data = try Data(contentsOf: url)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let tokens = json?["tokens"] as? [String: Any]
@@ -151,9 +151,16 @@ struct CodexAuthReader {
         return refreshToken
     }
 
+    @MainActor static func readAccountId() -> String? {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: authFilePath)),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tokens = json["tokens"] as? [String: Any] else { return nil }
+        return tokens["account_id"] as? String
+    }
+
     /// Check if auth.json exists (user has logged in to Codex at least once).
     @MainActor static var isAvailable: Bool {
-        FileManager.default.fileExists(atPath: authPath)
+        FileManager.default.fileExists(atPath: authFilePath)
     }
 }
 
@@ -162,10 +169,13 @@ struct CodexAuthReader {
 struct CodexUsageClient: Sendable {
     private static let usageURL = "https://chatgpt.com/backend-api/wham/usage"
 
-    static func fetchUsage(accessToken: String) async throws -> CodexUsageResponse {
+    static func fetchUsage(accessToken: String, accountId: String? = nil) async throws -> CodexUsageResponse {
         var request = URLRequest(url: URL(string: usageURL)!)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("toki-monitor/1.0", forHTTPHeaderField: "User-Agent")
+        if let accountId {
+            request.setValue(accountId, forHTTPHeaderField: "ChatGPT-Account-Id")
+        }
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
