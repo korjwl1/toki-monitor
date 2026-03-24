@@ -7,6 +7,8 @@ struct CustomDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
     var onEditPanel: ((PanelConfig) -> Void)?
 
+    @State private var barHoverState = BarHoverState()
+
 
     var body: some View {
         GeometryReader { geometry in
@@ -215,6 +217,7 @@ struct CustomDashboardView: View {
             enabledModels: viewModel.enabledModels,
             data: data
         )
+        let bucketSecs = viewModel.dashboardConfig.time.bucketSeconds
         Chart {
             ForEach(modelData, id: \.model) { entry in
                 ForEach(entry.points) { point in
@@ -236,6 +239,80 @@ struct CustomDashboardView: View {
                     .font(.system(size: 9))
             }
         }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                ZStack(alignment: .topLeading) {
+                    // Crosshair line — clipped to plot area only
+                    if barHoverState.date != nil, let plotFrame = proxy.plotFrame {
+                        let plotRect = geo[plotFrame]
+                        Rectangle()
+                            .fill(.secondary.opacity(0.3))
+                            .frame(width: 1, height: plotRect.height)
+                            .offset(x: barHoverState.position.x, y: plotRect.minY)
+                            .allowsHitTesting(false)
+                    }
+
+                    Rectangle()
+                        .fill(.clear)
+                        .contentShape(Rectangle())
+                        .onContinuousHover { phase in
+                            switch phase {
+                            case .active(let location):
+                                barHoverState.date = snapToNearestBar(at: location, proxy: proxy, geo: geo, modelData: modelData)
+                                barHoverState.position = location
+                            case .ended:
+                                barHoverState.date = nil
+                            }
+                        }
+                }
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            BarChartTooltipOverlay(
+                state: barHoverState,
+                modelData: modelData,
+                bucketSecs: bucketSecs,
+                colorForModel: { viewModel.colorForModel($0) },
+                formatDate: { formatBarDate($0) }
+            )
+        }
+    }
+
+    private func snapToNearestBar(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy, modelData: [(model: String, points: [TimeSeriesData.ChartPoint])]) -> Date? {
+        guard let plotFrame = proxy.plotFrame else { return nil }
+        let plotRect = geo[plotFrame]
+
+        // Only respond within the plot area
+        guard plotRect.contains(location) else { return nil }
+
+        let x = location.x - plotRect.minX
+        guard let date: Date = proxy.value(atX: x) else { return nil }
+        let allDates = modelData.flatMap { $0.points.map(\.date) }
+        let unique = Array(Set(allDates)).sorted()
+        return unique.min(by: { abs($0.timeIntervalSince(date)) < abs($1.timeIntervalSince(date)) })
+    }
+
+    private func isSameBucket(_ a: Date, _ b: Date, _ bucketSecs: Int) -> Bool {
+        if bucketSecs < 3600 {
+            return Calendar.current.isDate(a, equalTo: b, toGranularity: .minute)
+        } else if bucketSecs < 86400 {
+            return Calendar.current.isDate(a, equalTo: b, toGranularity: .hour)
+        }
+        return Calendar.current.isDate(a, inSameDayAs: b)
+    }
+
+    private func formatBarDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale.current
+        let secs = viewModel.dashboardConfig.time.bucketSeconds
+        if secs < 3600 {
+            f.dateFormat = "HH:mm"
+        } else if secs < 86400 {
+            f.dateFormat = "M/d HH:mm"
+        } else {
+            f.dateFormat = "M/d"
+        }
+        return f.string(from: date)
     }
 
     @ViewBuilder
@@ -323,5 +400,60 @@ struct CustomDashboardView: View {
             description: Text(L.dash.selectModelDesc)
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Bar Chart Hover State
+
+@Observable
+final class BarHoverState {
+    var date: Date?
+    var position: CGPoint = .zero
+}
+
+/// Isolated overlay that only re-renders when hover state changes,
+/// without causing the parent Chart to rebuild.
+struct BarChartTooltipOverlay: View {
+    let state: BarHoverState
+    let modelData: [(model: String, points: [TimeSeriesData.ChartPoint])]
+    let bucketSecs: Int
+    let colorForModel: (String) -> Color
+    let formatDate: (Date) -> String
+
+    var body: some View {
+        if let date = state.date {
+            let values = modelData.compactMap { entry -> (String, Int)? in
+                guard let pt = entry.points.first(where: { isSameBucket($0.date, date) }) else { return nil }
+                let v = Int(pt.value)
+                return v > 0 ? (entry.model, v) : nil
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(formatDate(date))
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                ForEach(values, id: \.0) { name, value in
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(colorForModel(name))
+                            .frame(width: 6, height: 6)
+                        Text("\(name): \(value)")
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    }
+                }
+            }
+            .padding(6)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+            .offset(x: state.position.x - 40, y: max(state.position.y - 60, 0))
+            .allowsHitTesting(false)
+        }
+    }
+
+    private func isSameBucket(_ a: Date, _ b: Date) -> Bool {
+        if bucketSecs < 3600 {
+            return Calendar.current.isDate(a, equalTo: b, toGranularity: .minute)
+        } else if bucketSecs < 86400 {
+            return Calendar.current.isDate(a, equalTo: b, toGranularity: .hour)
+        }
+        return Calendar.current.isDate(a, inSameDayAs: b)
     }
 }
