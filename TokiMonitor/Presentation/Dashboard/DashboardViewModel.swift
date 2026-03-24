@@ -191,8 +191,8 @@ final class DashboardViewModel {
             }
 
             // Backward compatibility: set global timeSeriesData from first loaded regular panel
-            if let firstLoaded = regularPanels.first(where: { panelData[$0.id]?.timeSeriesData != nil }) {
-                let data = panelData[firstLoaded.id]!.timeSeriesData!
+            if let firstLoaded = regularPanels.first(where: { panelData[$0.id]?.timeSeriesData != nil }),
+               let data = panelData[firstLoaded.id]?.timeSeriesData {
                 self.timeSeriesData = data
                 self.enabledModels = Set(data.allModelNames)
                 self.dataVersion += 1

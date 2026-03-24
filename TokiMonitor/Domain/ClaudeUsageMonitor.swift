@@ -50,17 +50,14 @@ final class ClaudeUsageMonitor {
         isAvailable = ClaudeAuthReader.isAvailable
 
         guard let token = ClaudeAuthReader.readAccessToken() else {
-            print("[ClaudeUsage] No token available, isAvailable=\(isAvailable)")
             if isAvailable {
                 lastError = nil
             }
             return
         }
 
-        print("[ClaudeUsage] Token read OK, fetching usage...")
         do {
             let usage = try await ClaudeUsageClient.fetchUsage(accessToken: token)
-            print("[ClaudeUsage] Usage fetched OK")
             currentUsage = usage
             lastError = nil
             consecutiveFailures = 0
@@ -77,8 +74,7 @@ final class ClaudeUsageMonitor {
                     lastError = error.localizedDescription
                 }
             }
-        } catch let error as DecodingError {
-            print("[ClaudeUsage] DecodingError: \(error)")
+        } catch is DecodingError {
             consecutiveFailures += 1
             if consecutiveFailures >= 3 {
                 lastError = L.tr("응답 형식 오류", "Response format error")

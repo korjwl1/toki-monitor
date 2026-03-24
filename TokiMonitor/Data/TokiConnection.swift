@@ -45,8 +45,9 @@ final class TokiTraceListener {
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
+        let maxLen = MemoryLayout.size(ofValue: addr.sun_path)
         _ = withUnsafeMutablePointer(to: &addr.sun_path.0) { ptr in
-            socketPath.withCString { cstr in strcpy(ptr, cstr) }
+            socketPath.withCString { cstr in strlcpy(ptr, cstr, maxLen) }
         }
 
         let bindOK = withUnsafePointer(to: &addr) { ptr in
