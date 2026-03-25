@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 
 /// Polls Codex (OpenAI) usage/rate-limit data from ChatGPT backend API.
 /// Reads OAuth token from ~/.codex/auth.json (written by Codex CLI login).
@@ -12,11 +13,13 @@ final class CodexUsageMonitor {
 
     private var pollingTask: Task<Void, Never>?
     private let aggregator: TokenAggregator
+    private let settings: AppSettings
     private var consecutiveFailures = 0
     private var fileWatcher: DispatchSourceFileSystemObject?
 
-    init(aggregator: TokenAggregator) {
+    init(aggregator: TokenAggregator, settings: AppSettings) {
         self.aggregator = aggregator
+        self.settings = settings
         self.isAvailable = CodexAuthReader.isAvailable
     }
 
@@ -63,6 +66,8 @@ final class CodexUsageMonitor {
             currentUsage = usage
             lastError = nil
             consecutiveFailures = 0
+            settings.codexHasSecondaryWindow = (usage.rateLimit.secondaryWindow != nil)
+            checkThresholds(usage)
         } catch let error as CodexAuthError {
             switch error {
             case .fetchFailed(401), .fetchFailed(403):
@@ -85,6 +90,78 @@ final class CodexUsageMonitor {
             lastError = error.localizedDescription
             consecutiveFailures += 1
         }
+    }
+
+    // MARK: - Threshold Alerts
+
+    private func checkThresholds(_ usage: CodexUsageResponse) {
+        let windows: [(UsageAlertBucket, CodexUsageWindow?)] = [
+            (.codexPrimary, usage.rateLimit.primaryWindow),
+            (.codexSecondary, usage.rateLimit.secondaryWindow)
+        ]
+
+        for (bucketType, window) in windows {
+            guard let window else { continue }
+            let utilization = Double(window.usedPercent)
+            let resetId = String(window.resetAt)
+
+            if utilization >= 90,
+               settings.usageAlert90Enabled,
+               settings.isUsageAlertBucketEnabled(.percent90, bucket: bucketType) {
+                if !UsageAlertStateStore.shared.hasNotified(
+                    threshold: .percent90,
+                    bucket: bucketType,
+                    resetId: resetId
+                ) {
+                    UsageAlertStateStore.shared.markNotified(
+                        threshold: .percent90,
+                        bucket: bucketType,
+                        resetId: resetId
+                    )
+                    sendUsageNotification(
+                        providerTitle: L.tr("Codex 사용량", "Codex Usage"),
+                        bucketLabel: bucketType.displayName,
+                        threshold: 90
+                    )
+                }
+                continue
+            }
+
+            if utilization >= 75,
+               settings.usageAlert75Enabled,
+               settings.isUsageAlertBucketEnabled(.percent75, bucket: bucketType) {
+                if !UsageAlertStateStore.shared.hasNotified(
+                    threshold: .percent75,
+                    bucket: bucketType,
+                    resetId: resetId
+                ) {
+                    UsageAlertStateStore.shared.markNotified(
+                        threshold: .percent75,
+                        bucket: bucketType,
+                        resetId: resetId
+                    )
+                    sendUsageNotification(
+                        providerTitle: L.tr("Codex 사용량", "Codex Usage"),
+                        bucketLabel: bucketType.displayName,
+                        threshold: 75
+                    )
+                }
+            }
+        }
+    }
+
+    private func sendUsageNotification(providerTitle: String, bucketLabel: String, threshold: Int) {
+        let content = UNMutableNotificationContent()
+        content.title = L.tr("\(providerTitle) \(threshold)% 도달", "\(providerTitle) reached \(threshold)%")
+        content.body = L.tr("\(bucketLabel) 사용량이 \(threshold)%를 넘었습니다.", "\(bucketLabel) usage exceeded \(threshold)%.")
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
     }
 
     // MARK: - File Watcher (auth.json change detection)

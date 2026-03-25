@@ -13,9 +13,6 @@ final class ClaudeUsageMonitor {
     private let aggregator: TokenAggregator
     private let settings: AppSettings
     private var pollingTask: Task<Void, Never>?
-    /// Per-window alert state keyed by resetsAt timestamp.
-    /// Once a threshold fires for a given resetId, it won't fire again until the window resets.
-    private var notifiedWindows: [String: Set<Int>] = [:]  // resetId → {75, 90}
     private var consecutiveFailures = 0
 
     init(aggregator: TokenAggregator, settings: AppSettings) {
@@ -61,6 +58,7 @@ final class ClaudeUsageMonitor {
             currentUsage = usage
             lastError = nil
             consecutiveFailures = 0
+            settings.claudeHasSevenDaySonnet = (usage.sevenDaySonnet != nil)
             checkThresholds(usage)
         } catch let error as OAuthError {
             if case .usageFetchFailed(401) = error {
@@ -104,39 +102,67 @@ final class ClaudeUsageMonitor {
     // MARK: - Threshold Alerts
 
     private func checkThresholds(_ usage: ClaudeUsageResponse) {
-        let windows: [(bucket: UsageBucket?, label: String)] = [
-            (usage.fiveHour, L.tr("5시간 세션", "5-hour session")),
-            (usage.sevenDay, L.tr("7일", "7-day")),
-            (usage.sevenDaySonnet, L.tr("7일 Sonnet", "7-day Sonnet")),
+        let buckets: [(UsageAlertBucket, UsageBucket?)] = [
+            (.claudeFiveHour, usage.fiveHour),
+            (.claudeSevenDay, usage.sevenDay),
+            (.claudeSevenDaySonnet, usage.sevenDaySonnet)
         ]
 
-        // Prune stale entries — only keep resetIds that are still active
-        let activeResetIds = Set(windows.compactMap { $0.bucket?.resetsAt })
-        notifiedWindows = notifiedWindows.filter { activeResetIds.contains($0.key) }
+        for (bucketType, bucket) in buckets {
+            guard let bucket else { continue }
+            let utilization = bucket.utilization
+            let resetId = bucket.resetsAt ?? "unknown"
 
-        for (bucket, label) in windows {
-            guard let bucket, let resetId = bucket.resetsAt else { continue }
-            let util = bucket.utilization
-            var notified = notifiedWindows[resetId] ?? []
-
-            if util >= 90 && !notified.contains(90) && settings.claudeAlert90 {
-                notified.insert(90)
-                sendNotification(
-                    title: L.tr("Claude 사용량 90% 도달", "Claude usage reached 90%"),
-                    body: L.tr("\(label) 사용량이 90%를 넘었습니다. 속도가 제한될 수 있습니다.",
-                               "\(label) usage exceeded 90%. Rate limiting may apply.")
-                )
-            } else if util >= 75 && !notified.contains(75) && settings.claudeAlert75 {
-                notified.insert(75)
-                sendNotification(
-                    title: L.tr("Claude 사용량 75% 도달", "Claude usage reached 75%"),
-                    body: L.tr("\(label) 사용량이 75%를 넘었습니다.",
-                               "\(label) usage exceeded 75%.")
-                )
+            if utilization >= 90,
+               settings.usageAlert90Enabled,
+               settings.isUsageAlertBucketEnabled(.percent90, bucket: bucketType) {
+                if !UsageAlertStateStore.shared.hasNotified(
+                    threshold: .percent90,
+                    bucket: bucketType,
+                    resetId: resetId
+                ) {
+                    UsageAlertStateStore.shared.markNotified(
+                        threshold: .percent90,
+                        bucket: bucketType,
+                        resetId: resetId
+                    )
+                    sendUsageNotification(
+                        providerTitle: L.panel.claudeUsage,
+                        bucketLabel: bucketType.displayName,
+                        threshold: 90
+                    )
+                }
+                continue
             }
 
-            notifiedWindows[resetId] = notified
+            if utilization >= 75,
+               settings.usageAlert75Enabled,
+               settings.isUsageAlertBucketEnabled(.percent75, bucket: bucketType) {
+                if !UsageAlertStateStore.shared.hasNotified(
+                    threshold: .percent75,
+                    bucket: bucketType,
+                    resetId: resetId
+                ) {
+                    UsageAlertStateStore.shared.markNotified(
+                        threshold: .percent75,
+                        bucket: bucketType,
+                        resetId: resetId
+                    )
+                    sendUsageNotification(
+                        providerTitle: L.panel.claudeUsage,
+                        bucketLabel: bucketType.displayName,
+                        threshold: 75
+                    )
+                }
+            }
         }
+    }
+
+    private func sendUsageNotification(providerTitle: String, bucketLabel: String, threshold: Int) {
+        sendNotification(
+            title: L.tr("\(providerTitle) \(threshold)% 도달", "\(providerTitle) reached \(threshold)%"),
+            body: L.tr("\(bucketLabel) 사용량이 \(threshold)%를 넘었습니다.", "\(bucketLabel) usage exceeded \(threshold)%.")
+        )
     }
 
     private func sendNotification(title: String, body: String) {

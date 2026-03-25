@@ -225,7 +225,18 @@ struct MenuContentView: View {
     // MARK: - Usage Widget
 
     private func usageWidget(_ usage: ClaudeUsageResponse) -> some View {
-        HStack(spacing: DS.md) {
+        let showFiveHour = settings.isClaudeUsageBucketVisible(.fiveHour)
+        let showSevenDay = settings.isClaudeUsageBucketVisible(.sevenDay)
+        let showSevenDaySonnet = settings.isClaudeUsageBucketVisible(.sevenDaySonnet)
+
+        var rows: [(String, UsageBucket)] = []
+        if showFiveHour, let fh = usage.fiveHour { rows.append((L.panel.fiveHour, fh)) }
+        if showSevenDay, let sd = usage.sevenDay { rows.append((L.panel.sevenDay, sd)) }
+        if showSevenDaySonnet, let sonnet = usage.sevenDaySonnet {
+            rows.append((L.notification.claudeSevenDaySonnet, sonnet))
+        }
+
+        return HStack(spacing: DS.md) {
             Image(systemName: "gauge.with.dots.needle.50percent")
                 .font(.system(size: 14))
                 .foregroundStyle(.white)
@@ -237,9 +248,14 @@ struct MenuContentView: View {
                 Text(L.panel.claudeUsage)
                     .font(.system(size: DS.fontTitle, weight: .semibold))
 
-                if let fh = usage.fiveHour { usageBar(L.panel.fiveHour, fh) }
-                if let sd = usage.sevenDay {
-                    usageBar(L.panel.sevenDay, sd)
+                if rows.isEmpty {
+                    Text(L.notification.noUsageBuckets)
+                        .font(.system(size: DS.fontCaption))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                        usageBar(row.0, row.1)
+                    }
                 }
             }
         }
@@ -276,7 +292,18 @@ struct MenuContentView: View {
     // MARK: - Codex Usage Widget
 
     private func codexUsageWidget(_ usage: CodexUsageResponse) -> some View {
-        HStack(spacing: DS.md) {
+        let showPrimary = settings.isCodexUsageWindowVisible(.primary)
+        let showSecondary = settings.isCodexUsageWindowVisible(.secondary)
+
+        var rows: [(String, Int, String)] = []
+        if showPrimary, let primary = usage.rateLimit.primaryWindow {
+            rows.append((primary.windowLabel, primary.usedPercent, primary.resetCountdown))
+        }
+        if showSecondary, let secondary = usage.rateLimit.secondaryWindow {
+            rows.append((secondary.windowLabel, secondary.usedPercent, secondary.resetCountdown))
+        }
+
+        return HStack(spacing: DS.md) {
             Image(systemName: "gauge.with.dots.needle.50percent")
                 .font(.system(size: 14))
                 .foregroundStyle(.white)
@@ -288,11 +315,14 @@ struct MenuContentView: View {
                 Text(L.tr("Codex 사용량", "Codex Usage"))
                     .font(.system(size: DS.fontTitle, weight: .semibold))
 
-                if let primary = usage.rateLimit.primaryWindow {
-                    codexUsageBar(primary.windowLabel, percent: primary.usedPercent, countdown: primary.resetCountdown)
-                }
-                if let secondary = usage.rateLimit.secondaryWindow {
-                    codexUsageBar(secondary.windowLabel, percent: secondary.usedPercent, countdown: secondary.resetCountdown)
+                if rows.isEmpty {
+                    Text(L.notification.noUsageBuckets)
+                        .font(.system(size: DS.fontCaption))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                        codexUsageBar(row.0, percent: row.1, countdown: row.2)
+                    }
                 }
             }
         }

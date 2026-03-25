@@ -138,6 +138,78 @@ enum SleepDelay: String, CaseIterable, Codable {
     }
 }
 
+// MARK: - Usage Alert / Usage Widget Buckets
+
+enum UsageAlertThreshold: String, CaseIterable, Codable {
+    case percent75 = "75"
+    case percent90 = "90"
+
+    var percent: Double {
+        switch self {
+        case .percent75: 75
+        case .percent90: 90
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .percent75: L.notification.alert75
+        case .percent90: L.notification.alert90
+        }
+    }
+}
+
+enum UsageAlertBucket: String, CaseIterable, Codable {
+    case claudeFiveHour
+    case claudeSevenDay
+    case claudeSevenDaySonnet
+    case codexPrimary
+    case codexSecondary
+
+    var providerId: String {
+        switch self {
+        case .claudeFiveHour, .claudeSevenDay, .claudeSevenDaySonnet: "anthropic"
+        case .codexPrimary, .codexSecondary: "openai"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .claudeFiveHour: L.notification.claudeFiveHour
+        case .claudeSevenDay: L.notification.claudeSevenDay
+        case .claudeSevenDaySonnet: L.notification.claudeSevenDaySonnet
+        case .codexPrimary: L.notification.codexPrimary
+        case .codexSecondary: L.notification.codexSecondary
+        }
+    }
+}
+
+enum ClaudeUsageBucketOption: String, CaseIterable, Codable {
+    case fiveHour
+    case sevenDay
+    case sevenDaySonnet
+
+    var displayName: String {
+        switch self {
+        case .fiveHour: L.notification.claudeFiveHour
+        case .sevenDay: L.notification.claudeSevenDay
+        case .sevenDaySonnet: L.notification.claudeSevenDaySonnet
+        }
+    }
+}
+
+enum CodexUsageWindowOption: String, CaseIterable, Codable {
+    case primary
+    case secondary
+
+    var displayName: String {
+        switch self {
+        case .primary: L.notification.codexPrimary
+        case .secondary: L.notification.codexSecondary
+        }
+    }
+}
+
 // MARK: - HP Bar Source
 
 enum HPBarSource: String, CaseIterable, Codable {
@@ -238,6 +310,10 @@ final class AppSettings {
     }
     var pendingPopupRequest: PopupRequest?
 
+    // Availability flags for optional usage buckets/windows (not persisted)
+    var claudeHasSevenDaySonnet: Bool?
+    var codexHasSecondaryWindow: Bool?
+
     // Anomaly detection
     var velocityAlertEnabled: Bool {
         didSet { save() }
@@ -251,10 +327,29 @@ final class AppSettings {
     var historicalMultiplier: Double {
         didSet { save() }
     }
-    var claudeAlert75: Bool {
+
+    // Usage alerts (per-threshold toggles)
+    var usageAlert75Enabled: Bool {
         didSet { save() }
     }
-    var claudeAlert90: Bool {
+    var usageAlert90Enabled: Bool {
+        didSet { save() }
+    }
+    /// Per-bucket enable map for 75% alerts. Keys = UsageAlertBucket.rawValue
+    var usageAlert75Buckets: [String: Bool] {
+        didSet { save() }
+    }
+    /// Per-bucket enable map for 90% alerts. Keys = UsageAlertBucket.rawValue
+    var usageAlert90Buckets: [String: Bool] {
+        didSet { save() }
+    }
+
+    /// Claude usage widget bucket visibility. Keys = ClaudeUsageBucketOption.rawValue
+    var claudeUsageWidgetBuckets: [String: Bool] {
+        didSet { save() }
+    }
+    /// Codex usage widget window visibility. Keys = CodexUsageWindowOption.rawValue
+    var codexUsageWidgetWindows: [String: Bool] {
         didSet { save() }
     }
     var language: AppLanguage {
@@ -289,8 +384,18 @@ final class AppSettings {
         velocityThreshold = ud.object(forKey: "velocityThreshold") as? Double ?? 0.50
         historicalAlertEnabled = ud.bool(forKey: "historicalAlertEnabled")
         historicalMultiplier = ud.object(forKey: "historicalMultiplier") as? Double ?? 3.0
-        claudeAlert75 = ud.object(forKey: "claudeAlert75") as? Bool ?? true
-        claudeAlert90 = ud.object(forKey: "claudeAlert90") as? Bool ?? true
+        let legacy75 = ud.object(forKey: "claudeAlert75") as? Bool
+        let legacy90 = ud.object(forKey: "claudeAlert90") as? Bool
+        usageAlert75Enabled = ud.object(forKey: "usageAlert75Enabled") as? Bool ?? legacy75 ?? true
+        usageAlert90Enabled = ud.object(forKey: "usageAlert90Enabled") as? Bool ?? legacy90 ?? true
+        usageAlert75Buckets = Self.loadStringBoolMap(ud, key: "usageAlert75Buckets")
+            ?? UsageAlertBucket.allCases.reduce(into: [:]) { $0[$1.rawValue] = false }
+        usageAlert90Buckets = Self.loadStringBoolMap(ud, key: "usageAlert90Buckets")
+            ?? UsageAlertBucket.allCases.reduce(into: [:]) { $0[$1.rawValue] = false }
+        claudeUsageWidgetBuckets = Self.loadStringBoolMap(ud, key: "claudeUsageWidgetBuckets")
+            ?? ClaudeUsageBucketOption.allCases.reduce(into: [:]) { $0[$1.rawValue] = true }
+        codexUsageWidgetWindows = Self.loadStringBoolMap(ud, key: "codexUsageWidgetWindows")
+            ?? CodexUsageWindowOption.allCases.reduce(into: [:]) { $0[$1.rawValue] = true }
         language = Self.loadEnum(ud, key: "language") ?? .system
         launchAtLogin = ud.bool(forKey: "launchAtLogin")
     }
@@ -350,8 +455,8 @@ final class AppSettings {
         defaults.set(velocityThreshold, forKey: "velocityThreshold")
         defaults.set(historicalAlertEnabled, forKey: "historicalAlertEnabled")
         defaults.set(historicalMultiplier, forKey: "historicalMultiplier")
-        defaults.set(claudeAlert75, forKey: "claudeAlert75")
-        defaults.set(claudeAlert90, forKey: "claudeAlert90")
+        defaults.set(usageAlert75Enabled, forKey: "usageAlert75Enabled")
+        defaults.set(usageAlert90Enabled, forKey: "usageAlert90Enabled")
         defaults.set(language.rawValue, forKey: "language")
 
         if let data = try? JSONEncoder().encode(providerSettingsMap) {
@@ -359,6 +464,18 @@ final class AppSettings {
         }
         if let data = try? JSONEncoder().encode(widgetOrder) {
             defaults.set(data, forKey: "widgetOrder")
+        }
+        if let data = try? JSONEncoder().encode(usageAlert75Buckets) {
+            defaults.set(data, forKey: "usageAlert75Buckets")
+        }
+        if let data = try? JSONEncoder().encode(usageAlert90Buckets) {
+            defaults.set(data, forKey: "usageAlert90Buckets")
+        }
+        if let data = try? JSONEncoder().encode(claudeUsageWidgetBuckets) {
+            defaults.set(data, forKey: "claudeUsageWidgetBuckets")
+        }
+        if let data = try? JSONEncoder().encode(codexUsageWidgetWindows) {
+            defaults.set(data, forKey: "codexUsageWidgetWindows")
         }
     }
 
@@ -427,6 +544,51 @@ final class AppSettings {
         return items
     }
 
+    private static func loadStringBoolMap(_ ud: UserDefaults, key: String) -> [String: Bool]? {
+        guard let data = ud.data(forKey: key),
+              let map = try? JSONDecoder().decode([String: Bool].self, from: data)
+        else { return nil }
+        return map
+    }
+
+    // MARK: - Usage Alert Helpers
+
+    func isUsageAlertBucketEnabled(_ threshold: UsageAlertThreshold, bucket: UsageAlertBucket) -> Bool {
+        switch threshold {
+        case .percent75:
+            return usageAlert75Buckets[bucket.rawValue] ?? false
+        case .percent90:
+            return usageAlert90Buckets[bucket.rawValue] ?? false
+        }
+    }
+
+    func setUsageAlertBucketEnabled(_ threshold: UsageAlertThreshold, bucket: UsageAlertBucket, enabled: Bool) {
+        switch threshold {
+        case .percent75:
+            usageAlert75Buckets[bucket.rawValue] = enabled
+        case .percent90:
+            usageAlert90Buckets[bucket.rawValue] = enabled
+        }
+    }
+
+    // MARK: - Usage Widget Helpers
+
+    func isClaudeUsageBucketVisible(_ bucket: ClaudeUsageBucketOption) -> Bool {
+        claudeUsageWidgetBuckets[bucket.rawValue] ?? true
+    }
+
+    func setClaudeUsageBucketVisible(_ bucket: ClaudeUsageBucketOption, visible: Bool) {
+        claudeUsageWidgetBuckets[bucket.rawValue] = visible
+    }
+
+    func isCodexUsageWindowVisible(_ window: CodexUsageWindowOption) -> Bool {
+        codexUsageWidgetWindows[window.rawValue] ?? true
+    }
+
+    func setCodexUsageWindowVisible(_ window: CodexUsageWindowOption, visible: Bool) {
+        codexUsageWidgetWindows[window.rawValue] = visible
+    }
+
     /// Returns resolved widget order, filling in any missing providers/claude_usage.
     func resolvedWidgetOrder() -> [MenuWidgetItem] {
         let enabledProviderIds = ProviderRegistry.configurableProviders
@@ -461,5 +623,43 @@ final class AppSettings {
               let map = try? JSONDecoder().decode([String: ProviderSettings].self, from: data)
         else { return [:] }
         return map
+    }
+}
+
+// MARK: - Usage Alert State Store
+
+@MainActor
+final class UsageAlertStateStore {
+    static let shared = UsageAlertStateStore()
+
+    private let defaults = UserDefaults.standard
+    private let storeKey = "usageAlertNotifiedResets"
+    private var cache: [String: String]
+
+    private init() {
+        if let data = defaults.data(forKey: storeKey),
+           let map = try? JSONDecoder().decode([String: String].self, from: data) {
+            cache = map
+        } else {
+            cache = [:]
+        }
+    }
+
+    func hasNotified(threshold: UsageAlertThreshold, bucket: UsageAlertBucket, resetId: String) -> Bool {
+        cache[key(threshold, bucket)] == resetId
+    }
+
+    func markNotified(threshold: UsageAlertThreshold, bucket: UsageAlertBucket, resetId: String) {
+        cache[key(threshold, bucket)] = resetId
+        save()
+    }
+
+    private func key(_ threshold: UsageAlertThreshold, _ bucket: UsageAlertBucket) -> String {
+        "\(threshold.rawValue):\(bucket.rawValue)"
+    }
+
+    private func save() {
+        guard let data = try? JSONEncoder().encode(cache) else { return }
+        defaults.set(data, forKey: storeKey)
     }
 }

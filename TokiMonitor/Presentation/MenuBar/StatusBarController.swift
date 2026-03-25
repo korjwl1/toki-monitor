@@ -29,7 +29,10 @@ final class StatusBarController {
     )
 
     // Codex Usage
-    private lazy var codexUsageMonitor = CodexUsageMonitor(aggregator: aggregator)
+    private lazy var codexUsageMonitor = CodexUsageMonitor(
+        aggregator: aggregator,
+        settings: settings
+    )
 
     // Update Checker
     private let updateChecker = UpdateChecker()

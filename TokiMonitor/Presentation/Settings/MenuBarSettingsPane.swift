@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuBarSettingsPane: View {
     @Bindable var settings: AppSettings
     private let availableThemes = AnimationTheme.discoverAll()
+    @State private var expandedWidgetIds: Set<String> = []
 
     var body: some View {
         Form {
@@ -211,37 +212,12 @@ struct MenuBarSettingsPane: View {
         Section(L.menuBar.widgetOrder) {
             let items = settings.resolvedWidgetOrder()
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                HStack(spacing: DS.sm) {
-                    Image(systemName: item.visible ? "eye" : "eye.slash")
-                        .foregroundStyle(item.visible ? .primary : .tertiary)
-                        .frame(width: 20)
-                        .onTapGesture {
-                            toggleWidgetVisibility(item.id)
-                        }
-
-                    Text(widgetDisplayName(item.id))
-
-                    Spacer()
-
-                    Button {
-                        moveWidget(at: idx, direction: -1, global: true)
-                    } label: {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(idx == 0)
-
-                    Button {
-                        moveWidget(at: idx, direction: 1, global: true)
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(idx == items.count - 1)
+                let key = expansionKey(global: true, providerId: nil, widgetId: item.id)
+                widgetRow(item: item, index: idx, total: items.count, global: true, providerId: nil)
+                if widgetHasSettings(item.id), expandedWidgetIds.contains(key) {
+                    widgetSettingsView(item.id)
+                        .padding(.leading, DS.sm)
                 }
-                .contentShape(Rectangle())
             }
         }
     }
@@ -250,40 +226,172 @@ struct MenuBarSettingsPane: View {
         Section(L.menuBar.widgetOrder) {
             let items = settings.resolvedProviderWidgetOrder(for: provider.id)
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                HStack(spacing: DS.sm) {
-                    Image(systemName: item.visible ? "eye" : "eye.slash")
-                        .foregroundStyle(item.visible ? .primary : .tertiary)
-                        .frame(width: 20)
-                        .onTapGesture {
-                            toggleProviderWidgetVisibility(providerId: provider.id, widgetId: item.id)
-                        }
-
-                    Text(widgetDisplayName(item.id))
-                        .foregroundStyle(item.visible ? .primary : .tertiary)
-
-                    Spacer()
-
-                    Button {
-                        moveProviderWidget(providerId: provider.id, at: idx, direction: -1)
-                    } label: {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(idx == 0)
-
-                    Button {
-                        moveProviderWidget(providerId: provider.id, at: idx, direction: 1)
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(idx == items.count - 1)
+                let key = expansionKey(global: false, providerId: provider.id, widgetId: item.id)
+                widgetRow(item: item, index: idx, total: items.count, global: false, providerId: provider.id)
+                if widgetHasSettings(item.id), expandedWidgetIds.contains(key) {
+                    widgetSettingsView(item.id)
+                        .padding(.leading, DS.sm)
                 }
-                .contentShape(Rectangle())
             }
         }
+    }
+
+    // MARK: - Widget Row Helpers
+
+    private func widgetRow(
+        item: MenuWidgetItem,
+        index: Int,
+        total: Int,
+        global: Bool,
+        providerId: String?
+    ) -> some View {
+        HStack(spacing: DS.sm) {
+            Image(systemName: item.visible ? "eye" : "eye.slash")
+                .foregroundStyle(item.visible ? .primary : .tertiary)
+                .frame(width: 20)
+                .onTapGesture {
+                    if global {
+                        toggleWidgetVisibility(item.id)
+                    } else if let providerId {
+                        toggleProviderWidgetVisibility(providerId: providerId, widgetId: item.id)
+                    }
+                }
+
+            if widgetHasSettings(item.id) {
+                Button {
+                    let key = expansionKey(global: global, providerId: providerId, widgetId: item.id)
+                    if expandedWidgetIds.contains(key) {
+                        expandedWidgetIds.remove(key)
+                    } else {
+                        expandedWidgetIds.insert(key)
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(widgetDisplayName(item.id))
+                            .foregroundStyle(item.visible ? .primary : .tertiary)
+                        Image(systemName: expandedWidgetIds.contains(expansionKey(global: global, providerId: providerId, widgetId: item.id)) ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(widgetDisplayName(item.id))
+                    .foregroundStyle(item.visible ? .primary : .tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Spacer()
+
+            Button {
+                if global {
+                    moveWidget(at: index, direction: -1, global: true)
+                } else if let providerId {
+                    moveProviderWidget(providerId: providerId, at: index, direction: -1)
+                }
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 10))
+            }
+            .buttonStyle(.plain)
+            .disabled(index == 0)
+
+            Button {
+                if global {
+                    moveWidget(at: index, direction: 1, global: true)
+                } else if let providerId {
+                    moveProviderWidget(providerId: providerId, at: index, direction: 1)
+                }
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10))
+            }
+            .buttonStyle(.plain)
+            .disabled(index == total - 1)
+        }
+    }
+
+    private func widgetHasSettings(_ id: String) -> Bool {
+        id == MenuWidgetItem.claudeUsageId || id == MenuWidgetItem.codexUsageId
+    }
+
+    @ViewBuilder
+    private func widgetSettingsView(_ id: String) -> some View {
+        Group {
+            if id == MenuWidgetItem.claudeUsageId {
+                indentedRow(Toggle(
+                    ClaudeUsageBucketOption.fiveHour.displayName,
+                    isOn: Binding(
+                        get: { settings.isClaudeUsageBucketVisible(.fiveHour) },
+                        set: { settings.setClaudeUsageBucketVisible(.fiveHour, visible: $0) }
+                    )
+                ))
+                indentedRow(Toggle(
+                    ClaudeUsageBucketOption.sevenDay.displayName,
+                    isOn: Binding(
+                        get: { settings.isClaudeUsageBucketVisible(.sevenDay) },
+                        set: { settings.setClaudeUsageBucketVisible(.sevenDay, visible: $0) }
+                    )
+                ))
+                indentedRow(
+                    Toggle(
+                        ClaudeUsageBucketOption.sevenDaySonnet.displayName,
+                        isOn: Binding(
+                            get: { settings.isClaudeUsageBucketVisible(.sevenDaySonnet) },
+                            set: { settings.setClaudeUsageBucketVisible(.sevenDaySonnet, visible: $0) }
+                        )
+                    )
+                    .disabled(settings.claudeHasSevenDaySonnet == false)
+                    .opacity(settings.claudeHasSevenDaySonnet == false ? 0.45 : 1)
+                )
+            } else if id == MenuWidgetItem.codexUsageId {
+                indentedRow(Toggle(
+                    CodexUsageWindowOption.primary.displayName,
+                    isOn: Binding(
+                        get: { settings.isCodexUsageWindowVisible(.primary) },
+                        set: { settings.setCodexUsageWindowVisible(.primary, visible: $0) }
+                    )
+                ))
+                indentedRow(
+                    Toggle(
+                        CodexUsageWindowOption.secondary.displayName,
+                        isOn: Binding(
+                            get: { settings.isCodexUsageWindowVisible(.secondary) },
+                            set: { settings.setCodexUsageWindowVisible(.secondary, visible: $0) }
+                        )
+                    )
+                    .disabled(settings.codexHasSecondaryWindow == false)
+                    .opacity(settings.codexHasSecondaryWindow == false ? 0.45 : 1)
+                )
+            }
+        }
+    }
+
+    private func indentedRow<Content: View>(_ content: Content) -> some View {
+        HStack(spacing: 0) {
+            Color.clear.frame(width: 16)
+            content
+        }
+    }
+
+    private func expansionKey(global: Bool, providerId: String?, widgetId: String) -> String {
+        if global { return "global:\(widgetId)" }
+        return "provider:\(providerId ?? "unknown"):\(widgetId)"
+    }
+
+    private func expansionBinding(for key: String) -> Binding<Bool> {
+        Binding(
+            get: { expandedWidgetIds.contains(key) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedWidgetIds.insert(key)
+                } else {
+                    expandedWidgetIds.remove(key)
+                }
+            }
+        )
     }
 
     private func toggleProviderWidgetVisibility(providerId: String, widgetId: String) {

@@ -53,6 +53,7 @@ enum L {
         static var widgetOrder: String { tr("위젯 순서", "Widget Order") }
         static var sleepDelay: String { tr("수면 대기 시간", "Sleep Delay") }
         static var claudeUsage: String { tr("Claude 사용량", "Claude Usage") }
+        static var usageBuckets: String { tr("사용량 항목", "Usage Buckets") }
     }
 
     // MARK: - Provider Settings
@@ -80,8 +81,16 @@ enum L {
 
     enum notification {
         static var claudeUsageAlerts: String { tr("Claude 사용량 알림", "Claude Usage Alerts") }
+        static var usageAlerts: String { tr("사용량 알림", "Usage Alerts") }
         static var alert75: String { tr("75% 도달 시 알림", "Alert at 75%") }
         static var alert90: String { tr("90% 도달 시 알림", "Alert at 90%") }
+        static var bucketDetails: String { tr("세부 항목", "Details") }
+        static var claudeFiveHour: String { tr("Claude 5시간", "Claude 5h") }
+        static var claudeSevenDay: String { tr("Claude 7일", "Claude 7d") }
+        static var claudeSevenDaySonnet: String { tr("Claude 7일 Sonnet", "Claude 7d Sonnet") }
+        static var codexPrimary: String { tr("Codex 기본 윈도우", "Codex Primary Window") }
+        static var codexSecondary: String { tr("Codex 보조 윈도우", "Codex Secondary Window") }
+        static var noUsageBuckets: String { tr("표시할 사용량 항목이 없습니다", "No usage buckets selected") }
         static var anomalyDetection: String { tr("이상 감지", "Anomaly Detection") }
         static var velocityAlert: String { tr("비용 속도 경고", "Cost Velocity Alert") }
         static var velocityDesc: String { tr("분당 비용이 임계값을 초과하면 캐릭터에 피격 이펙트가 발생합니다. 캐릭터 모드에서만 동작합니다.", "Character gets a hit effect when cost per minute exceeds the threshold. Only works in character mode.") }
