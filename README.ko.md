@@ -141,7 +141,9 @@ open /Applications/TokiMonitor.app
 - macOS Tahoe에서 Liquid Glass 지원
 
 <p align="center">
-  <img src="docs/images/settings.png" alt="설정" width="480" />
+  <img src="docs/images/settings-menubar.png" alt="설정 — 메뉴 바" width="480" />
+  <img src="docs/images/settings-widgets.png" alt="설정 — 위젯" width="480" />
+  <img src="docs/images/settings-notifications.png" alt="설정 — 알림" width="480" />
 </p>
 
 ---

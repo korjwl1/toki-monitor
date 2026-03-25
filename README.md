@@ -146,7 +146,9 @@ Not logged in? The widget shows a prompt instead of hiding — Claude shows "Cla
 - Liquid Glass on macOS Tahoe
 
 <p align="center">
-  <img src="docs/images/settings.png" alt="Settings" width="480" />
+  <img src="docs/images/settings-menubar.png" alt="Settings — Menu Bar" width="480" />
+  <img src="docs/images/settings-widgets.png" alt="Settings — Widgets" width="480" />
+  <img src="docs/images/settings-notifications.png" alt="Settings — Notifications" width="480" />
 </p>
 
 ---
