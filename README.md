@@ -128,10 +128,9 @@ Not logged in? The widget shows a prompt instead of hiding — Claude shows "Cla
 
 ### Anomaly detection
 
-- **Velocity alert** — icon color changes when $/min exceeds your threshold
-- **Historical baseline** — compares against your 24-hour average via PromQL
-- Choose: icon color change, system notification, or both
-- Custom alert colors per type
+- **Velocity alert** — character gets a hit effect (star burst + shake) when $/min exceeds your threshold
+- **Historical baseline** — character gets a poison effect (purple bubbles + color pulse) when usage exceeds N× your 24-hour average
+- Both effects only appear in character mode
 - Off by default. Configure in Settings → Notifications.
 
 ### Settings
