@@ -21,6 +21,9 @@ final class CharacterAnimationRenderer {
     /// 0.0–1.0, set externally. Draws a thin bar at the top of the canvas.
     var hpBarValue: Double = 0
 
+    private var isPlayingHitEffect = false
+    private weak var hitOverlay: HitStarView?
+
     private var frames: [NSImage] { theme?.runFrames ?? [] }
     private var sleepFrames: [NSImage] { theme?.sleepFrames ?? [] }
 
@@ -269,6 +272,80 @@ final class CharacterAnimationRenderer {
         applyFrame(currentFrame, from: frames, to: button)
     }
 
+    // MARK: - Hit Effect
+
+    func playHitEffect(on button: NSStatusBarButton) {
+        guard !isPlayingHitEffect else { return }
+        isPlayingHitEffect = true
+
+        let imgRect = button.cell?.imageRect(forBounds: button.bounds)
+            ?? button.bounds
+
+        // Spawn 2 star bursts at random positions over the character, different sizes
+        let sizes: [CGFloat] = [7, 4]
+        var stars: [HitStarView] = []
+
+        for size in sizes {
+            let maxX = imgRect.maxX - size
+            let maxY = imgRect.maxY - size
+            let x = CGFloat.random(in: imgRect.origin.x...max(imgRect.origin.x, maxX))
+            let y = CGFloat.random(in: imgRect.origin.y...max(imgRect.origin.y, maxY))
+
+            let star = HitStarView(frame: NSRect(x: x, y: y, width: size, height: size))
+            star.wantsLayer = true
+            star.layer?.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            let rotation = CGFloat.random(in: -0.6...0.6)  // ~±35°
+            star.frameCenterRotation = rotation * 180 / .pi
+            button.addSubview(star)
+            stars.append(star)
+        }
+
+        // Shake — shift the character image inside fixed canvas with damped oscillation
+        let originalImage = button.image
+        let canvasSize = originalImage?.size ?? NSSize(width: 24, height: 18)
+        let duration = 0.4
+        let totalFrames = 24  // ~60fps for 0.4s
+        let amplitude: CGFloat = 3.5
+        let frequency: CGFloat = 3.5  // oscillations
+
+        for i in 0...totalFrames {
+            let t = Double(i) / Double(totalFrames)
+            DispatchQueue.main.asyncAfter(deadline: .now() + t * duration) {
+                guard let src = originalImage else { return }
+                let decay = 1.0 - CGFloat(t)
+                let dx = amplitude * decay * sin(CGFloat(t) * frequency * 2 * .pi)
+
+                if abs(dx) < 0.3 && i == totalFrames {
+                    button.image = src
+                    return
+                }
+                let shifted = NSImage(size: canvasSize, flipped: false) { _ in
+                    src.draw(at: NSPoint(x: dx, y: 0),
+                             from: NSRect(origin: .zero, size: canvasSize),
+                             operation: .sourceOver, fraction: 1)
+                    return true
+                }
+                shifted.isTemplate = src.isTemplate
+                button.image = shifted
+            }
+        }
+
+        // Stars scale up then fade out
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            for star in stars {
+                star.frame = star.frame.insetBy(dx: -2, dy: -2)
+                star.needsDisplay = true
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
+            for star in stars { star.alphaValue = 0.5 }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            for star in stars { star.removeFromSuperview() }
+            self.isPlayingHitEffect = false
+        }
+    }
+
     private func tintedImage(_ image: NSImage, color: NSColor) -> NSImage {
         NSImage(size: image.size, flipped: false) { rect in
             image.draw(in: rect)
@@ -327,5 +404,42 @@ private class HPBarView: NSView {
         let fillRect = NSRect(x: 0, y: 0, width: bounds.width * v, height: bounds.height)
         color.setFill()
         NSBezierPath(roundedRect: fillRect, xRadius: r, yRadius: r).fill()
+    }
+}
+
+// MARK: - Hit Star Burst
+
+private class HitStarView: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        let cx = bounds.midX
+        let cy = bounds.midY
+        let outerR = min(bounds.width, bounds.height) / 2
+        let innerR = outerR * 0.2  // sharper spikes
+        let spikes = 4
+        let path = NSBezierPath()
+
+        for i in 0..<(spikes * 2) {
+            let angle = CGFloat(i) * .pi / CGFloat(spikes) - .pi / 2
+            let r = i.isMultiple(of: 2) ? outerR : innerR
+            let x = cx + r * cos(angle)
+            let y = cy + r * sin(angle)
+            if i == 0 { path.move(to: NSPoint(x: x, y: y)) }
+            else { path.line(to: NSPoint(x: x, y: y)) }
+        }
+        path.close()
+
+        NSColor.systemRed.setFill()
+        path.fill()
+        NSColor.systemOrange.setStroke()
+        path.lineWidth = 0.5
+        path.stroke()
     }
 }

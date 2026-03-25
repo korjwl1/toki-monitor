@@ -96,6 +96,7 @@ final class StatusItemUnit {
                 button: button,
                 tintColor: tintColor
             )
+
             if showRateText {
                 let text = TokenFormatter.formatRate(tokensPerMinute, unit: tokenUnit)
                 if let tintColor {
@@ -128,6 +129,11 @@ final class StatusItemUnit {
         case .sparkline:
             sparklineRenderer.update(history: history, button: button, tintColor: tintColor)
         }
+    }
+
+    func playHitEffect() {
+        guard let button = statusItem.button else { return }
+        characterRenderer.playHitEffect(on: button)
     }
 
     func teardown() {

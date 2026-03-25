@@ -9,6 +9,8 @@ final class StatusBarController {
 
     // Status item units (single for aggregated, multiple for perProvider)
     private var units: [StatusItemUnit] = []
+    private var lastSpendAlert: TokenAggregator.SpendAlert = .normal
+    private var hitEffectTimer: Timer?
 
     // Dashboard & Settings
     private let dashboardController = DashboardWindowController()
@@ -196,13 +198,23 @@ final class StatusBarController {
 
     private func updateAllDisplays() {
         // Override tint color based on spend alert (only if icon color mode)
-        let alertTint: NSColor? = switch aggregator.spendAlert {
-        case .critical where [.iconColor, .both].contains(settings.velocityAlertMode):
-            ProviderInfo.nsColorFromName(settings.velocityAlertColor)
-        case .elevated where [.iconColor, .both].contains(settings.historicalAlertMode):
-            ProviderInfo.nsColorFromName(settings.historicalAlertColor)
-        default: nil
+        // Hit effect repeats while spend alert is critical
+        let currentAlert = aggregator.spendAlert
+        if currentAlert == .critical, lastSpendAlert != .critical {
+            // Start repeating hit effect
+            for unit in units { unit.playHitEffect() }
+            hitEffectTimer?.invalidate()
+            hitEffectTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    for unit in self.units { unit.playHitEffect() }
+                }
+            }
+        } else if currentAlert != .critical, lastSpendAlert == .critical {
+            hitEffectTimer?.invalidate()
+            hitEffectTimer = nil
         }
+        lastSpendAlert = currentAlert
 
         for unit in units {
             if let pid = unit.providerId {
@@ -212,7 +224,7 @@ final class StatusBarController {
                 let colorName = settings.effectiveColorName(
                     for: ProviderRegistry.allProviders.first { $0.id == pid } ?? ProviderRegistry.unknown
                 )
-                let tint = alertTint ?? ProviderInfo.nsColorFromName(colorName)
+                let tint = ProviderInfo.nsColorFromName(colorName)
                 let ps = settings.effectiveSettings(for: pid)
                 let effectiveHPSource: HPBarSource = {
                     if let explicit = ps.hpBarSource { return explicit }
@@ -236,7 +248,7 @@ final class StatusBarController {
                 )
             } else {
                 let baseTint: NSColor? = settings.aggregatedColorName.map { ProviderInfo.nsColorFromName($0) }
-                let tint = alertTint ?? baseTint
+                let tint = baseTint
                 let aggregatedHP = resolveHPBar(source: settings.hpBarSource)
                 unit.update(
                     tokensPerMinute: aggregator.tokensPerMinute,

@@ -138,20 +138,6 @@ enum SleepDelay: String, CaseIterable, Codable {
     }
 }
 
-enum AlertMode: String, CaseIterable, Codable {
-    case iconColor
-    case notification
-    case both
-
-    var displayName: String {
-        switch self {
-        case .iconColor: L.tr("아이콘 색상", "Icon Color")
-        case .notification: L.tr("시스템 알림", "Notification")
-        case .both: L.tr("둘 다", "Both")
-        }
-    }
-}
-
 // MARK: - HP Bar Source
 
 enum HPBarSource: String, CaseIterable, Codable {
@@ -259,25 +245,12 @@ final class AppSettings {
     var velocityThreshold: Double {
         didSet { save() }
     }
-    var velocityAlertColor: String {
-        didSet { save() }
-    }
-    var velocityAlertMode: AlertMode {
-        didSet { save() }
-    }
     var historicalAlertEnabled: Bool {
         didSet { save() }
     }
     var historicalMultiplier: Double {
         didSet { save() }
     }
-    var historicalAlertColor: String {
-        didSet { save() }
-    }
-    var historicalAlertMode: AlertMode {
-        didSet { save() }
-    }
-
     var claudeAlert75: Bool {
         didSet { save() }
     }
@@ -314,12 +287,8 @@ final class AppSettings {
         widgetOrder = Self.loadWidgetOrder(ud)
         velocityAlertEnabled = ud.bool(forKey: "velocityAlertEnabled")
         velocityThreshold = ud.object(forKey: "velocityThreshold") as? Double ?? 0.50
-        velocityAlertColor = ud.string(forKey: "velocityAlertColor") ?? "red"
-        velocityAlertMode = Self.loadEnum(ud, key: "velocityAlertMode") ?? .iconColor
         historicalAlertEnabled = ud.bool(forKey: "historicalAlertEnabled")
         historicalMultiplier = ud.object(forKey: "historicalMultiplier") as? Double ?? 3.0
-        historicalAlertColor = ud.string(forKey: "historicalAlertColor") ?? "orange"
-        historicalAlertMode = Self.loadEnum(ud, key: "historicalAlertMode") ?? .iconColor
         claudeAlert75 = ud.object(forKey: "claudeAlert75") as? Bool ?? true
         claudeAlert90 = ud.object(forKey: "claudeAlert90") as? Bool ?? true
         language = Self.loadEnum(ud, key: "language") ?? .system
@@ -379,12 +348,8 @@ final class AppSettings {
         defaults.set(aggregatedColorName, forKey: "aggregatedColorName")
         defaults.set(velocityAlertEnabled, forKey: "velocityAlertEnabled")
         defaults.set(velocityThreshold, forKey: "velocityThreshold")
-        defaults.set(velocityAlertColor, forKey: "velocityAlertColor")
-        defaults.set(velocityAlertMode.rawValue, forKey: "velocityAlertMode")
         defaults.set(historicalAlertEnabled, forKey: "historicalAlertEnabled")
         defaults.set(historicalMultiplier, forKey: "historicalMultiplier")
-        defaults.set(historicalAlertColor, forKey: "historicalAlertColor")
-        defaults.set(historicalAlertMode.rawValue, forKey: "historicalAlertMode")
         defaults.set(claudeAlert75, forKey: "claudeAlert75")
         defaults.set(claudeAlert90, forKey: "claudeAlert90")
         defaults.set(language.rawValue, forKey: "language")
