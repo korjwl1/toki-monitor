@@ -4,7 +4,8 @@ DerivedData/
 *.xcscmblueprint
 *.profraw
 
-# Personal/local docs
-.claude/
+# Personal/local docs (keep .claude/skills/ for shared skills)
+.claude/*
+!.claude/skills/
 .spec-mix/
 specs/

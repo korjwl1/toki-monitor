@@ -23,7 +23,7 @@ struct GeneralSettingsPane: View {
                     Text("Toki Monitor")
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("v0.1.0")
+                    Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
                         .foregroundStyle(.tertiary)
                 }
             }
