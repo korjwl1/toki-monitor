@@ -75,6 +75,19 @@ struct CodexCredits: Codable {
         case hasCredits = "has_credits"
         case balance
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hasCredits = try container.decode(Bool.self, forKey: .hasCredits)
+        // API returns balance as either Double or String — handle both
+        if let d = try? container.decode(Double.self, forKey: .balance) {
+            balance = d
+        } else if let s = try? container.decode(String.self, forKey: .balance) {
+            balance = Double(s)
+        } else {
+            balance = nil
+        }
+    }
 }
 
 // MARK: - Codex Auth Token Reader
