@@ -125,14 +125,15 @@ final class TokenAggregator {
     // MARK: - Historical Baseline (Level 2)
 
     private func fetchHistoricalBaseline() {
-        Task {
+        Task { [weak self] in
+            guard let self else { return }
             let sinceFmt = DateFormatter()
             sinceFmt.dateFormat = "yyyyMMddHHmmss"
             sinceFmt.timeZone = TimeZone(identifier: "UTC")
             let since = sinceFmt.string(from: Date().addingTimeInterval(-86400)) // 24h ago
             let query = "usage{since=\"\(since)\"}[1h] by (model)"
 
-            guard let pointsByDate = try? await reportClient.queryPromQL(query: query) else { return }
+            guard let pointsByDate = try? await self.reportClient.queryPromQL(query: query) else { return }
 
             // Sum total cost across all points
             var totalCost: Double = 0

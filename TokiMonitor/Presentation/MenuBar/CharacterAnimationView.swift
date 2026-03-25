@@ -104,8 +104,6 @@ final class CharacterAnimationRenderer {
         hpBarView = nil
         stopPoison()
         isPlayingHitEffect = false
-        poisonTintOverlay?.removeFromSuperview()
-        poisonTintOverlay = nil
         stopAnimation()
         currentFrame = 0
     }
@@ -304,6 +302,7 @@ final class CharacterAnimationRenderer {
         anim.timingFunction = CAMediaTimingFunction(name: .easeOut)
         anim.isAdditive = true
 
+        layer.removeAnimation(forKey: "shake")
         layer.add(anim, forKey: "shake")
     }
 
@@ -338,18 +337,20 @@ final class CharacterAnimationRenderer {
         shakeCharacter(on: button)
 
         // Stars scale up then fade out
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard self != nil else { return }
             for star in stars {
                 star.frame = star.frame.insetBy(dx: -2, dy: -2)
                 star.needsDisplay = true
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) { [weak self] in
+            guard self != nil else { return }
             for star in stars { star.alphaValue = 0.5 }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
             for star in stars { star.removeFromSuperview() }
-            self.isPlayingHitEffect = false
+            self?.isPlayingHitEffect = false
         }
     }
 
@@ -375,6 +376,7 @@ final class CharacterAnimationRenderer {
         poisonTimer = nil
         for b in poisonBubbles { b.removeFromSuperview() }
         poisonBubbles.removeAll()
+        poisonTintOverlay?.sourceImage = nil
         poisonTintOverlay?.removeFromSuperview()
         poisonTintOverlay = nil
     }
@@ -487,9 +489,12 @@ final class CharacterAnimationRenderer {
 
             // Cleanup
             DispatchQueue.main.asyncAfter(deadline: .now() + lifetime + 0.1) { [weak self, weak dot] in
-                guard let dot else { return }
-                dot.removeFromSuperview()
-                self?.poisonBubbles.removeAll { $0 === dot }
+                dot?.removeFromSuperview()
+                if let dot {
+                    self?.poisonBubbles.removeAll { $0 === dot }
+                }
+                // Prune any zombie entries (deallocated views)
+                self?.poisonBubbles.removeAll { $0.superview == nil }
             }
         }
     }
