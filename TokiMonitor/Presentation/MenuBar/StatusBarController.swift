@@ -11,6 +11,7 @@ final class StatusBarController {
     private var units: [StatusItemUnit] = []
     private var lastSpendAlert: TokenAggregator.SpendAlert = .normal
     private var hitEffectTimer: Timer?
+    private var poisonActive = false
 
     // Dashboard & Settings
     private let dashboardController = DashboardWindowController()
@@ -198,10 +199,12 @@ final class StatusBarController {
 
     private func updateAllDisplays() {
         // Override tint color based on spend alert (only if icon color mode)
-        // Hit effect repeats while spend alert is critical
+        // Hit effect (critical) — repeats every 3s, offset to avoid overlap with poison bubbles
+        // Poison effect (elevated) — continuous bubble overlay
         let currentAlert = aggregator.spendAlert
+
+        // Critical: hit effect
         if currentAlert == .critical, lastSpendAlert != .critical {
-            // Start repeating hit effect
             for unit in units { unit.playHitEffect() }
             hitEffectTimer?.invalidate()
             hitEffectTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
@@ -214,6 +217,23 @@ final class StatusBarController {
             hitEffectTimer?.invalidate()
             hitEffectTimer = nil
         }
+
+        // Elevated: poison effect (restart if woke from sleep)
+        if currentAlert == .elevated {
+            if !poisonActive {
+                poisonActive = true
+                for unit in units { unit.startPoison() }
+            } else {
+                // Re-start poison on units that stopped (e.g. woke from sleep)
+                for unit in units where !unit.isPoisoned {
+                    unit.startPoison()
+                }
+            }
+        } else if poisonActive {
+            poisonActive = false
+            for unit in units { unit.stopPoison() }
+        }
+
         lastSpendAlert = currentAlert
 
         for unit in units {

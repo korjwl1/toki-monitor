@@ -96,7 +96,6 @@ final class StatusItemUnit {
                 button: button,
                 tintColor: tintColor
             )
-
             if showRateText {
                 let text = TokenFormatter.formatRate(tokensPerMinute, unit: tokenUnit)
                 if let tintColor {
@@ -132,9 +131,20 @@ final class StatusItemUnit {
     }
 
     func playHitEffect() {
-        guard let button = statusItem.button else { return }
+        guard currentStyle == .character, let button = statusItem.button else { return }
         characterRenderer.playHitEffect(on: button)
     }
+
+    func startPoison() {
+        guard currentStyle == .character, let button = statusItem.button else { return }
+        characterRenderer.startPoison(on: button)
+    }
+
+    func stopPoison() {
+        characterRenderer.stopPoison()
+    }
+
+    var isPoisoned: Bool { characterRenderer.isPoisoned }
 
     func teardown() {
         characterRenderer.stop()

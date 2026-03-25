@@ -24,6 +24,11 @@ final class CharacterAnimationRenderer {
     private var isPlayingHitEffect = false
     private weak var hitOverlay: HitStarView?
 
+    private(set) var isPoisoned = false
+    private var poisonTimer: Timer?
+    private var poisonBubbles: [PoisonBubbleView] = []
+    private weak var poisonTintOverlay: PoisonTintOverlayView?
+
     private var frames: [NSImage] { theme?.runFrames ?? [] }
     private var sleepFrames: [NSImage] { theme?.sleepFrames ?? [] }
 
@@ -53,6 +58,8 @@ final class CharacterAnimationRenderer {
                 if !isSleeping {
                     isSleeping = true
                     currentFrame = 0
+                    // Stop effects while sleeping
+                    if isPoisoned { stopPoison() }
                     startSleepAnimation(button: button)
                 }
             } else {
@@ -93,6 +100,12 @@ final class CharacterAnimationRenderer {
         idleSince = nil
         sleepCheckTimer?.invalidate()
         sleepCheckTimer = nil
+        hpBarView?.removeFromSuperview()
+        hpBarView = nil
+        stopPoison()
+        isPlayingHitEffect = false
+        poisonTintOverlay?.removeFromSuperview()
+        poisonTintOverlay = nil
         stopAnimation()
         currentFrame = 0
     }
@@ -167,6 +180,9 @@ final class CharacterAnimationRenderer {
             button.image = frame
             button.image?.isTemplate = true
         }
+
+        // Sync poison silhouette with current frame
+        poisonTintOverlay?.sourceImage = frame
 
         // Update HP bar overlay (native NSView, not image composite)
         // hpBarValue < 0 means no data / source is none
@@ -272,10 +288,29 @@ final class CharacterAnimationRenderer {
         applyFrame(currentFrame, from: frames, to: button)
     }
 
+    // MARK: - Shake (shared by hit & poison)
+    // Uses CAKeyframeAnimation on layer transform — doesn't touch button.image,
+    // so it runs independently of the frame animation timer.
+
+    private func shakeCharacter(on button: NSStatusBarButton, amplitude: CGFloat = 3.5, duration: Double = 0.4) {
+        button.wantsLayer = true
+        guard let layer = button.layer else { return }
+
+        let anim = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        anim.values = [0, amplitude, -amplitude, amplitude * 0.7,
+                        -amplitude * 0.5, amplitude * 0.3, -amplitude * 0.15, 0]
+        anim.keyTimes = [0, 0.12, 0.28, 0.42, 0.56, 0.7, 0.85, 1.0]
+        anim.duration = duration
+        anim.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        anim.isAdditive = true
+
+        layer.add(anim, forKey: "shake")
+    }
+
     // MARK: - Hit Effect
 
     func playHitEffect(on button: NSStatusBarButton) {
-        guard !isPlayingHitEffect else { return }
+        guard !isPlayingHitEffect, !isSleeping, poisonBubbles.isEmpty else { return }
         isPlayingHitEffect = true
 
         let imgRect = button.cell?.imageRect(forBounds: button.bounds)
@@ -294,41 +329,13 @@ final class CharacterAnimationRenderer {
             let star = HitStarView(frame: NSRect(x: x, y: y, width: size, height: size))
             star.wantsLayer = true
             star.layer?.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-            let rotation = CGFloat.random(in: -0.6...0.6)  // ~±35°
+            let rotation = CGFloat.random(in: -0.6...0.6)
             star.frameCenterRotation = rotation * 180 / .pi
             button.addSubview(star)
             stars.append(star)
         }
 
-        // Shake — shift the character image inside fixed canvas with damped oscillation
-        let originalImage = button.image
-        let canvasSize = originalImage?.size ?? NSSize(width: 24, height: 18)
-        let duration = 0.4
-        let totalFrames = 24  // ~60fps for 0.4s
-        let amplitude: CGFloat = 3.5
-        let frequency: CGFloat = 3.5  // oscillations
-
-        for i in 0...totalFrames {
-            let t = Double(i) / Double(totalFrames)
-            DispatchQueue.main.asyncAfter(deadline: .now() + t * duration) {
-                guard let src = originalImage else { return }
-                let decay = 1.0 - CGFloat(t)
-                let dx = amplitude * decay * sin(CGFloat(t) * frequency * 2 * .pi)
-
-                if abs(dx) < 0.3 && i == totalFrames {
-                    button.image = src
-                    return
-                }
-                let shifted = NSImage(size: canvasSize, flipped: false) { _ in
-                    src.draw(at: NSPoint(x: dx, y: 0),
-                             from: NSRect(origin: .zero, size: canvasSize),
-                             operation: .sourceOver, fraction: 1)
-                    return true
-                }
-                shifted.isTemplate = src.isTemplate
-                button.image = shifted
-            }
-        }
+        shakeCharacter(on: button)
 
         // Stars scale up then fade out
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -343,6 +350,147 @@ final class CharacterAnimationRenderer {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             for star in stars { star.removeFromSuperview() }
             self.isPlayingHitEffect = false
+        }
+    }
+
+    // MARK: - Poison Effect
+
+    func startPoison(on button: NSStatusBarButton) {
+        guard !isPoisoned, !isSleeping else { return }
+        isPoisoned = true
+
+        // Spawn a batch every 1.5s
+        spawnPoisonBatch(on: button)
+        poisonTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.isPoisoned else { return }
+                self.spawnPoisonBatch(on: button)
+            }
+        }
+    }
+
+    func stopPoison() {
+        isPoisoned = false
+        poisonTimer?.invalidate()
+        poisonTimer = nil
+        for b in poisonBubbles { b.removeFromSuperview() }
+        poisonBubbles.removeAll()
+        poisonTintOverlay?.removeFromSuperview()
+        poisonTintOverlay = nil
+    }
+
+    private func spawnPoisonBatch(on button: NSStatusBarButton) {
+        let imgRect = button.cell?.imageRect(forBounds: button.bounds)
+            ?? button.bounds
+        // Shake when bubbles start bursting
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.shakeCharacter(on: button, amplitude: 1.2, duration: 0.5)
+        }
+
+        // Purple silhouette flash — 2 pulses starting at burst time
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+            guard let self else { return }
+
+            let overlay: PoisonTintOverlayView
+            if let existing = self.poisonTintOverlay {
+                overlay = existing
+            } else {
+                overlay = PoisonTintOverlayView(frame: imgRect)
+                overlay.alphaValue = 0
+                button.addSubview(overlay)
+                self.poisonTintOverlay = overlay
+            }
+            overlay.frame = imgRect
+
+            let pulseDuration = 0.5
+            for pulse in 0..<2 {
+                let pulseStart = Double(pulse) * pulseDuration
+                let steps = 12
+                for i in 0...steps {
+                    let t = Double(i) / Double(steps)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + pulseStart + t * pulseDuration) { [weak overlay] in
+                        let blend = t < 0.5 ? t * 2 : (1 - t) * 2
+                        overlay?.alphaValue = CGFloat(blend * 0.55)
+                    }
+                }
+            }
+        }
+
+        let count = Int.random(in: 2...3)
+
+        let centerX = imgRect.midX
+        let centerY = imgRect.midY
+        let radiusX = imgRect.width * 0.35
+        let radiusY = imgRect.height * 0.35
+        var placedCenters: [CGPoint] = []
+
+        for _ in 0..<count {
+            let size: CGFloat = CGFloat.random(in: 3...5)
+
+            // Random point inside ellipse, with minimum spacing
+            var x: CGFloat = 0
+            var y: CGFloat = 0
+            for _ in 0..<20 {
+                let angle = CGFloat.random(in: 0...(2 * .pi))
+                let r = sqrt(CGFloat.random(in: 0...1))  // uniform distribution inside circle
+                let px = centerX + r * radiusX * cos(angle)
+                let py = centerY + r * radiusY * sin(angle)
+                let tooClose = placedCenters.contains { abs($0.x - px) < 4 && abs($0.y - py) < 4 }
+                if !tooClose {
+                    x = px - size / 2
+                    y = py - size / 2
+                    placedCenters.append(CGPoint(x: px, y: py))
+                    break
+                }
+                x = px - size / 2
+                y = py - size / 2
+            }
+
+            let dot = PoisonBubbleView(frame: NSRect(x: x, y: y, width: size, height: size))
+            dot.alphaValue = 0
+            button.addSubview(dot)
+            poisonBubbles.append(dot)
+
+            let cx = x + size / 2
+            let cy = y + size / 2
+            let lifetime = Double.random(in: 0.8...1.2)
+            let steps = 24
+            let stepTime = lifetime / Double(steps)
+
+            for i in 0...steps {
+                let t = Double(i) / Double(steps)
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * stepTime) { [weak dot] in
+                    guard let dot else { return }
+
+                    if t < 0.3 {
+                        // Phase 1: appear and grow
+                        let scale = CGFloat(t / 0.3)
+                        let s = size * scale
+                        dot.frame = NSRect(x: cx - s / 2, y: cy - s / 2, width: s, height: s)
+                        dot.alphaValue = CGFloat(t / 0.3)
+                    } else if t < 0.6 {
+                        // Phase 2: hold + slight wobble
+                        let wobble = sin(CGFloat(t) * 6 * .pi) * 0.5
+                        dot.frame = NSRect(x: cx - size / 2 + wobble, y: cy - size / 2, width: size, height: size)
+                        dot.alphaValue = 1.0
+                    } else {
+                        // Phase 3: burst — expand rapidly and fade
+                        let burstT = CGFloat((t - 0.6) / 0.4)
+                        let burstSize = size * (1.0 + burstT * 1.5)
+                        dot.frame = NSRect(x: cx - burstSize / 2, y: cy - burstSize / 2,
+                                           width: burstSize, height: burstSize)
+                        dot.alphaValue = 1.0 - burstT
+                    }
+                    dot.needsDisplay = true
+                }
+            }
+
+            // Cleanup
+            DispatchQueue.main.asyncAfter(deadline: .now() + lifetime + 0.1) { [weak self, weak dot] in
+                guard let dot else { return }
+                dot.removeFromSuperview()
+                self?.poisonBubbles.removeAll { $0 === dot }
+            }
         }
     }
 
@@ -441,5 +589,49 @@ private class HitStarView: NSView {
         NSColor.systemOrange.setStroke()
         path.lineWidth = 0.5
         path.stroke()
+    }
+}
+
+// MARK: - Poison Bubble
+
+private class PoisonBubbleView: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        // Pokemon-style poison purple: deep magenta-purple
+        NSColor(calibratedRed: 0.55, green: 0.1, blue: 0.6, alpha: 0.85).setFill()
+        NSBezierPath(ovalIn: bounds).fill()
+    }
+}
+
+// MARK: - Poison Silhouette Overlay
+// Draws the character image as a solid purple silhouette (sourceAtop).
+// Only character pixels are affected — transparent areas stay transparent.
+// Animate alphaValue for smooth color gradient effect.
+
+private class PoisonTintOverlayView: NSView {
+    var sourceImage: NSImage? { didSet { needsDisplay = true } }
+    private let overlayColor = NSColor(calibratedRed: 0.55, green: 0.1, blue: 0.6, alpha: 1.0)
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let src = sourceImage else { return }
+        // Draw character then fill only character pixels with purple
+        src.draw(in: bounds)
+        overlayColor.set()
+        bounds.fill(using: .sourceAtop)
     }
 }
