@@ -4,29 +4,20 @@ struct MenuBarSettingsPane: View {
     @Bindable var settings: AppSettings
     private let availableThemes = AnimationTheme.discoverAll()
     @State private var expandedWidgetIds: Set<String> = []
+    @State private var expandShowRateText = false
     @State private var showVelocityInfo = false
     @State private var showHistoricalInfo = false
 
     var body: some View {
         Form {
             Section(L.menuBar.displayMode) {
-                Picker(L.menuBar.mode, selection: $settings.providerDisplayMode) {
+                segmentedPickerRow(L.menuBar.mode, selection: $settings.providerDisplayMode.animation(.easeInOut(duration: 0.2))) {
                     ForEach(ProviderDisplayMode.allCases, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
-                .pickerStyle(.segmented)
 
-                if shouldShowTokenUnit {
-                    Picker(L.menuBar.unit, selection: $settings.tokenUnit) {
-                        ForEach(TokenUnit.allCases, id: \.self) { unit in
-                            Text(unit.displayName).tag(unit)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Picker(L.menuBar.sparklineTimeRange, selection: Binding(
+                segmentedPickerRow(L.menuBar.sparklineTimeRange, selection: Binding(
                     get: { settings.graphTimeRange },
                     set: {
                         settings.graphTimeRange = $0
@@ -37,14 +28,12 @@ struct MenuBarSettingsPane: View {
                         Text(range.displayName).tag(range)
                     }
                 }
-                .pickerStyle(.segmented)
 
-                Picker(L.menuBar.sleepDelay, selection: $settings.sleepDelay) {
+                segmentedPickerRow(L.menuBar.sleepDelay, selection: $settings.sleepDelay) {
                     ForEach(SleepDelay.allCases, id: \.self) { delay in
                         Text(delay.displayName).tag(delay)
                     }
                 }
-                .pickerStyle(.segmented)
             }
 
             if settings.providerDisplayMode == .aggregated {
@@ -55,6 +44,11 @@ struct MenuBarSettingsPane: View {
             }
         }
         .formStyle(.grouped)
+        .animation(.easeInOut(duration: 0.2), value: settings.providerDisplayMode)
+        .animation(.easeInOut(duration: 0.2), value: settings.animationStyle)
+        .animation(.easeInOut(duration: 0.2), value: settings.showRateText)
+        .animation(.easeInOut(duration: 0.2), value: settings.velocityAlertEnabled)
+        .animation(.easeInOut(duration: 0.2), value: settings.historicalAlertEnabled)
     }
 
     // MARK: - Aggregated Mode
@@ -133,12 +127,19 @@ struct MenuBarSettingsPane: View {
         textPosition: Binding<TextPosition>,
         providerId: String? = nil
     ) -> some View {
-        Picker(L.menuBar.style, selection: style) {
+        segmentedPickerRow(L.menuBar.style, selection: style.animation(.easeInOut(duration: 0.2))) {
             Text(L.menuBar.character).tag(AnimationStyle.character)
             Text(L.menuBar.numeric).tag(AnimationStyle.numeric)
             Text(L.menuBar.graph).tag(AnimationStyle.sparkline)
         }
-        .pickerStyle(.segmented)
+
+        if style.wrappedValue == .numeric {
+            segmentedPickerRow(L.menuBar.unit, selection: $settings.tokenUnit) {
+                ForEach(TokenUnit.allCases, id: \.self) { unit in
+                    Text(unit.displayName).tag(unit)
+                }
+            }
+        }
 
         if style.wrappedValue == .character {
             Picker(L.tr("캐릭터", "Character"), selection: $settings.animationThemeId) {
@@ -147,15 +148,55 @@ struct MenuBarSettingsPane: View {
                 }
             }
 
-            Toggle(L.menuBar.showRateText, isOn: showRateText)
-
-            if showRateText.wrappedValue {
-                Picker(L.menuBar.textPosition, selection: textPosition) {
-                    ForEach(TextPosition.allCases, id: \.self) { pos in
-                        Text(pos.displayName).tag(pos)
+            // Expandable Show Rate Text toggle
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        expandShowRateText.toggle()
                     }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(L.menuBar.showRateText)
+                            .foregroundStyle(.primary)
+                        Image(systemName: expandShowRateText ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-                .pickerStyle(.segmented)
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Toggle("", isOn: showRateText.animation(.easeInOut(duration: 0.2)))
+                    .labelsHidden()
+            }
+            .onChange(of: showRateText.wrappedValue) { _, enabled in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    expandShowRateText = enabled
+                }
+            }
+
+            if expandShowRateText {
+                Group {
+                    indentedRow(
+                        segmentedPickerRow(L.menuBar.unit, selection: $settings.tokenUnit) {
+                            ForEach(TokenUnit.allCases, id: \.self) { unit in
+                                Text(unit.displayName).tag(unit)
+                            }
+                        }
+                    )
+                    indentedRow(
+                        segmentedPickerRow(L.menuBar.textPosition, selection: textPosition) {
+                            ForEach(TextPosition.allCases, id: \.self) { pos in
+                                Text(pos.displayName).tag(pos)
+                            }
+                        }
+                    )
+                }
+                .disabled(!showRateText.wrappedValue)
+                .opacity(showRateText.wrappedValue ? 1 : 0.5)
             }
 
             // HP Bar source
@@ -213,7 +254,7 @@ struct MenuBarSettingsPane: View {
         let velocityEnabled = velocityAlertEnabledBinding(providerId: providerId)
         let historicalEnabled = historicalAlertEnabledBinding(providerId: providerId)
 
-        Toggle(isOn: velocityEnabled) {
+        Toggle(isOn: velocityEnabled.animation(.easeInOut(duration: 0.2))) {
             HStack(spacing: DS.xs) {
                 Text(L.notification.velocityAlert)
                 Button {
@@ -246,7 +287,7 @@ struct MenuBarSettingsPane: View {
             )
         }
 
-        Toggle(isOn: historicalEnabled) {
+        Toggle(isOn: historicalEnabled.animation(.easeInOut(duration: 0.2))) {
             HStack(spacing: DS.xs) {
                 Text(L.notification.historicalAlert)
                 Button {
@@ -281,6 +322,27 @@ struct MenuBarSettingsPane: View {
     }
 
     // MARK: - Helpers
+
+    private func segmentedPickerRow<T: Hashable, Content: View>(
+        _ label: String,
+        selection: Binding<T>,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: .center) {
+            Text(label)
+                .font(.system(size: DS.fontBody))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer()
+            Picker("", selection: selection) {
+                content()
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .controlSize(.small) // Make it slimmer
+            .fixedSize()
+        }
+        .padding(.vertical, -1) // Tighten row height further
+    }
 
     // MARK: - Widget Order
 
@@ -336,10 +398,12 @@ struct MenuBarSettingsPane: View {
             if widgetHasSettings(item.id) {
                 Button {
                     let key = expansionKey(global: global, providerId: providerId, widgetId: item.id)
-                    if expandedWidgetIds.contains(key) {
-                        expandedWidgetIds.remove(key)
-                    } else {
-                        expandedWidgetIds.insert(key)
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if expandedWidgetIds.contains(key) {
+                            expandedWidgetIds.remove(key)
+                        } else {
+                            expandedWidgetIds.insert(key)
+                        }
                     }
                 } label: {
                     HStack(spacing: 6) {
