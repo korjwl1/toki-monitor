@@ -156,16 +156,7 @@ final class UpdateChecker {
         let combined = commands.joined(separator: " && ")
         // Write a temp script and open it in Terminal
         let scriptPath = NSTemporaryDirectory() + "toki-update.command"
-        let scriptContent = """
-            #!/bin/bash
-            \(combined)
-            # Relaunch TokiMonitor after upgrade
-            killall TokiMonitor 2>/dev/null
-            sleep 1
-            open -a TokiMonitor
-            osascript -e 'tell application "Terminal" to close front window' &
-            exit 0
-            """
+        let scriptContent = "#!/bin/bash\n\(combined) && killall TokiMonitor 2>/dev/null && sleep 1 && open -a TokiMonitor\nosascript -e 'tell application \"Terminal\" to close (every window whose name contains \"toki-update\")' &\nexit 0\n"
         try? scriptContent.write(toFile: scriptPath, atomically: true, encoding: .utf8)
         // Make executable
         chmod(scriptPath, 0o755)
