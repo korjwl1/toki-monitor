@@ -193,10 +193,12 @@ final class CharacterAnimationRenderer {
         let xOffset = config?.hpBarXOffset ?? 0
 
         let barWidth = charWidth * widthRatio
-        let imgWidth = button.image?.size.width ?? charWidth
-        let btnWidth = button.bounds.width
-        let imgX = (btnWidth - imgWidth) / 2
-        let charCenterX = imgX + charWidth / 2
+
+        // Ask the button cell where it actually draws the image
+        let imgRect = button.cell?.imageRect(forBounds: button.bounds)
+            ?? NSRect(x: (button.bounds.width - charWidth) / 2, y: 0, width: charWidth, height: button.bounds.height)
+
+        let charCenterX = imgRect.origin.x + charWidth / 2
         let barX = charCenterX - barWidth / 2 + xOffset
 
         bar.frame = NSRect(
