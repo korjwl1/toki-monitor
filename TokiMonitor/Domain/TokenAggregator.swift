@@ -85,7 +85,7 @@ final class TokenAggregator {
     // MARK: - Trace Events
 
     func addEvent(_ event: TokenEvent) {
-        let total = event.inputTokens + event.outputTokens
+        let total = event.totalTokens
         let cost = event.costUSD ?? 0
         let provider = ProviderRegistry.resolve(model: event.model)
         traceEvents.append((date: event.receivedAt, tokens: total, cost: cost, providerId: provider.id, source: event.source))
