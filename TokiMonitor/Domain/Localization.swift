@@ -93,10 +93,10 @@ enum L {
         static var noUsageBuckets: String { tr("표시할 사용량 항목이 없습니다", "No usage buckets selected") }
         static var anomalyDetection: String { tr("이상 감지", "Anomaly Detection") }
         static var velocityAlert: String { tr("비용 속도 경고", "Cost Velocity Alert") }
-        static var velocityDesc: String { tr("분당 비용이 임계값을 초과하면 캐릭터에 피격 이펙트가 발생합니다. 캐릭터 모드에서만 동작합니다.", "Character gets a hit effect when cost per minute exceeds the threshold. Only works in character mode.") }
+        static var velocityDesc: String { tr("분당 비용이 임계값을 초과하면 캐릭터에 피격 이펙트가 발생합니다.", "Character gets a hit effect when cost per minute exceeds the threshold.") }
         static var velocityThreshold: String { tr("임계값 ($/분)", "Threshold ($/min)") }
         static var historicalAlert: String { tr("이상 급증 경고", "Unusual Spike Alert") }
-        static var historicalDesc: String { tr("현재 사용량이 24시간 평균의 N배를 초과하면 캐릭터에 독 이펙트가 발생합니다. 캐릭터 모드에서만 동작합니다.", "Character gets a poison effect when current usage exceeds N times the 24-hour average. Only works in character mode.") }
+        static var historicalDesc: String { tr("현재 사용량이 24시간 평균의 N배를 초과하면 캐릭터에 독 이펙트가 발생합니다.", "Character gets a poison effect when current usage exceeds N times the 24-hour average.") }
         static var historicalMultiplier: String { tr("배수", "Multiplier") }
     }
 

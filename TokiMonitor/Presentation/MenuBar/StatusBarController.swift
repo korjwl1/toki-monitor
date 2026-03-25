@@ -9,9 +9,10 @@ final class StatusBarController {
 
     // Status item units (single for aggregated, multiple for perProvider)
     private var units: [StatusItemUnit] = []
-    private var lastSpendAlert: TokenAggregator.SpendAlert = .normal
+    private var lastSpendAlerts: [String: TokenAggregator.SpendAlert] = [:]
+    private var currentUnitAlerts: [String: TokenAggregator.SpendAlert] = [:]
     private var hitEffectTimer: Timer?
-    private var poisonActive = false
+    private let aggregatedAlertKey = "aggregated"
 
     // Dashboard & Settings
     private let dashboardController = DashboardWindowController()
@@ -204,40 +205,54 @@ final class StatusBarController {
         // Override tint color based on spend alert (only if icon color mode)
         // Hit effect (critical) — repeats every 3s, offset to avoid overlap with poison bubbles
         // Poison effect (elevated) — continuous bubble overlay
-        let currentAlert = aggregator.spendAlert
+        var alerts: [String: TokenAggregator.SpendAlert] = [:]
+        alerts.reserveCapacity(units.count)
+        for unit in units {
+            if let pid = unit.providerId {
+                alerts[pid] = aggregator.perProviderSpendAlerts[pid] ?? .normal
+            } else {
+                alerts[aggregatedAlertKey] = aggregator.spendAlert
+            }
+        }
+        currentUnitAlerts = alerts
 
-        // Critical: hit effect
-        if currentAlert == .critical, lastSpendAlert != .critical {
-            for unit in units { unit.playHitEffect() }
-            hitEffectTimer?.invalidate()
+        for unit in units {
+            let key = unit.providerId ?? aggregatedAlertKey
+            let currentAlert = currentUnitAlerts[key] ?? .normal
+            let lastAlert = lastSpendAlerts[key] ?? .normal
+
+            if currentAlert == .critical, lastAlert != .critical {
+                unit.playHitEffect()
+            }
+
+            if currentAlert == .elevated {
+                if !unit.isPoisoned {
+                    unit.startPoison()
+                }
+            } else if unit.isPoisoned {
+                unit.stopPoison()
+            }
+
+            lastSpendAlerts[key] = currentAlert
+        }
+
+        let hasCritical = currentUnitAlerts.values.contains(.critical)
+        if hasCritical, hitEffectTimer == nil {
             hitEffectTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    for unit in self.units { unit.playHitEffect() }
+                    for unit in self.units {
+                        let key = unit.providerId ?? self.aggregatedAlertKey
+                        if self.currentUnitAlerts[key] == .critical {
+                            unit.playHitEffect()
+                        }
+                    }
                 }
             }
-        } else if currentAlert != .critical, lastSpendAlert == .critical {
+        } else if !hasCritical, hitEffectTimer != nil {
             hitEffectTimer?.invalidate()
             hitEffectTimer = nil
         }
-
-        // Elevated: poison effect (restart if woke from sleep)
-        if currentAlert == .elevated {
-            if !poisonActive {
-                poisonActive = true
-                for unit in units { unit.startPoison() }
-            } else {
-                // Re-start poison on units that stopped (e.g. woke from sleep)
-                for unit in units where !unit.isPoisoned {
-                    unit.startPoison()
-                }
-            }
-        } else if poisonActive {
-            poisonActive = false
-            for unit in units { unit.stopPoison() }
-        }
-
-        lastSpendAlert = currentAlert
 
         for unit in units {
             if let pid = unit.providerId {

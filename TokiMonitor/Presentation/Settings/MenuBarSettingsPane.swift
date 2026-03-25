@@ -4,6 +4,8 @@ struct MenuBarSettingsPane: View {
     @Bindable var settings: AppSettings
     private let availableThemes = AnimationTheme.discoverAll()
     @State private var expandedWidgetIds: Set<String> = []
+    @State private var showVelocityInfo = false
+    @State private var showHistoricalInfo = false
 
     var body: some View {
         Form {
@@ -158,6 +160,8 @@ struct MenuBarSettingsPane: View {
 
             // HP Bar source
             hpBarPicker(providerId: providerId)
+
+            anomalyDetectionControls(providerId: providerId)
         }
     }
 
@@ -201,6 +205,78 @@ struct MenuBarSettingsPane: View {
                     Text(source.displayName).tag(source)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func anomalyDetectionControls(providerId: String?) -> some View {
+        let velocityEnabled = velocityAlertEnabledBinding(providerId: providerId)
+        let historicalEnabled = historicalAlertEnabledBinding(providerId: providerId)
+
+        Toggle(isOn: velocityEnabled) {
+            HStack(spacing: DS.xs) {
+                Text(L.notification.velocityAlert)
+                Button {
+                    showVelocityInfo.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showVelocityInfo, arrowEdge: .bottom) {
+                    Text(L.notification.velocityDesc)
+                        .font(.system(size: DS.fontCaption))
+                        .padding(DS.md)
+                        .frame(width: 240)
+                }
+            }
+        }
+
+        if velocityEnabled.wrappedValue {
+            indentedRow(
+                HStack {
+                    Text(L.notification.velocityThreshold)
+                    Spacer()
+                    TextField("", value: velocityThresholdBinding(providerId: providerId), format: .number.precision(.fractionLength(2)))
+                        .frame(width: 80)
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
+                }
+            )
+        }
+
+        Toggle(isOn: historicalEnabled) {
+            HStack(spacing: DS.xs) {
+                Text(L.notification.historicalAlert)
+                Button {
+                    showHistoricalInfo.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showHistoricalInfo, arrowEdge: .bottom) {
+                    Text(L.notification.historicalDesc)
+                        .font(.system(size: DS.fontCaption))
+                        .padding(DS.md)
+                        .frame(width: 260)
+                }
+            }
+        }
+
+        if historicalEnabled.wrappedValue {
+            indentedRow(
+                HStack {
+                    Text(L.notification.historicalMultiplier)
+                    Spacer()
+                    TextField("", value: historicalMultiplierBinding(providerId: providerId), format: .number.precision(.fractionLength(1)))
+                        .frame(width: 60)
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
+                }
+            )
         }
     }
 
@@ -503,5 +579,63 @@ struct MenuBarSettingsPane: View {
             return ProviderInfo.availableColors.first { $0.name == colorName }?.displayName ?? colorName
         }
         return defaultLabel
+    }
+
+    // MARK: - Anomaly Detection Bindings
+
+    private func velocityAlertEnabledBinding(providerId: String?) -> Binding<Bool> {
+        if let providerId {
+            return Binding(
+                get: { settings.effectiveVelocityAlertEnabled(for: providerId) },
+                set: { newVal in
+                    var ps = settings.effectiveSettings(for: providerId)
+                    ps.velocityAlertEnabled = newVal == settings.velocityAlertEnabled ? nil : newVal
+                    settings.providerSettingsMap[providerId] = ps
+                }
+            )
+        }
+        return $settings.velocityAlertEnabled
+    }
+
+    private func velocityThresholdBinding(providerId: String?) -> Binding<Double> {
+        if let providerId {
+            return Binding(
+                get: { settings.effectiveVelocityThreshold(for: providerId) },
+                set: { newVal in
+                    var ps = settings.effectiveSettings(for: providerId)
+                    ps.velocityThreshold = newVal == settings.velocityThreshold ? nil : newVal
+                    settings.providerSettingsMap[providerId] = ps
+                }
+            )
+        }
+        return $settings.velocityThreshold
+    }
+
+    private func historicalAlertEnabledBinding(providerId: String?) -> Binding<Bool> {
+        if let providerId {
+            return Binding(
+                get: { settings.effectiveHistoricalAlertEnabled(for: providerId) },
+                set: { newVal in
+                    var ps = settings.effectiveSettings(for: providerId)
+                    ps.historicalAlertEnabled = newVal == settings.historicalAlertEnabled ? nil : newVal
+                    settings.providerSettingsMap[providerId] = ps
+                }
+            )
+        }
+        return $settings.historicalAlertEnabled
+    }
+
+    private func historicalMultiplierBinding(providerId: String?) -> Binding<Double> {
+        if let providerId {
+            return Binding(
+                get: { settings.effectiveHistoricalMultiplier(for: providerId) },
+                set: { newVal in
+                    var ps = settings.effectiveSettings(for: providerId)
+                    ps.historicalMultiplier = newVal == settings.historicalMultiplier ? nil : newVal
+                    settings.providerSettingsMap[providerId] = ps
+                }
+            )
+        }
+        return $settings.historicalMultiplier
     }
 }

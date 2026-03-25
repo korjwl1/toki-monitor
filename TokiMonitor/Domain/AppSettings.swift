@@ -244,6 +244,10 @@ struct ProviderSettings: Codable {
     var customColorName: String? = nil          // nil = provider default
     var widgetOrder: [MenuWidgetItem]? = nil    // nil = default order
     var hpBarSource: HPBarSource? = nil         // nil = global default
+    var velocityAlertEnabled: Bool? = nil       // nil = global default
+    var velocityThreshold: Double? = nil        // nil = global default
+    var historicalAlertEnabled: Bool? = nil     // nil = global default
+    var historicalMultiplier: Double? = nil     // nil = global default
 }
 
 // MARK: - Menu Bar Widget Order
@@ -423,6 +427,22 @@ final class AppSettings {
 
     func effectiveColorName(for provider: ProviderInfo) -> String {
         effectiveSettings(for: provider.id).customColorName ?? provider.colorName
+    }
+
+    func effectiveVelocityAlertEnabled(for providerId: String) -> Bool {
+        effectiveSettings(for: providerId).velocityAlertEnabled ?? velocityAlertEnabled
+    }
+
+    func effectiveVelocityThreshold(for providerId: String) -> Double {
+        effectiveSettings(for: providerId).velocityThreshold ?? velocityThreshold
+    }
+
+    func effectiveHistoricalAlertEnabled(for providerId: String) -> Bool {
+        effectiveSettings(for: providerId).historicalAlertEnabled ?? historicalAlertEnabled
+    }
+
+    func effectiveHistoricalMultiplier(for providerId: String) -> Double {
+        effectiveSettings(for: providerId).historicalMultiplier ?? historicalMultiplier
     }
 
     // MARK: - Persistence

@@ -46,6 +46,7 @@ final class TokenAggregator {
     }
 
     private(set) var spendAlert: SpendAlert = .normal
+    private(set) var perProviderSpendAlerts: [String: SpendAlert] = [:]
     /// Cost per minute in current rate window.
     private(set) var costPerMinute: Double = 0
     /// Historical average cost per minute (from 24h PromQL query).
@@ -194,7 +195,11 @@ final class TokenAggregator {
         guard now.timeIntervalSince(lastAlertCheckTime) >= alertCheckInterval else { return }
         lastAlertCheckTime = now
 
-        guard let s = settings else { spendAlert = .normal; return }
+        guard let s = settings else {
+            spendAlert = .normal
+            perProviderSpendAlerts = [:]
+            return
+        }
 
         let newAlert: SpendAlert
         if s.velocityAlertEnabled, costPerMinute >= s.velocityThreshold {
@@ -208,6 +213,24 @@ final class TokenAggregator {
         }
 
         spendAlert = newAlert
+
+        var providerAlerts: [String: SpendAlert] = [:]
+        providerAlerts.reserveCapacity(perProviderCostPerMinute.count)
+        for (pid, cost) in perProviderCostPerMinute {
+            let providerAlert: SpendAlert
+            if s.effectiveVelocityAlertEnabled(for: pid),
+               cost >= s.effectiveVelocityThreshold(for: pid) {
+                providerAlert = .critical
+            } else if s.effectiveHistoricalAlertEnabled(for: pid),
+                      let avg = historicalAvgCostPerMinute, avg > 0,
+                      cost > avg * s.effectiveHistoricalMultiplier(for: pid) {
+                providerAlert = .elevated
+            } else {
+                providerAlert = .normal
+            }
+            providerAlerts[pid] = providerAlert
+        }
+        perProviderSpendAlerts = providerAlerts
     }
 
     // MARK: - PromQL Report
