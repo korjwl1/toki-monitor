@@ -13,9 +13,9 @@ final class ClaudeUsageMonitor {
     private let aggregator: TokenAggregator
     private let settings: AppSettings
     private var pollingTask: Task<Void, Never>?
-    private var hasNotified75 = false
-    private var hasNotified90 = false
-    private var lastResetId: String?
+    /// Per-window alert state keyed by resetsAt timestamp.
+    /// Once a threshold fires for a given resetId, it won't fire again until the window resets.
+    private var notifiedWindows: [String: Set<Int>] = [:]  // resetId → {75, 90}
     private var consecutiveFailures = 0
 
     init(aggregator: TokenAggregator, settings: AppSettings) {
@@ -104,27 +104,38 @@ final class ClaudeUsageMonitor {
     // MARK: - Threshold Alerts
 
     private func checkThresholds(_ usage: ClaudeUsageResponse) {
-        let max = usage.maxUtilization
+        let windows: [(bucket: UsageBucket?, label: String)] = [
+            (usage.fiveHour, L.tr("5시간 세션", "5-hour session")),
+            (usage.sevenDay, L.tr("7일", "7-day")),
+            (usage.sevenDaySonnet, L.tr("7일 Sonnet", "7-day Sonnet")),
+        ]
 
-        let resetId = usage.fiveHour?.resetsAt ?? ""
-        if resetId != lastResetId {
-            hasNotified75 = false
-            hasNotified90 = false
-            lastResetId = resetId
-        }
+        // Prune stale entries — only keep resetIds that are still active
+        let activeResetIds = Set(windows.compactMap { $0.bucket?.resetsAt })
+        notifiedWindows = notifiedWindows.filter { activeResetIds.contains($0.key) }
 
-        if max >= 90 && !hasNotified90 && settings.claudeAlert90 {
-            hasNotified90 = true
-            sendNotification(
-                title: L.tr("Claude 사용량 90% 도달", "Claude usage reached 90%"),
-                body: L.tr("5시간 세션 사용량이 90%를 넘었습니다. 속도가 제한될 수 있습니다.", "5-hour session usage exceeded 90%. Rate limiting may apply.")
-            )
-        } else if max >= 75 && !hasNotified75 && settings.claudeAlert75 {
-            hasNotified75 = true
-            sendNotification(
-                title: L.tr("Claude 사용량 75% 도달", "Claude usage reached 75%"),
-                body: L.tr("5시간 세션 사용량이 75%를 넘었습니다.", "5-hour session usage exceeded 75%.")
-            )
+        for (bucket, label) in windows {
+            guard let bucket, let resetId = bucket.resetsAt else { continue }
+            let util = bucket.utilization
+            var notified = notifiedWindows[resetId] ?? []
+
+            if util >= 90 && !notified.contains(90) && settings.claudeAlert90 {
+                notified.insert(90)
+                sendNotification(
+                    title: L.tr("Claude 사용량 90% 도달", "Claude usage reached 90%"),
+                    body: L.tr("\(label) 사용량이 90%를 넘었습니다. 속도가 제한될 수 있습니다.",
+                               "\(label) usage exceeded 90%. Rate limiting may apply.")
+                )
+            } else if util >= 75 && !notified.contains(75) && settings.claudeAlert75 {
+                notified.insert(75)
+                sendNotification(
+                    title: L.tr("Claude 사용량 75% 도달", "Claude usage reached 75%"),
+                    body: L.tr("\(label) 사용량이 75%를 넘었습니다.",
+                               "\(label) usage exceeded 75%.")
+                )
+            }
+
+            notifiedWindows[resetId] = notified
         }
     }
 
