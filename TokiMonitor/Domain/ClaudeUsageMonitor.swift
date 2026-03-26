@@ -1,5 +1,4 @@
 import Foundation
-import UserNotifications
 
 /// Adaptive polling monitor for Claude usage/rate-limit data.
 /// Reads authentication from Claude Code's Keychain entry.
@@ -9,6 +8,7 @@ final class ClaudeUsageMonitor {
     private(set) var currentUsage: ClaudeUsageResponse?
     private(set) var lastError: String?
     private(set) var isAvailable: Bool = false
+    var isPolling: Bool { pollingTask != nil }
 
     private let aggregator: TokenAggregator
     private let settings: AppSettings
@@ -47,9 +47,7 @@ final class ClaudeUsageMonitor {
         isAvailable = ClaudeAuthReader.isAvailable
 
         guard let token = ClaudeAuthReader.readAccessToken() else {
-            if isAvailable {
-                lastError = nil
-            }
+            if isAvailable { lastError = nil }
             return
         }
 
@@ -62,26 +60,19 @@ final class ClaudeUsageMonitor {
             checkThresholds(usage)
         } catch let error as OAuthError {
             if case .usageFetchFailed(401) = error {
-                // Token invalid/expired — Claude Code will refresh it
-                lastError = nil
+                lastError = nil // Token invalid/expired — Claude Code will refresh it
             } else if case .usageFetchFailed(429) = error {
                 lastError = nil // Rate limited — retry on next poll
             } else {
                 consecutiveFailures += 1
-                if consecutiveFailures >= 3 {
-                    lastError = error.localizedDescription
-                }
+                if consecutiveFailures >= 3 { lastError = error.localizedDescription }
             }
         } catch is DecodingError {
             consecutiveFailures += 1
-            if consecutiveFailures >= 3 {
-                lastError = L.tr("응답 형식 오류", "Response format error")
-            }
+            if consecutiveFailures >= 3 { lastError = L.tr("응답 형식 오류", "Response format error") }
         } catch {
             consecutiveFailures += 1
-            if consecutiveFailures >= 3 {
-                lastError = error.localizedDescription
-            }
+            if consecutiveFailures >= 3 { lastError = error.localizedDescription }
         }
     }
 
@@ -89,7 +80,6 @@ final class ClaudeUsageMonitor {
 
     private func computeInterval() -> TimeInterval {
         if !isAvailable { return 60 }
-        // Exponential backoff on consecutive failures: 15s, 30s, 60s, 120s, max 300s
         if consecutiveFailures > 0 {
             return min(15 * pow(2, Double(consecutiveFailures - 1)), 300)
         }
@@ -102,81 +92,10 @@ final class ClaudeUsageMonitor {
     // MARK: - Threshold Alerts
 
     private func checkThresholds(_ usage: ClaudeUsageResponse) {
-        let buckets: [(UsageAlertBucket, UsageBucket?)] = [
-            (.claudeFiveHour, usage.fiveHour),
-            (.claudeSevenDay, usage.sevenDay),
-            (.claudeSevenDaySonnet, usage.sevenDaySonnet)
-        ]
-
-        for (bucketType, bucket) in buckets {
-            guard let bucket else { continue }
-            let utilization = bucket.utilization
-            let resetId = bucket.resetsAt ?? "unknown"
-
-            if utilization >= 90,
-               settings.usageAlert90Enabled,
-               settings.isUsageAlertBucketEnabled(.percent90, bucket: bucketType) {
-                if !UsageAlertStateStore.shared.hasNotified(
-                    threshold: .percent90,
-                    bucket: bucketType,
-                    resetId: resetId
-                ) {
-                    UsageAlertStateStore.shared.markNotified(
-                        threshold: .percent90,
-                        bucket: bucketType,
-                        resetId: resetId
-                    )
-                    sendUsageNotification(
-                        providerTitle: L.panel.claudeUsage,
-                        bucketLabel: bucketType.displayName,
-                        threshold: 90
-                    )
-                }
-                continue
-            }
-
-            if utilization >= 75,
-               settings.usageAlert75Enabled,
-               settings.isUsageAlertBucketEnabled(.percent75, bucket: bucketType) {
-                if !UsageAlertStateStore.shared.hasNotified(
-                    threshold: .percent75,
-                    bucket: bucketType,
-                    resetId: resetId
-                ) {
-                    UsageAlertStateStore.shared.markNotified(
-                        threshold: .percent75,
-                        bucket: bucketType,
-                        resetId: resetId
-                    )
-                    sendUsageNotification(
-                        providerTitle: L.panel.claudeUsage,
-                        bucketLabel: bucketType.displayName,
-                        threshold: 75
-                    )
-                }
-            }
-        }
-    }
-
-    private func sendUsageNotification(providerTitle: String, bucketLabel: String, threshold: Int) {
-        sendNotification(
-            title: L.tr("\(providerTitle) \(threshold)% 도달", "\(providerTitle) reached \(threshold)%"),
-            body: L.tr("\(bucketLabel) 사용량이 \(threshold)%를 넘었습니다.", "\(bucketLabel) usage exceeded \(threshold)%.")
-        )
-    }
-
-    private func sendNotification(title: String, body: String) {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
-
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil
-        )
-
-        UNUserNotificationCenter.current().add(request)
+        UsageAlertHelpers.checkThresholds([
+            .init(bucket: .claudeFiveHour,      utilization: usage.fiveHour?.utilization,      resetId: usage.fiveHour?.resetsAt      ?? "unknown"),
+            .init(bucket: .claudeSevenDay,      utilization: usage.sevenDay?.utilization,      resetId: usage.sevenDay?.resetsAt      ?? "unknown"),
+            .init(bucket: .claudeSevenDaySonnet, utilization: usage.sevenDaySonnet?.utilization, resetId: usage.sevenDaySonnet?.resetsAt ?? "unknown"),
+        ], providerTitle: L.panel.claudeUsage, settings: settings)
     }
 }

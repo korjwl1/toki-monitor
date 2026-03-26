@@ -1,5 +1,4 @@
 import Foundation
-import UserNotifications
 
 /// Polls Codex (OpenAI) usage/rate-limit data from ChatGPT backend API.
 /// Reads OAuth token from ~/.codex/auth.json (written by Codex CLI login).
@@ -10,6 +9,7 @@ final class CodexUsageMonitor {
     private(set) var currentUsage: CodexUsageResponse?
     private(set) var lastError: String?
     private(set) var isAvailable: Bool = false
+    var isPolling: Bool { pollingTask != nil }
 
     private var pollingTask: Task<Void, Never>?
     private let aggregator: TokenAggregator
@@ -99,73 +99,10 @@ final class CodexUsageMonitor {
     // MARK: - Threshold Alerts
 
     private func checkThresholds(_ usage: CodexUsageResponse) {
-        let windows: [(UsageAlertBucket, CodexUsageWindow?)] = [
-            (.codexPrimary, usage.rateLimit.primaryWindow),
-            (.codexSecondary, usage.rateLimit.secondaryWindow)
-        ]
-
-        for (bucketType, window) in windows {
-            guard let window else { continue }
-            let utilization = Double(window.usedPercent)
-            let resetId = String(window.resetAt)
-
-            if utilization >= 90,
-               settings.usageAlert90Enabled,
-               settings.isUsageAlertBucketEnabled(.percent90, bucket: bucketType) {
-                if !UsageAlertStateStore.shared.hasNotified(
-                    threshold: .percent90,
-                    bucket: bucketType,
-                    resetId: resetId
-                ) {
-                    UsageAlertStateStore.shared.markNotified(
-                        threshold: .percent90,
-                        bucket: bucketType,
-                        resetId: resetId
-                    )
-                    sendUsageNotification(
-                        providerTitle: L.tr("Codex 사용량", "Codex Usage"),
-                        bucketLabel: bucketType.displayName,
-                        threshold: 90
-                    )
-                }
-                continue
-            }
-
-            if utilization >= 75,
-               settings.usageAlert75Enabled,
-               settings.isUsageAlertBucketEnabled(.percent75, bucket: bucketType) {
-                if !UsageAlertStateStore.shared.hasNotified(
-                    threshold: .percent75,
-                    bucket: bucketType,
-                    resetId: resetId
-                ) {
-                    UsageAlertStateStore.shared.markNotified(
-                        threshold: .percent75,
-                        bucket: bucketType,
-                        resetId: resetId
-                    )
-                    sendUsageNotification(
-                        providerTitle: L.tr("Codex 사용량", "Codex Usage"),
-                        bucketLabel: bucketType.displayName,
-                        threshold: 75
-                    )
-                }
-            }
-        }
-    }
-
-    private func sendUsageNotification(providerTitle: String, bucketLabel: String, threshold: Int) {
-        let content = UNMutableNotificationContent()
-        content.title = L.tr("\(providerTitle) \(threshold)% 도달", "\(providerTitle) reached \(threshold)%")
-        content.body = L.tr("\(bucketLabel) 사용량이 \(threshold)%를 넘었습니다.", "\(bucketLabel) usage exceeded \(threshold)%.")
-        content.sound = .default
-
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
+        UsageAlertHelpers.checkThresholds([
+            .init(bucket: .codexPrimary,   utilization: usage.rateLimit.primaryWindow.map   { Double($0.usedPercent) }, resetId: usage.rateLimit.primaryWindow.map   { String($0.resetAt) } ?? "unknown"),
+            .init(bucket: .codexSecondary, utilization: usage.rateLimit.secondaryWindow.map { Double($0.usedPercent) }, resetId: usage.rateLimit.secondaryWindow.map { String($0.resetAt) } ?? "unknown"),
+        ], providerTitle: L.tr("Codex 사용량", "Codex Usage"), settings: settings)
     }
 
     // MARK: - File Watcher (auth.json change detection)

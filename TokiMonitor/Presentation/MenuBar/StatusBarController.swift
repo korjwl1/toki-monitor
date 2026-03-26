@@ -37,6 +37,8 @@ final class StatusBarController {
 
     // Update Checker
     private let updateChecker = UpdateChecker()
+    /// Codex root가 resolve된 이후에만 polling을 시작해야 하므로 플래그로 추적
+    private var codexRootResolved = false
 
     // Menu panel
     private var menuPanel: NSPanel?
@@ -60,7 +62,7 @@ final class StatusBarController {
         aggregator.timeRange = settings.defaultTimeRange
         aggregator.graphTimeRange = settings.graphTimeRange
         aggregator.startSampling()
-        usageMonitor.startPolling()
+        if isClaudeWidgetVisible { usageMonitor.startPolling() }
 
         // Startup sequence: daemon → settings sync → codex root → connect
         Task {
@@ -77,7 +79,8 @@ final class StatusBarController {
             }
             await syncProvidersOnFirstLaunch()
             await CodexAuthReader.resolveCodexRoot()
-            codexUsageMonitor.startPolling()
+            codexRootResolved = true
+            if isCodexWidgetVisible { codexUsageMonitor.startPolling() }
             updateChecker.checkOnLaunch()
             // Rebuild after sync so status items reflect actual provider state
             rebuildStatusItems()
@@ -202,57 +205,7 @@ final class StatusBarController {
     }
 
     private func updateAllDisplays() {
-        // Override tint color based on spend alert (only if icon color mode)
-        // Hit effect (critical) — repeats every 3s, offset to avoid overlap with poison bubbles
-        // Poison effect (elevated) — continuous bubble overlay
-        var alerts: [String: TokenAggregator.SpendAlert] = [:]
-        alerts.reserveCapacity(units.count)
-        for unit in units {
-            if let pid = unit.providerId {
-                alerts[pid] = aggregator.perProviderSpendAlerts[pid] ?? .normal
-            } else {
-                alerts[aggregatedAlertKey] = aggregator.spendAlert
-            }
-        }
-        currentUnitAlerts = alerts
-
-        for unit in units {
-            let key = unit.providerId ?? aggregatedAlertKey
-            let currentAlert = currentUnitAlerts[key] ?? .normal
-            let lastAlert = lastSpendAlerts[key] ?? .normal
-
-            if currentAlert == .critical, lastAlert != .critical {
-                unit.playHitEffect()
-            }
-
-            if currentAlert == .elevated {
-                if !unit.isPoisoned {
-                    unit.startPoison()
-                }
-            } else if unit.isPoisoned {
-                unit.stopPoison()
-            }
-
-            lastSpendAlerts[key] = currentAlert
-        }
-
-        let hasCritical = currentUnitAlerts.values.contains(.critical)
-        if hasCritical, hitEffectTimer == nil {
-            hitEffectTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    for unit in self.units {
-                        let key = unit.providerId ?? self.aggregatedAlertKey
-                        if self.currentUnitAlerts[key] == .critical {
-                            unit.playHitEffect()
-                        }
-                    }
-                }
-            }
-        } else if !hasCritical, hitEffectTimer != nil {
-            hitEffectTimer?.invalidate()
-            hitEffectTimer = nil
-        }
+        applyAlertEffects()
 
         for unit in units {
             if let pid = unit.providerId {
@@ -566,6 +519,9 @@ final class StatusBarController {
                 self.aggregator.timeRange = self.settings.defaultTimeRange
                 self.aggregator.graphTimeRange = self.settings.graphTimeRange
 
+                // 위젯 visibility 변경 시 polling 동기화
+                self.syncPollingState()
+
                 // Rebuild items if display mode or provider enablement changed
                 let needsRebuild = self.needsRebuild()
                 if needsRebuild {
@@ -583,6 +539,82 @@ final class StatusBarController {
                 self.observeSettings()
             }
         }
+    }
+
+    // MARK: - Alert Effects
+
+    /// Anomaly detection 상태 변화에 따라 hit/poison 시각 효과 적용.
+    private func applyAlertEffects() {
+        var alerts: [String: TokenAggregator.SpendAlert] = [:]
+        alerts.reserveCapacity(units.count)
+        for unit in units {
+            if let pid = unit.providerId {
+                alerts[pid] = aggregator.perProviderSpendAlerts[pid] ?? .normal
+            } else {
+                alerts[aggregatedAlertKey] = aggregator.spendAlert
+            }
+        }
+        currentUnitAlerts = alerts
+
+        for unit in units {
+            let key = unit.providerId ?? aggregatedAlertKey
+            let currentAlert = currentUnitAlerts[key] ?? .normal
+            let lastAlert = lastSpendAlerts[key] ?? .normal
+
+            if currentAlert == .critical, lastAlert != .critical {
+                unit.playHitEffect()
+            }
+
+            if currentAlert == .elevated {
+                if !unit.isPoisoned { unit.startPoison() }
+            } else if unit.isPoisoned {
+                unit.stopPoison()
+            }
+
+            lastSpendAlerts[key] = currentAlert
+        }
+
+        let hasCritical = currentUnitAlerts.values.contains(.critical)
+        if hasCritical, hitEffectTimer == nil {
+            hitEffectTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    for unit in self.units {
+                        let key = unit.providerId ?? self.aggregatedAlertKey
+                        if self.currentUnitAlerts[key] == .critical { unit.playHitEffect() }
+                    }
+                }
+            }
+        } else if !hasCritical, hitEffectTimer != nil {
+            hitEffectTimer?.invalidate()
+            hitEffectTimer = nil
+        }
+    }
+
+    // MARK: - Polling Control
+
+    /// 위젯 visibility에 따라 각 usage monitor의 polling을 시작/중단.
+    private func syncPollingState() {
+        if isClaudeWidgetVisible {
+            if !usageMonitor.isPolling { usageMonitor.startPolling() }
+        } else {
+            usageMonitor.stopPolling()
+        }
+
+        guard codexRootResolved else { return }
+        if isCodexWidgetVisible {
+            if !codexUsageMonitor.isPolling { codexUsageMonitor.startPolling() }
+        } else {
+            codexUsageMonitor.stopPolling()
+        }
+    }
+
+    private var isClaudeWidgetVisible: Bool {
+        settings.resolvedWidgetOrder().first { $0.id == MenuWidgetItem.claudeUsageId }?.visible ?? true
+    }
+
+    private var isCodexWidgetVisible: Bool {
+        settings.resolvedWidgetOrder().first { $0.id == MenuWidgetItem.codexUsageId }?.visible ?? true
     }
 
     private func showPopupForRequest(_ request: AppSettings.PopupRequest) {

@@ -1,5 +1,6 @@
 import Foundation
 import ServiceManagement
+import UserNotifications
 
 // MARK: - Language
 
@@ -681,5 +682,59 @@ final class UsageAlertStateStore {
     private func save() {
         guard let data = try? JSONEncoder().encode(cache) else { return }
         defaults.set(data, forKey: storeKey)
+    }
+}
+
+// MARK: - Usage Alert Notification Helper
+
+/// 두 UsageMonitor에서 공통으로 사용하는 threshold check + notification 로직.
+enum UsageAlertHelpers {
+    struct BucketCheck {
+        let bucket: UsageAlertBucket
+        let utilization: Double?
+        let resetId: String
+    }
+
+    /// threshold check 수행 후 필요 시 알림 발송.
+    @MainActor
+    static func checkThresholds(
+        _ items: [BucketCheck],
+        providerTitle: String,
+        settings: AppSettings
+    ) {
+        for item in items {
+            guard let utilization = item.utilization else { continue }
+
+            if utilization >= 90,
+               settings.usageAlert90Enabled,
+               settings.isUsageAlertBucketEnabled(.percent90, bucket: item.bucket) {
+                let store = UsageAlertStateStore.shared
+                if !store.hasNotified(threshold: .percent90, bucket: item.bucket, resetId: item.resetId) {
+                    store.markNotified(threshold: .percent90, bucket: item.bucket, resetId: item.resetId)
+                    sendNotification(providerTitle: providerTitle, bucketLabel: item.bucket.displayName, threshold: 90)
+                }
+                continue
+            }
+
+            if utilization >= 75,
+               settings.usageAlert75Enabled,
+               settings.isUsageAlertBucketEnabled(.percent75, bucket: item.bucket) {
+                let store = UsageAlertStateStore.shared
+                if !store.hasNotified(threshold: .percent75, bucket: item.bucket, resetId: item.resetId) {
+                    store.markNotified(threshold: .percent75, bucket: item.bucket, resetId: item.resetId)
+                    sendNotification(providerTitle: providerTitle, bucketLabel: item.bucket.displayName, threshold: 75)
+                }
+            }
+        }
+    }
+
+    static func sendNotification(providerTitle: String, bucketLabel: String, threshold: Int) {
+        let content = UNMutableNotificationContent()
+        content.title = L.tr("\(providerTitle) \(threshold)% 도달", "\(providerTitle) reached \(threshold)%")
+        content.body = L.tr("\(bucketLabel) 사용량이 \(threshold)%를 넘었습니다.", "\(bucketLabel) usage exceeded \(threshold)%.")
+        content.sound = .default
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        )
     }
 }

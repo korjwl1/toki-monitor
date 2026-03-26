@@ -201,6 +201,17 @@ final class TokenAggregator {
             return
         }
 
+        // 전역 + 개별 provider 이상 감지가 모두 꺼져있으면 계산 생략
+        let anyEnabled = s.velocityAlertEnabled || s.historicalAlertEnabled
+            || perProviderCostPerMinute.keys.contains {
+                s.effectiveVelocityAlertEnabled(for: $0) || s.effectiveHistoricalAlertEnabled(for: $0)
+            }
+        guard anyEnabled else {
+            if spendAlert != .normal { spendAlert = .normal }
+            if !perProviderSpendAlerts.isEmpty { perProviderSpendAlerts = [:] }
+            return
+        }
+
         let newAlert: SpendAlert
         if s.velocityAlertEnabled, costPerMinute >= s.velocityThreshold {
             newAlert = .critical
