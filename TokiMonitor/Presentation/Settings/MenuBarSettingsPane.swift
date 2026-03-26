@@ -147,6 +147,7 @@ struct MenuBarSettingsPane: View {
                     Text(theme.config.localizedName).tag(theme.config.id)
                 }
             }
+            .font(.system(size: 12))
 
             // Expandable Show Rate Text toggle
             HStack {
@@ -240,12 +241,14 @@ struct MenuBarSettingsPane: View {
                     Text(source.displayName).tag(source)
                 }
             }
+            .font(.system(size: 12))
         } else {
             Picker(L.tr("HP 바", "HP Bar"), selection: $settings.hpBarSource) {
                 ForEach(options, id: \.self) { source in
                     Text(source.displayName).tag(source)
                 }
             }
+            .font(.system(size: 12))
         }
     }
 
