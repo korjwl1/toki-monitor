@@ -1,5 +1,88 @@
 import Foundation
 
+// MARK: - Codex Usage Domain Models
+
+struct CodexUsageResponse: Codable {
+    let planType: String
+    let rateLimit: CodexRateLimit
+    let credits: CodexCredits?
+
+    enum CodingKeys: String, CodingKey {
+        case planType = "plan_type"
+        case rateLimit = "rate_limit"
+        case credits
+    }
+}
+
+struct CodexRateLimit: Codable {
+    let allowed: Bool
+    let limitReached: Bool
+    let primaryWindow: CodexUsageWindow?
+    let secondaryWindow: CodexUsageWindow?
+
+    enum CodingKeys: String, CodingKey {
+        case allowed
+        case limitReached = "limit_reached"
+        case primaryWindow = "primary_window"
+        case secondaryWindow = "secondary_window"
+    }
+}
+
+struct CodexUsageWindow: Codable {
+    let usedPercent: Int
+    let limitWindowSeconds: Int
+    let resetAfterSeconds: Int
+    let resetAt: Int
+
+    enum CodingKeys: String, CodingKey {
+        case usedPercent = "used_percent"
+        case limitWindowSeconds = "limit_window_seconds"
+        case resetAfterSeconds = "reset_after_seconds"
+        case resetAt = "reset_at"
+    }
+
+    var resetCountdown: String {
+        let totalHours = resetAfterSeconds / 3600
+        let m = (resetAfterSeconds % 3600) / 60
+        if totalHours >= 24 {
+            let d = totalHours / 24
+            return L.tr("\(d)일 \(totalHours % 24)시간", "\(d)d \(totalHours % 24)h")
+        }
+        if totalHours > 0 { return L.tr("\(totalHours)시간 \(m)분", "\(totalHours)h \(m)m") }
+        return L.tr("\(m)분", "\(m)m")
+    }
+
+    var windowLabel: String {
+        let hours = limitWindowSeconds / 3600
+        if hours >= 24 { return L.tr("\(hours / 24)일", "\(hours / 24)d") }
+        return L.tr("\(hours)시간", "\(hours)h")
+    }
+}
+
+struct CodexCredits: Codable {
+    let hasCredits: Bool
+    let balance: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case hasCredits = "has_credits"
+        case balance
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hasCredits = try container.decode(Bool.self, forKey: .hasCredits)
+        if let d = try? container.decode(Double.self, forKey: .balance) {
+            balance = d
+        } else if let s = try? container.decode(String.self, forKey: .balance) {
+            balance = Double(s)
+        } else {
+            balance = nil
+        }
+    }
+}
+
+// MARK: - Codex Usage Monitor
+
 /// Polls Codex (OpenAI) usage/rate-limit data from ChatGPT backend API.
 /// Reads OAuth token from ~/.codex/auth.json (written by Codex CLI login).
 /// Watches auth.json for changes via DispatchSource to recover from token expiry.
