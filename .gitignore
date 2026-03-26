@@ -3,6 +3,7 @@ xcuserdata/
 DerivedData/
 *.xcscmblueprint
 *.profraw
+build/
 
 # Personal/local docs (keep .claude/skills/ for shared skills)
 .claude/*
