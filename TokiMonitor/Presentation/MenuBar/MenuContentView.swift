@@ -142,9 +142,11 @@ struct MenuContentView: View {
             VStack(alignment: .leading, spacing: DS.xs) {
                 Text(L.tr("Codex 사용량", "Codex Usage"))
                     .font(.system(size: DS.fontTitle, weight: .semibold))
-                Text(L.tr("codex --login 실행 필요", "Run codex --login in terminal"))
+                Text(L.tr("codex 앱을 열고 앱 내에서 로그인하세요", "Open Codex and sign in inside the app"))
                     .font(.system(size: DS.fontCaption))
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(nil)
             }
         }
         .padding(.leading, DS.sm)

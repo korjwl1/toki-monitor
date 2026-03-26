@@ -78,10 +78,14 @@ final class CodexUsageMonitor {
             case .fetchFailed(429):
                 lastError = nil
                 consecutiveFailures += 1
-            case .authFileNotFound, .tokenMissing:
+            case .authFileNotFound:
                 isAvailable = false
                 currentUsage = nil
                 lastError = nil
+            case .tokenMissing:
+                // 파일은 있지만 토큰을 읽을 수 없음 → 로그인 화면 대신 에러 표시
+                lastError = L.tr("Codex 인증 정보를 읽을 수 없습니다", "Could not read Codex auth token")
+                consecutiveFailures += 1
             default:
                 lastError = error.localizedDescription
                 consecutiveFailures += 1

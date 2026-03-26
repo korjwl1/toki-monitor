@@ -127,7 +127,11 @@ struct CodexAuthReader {
             )
             if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !path.isEmpty {
-                codexRoot = path
+                // 해당 경로에 auth.json이 실제로 있을 때만 적용 (잘못된 경로로 덮어쓰기 방지)
+                let candidateAuthPath = path + "/auth.json"
+                if FileManager.default.fileExists(atPath: candidateAuthPath) {
+                    codexRoot = path
+                }
             }
         } catch {
             // Fall back to default
