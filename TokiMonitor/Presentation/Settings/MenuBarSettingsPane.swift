@@ -16,6 +16,7 @@ struct MenuBarSettingsPane: View {
                         Text(mode.displayName).tag(mode)
                     }
                 }
+                .background(scrollTopTracker)
 
                 segmentedPickerRow(L.menuBar.sparklineTimeRange, selection: Binding(
                     get: { settings.graphTimeRange },

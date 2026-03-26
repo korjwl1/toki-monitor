@@ -21,6 +21,7 @@ struct NotificationsSettingsPane: View {
                     withAnimation(.easeInOut(duration: 0.2)) { expandUsage75 = enabled }
                     chevronExpanded75 = enabled
                 }
+                .background(scrollTopTracker)
             } header: {
                 Text(L.notification.usageAlerts)
             }

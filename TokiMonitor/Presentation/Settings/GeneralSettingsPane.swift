@@ -12,6 +12,7 @@ struct GeneralSettingsPane: View {
                         Text(lang.displayName).tag(lang)
                     }
                 }
+                .background(scrollTopTracker)
             }
 
             Section(L.general.startup) {
