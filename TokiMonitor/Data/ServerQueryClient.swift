@@ -47,10 +47,14 @@ final class ServerQueryClient {
             byClause = " by (model)"
         }
 
-        // Extract filter if present: usage{provider="claude_code"}[...]
+        // Extract provider filter only — strip toki-local labels (since/until) that don't
+        // exist as VM series labels. VM time range is controlled by start/end query params.
         var filter = ""
         if let filterRange = query.range(of: #"\{[^}]+\}"#, options: .regularExpression) {
-            filter = String(query[filterRange])
+            let full = String(query[filterRange])
+            if let providerRange = full.range(of: #"provider="[^"]+""#, options: .regularExpression) {
+                filter = "{\(String(full[providerRange]))}"
+            }
         }
 
         return "sum\(byClause) (increase(toki_tokens_total\(filter)[\(step)]))"
