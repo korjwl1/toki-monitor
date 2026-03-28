@@ -60,9 +60,14 @@ final class ServerQueryClient {
         guard let http = resp as? HTTPURLResponse else { throw ServerQueryError.invalidResponse }
 
         if http.statusCode == 401, retryOn401 {
-            let refreshed = try await syncClient.refreshAccessToken(creds)
-            return try await queryRange(promql, start: start, end: end, step: step,
-                                        creds: refreshed, retryOn401: false)
+            do {
+                let refreshed = try await syncClient.refreshAccessToken(creds)
+                return try await queryRange(promql, start: start, end: end, step: step,
+                                            creds: refreshed, retryOn401: false)
+            } catch SyncClientError.refreshFailed {
+                SyncManager.shared.markTokenExpired()
+                throw ServerQueryError.tokenExpired
+            }
         }
         guard http.statusCode == 200 else {
             throw ServerQueryError.httpError(http.statusCode)
@@ -86,13 +91,26 @@ final class ServerQueryClient {
               let dataObj  = json["data"]   as? [String: Any],
               let results  = dataObj["result"] as? [[String: Any]] else { return [:] }
 
-        var byDate: [Date: [TokiModelSummary]] = [:]
+        // Intermediate accumulator keyed by (date, model).
+        // Collects per-type token values before building TokiModelSummary.
+        struct BucketKey: Hashable { let date: Date; let model: String }
+        struct TokenBucket {
+            var input: UInt64 = 0
+            var output: UInt64 = 0
+            var cacheCreation: UInt64 = 0
+            var cacheRead: UInt64 = 0
+            var total: UInt64 = 0
+            var events: Int = 0
+        }
+        var buckets: [BucketKey: TokenBucket] = [:]
+
         for result in results {
             guard let metric     = result["metric"] as? [String: String],
                   let valuePairs = result["values"] as? [[Any]] else { continue }
 
             // Prefer "model" label; fall back to "provider"
             let modelName = metric["model"] ?? metric["provider"] ?? "unknown"
+            let tokenType = metric["type"]  // e.g. "input", "output", "cache_create", "cache_read"
 
             for pair in valuePairs {
                 guard pair.count >= 2,
@@ -100,20 +118,44 @@ final class ServerQueryClient {
                       let valStr  = pair[1] as? String,
                       let val     = Double(valStr) else { continue }
                 let date = Date(timeIntervalSince1970: tsNum.doubleValue)
-                let summary = TokiModelSummary(
-                    model:        modelName,
-                    inputTokens:  UInt64(max(0, val)),
-                    outputTokens: 0,
-                    totalTokens:  UInt64(max(0, val)),
-                    events:       val > 0 ? 1 : 0,
-                    costUsd:      nil,
-                    cacheCreationInputTokens: nil,
-                    cacheReadInputTokens:     nil,
-                    cachedInputTokens:        nil,
-                    reasoningOutputTokens:    nil
-                )
-                byDate[date, default: []].append(summary)
+                let uval = UInt64(max(0, val))
+                let key = BucketKey(date: date, model: modelName)
+                var bucket = buckets[key] ?? TokenBucket()
+
+                switch tokenType {
+                case "input":
+                    bucket.input += uval
+                case "output":
+                    bucket.output += uval
+                case "cache_create":
+                    bucket.cacheCreation += uval
+                case "cache_read":
+                    bucket.cacheRead += uval
+                default:
+                    // No type label (aggregated query) — treat as input
+                    bucket.input += uval
+                }
+                bucket.total += uval
+                if val > 0 { bucket.events += 1 }
+                buckets[key] = bucket
             }
+        }
+
+        var byDate: [Date: [TokiModelSummary]] = [:]
+        for (key, bucket) in buckets {
+            let summary = TokiModelSummary(
+                model:        key.model,
+                inputTokens:  bucket.input,
+                outputTokens: bucket.output,
+                totalTokens:  bucket.total,
+                events:       bucket.events,
+                costUsd:      nil,
+                cacheCreationInputTokens: bucket.cacheCreation > 0 ? bucket.cacheCreation : nil,
+                cacheReadInputTokens:     bucket.cacheRead > 0 ? bucket.cacheRead : nil,
+                cachedInputTokens:        nil,
+                reasoningOutputTokens:    nil
+            )
+            byDate[key.date, default: []].append(summary)
         }
         return byDate
     }

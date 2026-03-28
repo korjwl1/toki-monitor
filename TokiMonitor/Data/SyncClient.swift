@@ -8,12 +8,36 @@ struct SyncCredentials: Codable {
     var httpURL: String      // HTTPS base URL for HTTP API
     var accessToken: String
     var refreshToken: String
+    var deviceKey: String
+    var deviceName: String
 
     enum CodingKeys: String, CodingKey {
         case serverAddr   = "server_addr"
         case httpURL      = "http_url"
         case accessToken  = "access_token"
         case refreshToken = "refresh_token"
+        case deviceKey    = "device_key"
+        case deviceName   = "device_name"
+    }
+
+    init(serverAddr: String, httpURL: String, accessToken: String, refreshToken: String,
+         deviceKey: String = "", deviceName: String = "") {
+        self.serverAddr = serverAddr
+        self.httpURL = httpURL
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.deviceKey = deviceKey
+        self.deviceName = deviceName
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        serverAddr   = try container.decode(String.self, forKey: .serverAddr)
+        httpURL      = try container.decode(String.self, forKey: .httpURL)
+        accessToken  = try container.decode(String.self, forKey: .accessToken)
+        refreshToken = try container.decode(String.self, forKey: .refreshToken)
+        deviceKey    = try container.decodeIfPresent(String.self, forKey: .deviceKey) ?? ""
+        deviceName   = try container.decodeIfPresent(String.self, forKey: .deviceName) ?? ""
     }
 }
 
@@ -73,12 +97,20 @@ final class SyncClient {
     // MARK: - HTTP Login
 
     /// POST /login with username/password. Saves credentials to Keychain on success.
-    func login(httpURL: String, serverAddr: String, username: String, password: String) async throws -> SyncCredentials {
+    func login(httpURL: String, serverAddr: String, username: String, password: String,
+                deviceKey: String = "", deviceName: String = "") async throws -> SyncCredentials {
         guard let url = URL(string: "\(httpURL)/login") else { throw SyncClientError.invalidURL }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["username": username, "password": password])
+        var body: [String: String] = ["username": username, "password": password]
+        if !deviceKey.isEmpty {
+            body["device_id"] = deviceKey
+        }
+        if !deviceName.isEmpty {
+            body["device_name"] = deviceName
+        }
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw SyncClientError.invalidResponse }
@@ -100,7 +132,9 @@ final class SyncClient {
             serverAddr:   serverAddr,
             httpURL:      httpURL,
             accessToken:  access,
-            refreshToken: refresh
+            refreshToken: refresh,
+            deviceKey:    deviceKey,
+            deviceName:   deviceName
         )
         try save(creds)
         return creds
