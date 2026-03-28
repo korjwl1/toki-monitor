@@ -282,6 +282,31 @@ enum L {
         static var gray: String { tr("회색", "Gray") }
     }
 
+    // MARK: - Sync
+
+    enum sync {
+        static var title: String        { tr("Sync", "Sync") }
+        static var notConfigured: String { tr("Sync 미설정", "Sync not configured") }
+        static var enableSync: String   { tr("Sync 활성화", "Enable Sync") }
+        static var disableSync: String  { tr("Sync 비활성화", "Disable Sync") }
+        static var openSettings: String { tr("Sync 설정...", "Sync Settings...") }
+        static var serverURL: String    { tr("서버 URL", "Server URL") }
+        static var syncAddr: String     { tr("Sync 주소 (host:port)", "Sync Address (host:port)") }
+        static var username: String     { tr("사용자명", "Username") }
+        static var password: String     { tr("비밀번호", "Password") }
+        static var login: String        { tr("로그인", "Login") }
+        static var loggedIn: String     { tr("로그인됨", "Logged in") }
+        static var tokenExpired: String { tr("토큰 만료됨. 다시 로그인하세요.", "Token expired. Please log in again.") }
+        static var reloginTitle: String { tr("Sync 재로그인 필요", "Sync Re-login Required") }
+        static var reloginBody: String  { tr("toki sync 서버 토큰이 만료되었습니다.", "Your toki sync server token has expired.") }
+        static var dataSource: String   { tr("데이터 소스", "Data Source") }
+        static var local: String        { tr("로컬", "Local") }
+        static var server: String       { tr("서버", "Server") }
+        static var serverDisabled: String { tr("서버 모드 사용 불가 (Sync 미설정)", "Server mode unavailable (Sync not configured)") }
+        static var status: String       { tr("상태", "Status") }
+        static var serverAddress: String { tr("서버 주소", "Server Address") }
+    }
+
     // MARK: - Usage countdown
 
     enum usage {

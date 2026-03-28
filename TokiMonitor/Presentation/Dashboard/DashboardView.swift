@@ -339,6 +339,7 @@ struct DashboardView: View {
                     variableControl(for: variable)
                 }
             }
+            dataSourcePicker
             modelFilterMenu
             timeRangeButton
             refreshControl
@@ -406,6 +407,29 @@ struct DashboardView: View {
         guard !rules.isEmpty else { return nil }
         if rules.contains(where: { $0.state == .alerting }) { return .alerting }
         return .ok
+    }
+
+    // MARK: - Data Source Picker
+
+    @ViewBuilder
+    private var dataSourcePicker: some View {
+        let syncConfigured = SyncManager.shared.isConfigured
+        Picker(L.sync.dataSource, selection: Binding(
+            get: { viewModel.dataSource },
+            set: { viewModel.dataSource = $0 }
+        )) {
+            Text(L.sync.local).tag(DashboardDataSource.local)
+            Text(L.sync.server)
+                .tag(DashboardDataSource.server)
+                .disabled(!syncConfigured)
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 120)
+        .disabled(!syncConfigured && viewModel.dataSource == .local ? false : !syncConfigured)
+        .help(syncConfigured ? L.sync.dataSource : L.sync.serverDisabled)
+        .onChange(of: syncConfigured) { _, configured in
+            if !configured { viewModel.dataSource = .local }
+        }
     }
 
     // MARK: - Time Range Button

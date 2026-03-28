@@ -1,0 +1,191 @@
+import Foundation
+
+/// Queries toki token metrics from the sync server's PromQL proxy.
+///
+/// Endpoints (JWT-authenticated):
+///   GET {httpURL}/api/v1/query_range?query=...&start=...&end=...&step=...
+///
+/// The server injects `user_id` filtering automatically — no need to include it
+/// in the query. VictoriaMetrics Prometheus-compatible response format is parsed.
+@MainActor
+final class ServerQueryClient {
+    private let syncClient: SyncClient
+
+    init(syncClient: SyncClient = .shared) {
+        self.syncClient = syncClient
+    }
+
+    // MARK: - Public API
+
+    /// Run a raw PromQL range query. Returns parsed time series data.
+    func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
+        let creds = try requireCredentials()
+        let vmQuery = translateToVMQuery(query, time: time)
+        let data = try await queryRange(vmQuery, start: time.fromDate, end: time.toDate,
+                                        step: time.bucketString, creds: creds, retryOn401: true)
+        let byDate = parseVMRangeResponse(data)
+        var points = byDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
+            .sorted { $0.date < $1.date }
+        points = gapFill(points: points, time: time)
+        let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
+            : time.bucketSeconds < 86400 ? .hourly : .daily
+        return TimeSeriesData(points: points, granularity: granularity)
+    }
+
+    // MARK: - Query Translation
+
+    /// Translates toki PromQL-like queries to VictoriaMetrics-compatible PromQL.
+    /// toki queries use `usage[bucket] by (dim)` syntax; VM uses counter-based PromQL.
+    private func translateToVMQuery(_ query: String, time: TimeConfig) -> String {
+        let step = time.bucketString
+
+        // Extract "by (dim)" clause if present
+        let byClause: String
+        if let byRange = query.range(of: #"by\s*\([^)]+\)"#, options: .regularExpression) {
+            byClause = " " + String(query[byRange])
+        } else {
+            byClause = " by (model)"
+        }
+
+        // Extract filter if present: usage{provider="claude_code"}[...]
+        var filter = ""
+        if let filterRange = query.range(of: #"\{[^}]+\}"#, options: .regularExpression) {
+            filter = String(query[filterRange])
+        }
+
+        return "sum\(byClause) (increase(toki_tokens_total\(filter)[\(step)]))"
+    }
+
+    // MARK: - HTTP
+
+    private func queryRange(
+        _ promql: String,
+        start: Date,
+        end: Date,
+        step: String,
+        creds: SyncCredentials,
+        retryOn401: Bool
+    ) async throws -> Data {
+        guard var components = URLComponents(string: "\(creds.httpURL)/api/v1/query_range") else {
+            throw ServerQueryError.invalidURL
+        }
+        components.queryItems = [
+            URLQueryItem(name: "query", value: promql),
+            URLQueryItem(name: "start", value: "\(Int(start.timeIntervalSince1970))"),
+            URLQueryItem(name: "end",   value: "\(Int(end.timeIntervalSince1970))"),
+            URLQueryItem(name: "step",  value: step),
+        ]
+        guard let url = components.url else { throw ServerQueryError.invalidURL }
+
+        var req = URLRequest(url: url, timeoutInterval: 20)
+        req.setValue("Bearer \(creds.accessToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { throw ServerQueryError.invalidResponse }
+
+        if http.statusCode == 401, retryOn401 {
+            let refreshed = try await syncClient.refreshAccessToken(creds)
+            return try await queryRange(promql, start: start, end: end, step: step,
+                                        creds: refreshed, retryOn401: false)
+        }
+        guard http.statusCode == 200 else {
+            throw ServerQueryError.httpError(http.statusCode)
+        }
+        return data
+    }
+
+    // MARK: - Response Parsing
+
+    /// Parses Prometheus/VictoriaMetrics API response into the app's model format.
+    ///
+    /// Response shape:
+    /// ```json
+    /// { "status": "success",
+    ///   "data": { "resultType": "matrix",
+    ///             "result": [{ "metric": {"model":"claude-opus-4-5",...},
+    ///                          "values": [[ts, "123"], ...] }] } }
+    /// ```
+    private func parseVMRangeResponse(_ data: Data) -> [Date: [TokiModelSummary]] {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let dataObj  = json["data"]   as? [String: Any],
+              let results  = dataObj["result"] as? [[String: Any]] else { return [:] }
+
+        var byDate: [Date: [TokiModelSummary]] = [:]
+        for result in results {
+            guard let metric     = result["metric"] as? [String: String],
+                  let valuePairs = result["values"] as? [[Any]] else { continue }
+
+            // Prefer "model" label; fall back to "provider"
+            let modelName = metric["model"] ?? metric["provider"] ?? "unknown"
+
+            for pair in valuePairs {
+                guard pair.count >= 2,
+                      let tsNum   = pair[0] as? NSNumber,
+                      let valStr  = pair[1] as? String,
+                      let val     = Double(valStr) else { continue }
+                let date = Date(timeIntervalSince1970: tsNum.doubleValue)
+                let summary = TokiModelSummary(
+                    model:        modelName,
+                    inputTokens:  UInt64(max(0, val)),
+                    outputTokens: 0,
+                    totalTokens:  UInt64(max(0, val)),
+                    events:       val > 0 ? 1 : 0,
+                    costUsd:      nil,
+                    cacheCreationInputTokens: nil,
+                    cacheReadInputTokens:     nil,
+                    cachedInputTokens:        nil,
+                    reasoningOutputTokens:    nil
+                )
+                byDate[date, default: []].append(summary)
+            }
+        }
+        return byDate
+    }
+
+    // MARK: - Gap Fill (epoch-aligned, mirrors TokiReportClient logic)
+
+    private func gapFill(points: [TimeSeriesPoint], time: TimeConfig) -> [TimeSeriesPoint] {
+        let step = TimeInterval(time.bucketSeconds)
+        guard step > 0 else { return points }
+
+        let alignedStart = floor(time.fromDate.timeIntervalSince1970 / step) * step
+        let alignedEnd   = time.toDate.timeIntervalSince1970
+        let existingKeys = Set(points.map { Int(floor($0.date.timeIntervalSince1970 / step) * step) })
+
+        var filled = points
+        var current = alignedStart
+        while current <= alignedEnd {
+            let bucket = Int(current)
+            if !existingKeys.contains(bucket) {
+                filled.append(TimeSeriesPoint(date: Date(timeIntervalSince1970: current), models: []))
+            }
+            current += step
+        }
+        return filled.sorted { $0.date < $1.date }
+    }
+
+    // MARK: - Helpers
+
+    private func requireCredentials() throws -> SyncCredentials {
+        guard let c = syncClient.load() else { throw ServerQueryError.notConfigured }
+        return c
+    }
+}
+
+enum ServerQueryError: LocalizedError {
+    case notConfigured
+    case invalidURL
+    case invalidResponse
+    case httpError(Int)
+    case tokenExpired
+
+    var errorDescription: String? {
+        switch self {
+        case .notConfigured:    return L.sync.notConfigured
+        case .invalidURL:       return L.tr("잘못된 URL", "Invalid URL")
+        case .invalidResponse:  return L.tr("잘못된 응답", "Invalid response")
+        case .httpError(let c): return "HTTP \(c)"
+        case .tokenExpired:     return L.sync.tokenExpired
+        }
+    }
+}

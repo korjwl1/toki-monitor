@@ -100,6 +100,10 @@
 		G10000000022 /* PlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000022 /* PlaylistView.swift */; };
 		G10000000023 /* AlertListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000023 /* AlertListView.swift */; };
 		G10000000024 /* DetailHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000000024 /* DetailHeaderView.swift */; };
+		SC10000000001 /* SyncClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC20000000001 /* SyncClient.swift */; };
+		SC10000000002 /* ServerQueryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC20000000002 /* ServerQueryClient.swift */; };
+		SC10000000003 /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC20000000003 /* SyncManager.swift */; };
+		SC10000000004 /* SyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC20000000004 /* SyncSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -209,6 +213,10 @@
 		G20000000022 /* PlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistView.swift; sourceTree = "<group>"; };
 		G20000000023 /* AlertListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertListView.swift; sourceTree = "<group>"; };
 		G20000000024 /* DetailHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailHeaderView.swift; sourceTree = "<group>"; };
+		SC20000000001 /* SyncClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncClient.swift; sourceTree = "<group>"; };
+		SC20000000002 /* ServerQueryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerQueryClient.swift; sourceTree = "<group>"; };
+		SC20000000003 /* SyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncManager.swift; sourceTree = "<group>"; };
+		SC20000000004 /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -218,6 +226,8 @@
 				DB2BF0000196F3EA0107C726 /* TokiConnection.swift */,
 				D7A07540C3665358D10E114C /* TokiEventStream.swift */,
 				B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */,
+				SC20000000001 /* SyncClient.swift */,
+				SC20000000002 /* ServerQueryClient.swift */,
 				8648934AE14365594C7132F0 /* Models */,
 				F10000000001 /* OAuth */,
 			);
@@ -384,6 +394,7 @@
 				518EA37BF638408B8EA6472F /* ProvidersSettingsPane.swift */,
 				C05EB08DE9C484A1538733DF /* NotificationsSettingsPane.swift */,
 				AB20000000001 /* AboutPane.swift */,
+				SC20000000004 /* SyncSettingsView.swift */,
 				BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */,
 			);
 			path = Settings;
@@ -421,6 +432,7 @@
 			children = (
 				G20000000015 /* AnnotationStore.swift */,
 				G20000000016 /* AlertManager.swift */,
+				SC20000000003 /* SyncManager.swift */,
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				AT20000001 /* AnimationTheme.swift */,
 				UC20000001 /* UpdateChecker.swift */,
@@ -641,6 +653,10 @@
 				G10000000022 /* PlaylistView.swift in Sources */,
 				G10000000023 /* AlertListView.swift in Sources */,
 				G10000000024 /* DetailHeaderView.swift in Sources */,
+				SC10000000001 /* SyncClient.swift in Sources */,
+				SC10000000002 /* ServerQueryClient.swift in Sources */,
+				SC10000000003 /* SyncManager.swift in Sources */,
+				SC10000000004 /* SyncSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -404,6 +404,7 @@ struct MenuContentView: View {
         VStack(spacing: DS.sm) {
             gridBtn(L.panel.dashboard, "chart.xyaxis.line", onOpenDashboard)
             gridBtn(L.panel.settings, "gearshape", onOpenSettings)
+            syncStatusBtn
             styleToggleBtn {
                 if let pid = filterProviderId {
                     // Per-provider: cycle this provider's style override
@@ -427,6 +428,26 @@ struct MenuContentView: View {
             }
         }
         .padding(0)
+    }
+
+    // MARK: - Sync Status Button
+
+    @ViewBuilder
+    private var syncStatusBtn: some View {
+        let syncManager = SyncManager.shared
+        Button(action: onOpenSettings) {
+            VStack(spacing: DS.xs) {
+                Image(systemName: syncManager.isConfigured ? "arrow.triangle.2.circlepath" : "arrow.triangle.2.circlepath.circle")
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundStyle(syncManager.isConfigured ? Color.green : Color.secondary)
+                Text(L.sync.title)
+                    .font(.system(size: DS.fontTiny))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: DS.Menu.btnSize, height: DS.Menu.btnSize)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func gridBtn(_ t: String, _ ic: String, _ action: @escaping () -> Void) -> some View {

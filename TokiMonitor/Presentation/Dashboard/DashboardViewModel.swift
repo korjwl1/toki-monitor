@@ -80,11 +80,19 @@ final class DashboardViewModel {
 
     // MARK: - Dependencies
     private let reportClient: TokiReportClient
+    private let serverQueryClient: ServerQueryClient
     let configStore = DashboardConfigStore()
     private let annotationStore = AnnotationStore()
 
-    init(reportClient: TokiReportClient = TokiReportClient()) {
+    /// Current data source (local CLI vs sync server). Persisted via AppSettings.
+    var dataSource: DashboardDataSource = .local {
+        didSet { fetchData() }
+    }
+
+    init(reportClient: TokiReportClient = TokiReportClient(),
+         serverQueryClient: ServerQueryClient = ServerQueryClient()) {
         self.reportClient = reportClient
+        self.serverQueryClient = serverQueryClient
         self.dashboardConfig = DashboardConfigStore().load()
         self.dashboardList = DashboardConfigStore().loadDashboardList()
         populateProviderOptions()
@@ -149,14 +157,26 @@ final class DashboardViewModel {
 
             // Execute all queries concurrently, collect results
             var queryResults: [(String, Result<TimeSeriesData, Error>)] = []
+            let useServer = dataSource == .server && SyncManager.shared.isConfigured
             await withTaskGroup(of: (String, Result<TimeSeriesData, Error>).self) { group in
                 for (query, _) in queryGroups {
-                    group.addTask { [reportClient] in
-                        do {
-                            let result = try await reportClient.queryPromQLAsTimeSeries(query: query, time: time)
-                            return (query, .success(result))
-                        } catch {
-                            return (query, .failure(error))
+                    if useServer {
+                        group.addTask { [serverQueryClient] in
+                            do {
+                                let result = try await serverQueryClient.queryPromQLAsTimeSeries(query: query, time: time)
+                                return (query, .success(result))
+                            } catch {
+                                return (query, .failure(error))
+                            }
+                        }
+                    } else {
+                        group.addTask { [reportClient] in
+                            do {
+                                let result = try await reportClient.queryPromQLAsTimeSeries(query: query, time: time)
+                                return (query, .success(result))
+                            } catch {
+                                return (query, .failure(error))
+                            }
                         }
                     }
                 }

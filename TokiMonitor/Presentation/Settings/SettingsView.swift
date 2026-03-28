@@ -29,6 +29,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     case menuBar
     case providers
     case notifications
+    case sync
     case about
 
     var id: String { rawValue }
@@ -39,6 +40,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .menuBar: L.cat.menuBar
         case .providers: L.cat.providers
         case .notifications: L.cat.notifications
+        case .sync: L.sync.title
         case .about: L.cat.about
         }
     }
@@ -49,6 +51,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .menuBar: "menubar.rectangle"
         case .providers: "building.2"
         case .notifications: "bell"
+        case .sync: "arrow.triangle.2.circlepath"
         case .about: "info.circle"
         }
     }
@@ -122,6 +125,8 @@ struct SettingsView: View {
             ProvidersSettingsPane(settings: settings)
         case .notifications:
             NotificationsSettingsPane(settings: settings)
+        case .sync:
+            SyncSettingsView()
         case .about:
             AboutPane()
         case nil:
