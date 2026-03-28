@@ -147,6 +147,9 @@ final class DashboardViewModel {
             let projectPanels = panels.filter { $0.effectiveMetric == .tokensByProject }
             let regularPanels = panels.filter { $0.effectiveMetric != .tokensByProject }
 
+            // Execute all queries concurrently, collect results
+            let useServer = dataSource == .server && SyncManager.shared.isConfigured
+
             // Build interpolated queries and group by unique query string
             var queryGroups: [String: [PanelConfig]] = [:]
             for panel in regularPanels {
@@ -155,9 +158,7 @@ final class DashboardViewModel {
                 queryGroups[interpolated, default: []].append(panel)
             }
 
-            // Execute all queries concurrently, collect results
             var queryResults: [(String, Result<TimeSeriesData, Error>)] = []
-            let useServer = dataSource == .server && SyncManager.shared.isConfigured
             await withTaskGroup(of: (String, Result<TimeSeriesData, Error>).self) { group in
                 for (query, _) in queryGroups {
                     if useServer {

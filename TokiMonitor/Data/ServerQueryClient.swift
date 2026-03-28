@@ -17,11 +17,11 @@ final class ServerQueryClient {
 
     // MARK: - Public API
 
-    /// Run a raw PromQL range query. Returns parsed time series data.
+    /// Run a standard PromQL range query against the toki-sync server proxy.
+    /// The query is passed as-is; the server injects `user_id` filtering automatically.
     func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
         let creds = try requireCredentials()
-        let vmQuery = translateToVMQuery(query, time: time)
-        let data = try await queryRange(vmQuery, start: time.fromDate, end: time.toDate,
+        let data = try await queryRange(query, start: time.fromDate, end: time.toDate,
                                         step: time.bucketString, creds: creds, retryOn401: true)
         let byDate = parseVMRangeResponse(data)
         var points = byDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
@@ -30,34 +30,6 @@ final class ServerQueryClient {
         let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
             : time.bucketSeconds < 86400 ? .hourly : .daily
         return TimeSeriesData(points: points, granularity: granularity)
-    }
-
-    // MARK: - Query Translation
-
-    /// Translates toki PromQL-like queries to VictoriaMetrics-compatible PromQL.
-    /// toki queries use `usage[bucket] by (dim)` syntax; VM uses counter-based PromQL.
-    private func translateToVMQuery(_ query: String, time: TimeConfig) -> String {
-        let step = time.bucketString
-
-        // Extract "by (dim)" clause if present
-        let byClause: String
-        if let byRange = query.range(of: #"by\s*\([^)]+\)"#, options: .regularExpression) {
-            byClause = " " + String(query[byRange])
-        } else {
-            byClause = " by (model)"
-        }
-
-        // Extract provider filter only — strip toki-local labels (since/until) that don't
-        // exist as VM series labels. VM time range is controlled by start/end query params.
-        var filter = ""
-        if let filterRange = query.range(of: #"\{[^}]+\}"#, options: .regularExpression) {
-            let full = String(query[filterRange])
-            if let providerRange = full.range(of: #"provider="[^"]+""#, options: .regularExpression) {
-                filter = "{\(String(full[providerRange]))}"
-            }
-        }
-
-        return "sum\(byClause) (increase(toki_tokens_total\(filter)[\(step)]))"
     }
 
     // MARK: - HTTP

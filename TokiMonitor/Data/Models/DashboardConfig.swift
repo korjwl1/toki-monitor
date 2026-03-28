@@ -475,17 +475,19 @@ enum PanelMetric: String, Codable, CaseIterable {
         }
     }
 
-    /// Default PromQL template for this metric.
-    /// Time range is passed via --since/--until CLI flags (local) or start/end API params (server).
-    /// $provider is replaced by interpolateQuery with provider="..." or removed when All selected.
+    /// Default PromQL query.
+    /// Uses standard PromQL syntax accepted by both the local toki CLI and
+    /// the toki-sync server PromQL proxy (VictoriaMetrics backend).
+    /// $provider replaced by interpolateQuery; time range passed separately
+    /// (--since/--until for CLI, start/end query params for server).
     var defaultQuery: String {
         switch self {
         case .totalTokens, .totalCost, .topModel, .cacheHitRate, .reasoningTokens,
              .tokensByModel, .costByModel, .modelBreakdown, .inputVsOutput,
              .apiCalls, .eventsByModel:
-            "usage{$provider}[$__interval] by (model)"
+            "sum by (model) (increase(toki_tokens_total{$provider}[$__interval]))"
         case .tokensByProject:
-            "sum(usage{$provider}[$__interval]) by (project)"
+            "sum by (project) (increase(toki_tokens_total{$provider}[$__interval]))"
         }
     }
 }
