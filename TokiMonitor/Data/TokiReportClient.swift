@@ -24,10 +24,10 @@ final class TokiReportClient: Sendable {
         sinceFmt.dateFormat = "yyyyMMddHHmmss"
         sinceFmt.timeZone = TimeZone(identifier: "UTC")
         let since = sinceFmt.string(from: Date().addingTimeInterval(-timeRange.duration - 3600))
-        let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
+        let query = "usage[\(bucket)] by (model)"
 
         let data = try await runner.runReport(
-            reportOptions: ["-z", "UTC"],
+            reportOptions: ["-z", "UTC", "--since", since],
             subcommandArgs: ["query", query]
         )
         let pointsByDate = TokiReportParser.parseReport(data)
@@ -70,19 +70,23 @@ final class TokiReportClient: Sendable {
         let sinceDate = time.fromDate.addingTimeInterval(-buffer)
         let since = sinceFmt.string(from: sinceDate)
 
-        var filters = "since=\"\(since)\""
+        var reportOptions = ["-z", "UTC", "--since", since]
         // Add until for absolute time ranges
         if !time.isRelative {
             let until = sinceFmt.string(from: time.toDate)
-            filters += ", until=\"\(until)\""
+            reportOptions += ["--until", until]
         }
+
+        var filters = ""
         if let provider {
-            filters += ", provider=\"\(provider)\""
+            filters = "provider=\"\(provider)\""
         }
-        let query = "usage{\(filters)}[\(bucket)] by (model)"
+        let query = filters.isEmpty
+            ? "usage[\(bucket)] by (model)"
+            : "usage{\(filters)}[\(bucket)] by (model)"
 
         let data = try await runner.runReport(
-            reportOptions: ["-z", "UTC"],
+            reportOptions: reportOptions,
             subcommandArgs: ["query", query]
         )
         let pointsByDate = TokiReportParser.parseReport(data)
