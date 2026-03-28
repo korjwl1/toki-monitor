@@ -129,6 +129,18 @@ open /Applications/TokiMonitor.app
 - 캐릭터 모드에서만 동작
 - 기본 꺼짐. 설정 → 알림에서 활성화.
 
+### 동기화 (서버 모드)
+
+[toki-sync](https://github.com/korjwl1/toki-sync) 서버에 연결하여 모든 디바이스의 사용량을 한 곳에서 볼 수 있습니다.
+
+- **로컬 / 서버 전환** — 대시보드 툴바에서 로컬 데이터와 서버 집계 데이터를 전환
+- **서버 모드**: toki-sync의 PromQL 프록시에 URLSession으로 직접 쿼리 (CLI 서브프로세스 오버헤드 없음)
+- **디바이스 목록**: 등록된 모든 디바이스와 마지막 접속 시각 표시
+- **토큰 갱신**: 401 시 JWT 자동 갱신, 재로그인이 필요하면 시스템 알림
+- **HTTPS 필수**: HTTPS가 아닌 서버 URL은 거부 (localhost는 개발용으로 예외)
+
+설정 → 동기화에서 서버 URL, 사용자명, 비밀번호를 입력하세요. 인증 정보는 macOS 키체인에 저장되며, toki 데몬과 공유됩니다.
+
 ### 설정
 
 - 합산 또는 개별 프로바이더 표시 (독립 스타일 설정)
@@ -172,14 +184,15 @@ toki는 백그라운드에서 조용히 실행됩니다 — 필요할 때까지 
 
 ```
 toki (Rust 데몬)                Toki Monitor (Swift/SwiftUI)
-├─ fjall TSDB                   ├─ Data        // UDS, CLI, Keychain
-├─ kqueue 파일 감시             ├─ Domain      // 집계, 알림
-├─ PromQL 엔진                  └─ Presentation// 메뉴바, 대시보드
-└─ UDS 서버
+├─ fjall TSDB                   ├─ Data        // UDS, CLI, Keychain, ServerQueryClient
+├─ kqueue 파일 감시             ├─ Domain      // 집계, 알림, SyncManager
+├─ PromQL 엔진                  └─ Presentation// 메뉴바, 대시보드, 동기화 설정
+├─ UDS 서버
+└─ sync 스레드 → toki-sync     toki-sync 서버 (선택)
+                                ├─ PromQL 프록시 (VictoriaMetrics)
 
-실시간:   daemon → trace → UDS → EventStream → Aggregator → 메뉴바
-대시보드: 패널 쿼리 → interpolate → toki report → 차트
-사용량:   Claude Keychain / Codex auth.json → Monitor → 위젯
+로컬:   패널 쿼리 → toki report → 차트
+서버:   패널 쿼리 → URLSession → toki-sync → VM → 차트
 ```
 
 ### 개인 정보
@@ -288,7 +301,7 @@ Resources/Animations/
 ## 예정된 기능
 
 - **Gemini CLI 지원** — Google Gemini 프로바이더 연동
-- **멀티 디바이스 동기화** — toki-sync를 통한 기기 간 사용량 데이터 공유
+- **멀티 디바이스 동기화** — ✅ toki-sync를 통한 기기 간 사용량 데이터 공유 (대시보드 서버 모드)
 - **사용량 보고서** — 주간/월간 요약, 전주 대비 및 전월 대비 분석
 
 ---
