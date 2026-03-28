@@ -41,6 +41,7 @@
 		AT10000001 /* AnimationTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AT20000001 /* AnimationTheme.swift */; };
 		AT10000002 /* Animations in Resources */ = {isa = PBXBuildFile; fileRef = AT20000002 /* Animations */; };
 		UC10000001 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = UC20000001 /* UpdateChecker.swift */; };
+		VC10000001 /* VersionCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = VC20000001 /* VersionCompatibility.swift */; };
 		4DF008865414431174E7637E /* frame_05.png in Resources */ = {isa = PBXBuildFile; fileRef = C89A62671E6B8235B289897B /* frame_05.png */; };
 		4E185ECB80CEBAD70B4DD71F /* TokiEventStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A07540C3665358D10E114C /* TokiEventStream.swift */; };
 		5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */; };
@@ -165,6 +166,7 @@
 		BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapper.swift; sourceTree = "<group>"; };
 		AT20000001 /* AnimationTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationTheme.swift; sourceTree = "<group>"; };
 		UC20000001 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
+		VC20000001 /* VersionCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionCompatibility.swift; sourceTree = "<group>"; };
 		AT20000002 /* Animations */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Animations; sourceTree = "<group>"; };
 		BDE38973AE985102C6A597D9 /* TokiMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TokiMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C060811529815B293611230B /* frame_03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_03.png; sourceTree = "<group>"; };
@@ -422,6 +424,7 @@
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				AT20000001 /* AnimationTheme.swift */,
 				UC20000001 /* UpdateChecker.swift */,
+				VC20000001 /* VersionCompatibility.swift */,
 				5D82D563F2B758C1208E987E /* AppSettings.swift */,
 				0103BDEAC6066E0274029149 /* ConnectionManager.swift */,
 				D10000000007 /* ClaudeUsageMonitor.swift */,
@@ -564,6 +567,7 @@
 				4DBBE21D70D7916D7F2DC175 /* AnimationStateMapper.swift in Sources */,
 				AT10000001 /* AnimationTheme.swift in Sources */,
 				UC10000001 /* UpdateChecker.swift in Sources */,
+				VC10000001 /* VersionCompatibility.swift in Sources */,
 				96C312BC7B488E45DAB00737 /* AppSettings.swift in Sources */,
 				D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */,
 				E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */,
