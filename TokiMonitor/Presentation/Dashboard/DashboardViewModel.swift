@@ -267,9 +267,19 @@ final class DashboardViewModel {
         let query = interpolateQuery(template, time: time)
 
         do {
+            let sinceFmt = DateFormatter()
+            sinceFmt.dateFormat = "yyyyMMddHHmmss"
+            sinceFmt.timeZone = TimeZone(identifier: "UTC")
+            let buffer = max(60, time.duration * 0.1)
+            let sinceDate = time.fromDate.addingTimeInterval(-buffer)
+            var cliArgs = ["report", "-z", "UTC", "--since", sinceFmt.string(from: sinceDate)]
+            if !time.isRelative {
+                cliArgs += ["--until", sinceFmt.string(from: time.toDate)]
+            }
+            cliArgs += ["--output-format", "json", "query", query]
             let rawData = try await CLIProcessRunner.run(
                 executable: TokiPath.resolved,
-                arguments: ["report", "-z", "UTC", "--output-format", "json", "query", query]
+                arguments: cliArgs
             )
 
             struct ProjectReport: Codable {

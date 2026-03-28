@@ -475,21 +475,17 @@ enum PanelMetric: String, Codable, CaseIterable {
         }
     }
 
-    /// Default PromQL template for this metric
-    /// PromQL query template. toki supports: usage, events, sessions, projects.
-    /// Cost, topModel, cacheHitRate, reasoning are computed client-side from usage data.
+    /// Default PromQL template for this metric.
+    /// Time range is passed via --since/--until CLI flags (local) or start/end API params (server).
+    /// $provider is replaced by interpolateQuery with provider="..." or removed when All selected.
     var defaultQuery: String {
         switch self {
-        case .totalTokens, .totalCost, .topModel, .cacheHitRate, .reasoningTokens:
-            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .tokensByModel, .costByModel, .modelBreakdown, .inputVsOutput:
-            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .apiCalls:
-            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .eventsByModel:
-            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
+        case .totalTokens, .totalCost, .topModel, .cacheHitRate, .reasoningTokens,
+             .tokensByModel, .costByModel, .modelBreakdown, .inputVsOutput,
+             .apiCalls, .eventsByModel:
+            "usage{$provider}[$__interval] by (model)"
         case .tokensByProject:
-            "sum(usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval]) by (project)"
+            "sum(usage{$provider}[$__interval]) by (project)"
         }
     }
 }

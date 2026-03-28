@@ -47,8 +47,17 @@ final class TokiReportClient: Sendable {
 
     /// Run a pre-interpolated PromQL query and return TimeSeriesData with gap-fill.
     func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
+        let sinceFmt = DateFormatter()
+        sinceFmt.dateFormat = "yyyyMMddHHmmss"
+        sinceFmt.timeZone = TimeZone(identifier: "UTC")
+        let buffer = max(60, time.duration * 0.1)
+        let sinceDate = time.fromDate.addingTimeInterval(-buffer)
+        var reportOptions = ["-z", "UTC", "--since", sinceFmt.string(from: sinceDate)]
+        if !time.isRelative {
+            reportOptions += ["--until", sinceFmt.string(from: time.toDate)]
+        }
         let data = try await runner.runReport(
-            reportOptions: ["-z", "UTC"],
+            reportOptions: reportOptions,
             subcommandArgs: ["query", query]
         )
         let pointsByDate = TokiReportParser.parseReport(data)
