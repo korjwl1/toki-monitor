@@ -250,15 +250,6 @@ enum L {
         static var aggregated: String { tr("합산", "Aggregated") }
         static var perProvider: String { tr("개별", "Per Provider") }
 
-
-        // DashboardTimeRange
-        static var sixHours: String { tr("6시간", "6h") }
-        static var twelveHours: String { tr("12시간", "12h") }
-        static var twentyFourHours: String { tr("24시간", "24h") }
-        static var sevenDays: String { tr("7일", "7d") }
-        static var fourteenDays: String { tr("14일", "14d") }
-        static var thirtyDays: String { tr("30일", "30d") }
-
         // TimeRange (popover)
         static var halfHour: String { tr("30분", "30m") }
         static var today: String { tr("오늘", "Today") }
