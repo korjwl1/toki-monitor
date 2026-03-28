@@ -221,7 +221,7 @@ private struct DeviceListSheet: View {
                             HStack {
                                 Text(device.name)
                                     .font(.body)
-                                if device.id == currentDeviceKey {
+                                if device.deviceKey == currentDeviceKey {
                                     Text(L.tr("(현재)", "(current)"))
                                         .font(.caption)
                                         .foregroundStyle(.blue)
@@ -310,6 +310,7 @@ private struct DeviceListSheet: View {
         devices = deviceArray.map { d in
             let id = d["id"] as? String ?? "-"
             let name = d["name"] as? String ?? "-"
+            let deviceKey = d["device_key"] as? String ?? ""
             let lastSeen = d["last_seen_at"] as? Int64
 
             let lastSeenText: String
@@ -323,13 +324,14 @@ private struct DeviceListSheet: View {
                 lastSeenText = "-"
             }
 
-            return DeviceInfo(id: id, name: name, lastSeenText: lastSeenText)
+            return DeviceInfo(id: id, deviceKey: deviceKey, name: name, lastSeenText: lastSeenText)
         }
     }
 }
 
 private struct DeviceInfo: Identifiable {
     let id: String
+    let deviceKey: String
     let name: String
     let lastSeenText: String
 }
