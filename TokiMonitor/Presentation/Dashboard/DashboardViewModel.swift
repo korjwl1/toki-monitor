@@ -82,6 +82,8 @@ final class DashboardViewModel {
     // MARK: - Dependencies
     private let reportClient: TokiReportClient
     private let serverQueryClient: ServerQueryClient
+    /// Active query client, swapped when `dataSource` changes.
+    private var queryClient: any QueryDataSource
     let configStore = DashboardConfigStore()
     private let annotationStore = AnnotationStore()
 
@@ -89,20 +91,30 @@ final class DashboardViewModel {
     var dataSource: DashboardDataSource = .local {
         didSet {
             UserDefaults.standard.set(dataSource.rawValue, forKey: "dashboardDataSource")
+            queryClient = resolveQueryClient()
             fetchData()
         }
+    }
+
+    private func resolveQueryClient() -> any QueryDataSource {
+        if dataSource == .server && SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired {
+            return serverQueryClient
+        }
+        return reportClient
     }
 
     init(reportClient: TokiReportClient = TokiReportClient(),
          serverQueryClient: ServerQueryClient = ServerQueryClient()) {
         self.reportClient = reportClient
         self.serverQueryClient = serverQueryClient
+        self.queryClient = reportClient  // default; updated below after dataSource is set
         self.dashboardConfig = DashboardConfigStore().load()
         self.dashboardList = DashboardConfigStore().loadDashboardList()
         if let raw = UserDefaults.standard.string(forKey: "dashboardDataSource"),
            let persisted = DashboardDataSource(rawValue: raw) {
             self.dataSource = persisted
         }
+        self.queryClient = resolveQueryClient()
         populateProviderOptions()
         loadAnnotations()
         loadExploreHistory()
@@ -157,9 +169,6 @@ final class DashboardViewModel {
             let projectPanels = panels.filter { $0.effectiveMetric == .tokensByProject }
             let regularPanels = panels.filter { $0.effectiveMetric != .tokensByProject }
 
-            // Execute all queries concurrently, collect results
-            let useServer = dataSource == .server && SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired
-
             // Build interpolated queries and group by unique query string
             var queryGroups: [String: [PanelConfig]] = [:]
             for panel in regularPanels {
@@ -168,26 +177,17 @@ final class DashboardViewModel {
                 queryGroups[interpolated, default: []].append(panel)
             }
 
+            // Execute all queries concurrently via the active query client
             var queryResults: [(String, Result<TimeSeriesData, Error>)] = []
             await withTaskGroup(of: (String, Result<TimeSeriesData, Error>).self) { group in
                 for (query, _) in queryGroups {
-                    if useServer {
-                        group.addTask { [serverQueryClient] in
-                            do {
-                                let result = try await serverQueryClient.queryPromQLAsTimeSeries(query: query, time: time)
-                                return (query, .success(result))
-                            } catch {
-                                return (query, .failure(error))
-                            }
-                        }
-                    } else {
-                        group.addTask { [reportClient] in
-                            do {
-                                let result = try await reportClient.queryPromQLAsTimeSeries(query: query, time: time)
-                                return (query, .success(result))
-                            } catch {
-                                return (query, .failure(error))
-                            }
+                    let client = self.queryClient
+                    group.addTask {
+                        do {
+                            let result = try await client.queryPromQLAsTimeSeries(query: query, time: time)
+                            return (query, .success(result))
+                        } catch {
+                            return (query, .failure(error))
                         }
                     }
                 }
@@ -276,12 +276,12 @@ final class DashboardViewModel {
     private func fetchProjectPanels(_ panels: [PanelConfig], time: TimeConfig) async {
         let template = PanelMetric.tokensByProject.defaultQuery
         let query = interpolateQuery(template, time: time)
-        let useServer = dataSource == .server && SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired
+        let isServer = queryClient is ServerQueryClient
 
-        if useServer {
+        if isServer {
             // Server mode: use PromQL query via server proxy
             do {
-                let data = try await serverQueryClient.queryPromQLAsTimeSeries(query: query, time: time)
+                let data = try await queryClient.queryPromQLAsTimeSeries(query: query, time: time)
                 for panel in panels {
                     panelData[panel.id] = .loaded(data)
                 }
@@ -797,22 +797,14 @@ final class DashboardViewModel {
         }
         saveExploreHistory()
 
-        let useServer = dataSource == .server && SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired
+        let client = queryClient
         Task {
             do {
-                if useServer {
-                    let time = dashboardConfig.time
-                    let interpolated = interpolateQuery(exploreQuery, time: time)
-                    let data = try await serverQueryClient.queryPromQLAsTimeSeries(query: interpolated, time: time)
-                    self.isExploreLoading = false
-                    self.exploreResults = data
-                } else {
-                    let pointsByDate = try await reportClient.queryPromQL(query: exploreQuery)
-                    self.isExploreLoading = false
-                    let points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
-                        .sorted { $0.date < $1.date }
-                    self.exploreResults = TimeSeriesData(points: points, granularity: .hourly)
-                }
+                let time = dashboardConfig.time
+                let interpolated = interpolateQuery(exploreQuery, time: time)
+                let data = try await client.queryPromQLAsTimeSeries(query: interpolated, time: time)
+                self.isExploreLoading = false
+                self.exploreResults = data
             } catch {
                 self.isExploreLoading = false
                 self.exploreResults = nil

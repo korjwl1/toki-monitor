@@ -7,7 +7,7 @@ import Foundation
 ///
 /// The server injects `user_id` filtering automatically — no need to include it
 /// in the query. VictoriaMetrics Prometheus-compatible response format is parsed.
-final class ServerQueryClient: @unchecked Sendable {
+final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
     @MainActor private let syncClient: SyncClient
 
     @MainActor
@@ -26,7 +26,7 @@ final class ServerQueryClient: @unchecked Sendable {
         let byDate = parseVMRangeResponse(data)
         var points = byDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
             .sorted { $0.date < $1.date }
-        points = gapFill(points: points, time: time)
+        points = TimeSeriesGapFiller.fill(points: points, time: time)
         let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
             : time.bucketSeconds < 86400 ? .hourly : .daily
         return TimeSeriesData(points: points, granularity: granularity)
@@ -160,28 +160,6 @@ final class ServerQueryClient: @unchecked Sendable {
             byDate[key.date, default: []].append(summary)
         }
         return byDate
-    }
-
-    // MARK: - Gap Fill (epoch-aligned, mirrors TokiReportClient logic)
-
-    private func gapFill(points: [TimeSeriesPoint], time: TimeConfig) -> [TimeSeriesPoint] {
-        let step = TimeInterval(time.bucketSeconds)
-        guard step > 0 else { return points }
-
-        let alignedStart = floor(time.fromDate.timeIntervalSince1970 / step) * step
-        let alignedEnd   = time.toDate.timeIntervalSince1970
-        let existingKeys = Set(points.map { Int(floor($0.date.timeIntervalSince1970 / step) * step) })
-
-        var filled = points
-        var current = alignedStart
-        while current <= alignedEnd {
-            let bucket = Int(current)
-            if !existingKeys.contains(bucket) {
-                filled.append(TimeSeriesPoint(date: Date(timeIntervalSince1970: current), models: []))
-            }
-            current += step
-        }
-        return filled.sorted { $0.date < $1.date }
     }
 
     // MARK: - Helpers

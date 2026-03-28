@@ -50,9 +50,13 @@ final class SyncClient {
     private let service = "toki-sync"
     private let account = "credentials"
 
+    /// In-memory credential cache to avoid repeated Keychain reads.
+    private var cachedCredentials: SyncCredentials?
+
     // MARK: - Keychain
 
     func load() -> SyncCredentials? {
+        if let cached = cachedCredentials { return cached }
         let query: [CFString: Any] = [
             kSecClass:       kSecClassGenericPassword,
             kSecAttrService: service,
@@ -63,7 +67,14 @@ final class SyncClient {
         var item: AnyObject?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
               let data = item as? Data else { return nil }
-        return try? JSONDecoder().decode(SyncCredentials.self, from: data)
+        let creds = try? JSONDecoder().decode(SyncCredentials.self, from: data)
+        cachedCredentials = creds
+        return creds
+    }
+
+    /// Invalidate the in-memory credential cache, forcing the next `load()` to read from Keychain.
+    func invalidateCache() {
+        cachedCredentials = nil
     }
 
     func save(_ creds: SyncCredentials) throws {
@@ -83,6 +94,7 @@ final class SyncClient {
         guard status == errSecSuccess else {
             throw SyncClientError.keychainError(status)
         }
+        invalidateCache()
     }
 
     func delete() {
@@ -92,6 +104,7 @@ final class SyncClient {
             kSecAttrAccount: account,
         ]
         SecItemDelete(query as CFDictionary)
+        invalidateCache()
     }
 
     // MARK: - HTTP Login
@@ -99,6 +112,11 @@ final class SyncClient {
     /// POST /login with username/password. Saves credentials to Keychain on success.
     func login(httpURL: String, serverAddr: String, username: String, password: String,
                 deviceKey: String = "", deviceName: String = "") async throws -> SyncCredentials {
+        guard httpURL.lowercased().hasPrefix("https://")
+                || httpURL.hasPrefix("http://localhost")
+                || httpURL.hasPrefix("http://127.0.0.1") else {
+            throw SyncClientError.insecureURL
+        }
         guard let url = URL(string: "\(httpURL)/login") else { throw SyncClientError.invalidURL }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
@@ -137,6 +155,7 @@ final class SyncClient {
             deviceName:   deviceName
         )
         try save(creds)
+        invalidateCache()
         return creds
     }
 
@@ -161,6 +180,7 @@ final class SyncClient {
         updated.accessToken  = access
         updated.refreshToken = refresh
         try save(updated)
+        invalidateCache()
         return updated
     }
 }
@@ -168,6 +188,7 @@ final class SyncClient {
 enum SyncClientError: LocalizedError {
     case keychainError(OSStatus)
     case invalidURL
+    case insecureURL
     case invalidResponse
     case invalidCredentials
     case serverError(String)
@@ -178,6 +199,7 @@ enum SyncClientError: LocalizedError {
         switch self {
         case .keychainError(let s):  return "Keychain error (\(s))"
         case .invalidURL:            return L.tr("잘못된 서버 URL", "Invalid server URL")
+        case .insecureURL:           return L.tr("HTTPS가 필요합니다 (localhost 제외)", "HTTPS is required (except localhost)")
         case .invalidResponse:       return L.tr("잘못된 응답", "Invalid response")
         case .invalidCredentials:    return L.tr("잘못된 사용자명 또는 비밀번호", "Invalid username or password")
         case .serverError(let m):    return m

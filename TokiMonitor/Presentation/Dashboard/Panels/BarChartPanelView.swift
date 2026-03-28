@@ -114,7 +114,7 @@ struct BarChartPanelView: View {
 
     // MARK: - Helpers
 
-    private func findNearestDate(at location: CGPoint, proxy: ChartProxy, geo: GeometryReader<some View>.Value, data: TimeSeriesData) -> Date? {
+    private func findNearestDate(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy, data: TimeSeriesData) -> Date? {
         let plotFrame = geo[proxy.plotFrame!]
         let x = location.x - plotFrame.minX
         guard let date: Date = proxy.value(atX: x) else { return nil }
