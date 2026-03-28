@@ -7,10 +7,10 @@ import Foundation
 ///
 /// The server injects `user_id` filtering automatically — no need to include it
 /// in the query. VictoriaMetrics Prometheus-compatible response format is parsed.
-@MainActor
-final class ServerQueryClient {
-    private let syncClient: SyncClient
+final class ServerQueryClient: @unchecked Sendable {
+    @MainActor private let syncClient: SyncClient
 
+    @MainActor
     init(syncClient: SyncClient = .shared) {
         self.syncClient = syncClient
     }
@@ -20,7 +20,7 @@ final class ServerQueryClient {
     /// Run a standard PromQL range query against the toki-sync server proxy.
     /// The query is passed as-is; the server injects `user_id` filtering automatically.
     func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
-        let creds = try requireCredentials()
+        let creds = try await requireCredentials()
         let data = try await queryRange(query, start: time.fromDate, end: time.toDate,
                                         step: time.bucketString, creds: creds, retryOn401: true)
         let byDate = parseVMRangeResponse(data)
@@ -65,7 +65,7 @@ final class ServerQueryClient {
                 return try await queryRange(promql, start: start, end: end, step: step,
                                             creds: refreshed, retryOn401: false)
             } catch SyncClientError.refreshFailed {
-                SyncManager.shared.markTokenExpired()
+                await SyncManager.shared.markTokenExpired()
                 throw ServerQueryError.tokenExpired
             }
         }
@@ -184,6 +184,7 @@ final class ServerQueryClient {
 
     // MARK: - Helpers
 
+    @MainActor
     private func requireCredentials() throws -> SyncCredentials {
         guard let c = syncClient.load() else { throw ServerQueryError.notConfigured }
         return c

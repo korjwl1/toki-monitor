@@ -77,6 +77,7 @@ final class DashboardViewModel {
 
     // MARK: - Auto-refresh
     private var refreshTimer: Timer?
+    private var fetchTask: Task<Void, Never>?
 
     // MARK: - Dependencies
     private let reportClient: TokiReportClient
@@ -86,7 +87,10 @@ final class DashboardViewModel {
 
     /// Current data source (local CLI vs sync server). Persisted via AppSettings.
     var dataSource: DashboardDataSource = .local {
-        didSet { fetchData() }
+        didSet {
+            UserDefaults.standard.set(dataSource.rawValue, forKey: "dashboardDataSource")
+            fetchData()
+        }
     }
 
     init(reportClient: TokiReportClient = TokiReportClient(),
@@ -95,6 +99,10 @@ final class DashboardViewModel {
         self.serverQueryClient = serverQueryClient
         self.dashboardConfig = DashboardConfigStore().load()
         self.dashboardList = DashboardConfigStore().loadDashboardList()
+        if let raw = UserDefaults.standard.string(forKey: "dashboardDataSource"),
+           let persisted = DashboardDataSource(rawValue: raw) {
+            self.dataSource = persisted
+        }
         populateProviderOptions()
         loadAnnotations()
         loadExploreHistory()
@@ -131,6 +139,8 @@ final class DashboardViewModel {
     }
 
     func fetchData() {
+        fetchTask?.cancel()
+
         let panels = dashboardConfig.panels.filter { $0.panelType != .rowPanel }
         let time = dashboardConfig.time
 
@@ -142,7 +152,7 @@ final class DashboardViewModel {
         isLoading = true
         errorMessage = nil
 
-        Task {
+        fetchTask = Task {
             // Separate project panels (need special parsing) from regular panels
             let projectPanels = panels.filter { $0.effectiveMetric == .tokensByProject }
             let regularPanels = panels.filter { $0.effectiveMetric != .tokensByProject }
@@ -266,7 +276,24 @@ final class DashboardViewModel {
     private func fetchProjectPanels(_ panels: [PanelConfig], time: TimeConfig) async {
         let template = PanelMetric.tokensByProject.defaultQuery
         let query = interpolateQuery(template, time: time)
+        let useServer = dataSource == .server && SyncManager.shared.isConfigured
 
+        if useServer {
+            // Server mode: use PromQL query via server proxy
+            do {
+                let data = try await serverQueryClient.queryPromQLAsTimeSeries(query: query, time: time)
+                for panel in panels {
+                    panelData[panel.id] = .loaded(data)
+                }
+            } catch {
+                for panel in panels {
+                    panelData[panel.id] = .error(error.localizedDescription)
+                }
+            }
+            return
+        }
+
+        // Local mode: use toki CLI with project-specific parsing
         do {
             let sinceFmt = DateFormatter()
             sinceFmt.dateFormat = "yyyyMMddHHmmss"
@@ -770,13 +797,22 @@ final class DashboardViewModel {
         }
         saveExploreHistory()
 
+        let useServer = dataSource == .server && SyncManager.shared.isConfigured
         Task {
             do {
-                let pointsByDate = try await reportClient.queryPromQL(query: exploreQuery)
-                self.isExploreLoading = false
-                let points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
-                    .sorted { $0.date < $1.date }
-                self.exploreResults = TimeSeriesData(points: points, granularity: .hourly)
+                if useServer {
+                    let time = dashboardConfig.time
+                    let interpolated = interpolateQuery(exploreQuery, time: time)
+                    let data = try await serverQueryClient.queryPromQLAsTimeSeries(query: interpolated, time: time)
+                    self.isExploreLoading = false
+                    self.exploreResults = data
+                } else {
+                    let pointsByDate = try await reportClient.queryPromQL(query: exploreQuery)
+                    self.isExploreLoading = false
+                    let points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
+                        .sorted { $0.date < $1.date }
+                    self.exploreResults = TimeSeriesData(points: points, granularity: .hourly)
+                }
             } catch {
                 self.isExploreLoading = false
                 self.exploreResults = nil
