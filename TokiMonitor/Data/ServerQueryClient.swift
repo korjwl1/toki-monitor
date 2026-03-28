@@ -64,9 +64,11 @@ final class ServerQueryClient: @unchecked Sendable {
                 let refreshed = try await syncClient.refreshAccessToken(creds)
                 return try await queryRange(promql, start: start, end: end, step: step,
                                             creds: refreshed, retryOn401: false)
-            } catch SyncClientError.refreshFailed {
+            } catch is SyncClientError {
                 await SyncManager.shared.markTokenExpired()
                 throw ServerQueryError.tokenExpired
+            } catch {
+                throw ServerQueryError.httpError(0)
             }
         }
         guard http.statusCode == 200 else {

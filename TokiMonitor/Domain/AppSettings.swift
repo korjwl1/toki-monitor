@@ -371,9 +371,6 @@ final class AppSettings {
     var codexUsageWidgetWindows: [String: Bool] {
         didSet { save() }
     }
-    var dashboardDataSource: DashboardDataSource {
-        didSet { save() }
-    }
     var language: AppLanguage {
         didSet { save() }
     }
@@ -418,7 +415,6 @@ final class AppSettings {
             ?? ClaudeUsageBucketOption.allCases.reduce(into: [:]) { $0[$1.rawValue] = true }
         codexUsageWidgetWindows = Self.loadStringBoolMap(ud, key: "codexUsageWidgetWindows")
             ?? CodexUsageWindowOption.allCases.reduce(into: [:]) { $0[$1.rawValue] = true }
-        dashboardDataSource = Self.loadEnum(ud, key: "dashboardDataSource") ?? .local
         language = Self.loadEnum(ud, key: "language") ?? .system
         launchAtLogin = ud.bool(forKey: "launchAtLogin")
     }
@@ -496,7 +492,6 @@ final class AppSettings {
         defaults.set(historicalMultiplier, forKey: "historicalMultiplier")
         defaults.set(usageAlert75Enabled, forKey: "usageAlert75Enabled")
         defaults.set(usageAlert90Enabled, forKey: "usageAlert90Enabled")
-        defaults.set(dashboardDataSource.rawValue, forKey: "dashboardDataSource")
         defaults.set(language.rawValue, forKey: "language")
 
         if let data = try? JSONEncoder().encode(providerSettingsMap) {

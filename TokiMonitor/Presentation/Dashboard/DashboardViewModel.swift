@@ -158,7 +158,7 @@ final class DashboardViewModel {
             let regularPanels = panels.filter { $0.effectiveMetric != .tokensByProject }
 
             // Execute all queries concurrently, collect results
-            let useServer = dataSource == .server && SyncManager.shared.isConfigured
+            let useServer = dataSource == .server && SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired
 
             // Build interpolated queries and group by unique query string
             var queryGroups: [String: [PanelConfig]] = [:]
@@ -276,7 +276,7 @@ final class DashboardViewModel {
     private func fetchProjectPanels(_ panels: [PanelConfig], time: TimeConfig) async {
         let template = PanelMetric.tokensByProject.defaultQuery
         let query = interpolateQuery(template, time: time)
-        let useServer = dataSource == .server && SyncManager.shared.isConfigured
+        let useServer = dataSource == .server && SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired
 
         if useServer {
             // Server mode: use PromQL query via server proxy
@@ -797,7 +797,7 @@ final class DashboardViewModel {
         }
         saveExploreHistory()
 
-        let useServer = dataSource == .server && SyncManager.shared.isConfigured
+        let useServer = dataSource == .server && SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired
         Task {
             do {
                 if useServer {

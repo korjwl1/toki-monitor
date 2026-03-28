@@ -23,6 +23,11 @@ final class SyncManager {
         return true
     }
 
+    var isTokenExpired: Bool {
+        if case .tokenExpired = state { return true }
+        return false
+    }
+
     var statusText: String {
         switch state {
         case .notConfigured:
