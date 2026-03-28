@@ -5,6 +5,8 @@ struct SyncSettingsView: View {
     @State private var showLoginSheet = false
     @State private var showDeviceList = false
     @State private var errorMessage: String?
+    /// Cached toki settings JSON, loaded once on appear to avoid repeated disk reads.
+    @State private var cachedSettings: [String: Any]?
 
     var body: some View {
         Form {
@@ -35,6 +37,7 @@ struct SyncSettingsView: View {
         .sheet(isPresented: $showDeviceList) {
             DeviceListSheet()
         }
+        .onAppear { loadSettings() }
         .if(errorMessage != nil) { view in
             view.overlay(alignment: .bottom) {
                 Text(errorMessage ?? "")
@@ -109,15 +112,21 @@ struct SyncSettingsView: View {
         }
     }
 
-    /// Read last sync time from toki settings if available.
-    private func lastSyncTimeText() -> String {
-        // Try reading from toki settings file (~/.config/toki/settings.json)
+    /// Load toki settings from disk once (called on `.onAppear`).
+    private func loadSettings() {
         let settingsURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/toki/settings.json")
         guard let data = try? Data(contentsOf: settingsURL),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return "N/A"
+            cachedSettings = nil
+            return
         }
+        cachedSettings = json
+    }
+
+    /// Read last sync time from cached settings.
+    private func lastSyncTimeText() -> String {
+        guard let json = cachedSettings else { return "N/A" }
 
         // Check sync_last_ts_claude_code (or any sync_last_ts_* key)
         var latestTs: Int64 = 0
