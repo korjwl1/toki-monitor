@@ -133,11 +133,18 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
                     bucket.cacheCreation += uval
                 case "cache_read":
                     bucket.cacheRead += uval
+                case "cached_input":        // Codex: subset of input
+                    bucket.cacheRead += uval
+                case "reasoning_output":    // Codex: subset of output
+                    bucket.cacheCreation += uval
                 default:
                     // No type label (aggregated query) — treat as input
                     bucket.input += uval
                 }
-                bucket.total += uval
+                // Only count independent types in total (breakdowns are subsets)
+                if tokenType == "input" || tokenType == "output" || tokenType == nil {
+                    bucket.total += uval
+                }
                 if val > 0 { bucket.events += 1 }
                 buckets[key] = bucket
             }

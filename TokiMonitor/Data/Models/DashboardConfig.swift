@@ -482,12 +482,16 @@ enum PanelMetric: String, Codable, CaseIterable {
     /// (--since/--until for CLI, start/end query params for server).
     var defaultQuery: String {
         switch self {
-        case .totalTokens, .totalCost, .topModel, .cacheHitRate, .reasoningTokens,
+        case .totalTokens, .totalCost, .topModel, .apiCalls:
+            // Filter to input+output only — avoids double-counting for providers
+            // where breakdown types (reasoning_output, cached_input) are subsets.
+            "sum by (model) (increase(toki_tokens_total{$provider,type=~\"input|output\"}[$__interval]))"
+        case .cacheHitRate, .reasoningTokens,
              .tokensByModel, .costByModel, .modelBreakdown, .inputVsOutput,
-             .apiCalls, .eventsByModel:
+             .eventsByModel:
             "sum by (model) (increase(toki_tokens_total{$provider}[$__interval]))"
         case .tokensByProject:
-            "sum by (project) (increase(toki_tokens_total{$provider}[$__interval]))"
+            "sum by (project) (increase(toki_tokens_total{$provider,type=~\"input|output\"}[$__interval]))"
         }
     }
 }
