@@ -139,7 +139,7 @@ open /Applications/TokiMonitor.app
 - **토큰 갱신**: 401 시 JWT 자동 갱신, 재로그인이 필요하면 시스템 알림
 - **HTTPS 필수**: HTTPS가 아닌 서버 URL은 거부 (localhost는 개발용으로 예외)
 
-설정 → 동기화에서 서버 URL, 사용자명, 비밀번호를 입력하세요. 인증 정보는 macOS 키체인에 저장되며, toki 데몬과 공유됩니다.
+설정 → 동기화에서 서버 URL을 입력하고 device code flow로 인증하세요 (브라우저가 열립니다). 인증 정보��� macOS 키체인에 저장되며, toki 데몬과 공유됩니��.
 
 ### 설정
 

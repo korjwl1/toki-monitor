@@ -154,7 +154,7 @@ Connect to a [toki-sync](https://github.com/korjwl1/toki-sync) server to view us
 - **Token refresh**: automatic JWT refresh on 401, with system notification when re-login is needed
 - **HTTPS enforced**: rejects non-HTTPS server URLs (localhost exempt for development)
 
-Configure in Settings → Sync — enter server URL, username, password. Credentials stored in macOS Keychain, shared with the toki daemon.
+Configure in Settings → Sync — enter server URL and authenticate via device code flow (opens browser). Credentials stored in macOS Keychain, shared with the toki daemon.
 
 <p align="center">
   <img src="docs/images/settings-menubar.png" alt="Settings — Menu Bar" width="480" />
