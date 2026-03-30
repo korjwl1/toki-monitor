@@ -22,6 +22,10 @@ final class DashboardConfigStore {
             config = DashboardConfig.migrateV1toV2(config)
             save(config)
         }
+        if config.schemaVersion < 3 {
+            config = DashboardConfig.migrateV2toV3(config)
+            save(config)
+        }
         return config
     }
 

@@ -9,9 +9,13 @@ final class TokiReportClient: Sendable, QueryDataSource {
     }
 
     /// Run a raw PromQL query and return parsed date→models map.
-    func queryPromQL(query: String) async throws -> [Date: [TokiModelSummary]] {
+    /// Optionally pass `since`/`until` timestamps (yyyyMMddHHmmss, UTC) as CLI flags.
+    func queryPromQL(query: String, since: String? = nil, until: String? = nil) async throws -> [Date: [TokiModelSummary]] {
+        var reportOptions = ["-z", "UTC"]
+        if let since { reportOptions += ["--since", since] }
+        if let until { reportOptions += ["--until", until] }
         let data = try await runner.runReport(
-            reportOptions: ["-z", "UTC"],
+            reportOptions: reportOptions,
             subcommandArgs: ["query", query]
         )
         return TokiReportParser.parseReport(data)

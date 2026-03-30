@@ -8,7 +8,7 @@ struct DashboardConfig: Codable, Equatable {
     var title: String = "Default"
     var description: String?
     var tags: [String] = []
-    var schemaVersion: Int = 2
+    var schemaVersion: Int = 3
     var version: Int = 1
 
     // Time configuration
@@ -483,15 +483,16 @@ enum PanelMetric: String, Codable, CaseIterable {
     var defaultQuery: String {
         switch self {
         case .totalTokens, .totalCost, .topModel, .apiCalls:
-            // Filter to input+output only — avoids double-counting for providers
-            // where breakdown types (reasoning_output, cached_input) are subsets.
-            "sum by (model) (increase(toki_tokens_total{$provider,type=~\"input|output\"}[$__interval]))"
+            // `usage` metric works natively in local CLI (already aggregates input+output).
+            // ServerQueryClient rewrites `usage` → `toki_tokens_total{type=~"input|output"}`
+            // to avoid double-counting breakdown types on the server.
+            "sum by (model) (increase(usage{$provider}[$__interval]))"
         case .cacheHitRate, .reasoningTokens,
              .tokensByModel, .costByModel, .modelBreakdown, .inputVsOutput,
              .eventsByModel:
-            "sum by (model) (increase(toki_tokens_total{$provider}[$__interval]))"
+            "sum by (model) (increase(usage{$provider}[$__interval]))"
         case .tokensByProject:
-            "sum by (project) (increase(toki_tokens_total{$provider,type=~\"input|output\"}[$__interval]))"
+            "sum by (project) (increase(usage{$provider}[$__interval]))"
         }
     }
 }
@@ -567,6 +568,42 @@ extension DashboardConfig {
         // Add default variables if none exist
         if migrated.templating.list.isEmpty {
             migrated.templating = Self.defaultTemplating
+        }
+        return migrated
+    }
+
+    /// Migrate from v2 to v3: replace `toki_tokens_total` with `usage` metric in queries.
+    /// The `usage` metric works natively in local toki CLI; `ServerQueryClient` rewrites
+    /// it to `toki_tokens_total{type=~"input|output"}` for the server backend.
+    static func migrateV2toV3(_ config: DashboardConfig) -> DashboardConfig {
+        var migrated = config
+        migrated.schemaVersion = 3
+        migrated.panels = config.panels.map { panel in
+            var p = panel
+            p.targets = panel.targets.map { target in
+                var t = target
+                if var q = t.query {
+                    q = q.replacingOccurrences(
+                        of: #"toki_tokens_total\{([^}]*),\s*type=~"input\|output"\}"#,
+                        with: #"usage{$1}"#,
+                        options: .regularExpression
+                    )
+                    q = q.replacingOccurrences(
+                        of: #"toki_tokens_total\{type=~"input\|output",\s*([^}]*)\}"#,
+                        with: #"usage{$1}"#,
+                        options: .regularExpression
+                    )
+                    q = q.replacingOccurrences(
+                        of: #"toki_tokens_total\{type=~"input\|output"\}"#,
+                        with: "usage",
+                        options: .regularExpression
+                    )
+                    q = q.replacingOccurrences(of: "toki_tokens_total", with: "usage")
+                    t.query = q
+                }
+                return t
+            }
+            return p
         }
         return migrated
     }

@@ -131,10 +131,10 @@ final class TokenAggregator {
             let sinceFmt = DateFormatter()
             sinceFmt.dateFormat = "yyyyMMddHHmmss"
             sinceFmt.timeZone = TimeZone(identifier: "UTC")
-            let since = sinceFmt.string(from: Date().addingTimeInterval(-86400)) // 24h ago
-            let query = "usage{since=\"\(since)\"}[1h] by (model)"
+            let sinceStr = sinceFmt.string(from: Date().addingTimeInterval(-86400)) // 24h ago
+            let query = "usage[1h] by (model)"
 
-            guard let pointsByDate = try? await self.reportClient.queryPromQL(query: query) else { return }
+            guard let pointsByDate = try? await self.reportClient.queryPromQL(query: query, since: sinceStr) else { return }
 
             // Sum total cost across all points
             var totalCost: Double = 0
@@ -251,12 +251,12 @@ final class TokenAggregator {
         isFetchingReport = true
 
         let bucket = graphTimeRange.promqlBucket
-        let since = graphTimeRange.sinceTimestamp
-        let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
+        let sinceStr = graphTimeRange.sinceTimestamp
+        let query = "usage[\(bucket)] by (model)"
 
         Task {
             defer { self.isFetchingReport = false }
-            guard let pointsByDate = try? await reportClient.queryPromQL(query: query) else { return }
+            guard let pointsByDate = try? await reportClient.queryPromQL(query: query, since: sinceStr) else { return }
             self.buildBins(from: pointsByDate)
             self.buildSummaries(from: pointsByDate)
         }

@@ -233,21 +233,8 @@ final class DashboardViewModel {
 
     func interpolateQuery(_ template: String, time: TimeConfig? = nil) -> String {
         let t = time ?? dashboardConfig.time
-        let sinceFmt = DateFormatter()
-        sinceFmt.dateFormat = "yyyyMMddHHmmss"
-        sinceFmt.timeZone = TimeZone(identifier: "UTC")
-
-        let buffer = max(60, t.duration * 0.1)
-        let sinceDate = t.fromDate.addingTimeInterval(-buffer)
 
         var query = template
-        query = query.replacingOccurrences(of: "$__from", with: sinceFmt.string(from: sinceDate))
-        if !t.isRelative {
-            query = query.replacingOccurrences(of: "$__to", with: sinceFmt.string(from: t.toDate))
-        } else {
-            // Remove until clause for relative time
-            query = query.replacingOccurrences(of: ", until=\"$__to\"", with: "")
-        }
         query = query.replacingOccurrences(of: "$__interval", with: t.bucketString)
 
         // Provider variable

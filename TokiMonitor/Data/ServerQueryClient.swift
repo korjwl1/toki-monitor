@@ -18,10 +18,12 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
     // MARK: - Public API
 
     /// Run a standard PromQL range query against the toki-sync server proxy.
-    /// The query is passed as-is; the server injects `user_id` filtering automatically.
+    /// Rewrites local-compatible `usage` metric to `toki_tokens_total{type=~"input|output"}`
+    /// so the VictoriaMetrics backend doesn't double-count breakdown types.
     func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
+        let rewritten = Self.rewriteForServer(query)
         let creds = try await requireCredentials()
-        let data = try await queryRange(query, start: time.fromDate, end: time.toDate,
+        let data = try await queryRange(rewritten, start: time.fromDate, end: time.toDate,
                                         step: time.bucketString, creds: creds, retryOn401: true)
         let byDate = parseVMRangeResponse(data)
         var points = byDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
@@ -30,6 +32,39 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
         let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
             : time.bucketSeconds < 86400 ? .hourly : .daily
         return TimeSeriesData(points: points, granularity: granularity)
+    }
+
+    // MARK: - Query Rewriting
+
+    /// Rewrite local `usage{...}` metric to `toki_tokens_total{...,type=~"input|output"}`
+    /// for the VictoriaMetrics backend. The local toki CLI's `usage` metric already
+    /// aggregates input+output correctly, but the server stores breakdown types separately,
+    /// so we must filter to avoid double-counting.
+    static func rewriteForServer(_ query: String) -> String {
+        // Pattern: usage{...} or bare usage (no braces)
+        // Replace metric name and inject type filter into label matchers
+        var result = query
+        // usage{<labels>} → toki_tokens_total{<labels>,type=~"input|output"}
+        // Handle case where braces contain labels
+        result = result.replacingOccurrences(
+            of: #"usage\{([^}]*)\}"#,
+            with: #"toki_tokens_total{$1,type=~"input|output"}"#,
+            options: .regularExpression
+        )
+        // Clean up double/leading commas from empty label sets: {,type=~...} → {type=~...}
+        result = result.replacingOccurrences(
+            of: #"\{,type"#,
+            with: #"{type"#,
+            options: .regularExpression
+        )
+        // Handle bare `usage` (no braces) followed by [ or end — shouldn't normally appear
+        // in interpolated queries but handle defensively
+        result = result.replacingOccurrences(
+            of: #"usage\["#,
+            with: #"toki_tokens_total{type=~"input|output"}["#,
+            options: .regularExpression
+        )
+        return result
     }
 
     // MARK: - HTTP
