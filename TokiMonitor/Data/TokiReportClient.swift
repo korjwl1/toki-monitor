@@ -1,6 +1,6 @@
 import Foundation
 
-/// Runs `toki report` CLI commands and parses output.
+/// Runs `toki report` and `toki query` CLI commands and parses output.
 final class TokiReportClient: Sendable, QueryDataSource {
     private let runner: TokiReportRunner
 
@@ -8,8 +8,18 @@ final class TokiReportClient: Sendable, QueryDataSource {
         self.runner = runner
     }
 
-    /// Run a raw PromQL query and return parsed date→models map.
-    /// Optionally pass `since`/`until` timestamps (yyyyMMddHHmmss, UTC) as CLI flags.
+    /// Run an instant PromQL query via `toki query` (top-level command, no --since/--until).
+    /// The PromQL itself determines the time range via range vectors.
+    func queryPromQL(query: String) async throws -> [Date: [TokiModelSummary]] {
+        let data = try await CLIProcessRunner.run(
+            executable: TokiPath.resolved,
+            arguments: ["query", "-z", "UTC", "--output-format", "json", query]
+        )
+        return TokiReportParser.parseReport(data)
+    }
+
+    /// Run a PromQL query via `toki report` with explicit since/until time window.
+    /// Used for range queries (time-series charts) that need a CLI-provided time window.
     func queryPromQL(query: String, since: String? = nil, until: String? = nil) async throws -> [Date: [TokiModelSummary]] {
         var reportOptions = ["-z", "UTC"]
         if let since { reportOptions += ["--since", since] }

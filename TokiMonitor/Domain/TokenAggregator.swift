@@ -128,6 +128,8 @@ final class TokenAggregator {
     private func fetchHistoricalBaseline() {
         Task { [weak self] in
             guard let self else { return }
+            // Instant query: the [1h] range vector scans last 1 hour per bucket over full DB.
+            // For historical baseline we want 24h of 1h buckets.
             let sinceFmt = DateFormatter()
             sinceFmt.dateFormat = "yyyyMMddHHmmss"
             sinceFmt.timeZone = TimeZone(identifier: "UTC")
