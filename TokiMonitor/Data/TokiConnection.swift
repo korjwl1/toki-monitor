@@ -7,6 +7,7 @@ enum TokiPath {
         let candidates = [
             "/opt/homebrew/bin/toki",
             "/usr/local/bin/toki",
+            "\(NSHomeDirectory())/.local/bin/toki",
             "\(NSHomeDirectory())/.cargo/bin/toki",
         ]
         for path in candidates {
