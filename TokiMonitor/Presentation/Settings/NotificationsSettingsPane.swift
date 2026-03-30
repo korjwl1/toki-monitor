@@ -33,24 +33,29 @@ struct NotificationsSettingsPane: View {
             UsageAlertBucket.claudeFiveHour.displayName,
             isOn: usageBucketBinding(threshold, .claudeFiveHour)
         )
+        .padding(.leading, 16)
         Toggle(
             UsageAlertBucket.claudeSevenDay.displayName,
             isOn: usageBucketBinding(threshold, .claudeSevenDay)
         )
+        .padding(.leading, 16)
         Toggle(
             UsageAlertBucket.claudeSevenDaySonnet.displayName,
             isOn: usageBucketBinding(threshold, .claudeSevenDaySonnet)
         )
+        .padding(.leading, 16)
         .disabled(settings.claudeHasSevenDaySonnet == false)
         .opacity(settings.claudeHasSevenDaySonnet == false ? 0.45 : 1)
         Toggle(
             UsageAlertBucket.codexPrimary.displayName,
             isOn: usageBucketBinding(threshold, .codexPrimary)
         )
+        .padding(.leading, 16)
         Toggle(
             UsageAlertBucket.codexSecondary.displayName,
             isOn: usageBucketBinding(threshold, .codexSecondary)
         )
+        .padding(.leading, 16)
         .disabled(settings.codexHasSecondaryWindow == false)
         .opacity(settings.codexHasSecondaryWindow == false ? 0.45 : 1)
     }
