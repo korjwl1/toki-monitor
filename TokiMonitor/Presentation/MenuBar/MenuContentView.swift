@@ -12,7 +12,7 @@ struct MenuContentView: View {
 
     var onStartDaemon: () -> Void
     var onOpenDashboard: () -> Void
-    var onOpenSettings: () -> Void
+    var onOpenSettings: (SettingsCategory?) -> Void
     var onQuit: () -> Void
 
     private var isConnected: Bool { connectionManager.state.isConnected }
@@ -403,7 +403,7 @@ struct MenuContentView: View {
     private var rightPanel: some View {
         VStack(spacing: DS.sm) {
             gridBtn(L.panel.dashboard, "chart.xyaxis.line", onOpenDashboard)
-            gridBtn(L.panel.settings, "gearshape", onOpenSettings)
+            gridBtn(L.panel.settings, "gearshape") { onOpenSettings(nil) }
             syncStatusBtn
             styleToggleBtn {
                 if let pid = filterProviderId {
@@ -435,7 +435,7 @@ struct MenuContentView: View {
     @ViewBuilder
     private var syncStatusBtn: some View {
         let syncManager = SyncManager.shared
-        Button(action: onOpenSettings) {
+        Button { onOpenSettings(.sync) } label: {
             VStack(spacing: DS.xs) {
                 Image(systemName: syncManager.isConfigured ? "arrow.triangle.2.circlepath" : "arrow.triangle.2.circlepath.circle")
                     .font(.system(size: 18, weight: .light))

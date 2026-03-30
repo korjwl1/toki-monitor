@@ -10,14 +10,14 @@ struct SyncSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                stateRow
-                    .background(Color.clear.preference(key: ScrollTopYKey.self, value: 0))
-                    .scrollTopTracker
-            }
-
             if syncManager.isConfigured {
                 connectedSection
+            } else {
+                Section {
+                    stateRow
+                        .background(Color.clear.preference(key: ScrollTopYKey.self, value: 0))
+                        .scrollTopTracker
+                }
             }
         }
         .formStyle(.grouped)
@@ -56,6 +56,7 @@ struct SyncSettingsView: View {
         Section(L.sync.status) {
             if case .configured(let addr, let url) = syncManager.state {
                 LabeledContent(L.sync.serverAddress, value: addr)
+                    .background(scrollTopTracker)
                 LabeledContent("HTTP URL", value: url)
             }
 

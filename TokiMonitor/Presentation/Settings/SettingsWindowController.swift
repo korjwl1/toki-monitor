@@ -10,15 +10,26 @@ final class SettingsWindowController {
         self.settings = settings
     }
 
-    func show() {
+    func show(category: SettingsCategory? = nil) {
         if let window, window.isVisible {
+            if let category {
+                SettingsNavigation.shared.selectedCategory = category
+            }
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
 
+        let navigation = SettingsNavigation.shared
+        if let category {
+            navigation.selectedCategory = category
+        } else {
+            navigation.selectedCategory = .menuBar
+        }
+
         let settingsView = SettingsView(
-            settings: settings
+            settings: settings,
+            navigation: navigation
         ) { [weak self] in
             self?.window?.close()
         }

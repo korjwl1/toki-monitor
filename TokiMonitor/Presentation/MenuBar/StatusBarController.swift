@@ -310,10 +310,10 @@ final class StatusBarController {
                     self?.dashboardController.show()
                 }
             },
-            onOpenSettings: { [weak self] in
+            onOpenSettings: { [weak self] category in
                 self?.dismissPanel()
                 DispatchQueue.main.async {
-                    self?.settingsController.show()
+                    self?.settingsController.show(category: category)
                 }
             },
             onQuit: {
@@ -453,9 +453,9 @@ final class StatusBarController {
                 self?.dismissPanel()
                 DispatchQueue.main.async { self?.dashboardController.show() }
             },
-            onOpenSettings: { [weak self] in
+            onOpenSettings: { [weak self] category in
                 self?.dismissPanel()
-                DispatchQueue.main.async { self?.settingsController.show() }
+                DispatchQueue.main.async { self?.settingsController.show(category: category) }
             },
             onQuit: { NSApp.terminate(nil) }
         )
