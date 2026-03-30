@@ -215,23 +215,6 @@ private final class LockedFlag: @unchecked Sendable {
     }
 }
 
-/// Runs `toki report` CLI and returns JSON output.
-final class TokiReportRunner: Sendable {
-    private let tokiPath: String
-
-    init(tokiPath: String = TokiPath.resolved) {
-        self.tokiPath = tokiPath
-    }
-
-    func runReport(
-        reportOptions: [String] = [],
-        subcommandArgs: [String]
-    ) async throws -> Data {
-        let args = ["report", "--output-format", "json"] + reportOptions + subcommandArgs
-        return try await CLIProcessRunner.run(executable: tokiPath, arguments: args)
-    }
-}
-
 /// Runs toki settings commands.
 final class TokiSettingsRunner: Sendable {
     private let tokiPath: String

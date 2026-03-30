@@ -120,8 +120,7 @@ struct ExploreView: View {
     private func exploreChart(data: TimeSeriesData) -> some View {
         let modelNames = data.allModelNames
         if modelNames.isEmpty {
-            Text(L.tr("데이터 없음", "No data"))
-                .foregroundStyle(.secondary)
+            Spacer()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Chart {

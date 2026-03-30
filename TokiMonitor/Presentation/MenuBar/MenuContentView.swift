@@ -404,7 +404,6 @@ struct MenuContentView: View {
         VStack(spacing: DS.sm) {
             gridBtn(L.panel.dashboard, "chart.xyaxis.line", onOpenDashboard)
             gridBtn(L.panel.settings, "gearshape") { onOpenSettings(nil) }
-            syncStatusBtn
             styleToggleBtn {
                 if let pid = filterProviderId {
                     // Per-provider: cycle this provider's style override
@@ -426,6 +425,7 @@ struct MenuContentView: View {
                     }
                 }
             }
+            syncStatusBtn
         }
         .padding(0)
     }

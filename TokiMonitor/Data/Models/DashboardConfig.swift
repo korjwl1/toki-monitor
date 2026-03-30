@@ -482,14 +482,14 @@ enum PanelMetric: String, Codable, CaseIterable {
     /// (--since/--until for CLI, start/end query params for server).
     var defaultQuery: String {
         switch self {
-        case .totalTokens, .totalCost, .topModel, .apiCalls:
-            // `usage` metric works natively in local CLI (already aggregates input+output).
-            // ServerQueryClient rewrites `usage` → `toki_tokens_total{type=~"input|output"}`
-            // to avoid double-counting breakdown types on the server.
+        case .totalTokens, .topModel:
             "sum by (model) (increase(usage{$provider}[$__interval]))"
+        case .totalCost, .costByModel:
+            "sum by (model) (increase(cost{$provider}[$__interval]))"
+        case .apiCalls, .eventsByModel:
+            "sum by (model) (increase(events{$provider}[$__interval]))"
         case .cacheHitRate, .reasoningTokens,
-             .tokensByModel, .costByModel, .modelBreakdown, .inputVsOutput,
-             .eventsByModel:
+             .tokensByModel, .modelBreakdown, .inputVsOutput:
             "sum by (model) (increase(usage{$provider}[$__interval]))"
         case .tokensByProject:
             "sum by (project) (increase(usage{$provider}[$__interval]))"

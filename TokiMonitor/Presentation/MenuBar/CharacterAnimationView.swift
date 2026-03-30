@@ -15,6 +15,8 @@ final class CharacterAnimationRenderer {
     private var idleSince: Date?
     private var isSleeping = false
     private var sleepCheckTimer: Timer?
+    private var lastUpdateTime: Date = Date()
+    private var updateWatchdogTimer: Timer?
 
     var sleepDelay: TimeInterval = 120
 
@@ -48,6 +50,19 @@ final class CharacterAnimationRenderer {
     func update(tokensPerMinute: Double, button: NSStatusBarButton, tintColor: NSColor? = nil) {
         isStopped = false
         currentTintColor = tintColor
+        lastUpdateTime = Date()
+
+        // Watchdog: if update() isn't called for 5 seconds, force idle (e.g. daemon disconnected)
+        updateWatchdogTimer?.invalidate()
+        updateWatchdogTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, !self.isStopped else { return }
+                self.stopAnimation()
+                self.applyFrame(0, from: self.frames, to: button)
+                self.idleSince = self.idleSince ?? Date()
+            }
+        }
+
         let idle = mapper.isIdle(tokensPerMinute: tokensPerMinute)
 
         if idle {
@@ -100,6 +115,8 @@ final class CharacterAnimationRenderer {
         idleSince = nil
         sleepCheckTimer?.invalidate()
         sleepCheckTimer = nil
+        updateWatchdogTimer?.invalidate()
+        updateWatchdogTimer = nil
         hpBarView?.removeFromSuperview()
         hpBarView = nil
         stopPoison()
@@ -228,13 +245,21 @@ final class CharacterAnimationRenderer {
         bar.needsDisplay = true
     }
 
+    private var animationGeneration: UInt64 = 0
+
     private func startAnimation(interval: TimeInterval, button: NSStatusBarButton) {
         frameTimer?.invalidate()
         currentInterval = interval
+        animationGeneration &+= 1
+        let gen = animationGeneration
 
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             guard let self else { return }
-            Task { @MainActor in self.advanceFrame(button: button) }
+            Task { @MainActor in
+                // Ignore if animation was stopped/restarted since this timer was created
+                guard self.animationGeneration == gen else { return }
+                self.advanceFrame(button: button)
+            }
         }
         RunLoop.main.add(timer, forMode: .common)
         frameTimer = timer
@@ -262,6 +287,7 @@ final class CharacterAnimationRenderer {
         frameTimer?.invalidate()
         frameTimer = nil
         currentInterval = 0
+        animationGeneration &+= 1  // invalidate any pending advanceFrame dispatches
     }
 
     private func scheduleSleepCheck(button: NSStatusBarButton) {

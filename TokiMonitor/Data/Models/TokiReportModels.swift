@@ -123,7 +123,17 @@ enum TokiReportParser {
         return nil
     }
 
+    /// Extract label portion after `|` in period string (model or project name).
+    /// e.g. "2026-03-29T08:00:00|claude-opus-4-6" → "claude-opus-4-6"
+    static func extractLabel(from period: String) -> String? {
+        guard let pipe = period.firstIndex(of: "|") else { return nil }
+        let label = String(period[period.index(after: pipe)...])
+        return label.isEmpty ? nil : label
+    }
+
     /// Parse entries into a date-keyed dictionary of model summaries.
+    /// When the PromQL `sum by (model)` query returns "(total)" as the model name,
+    /// the actual model/label name is extracted from the period string after the `|`.
     static func parseEntries(
         _ entries: [TokiReportEntry],
         into pointsByDate: inout [Date: [TokiModelSummary]]
@@ -133,7 +143,36 @@ enum TokiReportParser {
                   let models = entry.usagePerModels else { continue }
             let dateStr = extractDateString(from: periodStr)
             guard let date = parseDate(dateStr) else { continue }
-            pointsByDate[date, default: []].append(contentsOf: models)
+            let periodLabel = extractLabel(from: periodStr)
+            let resolved = models.map { summary -> TokiModelSummary in
+                var correctedModel = summary.model
+                // PromQL aggregation produces "(total)" — recover real name from period label
+                if correctedModel == "(total)", let label = periodLabel {
+                    correctedModel = label
+                }
+                // Compute cost client-side when not provided by CLI
+                let cost = summary.costUsd ?? ModelPricing.estimateCost(
+                    model: correctedModel,
+                    inputTokens: summary.inputTokens,
+                    outputTokens: summary.outputTokens,
+                    cacheCreationInputTokens: summary.cacheCreationInputTokens,
+                    cacheReadInputTokens: summary.cacheReadInputTokens,
+                    cachedInputTokens: summary.cachedInputTokens
+                )
+                return TokiModelSummary(
+                    model: correctedModel,
+                    inputTokens: summary.inputTokens,
+                    outputTokens: summary.outputTokens,
+                    totalTokens: summary.totalTokens,
+                    events: summary.events,
+                    costUsd: cost,
+                    cacheCreationInputTokens: summary.cacheCreationInputTokens,
+                    cacheReadInputTokens: summary.cacheReadInputTokens,
+                    cachedInputTokens: summary.cachedInputTokens,
+                    reasoningOutputTokens: summary.reasoningOutputTokens
+                )
+            }
+            pointsByDate[date, default: []].append(contentsOf: resolved)
         }
     }
 

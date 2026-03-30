@@ -29,6 +29,7 @@
 		2B5BAB785ED50C752A107E13 /* CostChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ADB19DAAAC2A8BD63CB59C8 /* CostChart.swift */; };
 		2C3F97F7C70F8029872F46B7 /* TablePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA03537C2F0CAF1D37B5252 /* TablePanelView.swift */; };
 		2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */; };
+		A1B2C3D4E5F60718091A2B3C /* ModelPricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6071809A1B2C3D4E5F6 /* ModelPricing.swift */; };
 		2FD39BD3817670D06BE68CEF /* ProviderRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507FA6EFF17810ED320DE318 /* ProviderRegistryTests.swift */; };
 		30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */; };
 		3332CEA99B4EBD15C418D910 /* run_05.png in Resources */ = {isa = PBXBuildFile; fileRef = 427ED7AB9807D9DD887EBD92 /* run_05.png */; };
@@ -221,6 +222,7 @@
 		C4C36A205DFC4F7DA9CD54A9 /* VersionCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionCompatibility.swift; sourceTree = "<group>"; };
 		C89A62671E6B8235B289897B /* frame_05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_05.png; sourceTree = "<group>"; };
 		CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRegistry.swift; sourceTree = "<group>"; };
+		D4E5F6071809A1B2C3D4E5F6 /* ModelPricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPricing.swift; sourceTree = "<group>"; };
 		CBE42DEDC857AB657D449C5E /* ClaudeAuthReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAuthReader.swift; sourceTree = "<group>"; };
 		D0A80F24970E2F377FB13231 /* DashboardEditOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardEditOverlay.swift; sourceTree = "<group>"; };
 		D1837716A9BFD555E0A36B8A /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
@@ -524,6 +526,7 @@
 				DA62A18D444F7F8A7D39F9B6 /* Localization.swift */,
 				F61E686B7BA4F794ABE3C325 /* PanelDataExtractor.swift */,
 				9953C511BFF1317C46D027D6 /* PlaylistManager.swift */,
+				D4E5F6071809A1B2C3D4E5F6 /* ModelPricing.swift */,
 				CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */,
 				37F55200D88B2D7260541C5D /* ProviderSummary.swift */,
 				4BDA0DC9C4300E5F7B2E3F2A /* SyncManager.swift */,
@@ -695,6 +698,7 @@
 				417DA2C685E33E4F4E375DE4 /* PlaylistManager.swift in Sources */,
 				F517514F5BE935557A7EA1AA /* PlaylistView.swift in Sources */,
 				27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */,
+				A1B2C3D4E5F60718091A2B3C /* ModelPricing.swift in Sources */,
 				2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */,
 				46DF834236EAC2C92B2F93AE /* ProviderSummary.swift in Sources */,
 				1ABD9FFEA542EBFB957B76CD /* ProvidersSettingsPane.swift in Sources */,

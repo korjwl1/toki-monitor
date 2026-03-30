@@ -56,7 +56,8 @@ final class SyncClient {
     // MARK: - Keychain
 
     func load() -> SyncCredentials? {
-        if let cached = cachedCredentials { return cached }
+        // Always read from Keychain — cost is ~ms, and credentials may be
+        // updated externally by `toki settings sync enable/disable`.
         let query: [CFString: Any] = [
             kSecClass:       kSecClassGenericPassword,
             kSecAttrService: service,
@@ -68,7 +69,6 @@ final class SyncClient {
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
               let data = item as? Data else { return nil }
         let creds = try? JSONDecoder().decode(SyncCredentials.self, from: data)
-        cachedCredentials = creds
         return creds
     }
 
@@ -157,6 +157,20 @@ final class SyncClient {
         try save(creds)
         invalidateCache()
         return creds
+    }
+
+    /// Rename device via toki CLI. toki handles both Keychain and settings update.
+    func renameDevice(_ newName: String) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: TokiPath.resolved)
+        process.arguments = ["settings", "sync", "rename", newName]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw SyncClientError.invalidResponse
+        }
     }
 
     /// POST /token/refresh. Saves updated credentials to Keychain on success.

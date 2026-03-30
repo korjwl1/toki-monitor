@@ -100,6 +100,27 @@ struct TimeSeriesData {
         self.totalEvents = events
     }
 
+    /// Override totals with values from an instant query (avoids range step overlap).
+    func withOverriddenTotals(totalTokens: UInt64, totalCost: Double, totalEvents: Int, topModel: String?) -> TimeSeriesData {
+        TimeSeriesData(
+            points: points, granularity: granularity, allModelNames: allModelNames,
+            topModel: topModel ?? self.topModel,
+            totalTokens: totalTokens, totalCost: totalCost, totalEvents: totalEvents
+        )
+    }
+
+    private init(points: [TimeSeriesPoint], granularity: TimeSeriesGranularity,
+                 allModelNames: [String], topModel: String?,
+                 totalTokens: UInt64, totalCost: Double, totalEvents: Int) {
+        self.points = points
+        self.granularity = granularity
+        self.allModelNames = allModelNames
+        self.topModel = topModel
+        self.totalTokens = totalTokens
+        self.totalCost = totalCost
+        self.totalEvents = totalEvents
+    }
+
     struct ChartPoint: Identifiable {
         var id: Date { date }
         let date: Date

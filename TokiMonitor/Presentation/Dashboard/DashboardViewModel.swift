@@ -92,6 +92,9 @@ final class DashboardViewModel {
         didSet {
             UserDefaults.standard.set(dataSource.rawValue, forKey: "dashboardDataSource")
             queryClient = resolveQueryClient()
+            // Clear all cached panel data so stale results from the other source don't show
+            panelData.removeAll()
+            timeSeriesData = nil
             fetchData()
         }
     }
@@ -156,10 +159,9 @@ final class DashboardViewModel {
         let panels = dashboardConfig.panels.filter { $0.panelType != .rowPanel }
         let time = dashboardConfig.time
 
-        // Mark all panels as loading, preserving previous data
+        // Mark all panels as loading (no stale data preserved)
         for panel in panels {
-            let previous = panelData[panel.id]?.timeSeriesData
-            panelData[panel.id] = .loading(previous: previous)
+            panelData[panel.id] = .loading(previous: nil)
         }
         isLoading = true
         errorMessage = nil
@@ -280,18 +282,13 @@ final class DashboardViewModel {
             return
         }
 
-        // Local mode: use toki CLI with project-specific parsing
+        // Local mode: use toki query with project-specific parsing
         do {
-            let sinceFmt = DateFormatter()
-            sinceFmt.dateFormat = "yyyyMMddHHmmss"
-            sinceFmt.timeZone = TimeZone(identifier: "UTC")
-            let buffer = max(60, time.duration * 0.1)
-            let sinceDate = time.fromDate.addingTimeInterval(-buffer)
-            var cliArgs = ["report", "-z", "UTC", "--since", sinceFmt.string(from: sinceDate)]
-            if !time.isRelative {
-                cliArgs += ["--until", sinceFmt.string(from: time.toDate)]
-            }
-            cliArgs += ["--output-format", "json", "query", query]
+            let startEpoch = Int(time.fromDate.timeIntervalSince1970)
+            let endEpoch = Int(time.toDate.timeIntervalSince1970)
+            let cliArgs = ["query", "-z", "UTC", "--output-format", "json",
+                           "--start", "\(startEpoch)", "--end", "\(endEpoch)",
+                           "--step", time.bucketString, query]
             let rawData = try await CLIProcessRunner.run(
                 executable: TokiPath.resolved,
                 arguments: cliArgs

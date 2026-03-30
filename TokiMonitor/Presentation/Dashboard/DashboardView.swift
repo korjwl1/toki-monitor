@@ -248,14 +248,11 @@ struct DashboardView: View {
                 playlistControlBar
             }
 
-            // Main content
+            // Main content — always show panel layout, panels handle empty state internally
             Group {
-                if viewModel.isLoading && viewModel.timeSeriesData == nil {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = viewModel.errorMessage {
+                if let error = viewModel.errorMessage {
                     errorView(error)
-                } else if viewModel.timeSeriesData != nil {
+                } else {
                     CustomDashboardView(viewModel: viewModel, onEditPanel: { panel in
                         var transaction = Transaction()
                         transaction.disablesAnimations = true
@@ -263,8 +260,6 @@ struct DashboardView: View {
                             editingPanel = panel
                         }
                     })
-                } else {
-                    emptyView
                 }
             }
         }
@@ -328,8 +323,9 @@ struct DashboardView: View {
 
     private var controlsBar: some View {
         HStack(spacing: DS.sm) {
-            // Dashboard title
+            // Dashboard title + data source
             dashboardTitle
+            dataSourcePicker
 
             Spacer()
 
@@ -339,7 +335,6 @@ struct DashboardView: View {
                     variableControl(for: variable)
                 }
             }
-            dataSourcePicker
             modelFilterMenu
             timeRangeButton
             refreshControl
@@ -414,18 +409,30 @@ struct DashboardView: View {
     @ViewBuilder
     private var dataSourcePicker: some View {
         let syncConfigured = SyncManager.shared.isConfigured
-        Picker(L.sync.dataSource, selection: Binding(
-            get: { viewModel.dataSource },
-            set: { viewModel.dataSource = $0 }
-        )) {
-            Text(L.sync.local).tag(DashboardDataSource.local)
-            Text(L.sync.server)
-                .tag(DashboardDataSource.server)
-                .disabled(!syncConfigured)
+        let isServer = viewModel.dataSource == .server
+        Menu {
+            Button {
+                viewModel.dataSource = .local
+            } label: {
+                if !isServer { Label(L.sync.local, systemImage: "checkmark") } else { Text(L.sync.local) }
+            }
+            Button {
+                viewModel.dataSource = .server
+            } label: {
+                if isServer { Label(L.sync.server, systemImage: "checkmark") } else { Text(L.sync.server) }
+            }
+            .disabled(!syncConfigured)
+        } label: {
+            HStack(spacing: DS.xs) {
+                Image(systemName: isServer ? "cloud.fill" : "laptopcomputer")
+                    .font(.system(size: DS.fontCaption))
+                Text(isServer ? L.sync.server : L.sync.local)
+                    .font(.system(size: DS.fontCaption))
+            }
+            .modifier(ToolbarPillModifier(isActive: isServer))
         }
-        .pickerStyle(.segmented)
-        .frame(width: 120)
-        .disabled(!syncConfigured && viewModel.dataSource == .local ? false : !syncConfigured)
+        .menuStyle(.borderlessButton)
+        .fixedSize()
         .help(syncConfigured ? L.sync.dataSource : L.sync.serverDisabled)
         .onChange(of: syncConfigured) { _, configured in
             if !configured { viewModel.dataSource = .local }
