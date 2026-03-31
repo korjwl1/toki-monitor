@@ -74,7 +74,10 @@ struct TimeConfig: Codable, Equatable {
 
     /// Bucket size in seconds — duration ÷ 15, minimum 1s
     var bucketSeconds: Int {
-        max(1, Int(duration / 15.0))
+        // Round up to nearest hour (3600s) so hourly pre-aggregated VM data
+        // always maps to exactly one bucket (no boundary splits).
+        let raw = max(1, Int(duration / 15.0))
+        return max(3600, ((raw + 3599) / 3600) * 3600)
     }
 
     /// PromQL bucket string — converts seconds to compound duration (e.g. "4m", "12m30s", "1h20m")
