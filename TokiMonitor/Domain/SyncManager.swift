@@ -82,9 +82,14 @@ final class SyncManager {
     }
 
     private func refreshLiveStatus() {
-        guard case .configured(let addr, let url, _) = state else { return }
-        let live = Self.readLiveStatus()
-        state = .configured(serverAddr: addr, httpURL: url, liveStatus: live)
+        switch state {
+        case .configured(let addr, let url, _):
+            let live = Self.readLiveStatus()
+            state = .configured(serverAddr: addr, httpURL: url, liveStatus: live)
+        case .notConfigured:
+            // Check if sync was re-enabled since last check
+            reload()
+        }
     }
 
     private static func readLiveStatus() -> SyncLiveStatus {
