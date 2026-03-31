@@ -86,8 +86,8 @@ final class SyncManager {
         case .configured(let addr, let url, _):
             let live = Self.readLiveStatus()
             state = .configured(serverAddr: addr, httpURL: url, liveStatus: live)
-        case .notConfigured:
-            // Check if sync was re-enabled since last check
+        case .notConfigured, .tokenExpired:
+            // Check if sync was re-enabled or token refreshed since last check
             reload()
         }
     }
