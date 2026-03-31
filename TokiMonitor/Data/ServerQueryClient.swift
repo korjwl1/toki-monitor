@@ -151,6 +151,7 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
             var cacheRead: UInt64 = 0
             var total: UInt64 = 0
             var events: Int = 0
+            var costUsd: Double? = nil
         }
         var buckets: [BucketKey: TokenBucket] = [:]
 
@@ -177,7 +178,7 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
                 let tokiMetric = metric["__toki_metric__"]
 
                 if tokiMetric == "cost" {
-                    bucket.total += uval  // cost value in "total" for display
+                    bucket.costUsd = (bucket.costUsd ?? 0.0) + val
                 } else {
                     switch tokenType {
                     case "input":
@@ -209,7 +210,9 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
         for (key, bucket) in buckets {
             let cacheCreation: UInt64? = bucket.cacheCreation > 0 ? bucket.cacheCreation : nil
             let cacheRead: UInt64? = bucket.cacheRead > 0 ? bucket.cacheRead : nil
-            let estimatedCost = ModelPricing.estimateCost(
+            // Use server-computed cost if available (from cost{} query),
+            // otherwise estimate locally from token counts
+            let estimatedCost = bucket.costUsd ?? ModelPricing.estimateCost(
                 model: key.model,
                 inputTokens: bucket.input,
                 outputTokens: bucket.output,
