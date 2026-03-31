@@ -17,16 +17,11 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
 
     // MARK: - Public API
 
-    /// Run a standard PromQL range query against the toki-sync server proxy.
-    /// Rewrites local-compatible `usage` metric to `toki_tokens_total`
-    /// so the VictoriaMetrics backend returns per-type breakdowns.
-    ///
-    /// Also issues a parallel `count_over_time` query (on `type="input"` only)
-    /// to get accurate event counts. `sum_over_time` destroys event count
-    /// information, so we cannot derive API call counts from token sums.
+    /// Run a PromQL range query against the toki-sync server.
+    /// No client-side rewriting — server handles toki PromQL translation
+    /// (usage→toki_usage_total, events→toki_events_total, cost→server-side pricing).
+    /// Same query works on both local daemon and server.
     func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
-        let rewritten = Self.rewriteForServer(query)
-        let eventsQuery = Self.rewriteForEventCount(query)
         let creds = try await requireCredentials()
 
         // Floor start to bucket boundary — matches local daemon's epoch-floor bucketing
@@ -34,112 +29,17 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
         let rawStart = Int(time.fromDate.timeIntervalSince1970)
         let flooredStart = Date(timeIntervalSince1970: Double((rawStart / step) * step))
 
-        // Range queries for chart + totals (LOCAL range sum = SERVER range sum, verified)
-        async let tokenData = queryRange(rewritten, start: flooredStart, end: time.toDate,
-                                         step: time.bucketString, creds: creds, retryOn401: true)
-        async let eventsData = queryRange(eventsQuery, start: flooredStart, end: time.toDate,
-                                          step: time.bucketString, creds: creds, retryOn401: true)
+        let data = try await queryRange(query, start: flooredStart, end: time.toDate,
+                                        step: time.bucketString, creds: creds, retryOn401: true)
 
-        let byDate = parseVMRangeResponse(try await tokenData)
-        let eventCounts = parseVMEventCounts(try await eventsData)
-        let merged = mergeEventCounts(byDate: byDate, eventCounts: eventCounts)
-
-        var points = merged.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
+        let byDate = parseVMRangeResponse(data)
+        var points = byDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
             .sorted { $0.date < $1.date }
         points = TimeSeriesGapFiller.fill(points: points, time: time)
         let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
             : time.bucketSeconds < 86400 ? .hourly : .daily
 
         return TimeSeriesData(points: points, granularity: granularity)
-    }
-
-    // MARK: - Query Rewriting
-
-    /// Rewrite query for event counting using `toki_events_total`.
-    /// Every API call writes exactly one `toki_events_total` data point (value=1),
-    /// regardless of whether token values are zero.
-    /// Uses `sum_over_time` to count events (sum of 1s = event count).
-    static func rewriteForEventCount(_ query: String) -> String {
-        var result = query
-        // usage{<labels>} → toki_events_total{<labels>}
-        result = result.replacingOccurrences(
-            of: #"usage\{([^}]*)\}"#,
-            with: #"toki_events_total{$1}"#,
-            options: .regularExpression
-        )
-        result = result.replacingOccurrences(
-            of: #"toki_events_total\{\}"#,
-            with: "toki_events_total",
-            options: .regularExpression
-        )
-        result = result.replacingOccurrences(
-            of: #"usage\["#,
-            with: #"toki_events_total["#,
-            options: .regularExpression
-        )
-        // increase() → sum_over_time() (sum of 1s = event count)
-        result = result.replacingOccurrences(
-            of: #"increase\("#,
-            with: "sum_over_time(",
-            options: .regularExpression
-        )
-        return result
-    }
-
-    /// Rewrite local `usage{...}` metric to `toki_tokens_total{...}` for the
-    /// VictoriaMetrics backend. The local toki CLI's `usage` metric aggregates all
-    /// token types (input, output, cache_create, cache_read, etc.) into one value.
-    /// The server stores each type as a separate series under `toki_tokens_total`.
-    ///
-    /// Also injects `type` into `by (...)` clauses so the parser receives per-type
-    /// breakdowns for accurate cost estimation and token categorization.
-    static func rewriteForServer(_ query: String) -> String {
-        var result = query
-
-        // Metric-specific rewrites:
-        // cost{} → toki_cost_usd{} (no type injection needed)
-        // events{} → toki_events_total{} (no type injection needed)
-        // usage{} → toki_tokens_total{} (needs type injection)
-        let isCostQuery = result.contains("cost{") || result.contains("cost[")
-        let isEventsQuery = result.contains("events{") || result.contains("events[")
-
-        if isCostQuery {
-            result = result.replacingOccurrences(of: #"cost\{([^}]*)\}"#, with: #"toki_cost_usd{$1}"#, options: .regularExpression)
-            result = result.replacingOccurrences(of: #"toki_cost_usd\{\}"#, with: "toki_cost_usd", options: .regularExpression)
-            result = result.replacingOccurrences(of: #"cost\["#, with: #"toki_cost_usd["#, options: .regularExpression)
-        } else if isEventsQuery {
-            result = result.replacingOccurrences(of: #"events\{([^}]*)\}"#, with: #"toki_events_total{$1}"#, options: .regularExpression)
-            result = result.replacingOccurrences(of: #"toki_events_total\{\}"#, with: "toki_events_total", options: .regularExpression)
-            result = result.replacingOccurrences(of: #"events\["#, with: #"toki_events_total["#, options: .regularExpression)
-        } else {
-            // usage → toki_tokens_total
-            result = result.replacingOccurrences(of: #"usage\{([^}]*)\}"#, with: #"toki_tokens_total{$1}"#, options: .regularExpression)
-            result = result.replacingOccurrences(of: #"toki_tokens_total\{\}"#, with: "toki_tokens_total", options: .regularExpression)
-            result = result.replacingOccurrences(of: #"usage\["#, with: #"toki_tokens_total["#, options: .regularExpression)
-        }
-
-        // increase() → sum_over_time() (VM stores gauge, not counter)
-        result = result.replacingOccurrences(
-            of: #"increase\("#,
-            with: "sum_over_time(",
-            options: .regularExpression
-        )
-
-        // Inject `type` into by() only for token queries (not cost/events)
-        if !isCostQuery && !isEventsQuery {
-            result = result.replacingOccurrences(
-                of: #"by\s*\(([^)]*)\)"#,
-                with: "by ($1, type)",
-                options: .regularExpression
-            )
-            // Clean up if type was already present
-            result = result.replacingOccurrences(
-                of: #", type, type\)"#,
-                with: ", type)",
-                options: .regularExpression
-            )
-        }
-        return result
     }
 
     // MARK: - HTTP
@@ -272,29 +172,35 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
                 let key = BucketKey(date: date, model: modelName)
                 var bucket = buckets[key] ?? TokenBucket()
 
-                switch tokenType {
-                case "input":
-                    bucket.input += uval
-                case "output":
-                    bucket.output += uval
-                case "cache_create":
-                    bucket.cacheCreation += uval
-                case "cache_read":
-                    bucket.cacheRead += uval
-                case "cached_input":        // Codex: subset of input
-                    bucket.cacheRead += uval
-                case "reasoning_output":    // Codex: subset of output
-                    bucket.cacheCreation += uval
-                default:
-                    // No type label (aggregated query) — treat as input
-                    bucket.input += uval
+                // Server returns per-type breakdown (type label) or aggregated total (no type).
+                // __toki_metric__="cost" means the value is USD, not tokens.
+                let tokiMetric = metric["__toki_metric__"]
+
+                if tokiMetric == "cost" {
+                    bucket.total += uval  // cost value in "total" for display
+                } else {
+                    switch tokenType {
+                    case "input":
+                        bucket.input += uval
+                    case "output":
+                        bucket.output += uval
+                    case "cache_create":
+                        bucket.cacheCreation += uval
+                    case "cache_read":
+                        bucket.cacheRead += uval
+                    case "cached_input":
+                        bucket.cacheRead += uval
+                    case "reasoning_output":
+                        bucket.cacheCreation += uval
+                    default:
+                        // No type label — aggregated total (usage via toki_usage_total,
+                        // or events via toki_events_total)
+                        bucket.total += uval
+                    }
+                    if tokenType != nil {
+                        bucket.total += uval
+                    }
                 }
-                // Count all types in total — the local CLI's total_tokens includes
-                // input + output + cache_creation + cache_read
-                bucket.total += uval
-                // Events are NOT counted here — sum_over_time values cannot tell us
-                // how many API calls occurred. A parallel count_over_time query
-                // provides accurate event counts (see mergeEventCounts).
                 buckets[key] = bucket
             }
         }
@@ -325,64 +231,6 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
             byDate[key.date, default: []].append(summary)
         }
         return byDate
-    }
-
-    // MARK: - Event Count Parsing
-
-    /// Parse a `count_over_time` response into (date, model) → event count.
-    /// The query is filtered to `type="input"` so each data point = one API call.
-    private func parseVMEventCounts(_ data: Data) -> [Date: [String: Int]] {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let dataObj  = json["data"]   as? [String: Any],
-              let results  = dataObj["result"] as? [[String: Any]] else { return [:] }
-
-        var counts: [Date: [String: Int]] = [:]
-
-        for result in results {
-            guard let metric     = result["metric"] as? [String: String],
-                  let valuePairs = result["values"] as? [[Any]] else { continue }
-
-            let modelName = metric["model"] ?? metric["project"] ?? metric["provider"] ?? "unknown"
-
-            for pair in valuePairs {
-                guard pair.count >= 2,
-                      let tsNum   = pair[0] as? NSNumber,
-                      let valStr  = pair[1] as? String,
-                      let valDbl  = Double(valStr) else { continue }
-                let date = Date(timeIntervalSince1970: tsNum.doubleValue)
-                let val = Int(max(0, valDbl))
-                counts[date, default: [:]][modelName, default: 0] += val
-            }
-        }
-        return counts
-    }
-
-    /// Merge event counts from a parallel `count_over_time` query into the
-    /// token data parsed by `parseVMRangeResponse`.
-    private func mergeEventCounts(
-        byDate: [Date: [TokiModelSummary]],
-        eventCounts: [Date: [String: Int]]
-    ) -> [Date: [TokiModelSummary]] {
-        var merged: [Date: [TokiModelSummary]] = [:]
-        for (date, summaries) in byDate {
-            let dateCounts = eventCounts[date] ?? [:]
-            merged[date] = summaries.map { summary in
-                let events = dateCounts[summary.model] ?? 0
-                return TokiModelSummary(
-                    model: summary.model,
-                    inputTokens: summary.inputTokens,
-                    outputTokens: summary.outputTokens,
-                    totalTokens: summary.totalTokens,
-                    events: events,
-                    costUsd: summary.costUsd,
-                    cacheCreationInputTokens: summary.cacheCreationInputTokens,
-                    cacheReadInputTokens: summary.cacheReadInputTokens,
-                    cachedInputTokens: summary.cachedInputTokens,
-                    reasoningOutputTokens: summary.reasoningOutputTokens
-                )
-            }
-        }
-        return merged
     }
 
     // MARK: - Helpers
