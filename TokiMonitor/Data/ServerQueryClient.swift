@@ -17,23 +17,23 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
 
     // MARK: - Public API
 
-    /// Run a PromQL range query against the toki-sync server.
-    /// No client-side rewriting — server handles toki PromQL translation
-    /// (usage→toki_usage_total, events→toki_events_total, cost→server-side pricing).
-    /// Same query works on both local daemon and server.
+    /// Run a PromQL query against the toki-sync server.
+    /// Server returns toki-format JSON (same as `toki query --output-format json`).
+    /// No client-side rewriting or special parsing — same parser as local.
     func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
         let creds = try await requireCredentials()
 
-        // Floor start to bucket boundary — matches local daemon's epoch-floor bucketing
         let step = time.bucketSeconds
         let rawStart = Int(time.fromDate.timeIntervalSince1970)
-        let flooredStart = Date(timeIntervalSince1970: Double((rawStart / step) * step))
+        let startEpoch = (rawStart / step) * step
+        let endEpoch = Int(time.toDate.timeIntervalSince1970)
 
-        let data = try await queryRange(query, start: flooredStart, end: time.toDate,
-                                        step: time.bucketString, creds: creds, retryOn401: true)
+        let data = try await tokiQuery(query, start: startEpoch, end: endEpoch,
+                                       step: time.bucketString, creds: creds, retryOn401: true)
 
-        let byDate = parseVMRangeResponse(data)
-        var points = byDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
+        // Same parser as local TokiReportClient
+        let pointsByDate = TokiReportParser.parseReport(data)
+        var points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
             .sorted { $0.date < $1.date }
         points = TimeSeriesGapFiller.fill(points: points, time: time)
         let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
@@ -43,6 +43,48 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
     }
 
     // MARK: - HTTP
+
+    /// Query /api/v1/toki/query — returns toki-format JSON (same as local CLI).
+    private func tokiQuery(
+        _ promql: String,
+        start: Int,
+        end: Int,
+        step: String,
+        creds: SyncCredentials,
+        retryOn401: Bool
+    ) async throws -> Data {
+        guard var components = URLComponents(string: "\(creds.httpURL)/api/v1/toki/query") else {
+            throw ServerQueryError.invalidURL
+        }
+        components.queryItems = [
+            URLQueryItem(name: "query", value: promql),
+            URLQueryItem(name: "start", value: "\(start)"),
+            URLQueryItem(name: "end", value: "\(end)"),
+            URLQueryItem(name: "step", value: step),
+            URLQueryItem(name: "scope", value: "self"),
+        ]
+        guard let url = components.url else { throw ServerQueryError.invalidURL }
+
+        var req = URLRequest(url: url, timeoutInterval: 30)
+        req.setValue("Bearer \(creds.accessToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { throw ServerQueryError.invalidResponse }
+
+        if http.statusCode == 401, retryOn401 {
+            do {
+                let refreshed = try await syncClient.refreshAccessToken(creds)
+                return try await tokiQuery(promql, start: start, end: end, step: step, creds: refreshed, retryOn401: false)
+            } catch is SyncClientError {
+                await SyncManager.shared.markTokenExpired()
+                throw ServerQueryError.tokenExpired
+            } catch {
+                throw ServerQueryError.httpError(0)
+            }
+        }
+        guard http.statusCode == 200 else { throw ServerQueryError.httpError(http.statusCode) }
+        return data
+    }
 
     private func queryInstant(
         _ promql: String,
