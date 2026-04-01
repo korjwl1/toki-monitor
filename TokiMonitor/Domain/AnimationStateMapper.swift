@@ -18,7 +18,7 @@ struct AnimationStateMapper {
     private let slowInterval: TimeInterval = 0.50   // slowest frame interval
     private let fastInterval: TimeInterval = 0.05   // fastest frame interval
     private let minRate: Double = 10                // below = idle
-    private let maxRate: Double = 100000            // clamp ceiling
+    private let maxRate: Double = 1000000            // clamp ceiling (~$30/m for Opus)
 
     func isIdle(tokensPerMinute: Double) -> Bool {
         tokensPerMinute < minRate
