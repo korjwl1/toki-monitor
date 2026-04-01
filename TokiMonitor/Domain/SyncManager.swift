@@ -103,10 +103,12 @@ final class SyncManager {
     }
 
     /// Disable sync via toki CLI (handles Keychain cleanup, settings, etc.)
-    func disable() {
+    /// Disable sync. If `deleteRemoteData` is true, uses `--delete` to remove
+    /// this device's data from the server. Otherwise uses `--keep`.
+    func disable(deleteRemoteData: Bool = false) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: TokiPath.resolved)
-        process.arguments = ["settings", "sync", "disable", "--keep"]
+        process.arguments = ["settings", "sync", "disable", deleteRemoteData ? "--delete" : "--keep"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try? process.run()

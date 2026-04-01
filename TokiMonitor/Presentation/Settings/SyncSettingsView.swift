@@ -4,6 +4,7 @@ struct SyncSettingsView: View {
     @State private var syncManager = SyncManager.shared
     @State private var showLoginSheet = false
     @State private var showDeviceList = false
+    @State private var showDisableConfirm = false
     @State private var errorMessage: String?
     /// Cached toki settings JSON, loaded once on appear to avoid repeated disk reads.
     @State private var cachedSettings: [String: Any]?
@@ -105,9 +106,22 @@ struct SyncSettingsView: View {
             }
 
             Button(role: .destructive) {
-                syncManager.disable()
+                showDisableConfirm = true
             } label: {
                 Label(L.sync.disableSync, systemImage: "xmark.circle")
+            }
+            .confirmationDialog(
+                L.tr("동기화를 비활성화하시겠습니까?", "Disable sync?"),
+                isPresented: $showDisableConfirm,
+                titleVisibility: .visible
+            ) {
+                Button(L.tr("비활성화 (서버 데이터 유지)", "Disable (keep server data)")) {
+                    syncManager.disable(deleteRemoteData: false)
+                }
+                Button(L.tr("비활성화 및 서버 데이터 삭제", "Disable & delete server data"), role: .destructive) {
+                    syncManager.disable(deleteRemoteData: true)
+                }
+                Button(L.tr("취소", "Cancel"), role: .cancel) {}
             }
         }
     }
