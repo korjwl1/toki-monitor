@@ -8,17 +8,17 @@ enum AnimationStyle: String, CaseIterable, Codable {
 
 /// Maps token throughput rate to a continuous animation interval.
 ///
-/// Uses log scale for wide dynamic range (10 tok/m to 100K+ tok/m):
-///   - idle (< 10 tok/m): no animation (sleeping rabbit)
-///   - low (~10 tok/m): ~0.5s/frame → ~2 FPS — gentle stroll
-///   - mid (~1K tok/m): ~0.28s/frame → ~3.6 FPS — brisk trot
-///   - high (~10K tok/m): ~0.16s/frame → ~6 FPS — running
-///   - sprint (~50K+ tok/m): ~0.05s/frame → ~20 FPS — full sprint
+/// Uses log scale for wide dynamic range (1K to 5M tok/m):
+///   - idle (< 1K tok/m): no animation (sleeping rabbit)
+///   - light (~5K tok/m): ~0.38s/frame → ~2.6 FPS — gentle stroll
+///   - active (~200K tok/m): ~0.21s/frame → ~4.7 FPS — brisk trot
+///   - normal (~750K tok/m): ~0.16s/frame → ~6.5 FPS — running
+///   - sprint (~3M+ tok/m): ~0.08s/frame → ~12 FPS — full sprint
 struct AnimationStateMapper {
-    private let slowInterval: TimeInterval = 0.50   // slowest frame interval
-    private let fastInterval: TimeInterval = 0.05   // fastest frame interval
-    private let minRate: Double = 10                // below = idle
-    private let maxRate: Double = 1000000            // clamp ceiling (~$30/m for Opus)
+    private let slowInterval: TimeInterval = 0.45   // slowest frame interval
+    private let fastInterval: TimeInterval = 0.07   // fastest frame interval
+    private let minRate: Double = 1000              // below = idle
+    private let maxRate: Double = 5000000           // clamp ceiling (peak burst)
 
     func isIdle(tokensPerMinute: Double) -> Bool {
         tokensPerMinute < minRate

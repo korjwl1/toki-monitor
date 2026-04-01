@@ -17,37 +17,37 @@ struct AnimationStateMapperTests {
 
     @Test("Above threshold is not idle")
     func aboveThreshold() {
-        #expect(!mapper.isIdle(tokensPerMinute: 10))
-        #expect(!mapper.isIdle(tokensPerMinute: 100))
+        #expect(!mapper.isIdle(tokensPerMinute: 1000))
+        #expect(!mapper.isIdle(tokensPerMinute: 100000))
     }
 
     @Test("Idle rate returns zero interval")
     func idleInterval() {
         #expect(mapper.interval(for: 0) == 0)
-        #expect(mapper.interval(for: 5) == 0)
+        #expect(mapper.interval(for: 500) == 0)
     }
 
     @Test("Higher rate produces shorter interval (faster animation)")
     func intervalDecreasesWithRate() {
-        let slow = mapper.interval(for: 50)
-        let fast = mapper.interval(for: 5000)
-        let sprint = mapper.interval(for: 50000)
+        let slow = mapper.interval(for: 5000)
+        let fast = mapper.interval(for: 500000)
+        let sprint = mapper.interval(for: 3000000)
         #expect(slow > fast)
         #expect(fast > sprint)
     }
 
     @Test("Interval is clamped at max rate")
     func intervalClamped() {
-        let atMax = mapper.interval(for: 1000000)
-        let beyondMax = mapper.interval(for: 5000000)
+        let atMax = mapper.interval(for: 5000000)
+        let beyondMax = mapper.interval(for: 50000000)
         #expect(atMax == beyondMax)
     }
 
     @Test("Interval is positive for non-idle rates")
     func intervalPositive() {
-        #expect(mapper.interval(for: 10) > 0)
         #expect(mapper.interval(for: 1000) > 0)
-        #expect(mapper.interval(for: 50000) > 0)
+        #expect(mapper.interval(for: 100000) > 0)
+        #expect(mapper.interval(for: 3000000) > 0)
     }
 }
 
