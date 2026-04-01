@@ -435,11 +435,26 @@ struct MenuContentView: View {
     @ViewBuilder
     private var syncStatusBtn: some View {
         let syncManager = SyncManager.shared
+        let (icon, color): (String, Color) = {
+            guard syncManager.isConfigured else {
+                return ("arrow.triangle.2.circlepath.circle", .secondary)
+            }
+            switch syncManager.liveStatus {
+            case .connected:
+                return ("arrow.triangle.2.circlepath", .green)
+            case .disconnected:
+                return ("arrow.triangle.2.circlepath", .orange)
+            case .authFailed, .tokenExpired:
+                return ("exclamationmark.arrow.triangle.2.circlepath", .red)
+            case .unknown:
+                return ("arrow.triangle.2.circlepath", .secondary)
+            }
+        }()
         Button { onOpenSettings(.sync) } label: {
             VStack(spacing: DS.xs) {
-                Image(systemName: syncManager.isConfigured ? "arrow.triangle.2.circlepath" : "arrow.triangle.2.circlepath.circle")
+                Image(systemName: icon)
                     .font(.system(size: 18, weight: .light))
-                    .foregroundStyle(syncManager.isConfigured ? Color.green : Color.secondary)
+                    .foregroundStyle(color)
                 Text(L.sync.title)
                     .font(.system(size: DS.fontTiny))
                     .foregroundStyle(.secondary)
