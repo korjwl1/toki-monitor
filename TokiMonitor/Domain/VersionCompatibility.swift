@@ -42,11 +42,40 @@ final class VersionCompatibilityChecker {
 
     private var updateWindow: NSWindow?
 
+    /// Run brew upgrade toki, wait for completion, re-check version, dismiss modal if OK.
+    private func runUpdate() {
+        let scriptPath = NSTemporaryDirectory() + "toki-version-update.command"
+        let script = """
+        #!/bin/bash
+        brew update && brew upgrade toki
+        osascript -e 'tell application "Terminal" to close (every window whose name contains "toki-version-update")' &
+        exit 0
+        """
+        try? script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+        chmod(scriptPath, 0o755)
+        NSWorkspace.shared.open(URL(fileURLWithPath: scriptPath))
+
+        // Poll until the version is updated (check every 3 seconds, up to 2 minutes)
+        Task {
+            for _ in 0..<40 {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                if let major = await installedTokiMajorVersion(), major >= requiredTokiMajorVersion {
+                    updateWindow?.close()
+                    updateWindow = nil
+                    return
+                }
+            }
+        }
+    }
+
     private func showUpdateRequiredModal(installedMajor: Int) {
-        let view = TokiUpdateRequiredView(
+        var view = TokiUpdateRequiredView(
             installedVersion: "v\(installedMajor).x",
             requiredVersion: "v\(requiredTokiMajorVersion)"
         )
+        view.onUpdate = { [weak self] in
+            self?.runUpdate()
+        }
         let hostingController = NSHostingController(rootView: view)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 440, height: 240),
@@ -103,13 +132,14 @@ private struct TokiUpdateRequiredView: View {
                 .multilineTextAlignment(.center)
             }
 
-            Button(L.tr("brew upgrade toki 복사", "Copy brew upgrade toki")) {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString("brew update && brew upgrade toki", forType: .string)
+            Button(L.tr("지금 업데이트", "Update Now")) {
+                onUpdate()
             }
             .keyboardShortcut(.defaultAction)
         }
         .padding(24)
         .frame(width: 440)
     }
+
+    var onUpdate: () -> Void = {}
 }
