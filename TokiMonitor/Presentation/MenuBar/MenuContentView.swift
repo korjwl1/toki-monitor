@@ -12,7 +12,7 @@ struct MenuContentView: View {
 
     var onStartDaemon: () -> Void
     var onOpenDashboard: () -> Void
-    var onOpenSettings: () -> Void
+    var onOpenSettings: (SettingsCategory?) -> Void
     var onQuit: () -> Void
 
     private var isConnected: Bool { connectionManager.state.isConnected }
@@ -403,7 +403,7 @@ struct MenuContentView: View {
     private var rightPanel: some View {
         VStack(spacing: DS.sm) {
             gridBtn(L.panel.dashboard, "chart.xyaxis.line", onOpenDashboard)
-            gridBtn(L.panel.settings, "gearshape", onOpenSettings)
+            gridBtn(L.panel.settings, "gearshape") { onOpenSettings(nil) }
             styleToggleBtn {
                 if let pid = filterProviderId {
                     // Per-provider: cycle this provider's style override
@@ -425,8 +425,44 @@ struct MenuContentView: View {
                     }
                 }
             }
+            syncStatusBtn
         }
         .padding(0)
+    }
+
+    // MARK: - Sync Status Button
+
+    @ViewBuilder
+    private var syncStatusBtn: some View {
+        let syncManager = SyncManager.shared
+        let (icon, color): (String, Color) = {
+            guard syncManager.isConfigured else {
+                return ("arrow.triangle.2.circlepath.circle", .secondary)
+            }
+            switch syncManager.liveStatus {
+            case .connected:
+                return ("arrow.triangle.2.circlepath", .green)
+            case .disconnected:
+                return ("arrow.triangle.2.circlepath", .orange)
+            case .authFailed, .tokenExpired:
+                return ("exclamationmark.arrow.triangle.2.circlepath", .red)
+            case .unknown:
+                return ("arrow.triangle.2.circlepath", .secondary)
+            }
+        }()
+        Button { onOpenSettings(.sync) } label: {
+            VStack(spacing: DS.xs) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundStyle(color)
+                Text(L.sync.title)
+                    .font(.system(size: DS.fontTiny))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: DS.Menu.btnSize, height: DS.Menu.btnSize)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func gridBtn(_ t: String, _ ic: String, _ action: @escaping () -> Void) -> some View {

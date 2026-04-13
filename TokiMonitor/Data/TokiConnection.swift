@@ -7,6 +7,7 @@ enum TokiPath {
         let candidates = [
             "/opt/homebrew/bin/toki",
             "/usr/local/bin/toki",
+            "\(NSHomeDirectory())/.local/bin/toki",
             "\(NSHomeDirectory())/.cargo/bin/toki",
         ]
         for path in candidates {
@@ -211,23 +212,6 @@ private final class LockedFlag: @unchecked Sendable {
         if _value { return false }
         _value = true
         return true
-    }
-}
-
-/// Runs `toki report` CLI and returns JSON output.
-final class TokiReportRunner: Sendable {
-    private let tokiPath: String
-
-    init(tokiPath: String = TokiPath.resolved) {
-        self.tokiPath = tokiPath
-    }
-
-    func runReport(
-        reportOptions: [String] = [],
-        subcommandArgs: [String]
-    ) async throws -> Data {
-        let args = ["report", "--output-format", "json"] + reportOptions + subcommandArgs
-        return try await CLIProcessRunner.run(executable: tokiPath, arguments: args)
     }
 }
 

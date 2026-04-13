@@ -144,6 +144,18 @@ Not logged in? The widget shows a prompt instead of hiding — Claude shows "Cla
 - Full Korean / English localization
 - Liquid Glass on macOS Tahoe
 
+### Sync (Server Mode)
+
+Connect to a [toki-sync](https://github.com/korjwl1/toki-sync) server to view usage across all your devices.
+
+- **Local / Server toggle** in the dashboard toolbar — switch between local data and server-aggregated data
+- **Server mode**: queries toki-sync's PromQL proxy via URLSession (no CLI subprocess overhead)
+- **Device list**: see all registered devices with last-seen timestamps
+- **Token refresh**: automatic JWT refresh on 401, with system notification when re-login is needed
+- **HTTPS enforced**: rejects non-HTTPS server URLs (localhost exempt for development)
+
+Configure in Settings → Sync — enter server URL and authenticate via device code flow (opens browser). Credentials stored in macOS Keychain, shared with the toki daemon.
+
 <p align="center">
   <img src="docs/images/settings-menubar.png" alt="Settings — Menu Bar" width="480" />
   <img src="docs/images/settings-widgets.png" alt="Settings — Widgets" width="480" />
@@ -176,14 +188,15 @@ toki runs silently in the background — you won't notice it until you need it. 
 
 ```
 toki (Rust daemon)              Toki Monitor (Swift/SwiftUI)
-├─ fjall TSDB                   ├─ Data        // UDS, CLI, Keychain
-├─ kqueue file watchers         ├─ Domain      // Aggregation, alerts
-├─ PromQL engine                └─ Presentation// Menu bar, dashboard
-└─ UDS server
+├─ fjall TSDB                   ├─ Data        // UDS, CLI, Keychain, ServerQueryClient
+├─ kqueue file watchers         ├─ Domain      // Aggregation, alerts, SyncManager
+├─ PromQL engine                └─ Presentation// Menu bar, dashboard, sync settings
+├─ UDS server
+└─ sync thread → toki-sync     toki-sync server (optional)
+                                ├─ PromQL proxy (VictoriaMetrics)
 
-Real-time:  daemon → trace → UDS → EventStream → Aggregator → Menu Bar
-Dashboard:  Panel query → interpolate($__from, $provider) → toki report → Chart
-Usage:      Claude Keychain / Codex auth.json → Monitor → Widget
+Local:  Panel query → toki report → Chart
+Server: Panel query → URLSession → toki-sync → VM → Chart
 ```
 
 ### Privacy
@@ -293,7 +306,7 @@ Themes are discovered at launch. Select in Settings → Menu Bar → Character.
 ## Upcoming
 
 - **Gemini CLI support** — Google Gemini provider integration
-- **Multi-device sync** — share usage data across machines via toki-sync
+- **Multi-device sync** — ✅ share usage data across machines via toki-sync (Server mode in dashboard)
 - **Usage reports** — weekly/monthly summaries with week-over-week and month-over-month comparisons
 
 ---

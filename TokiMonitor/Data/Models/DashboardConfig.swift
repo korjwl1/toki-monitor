@@ -8,7 +8,7 @@ struct DashboardConfig: Codable, Equatable {
     var title: String = "Default"
     var description: String?
     var tags: [String] = []
-    var schemaVersion: Int = 2
+    var schemaVersion: Int = 3
     var version: Int = 1
 
     // Time configuration
@@ -74,7 +74,7 @@ struct TimeConfig: Codable, Equatable {
 
     /// Bucket size in seconds — duration ÷ 15, minimum 1s
     var bucketSeconds: Int {
-        max(1, Int(duration / 15.0))
+        return max(1, Int(duration / 15.0))
     }
 
     /// PromQL bucket string — converts seconds to compound duration (e.g. "4m", "12m30s", "1h20m")
@@ -475,21 +475,24 @@ enum PanelMetric: String, Codable, CaseIterable {
         }
     }
 
-    /// Default PromQL template for this metric
-    /// PromQL query template. toki supports: usage, events, sessions, projects.
-    /// Cost, topModel, cacheHitRate, reasoning are computed client-side from usage data.
+    /// Default PromQL query.
+    /// Uses standard PromQL syntax accepted by both the local toki CLI and
+    /// the toki-sync server PromQL proxy (VictoriaMetrics backend).
+    /// $provider replaced by interpolateQuery; time range passed separately
+    /// (--since/--until for CLI, start/end query params for server).
     var defaultQuery: String {
         switch self {
-        case .totalTokens, .totalCost, .topModel, .cacheHitRate, .reasoningTokens:
-            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .tokensByModel, .costByModel, .modelBreakdown, .inputVsOutput:
-            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .apiCalls:
-            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
-        case .eventsByModel:
-            "usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval] by (model)"
+        case .totalTokens, .topModel:
+            "sum by (model) (increase(usage{$provider}[$__interval]))"
+        case .totalCost, .costByModel:
+            "sum by (model) (increase(cost{$provider}[$__interval]))"
+        case .apiCalls, .eventsByModel:
+            "sum by (model) (increase(events{$provider}[$__interval]))"
+        case .cacheHitRate, .reasoningTokens,
+             .tokensByModel, .modelBreakdown, .inputVsOutput:
+            "sum by (model) (increase(usage{$provider}[$__interval]))"
         case .tokensByProject:
-            "sum(usage{since=\"$__from\", until=\"$__to\", $provider}[$__interval]) by (project)"
+            "sum by (project) (increase(usage{$provider}[$__interval]))"
         }
     }
 }
@@ -565,6 +568,42 @@ extension DashboardConfig {
         // Add default variables if none exist
         if migrated.templating.list.isEmpty {
             migrated.templating = Self.defaultTemplating
+        }
+        return migrated
+    }
+
+    /// Migrate from v2 to v3: replace `toki_tokens_total` with `usage` metric in queries.
+    /// The `usage` metric works natively in local toki CLI; `ServerQueryClient` rewrites
+    /// it to `toki_tokens_total{type=~"input|output"}` for the server backend.
+    static func migrateV2toV3(_ config: DashboardConfig) -> DashboardConfig {
+        var migrated = config
+        migrated.schemaVersion = 3
+        migrated.panels = config.panels.map { panel in
+            var p = panel
+            p.targets = panel.targets.map { target in
+                var t = target
+                if var q = t.query {
+                    q = q.replacingOccurrences(
+                        of: #"toki_tokens_total\{([^}]*),\s*type=~"input\|output"\}"#,
+                        with: #"usage{$1}"#,
+                        options: .regularExpression
+                    )
+                    q = q.replacingOccurrences(
+                        of: #"toki_tokens_total\{type=~"input\|output",\s*([^}]*)\}"#,
+                        with: #"usage{$1}"#,
+                        options: .regularExpression
+                    )
+                    q = q.replacingOccurrences(
+                        of: #"toki_tokens_total\{type=~"input\|output"\}"#,
+                        with: "usage",
+                        options: .regularExpression
+                    )
+                    q = q.replacingOccurrences(of: "toki_tokens_total", with: "usage")
+                    t.query = q
+                }
+                return t
+            }
+            return p
         }
         return migrated
     }

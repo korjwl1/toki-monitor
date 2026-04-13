@@ -74,9 +74,21 @@ final class TokenAggregator {
     // MARK: - Private
 
     private var traceEvents: [(date: Date, tokens: UInt64, cost: Double, providerId: String, source: String)] = []
-    private let rateWindow: TimeInterval = 30
+    private let rateWindow: TimeInterval = 30   // Window for session counting + event pruning
     private let historyBins = 30
     private var rateTimer: Timer?
+
+    // EMA (Exponential Moving Average) for smooth rate transitions.
+    // Instead of flat window average (which creates cliffs when events exit the window),
+    // EMA blends each second's measurement with the previous rate:
+    //   rate = alpha × instant_rate + (1 - alpha) × prev_rate
+    // This gives natural ramp-up (~3s to 90%) and gradual decay (no sudden drop to 0).
+    private let emaAlpha: Double = 0.3  // Smoothing factor (0.3 = responsive yet smooth)
+    private var lastTickTime: Date = Date()
+    private var tokensSinceLastTick: UInt64 = 0
+    private var costSinceLastTick: Double = 0
+    private var providerTokensSinceLastTick: [String: UInt64] = [:]
+    private var providerCostSinceLastTick: [String: Double] = [:]
     private var reportTimer: Timer?
     private let reportClient = TokiReportClient()
     private let reportRefreshInterval: TimeInterval = 10
@@ -90,18 +102,24 @@ final class TokenAggregator {
         let cost = event.costUSD ?? 0
         let provider = ProviderRegistry.resolve(model: event.model)
         traceEvents.append((date: event.receivedAt, tokens: total, cost: cost, providerId: provider.id, source: event.source))
-        pruneTraceEvents()
-        recalculateRate()
+
+        // Accumulate for next EMA tick
+        tokensSinceLastTick += total
+        costSinceLastTick += cost
+        providerTokensSinceLastTick[provider.id, default: 0] += total
+        providerCostSinceLastTick[provider.id, default: 0] += cost
     }
 
     // MARK: - Start/Stop
 
     func startSampling() {
+        lastTickTime = Date()
         rateTimer?.invalidate()
-        rateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        rateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
+                self?.emaTick()
                 self?.pruneTraceEvents()
-                self?.recalculateRate()
+                self?.recalculateSessionCounts()
             }
         }
 
@@ -128,13 +146,15 @@ final class TokenAggregator {
     private func fetchHistoricalBaseline() {
         Task { [weak self] in
             guard let self else { return }
+            // Instant query: the [1h] range vector scans last 1 hour per bucket over full DB.
+            // For historical baseline we want 24h of 1h buckets.
             let sinceFmt = DateFormatter()
             sinceFmt.dateFormat = "yyyyMMddHHmmss"
             sinceFmt.timeZone = TimeZone(identifier: "UTC")
-            let since = sinceFmt.string(from: Date().addingTimeInterval(-86400)) // 24h ago
-            let query = "usage{since=\"\(since)\"}[1h] by (model)"
+            let sinceStr = sinceFmt.string(from: Date().addingTimeInterval(-86400)) // 24h ago
+            let query = "usage[1h] by (model)"
 
-            guard let pointsByDate = try? await self.reportClient.queryPromQL(query: query) else { return }
+            guard let pointsByDate = try? await self.reportClient.queryPromQL(query: query, since: sinceStr) else { return }
 
             // Sum total cost across all points
             var totalCost: Double = 0
@@ -149,42 +169,68 @@ final class TokenAggregator {
         }
     }
 
-    // MARK: - Rate (trace, 30s window)
+    // MARK: - Rate (EMA-based)
 
     private func pruneTraceEvents() {
         let cutoff = Date().addingTimeInterval(-rateWindow - 5)
         traceEvents.removeAll { $0.date < cutoff }
     }
 
-    private func recalculateRate() {
+    /// EMA tick: blend this second's instantaneous rate with previous EMA value.
+    /// Called every 1 second by rateTimer.
+    private func emaTick() {
+        let now = Date()
+        let dt = now.timeIntervalSince(lastTickTime)
+        guard dt > 0 else { return }
+        lastTickTime = now
+
+        // Instantaneous rate for this tick (extrapolated to per-minute)
+        let instantTokensPerMin = Double(tokensSinceLastTick) * (60.0 / dt)
+        let instantCostPerMin = costSinceLastTick * (60.0 / dt)
+
+        // EMA blend: responsive ramp-up, smooth decay
+        tokensPerMinute = emaAlpha * instantTokensPerMin + (1 - emaAlpha) * tokensPerMinute
+        costPerMinute = emaAlpha * instantCostPerMin + (1 - emaAlpha) * costPerMinute
+
+        // Per-provider EMA
+        var allProviders = Set(providerTokensSinceLastTick.keys)
+        allProviders.formUnion(perProviderRates.keys)
+
+        for pid in allProviders {
+            let instantTok = Double(providerTokensSinceLastTick[pid] ?? 0) * (60.0 / dt)
+            let instantCost = (providerCostSinceLastTick[pid] ?? 0) * (60.0 / dt)
+            perProviderRates[pid] = emaAlpha * instantTok + (1 - emaAlpha) * (perProviderRates[pid] ?? 0)
+            perProviderCostPerMinute[pid] = emaAlpha * instantCost + (1 - emaAlpha) * (perProviderCostPerMinute[pid] ?? 0)
+        }
+
+        // Reset accumulators
+        tokensSinceLastTick = 0
+        costSinceLastTick = 0
+        providerTokensSinceLastTick.removeAll()
+        providerCostSinceLastTick.removeAll()
+
+        // Clamp near-zero values to exactly zero (avoid 0.001 tok/m forever)
+        if tokensPerMinute < 100 { tokensPerMinute = 0 }
+        if costPerMinute < 0.001 { costPerMinute = 0 }
+        for (pid, rate) in perProviderRates where rate < 100 {
+            perProviderRates[pid] = 0
+        }
+        for (pid, cost) in perProviderCostPerMinute where cost < 0.001 {
+            perProviderCostPerMinute[pid] = 0
+        }
+
+        updateSpendAlert()
+    }
+
+    /// Session counts still use the window approach (need to see unique sources over time).
+    private func recalculateSessionCounts() {
         let cutoff = Date().addingTimeInterval(-rateWindow)
         let recent = traceEvents.filter { $0.date >= cutoff }
-        let totalTokens = recent.reduce(UInt64(0)) { $0 + $1.tokens }
-        let minutes = rateWindow / 60.0
-        tokensPerMinute = Double(totalTokens) / minutes
-
-        var providerTotals: [String: UInt64] = [:]
-        for e in recent {
-            providerTotals[e.providerId, default: 0] += e.tokens
-        }
-        perProviderRates = providerTotals.mapValues { Double($0) / minutes }
-
-        // Count unique sessions per provider in rate window
         var sessionsByProvider: [String: Set<String>] = [:]
         for e in recent {
             sessionsByProvider[e.providerId, default: []].insert(e.source)
         }
         perProviderSessionCount = sessionsByProvider.mapValues(\.count)
-
-        // Cost velocity
-        var costByProvider: [String: Double] = [:]
-        for e in recent {
-            costByProvider[e.providerId, default: 0] += e.cost
-        }
-        perProviderCostPerMinute = costByProvider.mapValues { $0 / minutes }
-        let totalCost = recent.reduce(0.0) { $0 + $1.cost }
-        costPerMinute = totalCost / minutes
-        updateSpendAlert()
     }
 
     private var lastAlertCheckTime: Date = .distantPast
@@ -251,12 +297,12 @@ final class TokenAggregator {
         isFetchingReport = true
 
         let bucket = graphTimeRange.promqlBucket
-        let since = graphTimeRange.sinceTimestamp
-        let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
+        let sinceStr = graphTimeRange.sinceTimestamp
+        let query = "usage[\(bucket)] by (model)"
 
         Task {
             defer { self.isFetchingReport = false }
-            guard let pointsByDate = try? await reportClient.queryPromQL(query: query) else { return }
+            guard let pointsByDate = try? await reportClient.queryPromQL(query: query, since: sinceStr) else { return }
             self.buildBins(from: pointsByDate)
             self.buildSummaries(from: pointsByDate)
         }
@@ -270,7 +316,6 @@ final class TokenAggregator {
         let rateScale = 1.0 / (binWidth / 60.0)
 
         var globalBins = [Double](repeating: 0, count: historyBins)
-        // Pre-allocate provider bins using known providers to avoid repeated nil checks
         var providerBins: [String: [Double]] = [:]
         providerBins.reserveCapacity(8)
 

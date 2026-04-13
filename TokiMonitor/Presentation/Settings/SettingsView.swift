@@ -24,11 +24,18 @@ extension View {
 
 // MARK: - Settings Category
 
+@MainActor @Observable
+final class SettingsNavigation {
+    static let shared = SettingsNavigation()
+    var selectedCategory: SettingsCategory? = .menuBar
+}
+
 enum SettingsCategory: String, CaseIterable, Identifiable {
     case general
     case menuBar
     case providers
     case notifications
+    case sync
     case about
 
     var id: String { rawValue }
@@ -39,6 +46,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .menuBar: L.cat.menuBar
         case .providers: L.cat.providers
         case .notifications: L.cat.notifications
+        case .sync: L.sync.title
         case .about: L.cat.about
         }
     }
@@ -49,6 +57,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .menuBar: "menubar.rectangle"
         case .providers: "building.2"
         case .notifications: "bell"
+        case .sync: "arrow.triangle.2.circlepath"
         case .about: "info.circle"
         }
     }
@@ -56,9 +65,9 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @Bindable var settings: AppSettings
+    @Bindable var navigation: SettingsNavigation
     var onClose: (() -> Void)?
 
-    @State private var selectedCategory: SettingsCategory? = .menuBar
     @State private var initialSectionY: CGFloat = .infinity
     @State private var currentSectionY: CGFloat = .infinity
 
@@ -69,7 +78,7 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(SettingsCategory.allCases, selection: $selectedCategory) { category in
+            List(SettingsCategory.allCases, selection: $navigation.selectedCategory) { category in
                 Label(category.title, systemImage: category.icon)
                     .tag(category)
             }
@@ -103,7 +112,7 @@ struct SettingsView: View {
                 }
                 currentSectionY = y
             }
-            .onChange(of: selectedCategory) { _, _ in
+            .onChange(of: navigation.selectedCategory) { _, _ in
                 initialSectionY = .infinity
                 currentSectionY = .infinity
             }
@@ -113,7 +122,7 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var detailView: some View {
-        switch selectedCategory {
+        switch navigation.selectedCategory {
         case .general:
             GeneralSettingsPane(settings: settings, onClose: onClose)
         case .menuBar:
@@ -122,6 +131,8 @@ struct SettingsView: View {
             ProvidersSettingsPane(settings: settings)
         case .notifications:
             NotificationsSettingsPane(settings: settings)
+        case .sync:
+            SyncSettingsView()
         case .about:
             AboutPane()
         case nil:

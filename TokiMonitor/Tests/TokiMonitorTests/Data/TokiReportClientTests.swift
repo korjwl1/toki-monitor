@@ -35,10 +35,4 @@ struct TokiReportClientTests {
         #expect(ProviderRegistry.resolveSchema("unknown_provider").id == "unknown")
     }
 
-    @Test("ReportPeriod subcommands")
-    func reportPeriodSubcommands() {
-        #expect(ReportPeriod.daily.subcommand == "daily")
-        #expect(ReportPeriod.weekly.subcommand == "weekly")
-        #expect(ReportPeriod.monthly.subcommand == "monthly")
-    }
 }

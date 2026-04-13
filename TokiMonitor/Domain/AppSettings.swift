@@ -237,6 +237,20 @@ enum HPBarSource: String, CaseIterable, Codable {
     }
 }
 
+// MARK: - Dashboard Data Source
+
+enum DashboardDataSource: String, CaseIterable, Codable {
+    case local   // toki CLI (default)
+    case server  // toki-sync PromQL proxy
+
+    var displayName: String {
+        switch self {
+        case .local:  L.sync.local
+        case .server: L.sync.server
+        }
+    }
+}
+
 // MARK: - Per-Provider Settings
 
 struct ProviderSettings: Codable {

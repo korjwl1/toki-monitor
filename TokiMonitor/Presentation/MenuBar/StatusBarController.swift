@@ -37,6 +37,8 @@ final class StatusBarController {
 
     // Update Checker
     private let updateChecker = UpdateChecker()
+    // Version Compatibility
+    private let versionChecker = VersionCompatibilityChecker()
     /// Codex root가 resolve된 이후에만 polling을 시작해야 하므로 플래그로 추적
     private var codexRootResolved = false
 
@@ -82,6 +84,7 @@ final class StatusBarController {
             codexRootResolved = true
             if isCodexWidgetVisible { codexUsageMonitor.startPolling() }
             updateChecker.checkOnLaunch()
+            versionChecker.checkOnLaunch()
             // Rebuild after sync so status items reflect actual provider state
             rebuildStatusItems()
         }
@@ -307,10 +310,10 @@ final class StatusBarController {
                     self?.dashboardController.show()
                 }
             },
-            onOpenSettings: { [weak self] in
+            onOpenSettings: { [weak self] category in
                 self?.dismissPanel()
                 DispatchQueue.main.async {
-                    self?.settingsController.show()
+                    self?.settingsController.show(category: category)
                 }
             },
             onQuit: {
@@ -450,9 +453,9 @@ final class StatusBarController {
                 self?.dismissPanel()
                 DispatchQueue.main.async { self?.dashboardController.show() }
             },
-            onOpenSettings: { [weak self] in
+            onOpenSettings: { [weak self] category in
                 self?.dismissPanel()
-                DispatchQueue.main.async { self?.settingsController.show() }
+                DispatchQueue.main.async { self?.settingsController.show(category: category) }
             },
             onQuit: { NSApp.terminate(nil) }
         )

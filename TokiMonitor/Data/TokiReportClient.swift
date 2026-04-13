@@ -1,125 +1,50 @@
 import Foundation
 
-/// Runs `toki report` CLI commands and parses output.
-final class TokiReportClient: Sendable {
-    private let runner: TokiReportRunner
+/// Runs `toki query` CLI commands and parses output.
+final class TokiReportClient: Sendable, QueryDataSource {
 
-    init(runner: TokiReportRunner = TokiReportRunner()) {
-        self.runner = runner
-    }
-
-    /// Flat list of model summaries for a period.
-    func queryAllSummaries(period: ReportPeriod) async throws -> [TokiModelSummary] {
-        let data = try await runner.runReport(
-            reportOptions: ["-z", "UTC"],
-            subcommandArgs: [period.subcommand, "--since", period.sinceDate]
-        )
-        return TokiReportParser.parseFlatSummaries(data)
-    }
-
-    /// Time-series data for dashboard charts via PromQL.
-    func queryTimeSeries(timeRange: DashboardTimeRange) async throws -> TimeSeriesData {
-        let bucket = timeRange.granularity.bucket
-        let sinceFmt = DateFormatter()
-        sinceFmt.dateFormat = "yyyyMMddHHmmss"
-        sinceFmt.timeZone = TimeZone(identifier: "UTC")
-        let since = sinceFmt.string(from: Date().addingTimeInterval(-timeRange.duration - 3600))
-        let query = "usage{since=\"\(since)\"}[\(bucket)] by (model)"
-
-        let data = try await runner.runReport(
-            reportOptions: ["-z", "UTC"],
-            subcommandArgs: ["query", query]
-        )
-        let pointsByDate = TokiReportParser.parseReport(data)
-        let points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
-            .sorted { $0.date < $1.date }
-        return TimeSeriesData(points: points, granularity: timeRange.granularity)
-    }
-
-    /// Run a raw PromQL query and return parsed date→models map.
+    /// Run an instant PromQL query via `toki query` (top-level command, no --since/--until).
+    /// The PromQL itself determines the time range via range vectors.
     func queryPromQL(query: String) async throws -> [Date: [TokiModelSummary]] {
-        let data = try await runner.runReport(
-            reportOptions: ["-z", "UTC"],
-            subcommandArgs: ["query", query]
+        let data = try await CLIProcessRunner.run(
+            executable: TokiPath.resolved,
+            arguments: ["query", "-z", "UTC", "--output-format", "json", query]
         )
         return TokiReportParser.parseReport(data)
     }
 
-    /// Run a pre-interpolated PromQL query and return TimeSeriesData with gap-fill.
+    /// Run a PromQL query via `toki query` (top-level command).
+    /// The `since`/`until` parameters are accepted for API compatibility but ignored —
+    /// the PromQL range vector (e.g. `[1h]`) determines the time window.
+    func queryPromQL(query: String, since: String? = nil, until: String? = nil) async throws -> [Date: [TokiModelSummary]] {
+        let data = try await CLIProcessRunner.run(
+            executable: TokiPath.resolved,
+            arguments: ["query", "-z", "UTC", "--output-format", "json", query]
+        )
+        return TokiReportParser.parseReport(data)
+    }
+
+    /// Run a range query via `toki query --start/--end/--step` (Prometheus/VM query_range compatible).
+    /// Start is floored to bucket boundary so local daemon's epoch-floor bucketing
+    /// produces the same step grid as VM's start-aligned steps.
     func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
-        let data = try await runner.runReport(
-            reportOptions: ["-z", "UTC"],
-            subcommandArgs: ["query", query]
+        let step = time.bucketSeconds
+        let rawStart = Int(time.fromDate.timeIntervalSince1970)
+        let startEpoch = (rawStart / step) * step  // floor to bucket boundary
+        let endEpoch = Int(time.toDate.timeIntervalSince1970)
+        let data = try await CLIProcessRunner.run(
+            executable: TokiPath.resolved,
+            arguments: ["query", "-z", "UTC", "--output-format", "json",
+                         "--start", "\(startEpoch)", "--end", "\(endEpoch)",
+                         "--step", time.bucketString, query]
         )
         let pointsByDate = TokiReportParser.parseReport(data)
         var points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
             .sorted { $0.date < $1.date }
-        points = Self.gapFillEpochAligned(points: points, time: time)
+        points = TimeSeriesGapFiller.fill(points: points, time: time)
         let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
             : time.bucketSeconds < 86400 ? .hourly : .daily
         return TimeSeriesData(points: points, granularity: granularity)
     }
 
-    /// Time-series data from TimeConfig (Grafana-style relative time).
-    func queryTimeSeriesFromConfig(time: TimeConfig, provider: String? = nil) async throws -> TimeSeriesData {
-        let bucket = time.bucketString
-        let sinceFmt = DateFormatter()
-        sinceFmt.dateFormat = "yyyyMMddHHmmss"
-        sinceFmt.timeZone = TimeZone(identifier: "UTC")
-        let buffer = max(60, time.duration * 0.1)
-        let sinceDate = time.fromDate.addingTimeInterval(-buffer)
-        let since = sinceFmt.string(from: sinceDate)
-
-        var filters = "since=\"\(since)\""
-        // Add until for absolute time ranges
-        if !time.isRelative {
-            let until = sinceFmt.string(from: time.toDate)
-            filters += ", until=\"\(until)\""
-        }
-        if let provider {
-            filters += ", provider=\"\(provider)\""
-        }
-        let query = "usage{\(filters)}[\(bucket)] by (model)"
-
-        let data = try await runner.runReport(
-            reportOptions: ["-z", "UTC"],
-            subcommandArgs: ["query", query]
-        )
-        let pointsByDate = TokiReportParser.parseReport(data)
-        var points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
-            .sorted { $0.date < $1.date }
-        points = Self.gapFillEpochAligned(points: points, time: time)
-        let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
-            : time.bucketSeconds < 86400 ? .hourly : .daily
-        return TimeSeriesData(points: points, granularity: granularity)
-    }
-
-    // MARK: - Gap Fill (epoch-aligned, matches toki's bucket boundaries)
-
-    private static func gapFillEpochAligned(
-        points: [TimeSeriesPoint],
-        time: TimeConfig
-    ) -> [TimeSeriesPoint] {
-        let step = TimeInterval(time.bucketSeconds)
-        guard step > 0 else { return points }
-
-        let fromEpoch = time.fromDate.timeIntervalSince1970
-        let toEpoch = time.toDate.timeIntervalSince1970
-
-        let alignedStart = floor(fromEpoch / step) * step
-        let alignedEnd = toEpoch
-
-        let existingDates = Set(points.map { Int(floor($0.date.timeIntervalSince1970 / step) * step) })
-
-        var filled = points
-        var current = alignedStart
-        while current <= alignedEnd {
-            let bucket = Int(current)
-            if !existingDates.contains(bucket) {
-                filled.append(TimeSeriesPoint(date: Date(timeIntervalSince1970: current), models: []))
-            }
-            current += step
-        }
-        return filled.sorted { $0.date < $1.date }
-    }
 }

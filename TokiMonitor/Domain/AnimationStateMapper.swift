@@ -6,43 +6,35 @@ enum AnimationStyle: String, CaseIterable, Codable {
     case sparkline   // Mini graph
 }
 
-/// Maps token throughput rate to a continuous animation interval,
-/// inspired by menubar_runcat's CPU-proportional speed formula.
+/// Maps token throughput rate to a continuous animation interval.
 ///
-/// Speed range for 7-frame character (one full cycle):
-///   - idle (0 tok/m): no animation
-///   - low (~10 tok/m): ~0.35s/frame → ~2 FPS, full cycle ~2.5s — gentle stroll
-///   - mid (~500 tok/m): ~0.15s/frame → ~7 FPS, full cycle ~1s — brisk trot
-///   - high (~2000+ tok/m): ~0.1s/frame → ~10 FPS, full cycle ~0.7s — sprint
+/// Uses log scale calibrated to actual observed rates:
+///   - idle (< 10K tok/m): no animation
+///   - start (~10K tok/m): 5.0 FPS — smooth minimum (below this, frames stutter)
+///   - light (~500K tok/m): 6.5 FPS — brisk trot
+///   - median (~2.2M tok/m): 8.0 FPS — running
+///   - peak (~5M tok/m): 9.0 FPS — fast run
+///   - heavy (8x, ~40M tok/m): 14 FPS — full sprint
 struct AnimationStateMapper {
-    private let slowInterval: TimeInterval = 0.35   // slowest frame interval
-    private let fastInterval: TimeInterval = 0.10   // fastest frame interval
-    private let maxRate: Double = 10000             // clamp ceiling
-    private let idleThreshold: Double = 1           // below = idle
+    private let slowInterval: TimeInterval = 0.20   // 5 FPS minimum (smooth for 7-frame cycle)
+    private let fastInterval: TimeInterval = 0.06   // ~16 FPS max
+    private let minRate: Double = 10000             // below = idle
+    private let maxRate: Double = 50000000          // 8x heavy user peak
 
     func isIdle(tokensPerMinute: Double) -> Bool {
-        tokensPerMinute < idleThreshold
+        tokensPerMinute < minRate
     }
 
     /// Returns per-frame interval. 0 means idle (no animation).
     func interval(for tokensPerMinute: Double) -> TimeInterval {
         guard !isIdle(tokensPerMinute: tokensPerMinute) else { return 0 }
 
-        // Normalize rate to 0...1 range
-        let clamped = min(tokensPerMinute, maxRate)
-        let t = (clamped - idleThreshold) / (maxRate - idleThreshold)
-
-        // Sigmoid curve centered at midpoint (~2000 tok/m)
-        // Steep transition in the 500-2000 range where most usage happens
-        let steepness = 8.0
-        let midpoint = 0.2  // 20% of maxRate = ~2000 tok/m
-        let sigmoid = 1.0 / (1.0 + exp(-steepness * (t - midpoint)))
-        // Normalize sigmoid to 0...1 range
-        let sigMin = 1.0 / (1.0 + exp(-steepness * (0 - midpoint)))
-        let sigMax = 1.0 / (1.0 + exp(-steepness * (1 - midpoint)))
-        let eased = (sigmoid - sigMin) / (sigMax - sigMin)
+        // Log scale: spreads the 10 → 100K range evenly for visible speed changes.
+        // Linear scale would saturate at ~2K tok/m, making 2K and 50K look identical.
+        let clamped = min(max(tokensPerMinute, minRate), maxRate)
+        let t = (log10(clamped) - log10(minRate)) / (log10(maxRate) - log10(minRate))
 
         // Lerp between slow and fast
-        return slowInterval - eased * (slowInterval - fastInterval)
+        return slowInterval - t * (slowInterval - fastInterval)
     }
 }

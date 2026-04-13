@@ -165,7 +165,7 @@ struct CustomDashboardView: View {
             statContent(for: panel.effectiveMetric, data: data)
         case .timeSeries:
             if isEmpty {
-                emptyDataView
+                Spacer()
             } else if viewModel.filteredModelNames.isEmpty {
                 noModelSelected
             } else {
@@ -177,16 +177,16 @@ struct CustomDashboardView: View {
             }
         case .barChart:
             if isEmpty {
-                emptyDataView
+                Spacer()
             } else if viewModel.filteredModelNames.isEmpty {
                 noModelSelected
             } else {
                 barChartContent(for: panel.effectiveMetric, data: data)
             }
         case .pieChart:
-            if isEmpty { emptyDataView } else { pieChartContent(for: panel.effectiveMetric, data: data) }
+            if isEmpty { Spacer() } else { pieChartContent(for: panel.effectiveMetric, data: data) }
         case .table:
-            if isEmpty { emptyDataView } else { tableContent(data: data) }
+            if isEmpty { Spacer() } else { tableContent(data: data) }
         case .gauge:
             gaugeContent(for: panel.effectiveMetric, data: data)
         case .rowPanel:

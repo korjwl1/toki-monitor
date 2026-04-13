@@ -77,16 +77,47 @@ final class DashboardViewModel {
 
     // MARK: - Auto-refresh
     private var refreshTimer: Timer?
+    private var fetchTask: Task<Void, Never>?
 
     // MARK: - Dependencies
     private let reportClient: TokiReportClient
+    private let serverQueryClient: ServerQueryClient
+    /// Active query client, swapped when `dataSource` changes.
+    private var queryClient: any QueryDataSource
     let configStore = DashboardConfigStore()
     private let annotationStore = AnnotationStore()
 
-    init(reportClient: TokiReportClient = TokiReportClient()) {
+    /// Current data source (local CLI vs sync server). Persisted via AppSettings.
+    var dataSource: DashboardDataSource = .local {
+        didSet {
+            UserDefaults.standard.set(dataSource.rawValue, forKey: "dashboardDataSource")
+            queryClient = resolveQueryClient()
+            // Clear all cached panel data so stale results from the other source don't show
+            panelData.removeAll()
+            timeSeriesData = nil
+            fetchData()
+        }
+    }
+
+    private func resolveQueryClient() -> any QueryDataSource {
+        if dataSource == .server && SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired {
+            return serverQueryClient
+        }
+        return reportClient
+    }
+
+    init(reportClient: TokiReportClient = TokiReportClient(),
+         serverQueryClient: ServerQueryClient = ServerQueryClient()) {
         self.reportClient = reportClient
+        self.serverQueryClient = serverQueryClient
+        self.queryClient = reportClient  // default; updated below after dataSource is set
         self.dashboardConfig = DashboardConfigStore().load()
         self.dashboardList = DashboardConfigStore().loadDashboardList()
+        if let raw = UserDefaults.standard.string(forKey: "dashboardDataSource"),
+           let persisted = DashboardDataSource(rawValue: raw) {
+            self.dataSource = persisted
+        }
+        self.queryClient = resolveQueryClient()
         populateProviderOptions()
         loadAnnotations()
         loadExploreHistory()
@@ -123,18 +154,19 @@ final class DashboardViewModel {
     }
 
     func fetchData() {
+        fetchTask?.cancel()
+
         let panels = dashboardConfig.panels.filter { $0.panelType != .rowPanel }
         let time = dashboardConfig.time
 
-        // Mark all panels as loading, preserving previous data
+        // Mark all panels as loading (no stale data preserved)
         for panel in panels {
-            let previous = panelData[panel.id]?.timeSeriesData
-            panelData[panel.id] = .loading(previous: previous)
+            panelData[panel.id] = .loading(previous: nil)
         }
         isLoading = true
         errorMessage = nil
 
-        Task {
+        fetchTask = Task {
             // Separate project panels (need special parsing) from regular panels
             let projectPanels = panels.filter { $0.effectiveMetric == .tokensByProject }
             let regularPanels = panels.filter { $0.effectiveMetric != .tokensByProject }
@@ -147,13 +179,14 @@ final class DashboardViewModel {
                 queryGroups[interpolated, default: []].append(panel)
             }
 
-            // Execute all queries concurrently, collect results
+            // Execute all queries concurrently via the active query client
             var queryResults: [(String, Result<TimeSeriesData, Error>)] = []
             await withTaskGroup(of: (String, Result<TimeSeriesData, Error>).self) { group in
                 for (query, _) in queryGroups {
-                    group.addTask { [reportClient] in
+                    let client = self.queryClient
+                    group.addTask {
                         do {
-                            let result = try await reportClient.queryPromQLAsTimeSeries(query: query, time: time)
+                            let result = try await client.queryPromQLAsTimeSeries(query: query, time: time)
                             return (query, .success(result))
                         } catch {
                             return (query, .failure(error))
@@ -202,21 +235,8 @@ final class DashboardViewModel {
 
     func interpolateQuery(_ template: String, time: TimeConfig? = nil) -> String {
         let t = time ?? dashboardConfig.time
-        let sinceFmt = DateFormatter()
-        sinceFmt.dateFormat = "yyyyMMddHHmmss"
-        sinceFmt.timeZone = TimeZone(identifier: "UTC")
-
-        let buffer = max(60, t.duration * 0.1)
-        let sinceDate = t.fromDate.addingTimeInterval(-buffer)
 
         var query = template
-        query = query.replacingOccurrences(of: "$__from", with: sinceFmt.string(from: sinceDate))
-        if !t.isRelative {
-            query = query.replacingOccurrences(of: "$__to", with: sinceFmt.string(from: t.toDate))
-        } else {
-            // Remove until clause for relative time
-            query = query.replacingOccurrences(of: ", until=\"$__to\"", with: "")
-        }
         query = query.replacingOccurrences(of: "$__interval", with: t.bucketString)
 
         // Provider variable
@@ -245,11 +265,33 @@ final class DashboardViewModel {
     private func fetchProjectPanels(_ panels: [PanelConfig], time: TimeConfig) async {
         let template = PanelMetric.tokensByProject.defaultQuery
         let query = interpolateQuery(template, time: time)
+        let isServer = queryClient is ServerQueryClient
 
+        if isServer {
+            // Server mode: use PromQL query via server proxy
+            do {
+                let data = try await queryClient.queryPromQLAsTimeSeries(query: query, time: time)
+                for panel in panels {
+                    panelData[panel.id] = .loaded(data)
+                }
+            } catch {
+                for panel in panels {
+                    panelData[panel.id] = .error(error.localizedDescription)
+                }
+            }
+            return
+        }
+
+        // Local mode: use toki query with project-specific parsing
         do {
+            let startEpoch = Int(time.fromDate.timeIntervalSince1970)
+            let endEpoch = Int(time.toDate.timeIntervalSince1970)
+            let cliArgs = ["query", "-z", "UTC", "--output-format", "json",
+                           "--start", "\(startEpoch)", "--end", "\(endEpoch)",
+                           "--step", time.bucketString, query]
             let rawData = try await CLIProcessRunner.run(
                 executable: TokiPath.resolved,
-                arguments: ["report", "-z", "UTC", "--output-format", "json", "query", query]
+                arguments: cliArgs
             )
 
             struct ProjectReport: Codable {
@@ -739,13 +781,14 @@ final class DashboardViewModel {
         }
         saveExploreHistory()
 
+        let client = queryClient
         Task {
             do {
-                let pointsByDate = try await reportClient.queryPromQL(query: exploreQuery)
+                let time = dashboardConfig.time
+                let interpolated = interpolateQuery(exploreQuery, time: time)
+                let data = try await client.queryPromQLAsTimeSeries(query: interpolated, time: time)
                 self.isExploreLoading = false
-                let points = pointsByDate.map { TimeSeriesPoint(date: $0.key, models: $0.value) }
-                    .sorted { $0.date < $1.date }
-                self.exploreResults = TimeSeriesData(points: points, granularity: .hourly)
+                self.exploreResults = data
             } catch {
                 self.isExploreLoading = false
                 self.exploreResults = nil
