@@ -132,54 +132,19 @@ final class CharacterAnimationRenderer {
         // Default to "rabbit", fallback to first available
         theme = themes.first(where: { $0.config.id == "rabbit" }) ?? themes.first
 
-        // Fallback: load from legacy CharacterFrames location
+        // Ultimate fallback: placeholder circles
         if theme == nil {
-            loadLegacyFrames()
-        }
-    }
-
-    private func loadLegacyFrames() {
-        let bundle = Bundle.main
-        let frameSize = NSSize(width: 24, height: 18)
-        let canvasSize = NSSize(width: 28, height: 18)
-
-        var runFrames: [NSImage] = []
-        for i in 0..<7 {
-            let name = String(format: "frame_%02d", i)
-            guard let url = bundle.url(forResource: name, withExtension: "png"),
-                  let src = NSImage(contentsOf: url) else { continue }
-            src.size = frameSize
-            let canvas = NSImage(size: canvasSize, flipped: false) { _ in
-                src.draw(in: NSRect(origin: .zero, size: frameSize))
-                return true
-            }
-            canvas.isTemplate = true
-            runFrames.append(canvas)
-        }
-
-        guard !runFrames.isEmpty else {
-            // Ultimate fallback: placeholder circles
             let placeholderConfig = AnimationThemeConfig(
                 id: "placeholder", name: "Placeholder",
                 frameSize: [18, 18], canvasSize: [18, 18],
                 sleep: .init(mode: "overlay")
             )
-            let placeholders = generatePlaceholderFrames()
             theme = AnimationTheme(
                 config: placeholderConfig,
-                runFrames: placeholders,
+                runFrames: generatePlaceholderFrames(),
                 sleepFrames: []
             )
-            return
         }
-
-        let config = AnimationThemeConfig(
-            id: "rabbit", name: "Rabbit",
-            frameSize: [24, 18], canvasSize: [28, 18],
-            sleep: .init(mode: "overlay", textOffset: [-7, -1], fontSize: 5, interval: 0.8)
-        )
-        let sleepFrames = AnimationTheme.generateOverlaySleepFrames(base: runFrames[0], config: config)
-        theme = AnimationTheme(config: config, runFrames: runFrames, sleepFrames: sleepFrames)
     }
 
     private weak var hpBarView: HPBarView?

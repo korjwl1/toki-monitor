@@ -95,6 +95,7 @@ final class StatusBarController {
         // Observe
         observeTokenRate()
         observeSettings()
+        observeTokenActivity()
     }
 
     // MARK: - First Launch & Daemon
@@ -355,10 +356,16 @@ final class StatusBarController {
 
         // Position below the clicked status item
         if let button = unit.statusItem.button,
-           let window = button.window {
-            let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
+           let buttonWindow = button.window {
+            // Convert button bounds to global screen coordinates for accurate positioning.
+            // Use button.window.screen to find the actual screen the status item is on,
+            // rather than NSScreen.main which points to the key-window screen (wrong on multi-display).
+            let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+            let screen = buttonWindow.screen
+                ?? NSScreen.screens.first(where: { $0.frame.contains(buttonFrame.origin) })
+                ?? NSScreen.main
+            let screenFrame = screen?.visibleFrame ?? .zero
             let contentSize = hostingView.fittingSize
-            let screenFrame = NSScreen.main?.visibleFrame ?? .zero
 
             // Set content size — panel auto-calculates frame including titlebar
             panel.setContentSize(contentSize)
@@ -484,6 +491,28 @@ final class StatusBarController {
     }
 
     // MARK: - Observation
+
+    /// token rate가 0→nonzero로 전환될 때 usage monitor sleep을 즉시 중단하고 poll 앞당김.
+    private var wasTokenActive = false
+
+    private func observeTokenActivity() {
+        withObservationTracking {
+            _ = aggregator.tokensPerMinute
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let isActive = self.aggregator.tokensPerMinute > 0
+                if isActive && !self.wasTokenActive {
+                    // 토큰이 흐르기 시작했다 = 연결이 살아있다.
+                    // 에러 backoff 중인 monitor만 즉시 재시도.
+                    if self.usageMonitor.isInBackoff { self.usageMonitor.wakeForImmediatePoll() }
+                    if self.codexUsageMonitor.isInTransientBackoff { self.codexUsageMonitor.wakeForImmediatePoll() }
+                }
+                self.wasTokenActive = isActive
+                self.observeTokenActivity()
+            }
+        }
+    }
 
     private func observeTokenRate() {
         withObservationTracking {

@@ -5,7 +5,7 @@ import SwiftUI
 /// Must be bumped whenever toki introduces breaking protocol changes.
 let requiredTokiMajorVersion = 2
 
-/// Checks toki CLI major version and shows a non-dismissible modal if outdated.
+/// Checks toki CLI major version and shows an update-required modal if outdated.
 @MainActor
 final class VersionCompatibilityChecker {
 
@@ -27,7 +27,7 @@ final class VersionCompatibilityChecker {
     }
 
     /// Check version on launch. If toki is installed but major version is too old,
-    /// shows a non-dismissible update-required modal and disables query features.
+    /// shows an update-required modal and disables query features.
     /// If toki is not installed, does nothing (toki-monitor can still work via daemon).
     func checkOnLaunch() {
         Task {
@@ -42,7 +42,7 @@ final class VersionCompatibilityChecker {
 
     private var updateWindow: NSWindow?
 
-    /// Run brew upgrade toki, wait for completion, re-check version, dismiss modal if OK.
+    /// Open Terminal with brew upgrade toki.
     private func runUpdate() {
         let scriptPath = NSTemporaryDirectory() + "toki-version-update.command"
         let script = """
@@ -54,32 +54,37 @@ final class VersionCompatibilityChecker {
         try? script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
         chmod(scriptPath, 0o755)
         NSWorkspace.shared.open(URL(fileURLWithPath: scriptPath))
+    }
 
-        // Poll until the version is updated (check every 3 seconds, up to 2 minutes)
-        Task {
-            for _ in 0..<40 {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                if let major = await installedTokiMajorVersion(), major >= requiredTokiMajorVersion {
-                    updateWindow?.close()
-                    updateWindow = nil
-                    return
-                }
-            }
+    /// Re-check version and close modal if now up to date. Returns true if OK.
+    func recheckVersion() async -> Bool {
+        guard let major = await installedTokiMajorVersion() else { return false }
+        if major >= requiredTokiMajorVersion {
+            updateWindow?.close()
+            updateWindow = nil
+            return true
         }
+        return false
     }
 
     private func showUpdateRequiredModal(installedMajor: Int) {
-        var view = TokiUpdateRequiredView(
+        let view = TokiUpdateRequiredView(
             installedVersion: "v\(installedMajor).x",
-            requiredVersion: "v\(requiredTokiMajorVersion)"
+            requiredVersion: "v\(requiredTokiMajorVersion)",
+            onUpdate: { [weak self] in self?.runUpdate() },
+            onRecheck: { [weak self] in
+                guard let self else { return }
+                Task { await self.recheckVersion() }
+            },
+            onDismiss: { [weak self] in
+                self?.updateWindow?.close()
+                self?.updateWindow = nil
+            }
         )
-        view.onUpdate = { [weak self] in
-            self?.runUpdate()
-        }
         let hostingController = NSHostingController(rootView: view)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 240),
-            styleMask: [.titled],
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 260),
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
@@ -87,15 +92,12 @@ final class VersionCompatibilityChecker {
         window.title = L.tr("toki 업데이트 필요", "toki Update Required")
         window.isReleasedWhenClosed = false
         window.level = .modalPanel
-        // Non-dismissible: no close button, ESC does nothing
-        window.standardWindowButton(.closeButton)?.isEnabled = false
-        window.standardWindowButton(.closeButton)?.isHidden = true
 
         if let screen = NSScreen.main {
             let sf = screen.frame
             let size = hostingController.view.fittingSize
             let w = max(size.width, 440)
-            let h = max(size.height, 240)
+            let h = max(size.height, 260)
             let x = sf.origin.x + (sf.width - w) / 2
             let y = sf.origin.y + (sf.height - h) / 2
             window.setFrame(NSRect(x: x, y: y, width: w, height: h), display: true)
@@ -112,6 +114,13 @@ final class VersionCompatibilityChecker {
 private struct TokiUpdateRequiredView: View {
     let installedVersion: String
     let requiredVersion: String
+    let onUpdate: () -> Void
+    let onRecheck: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var didClickUpdate = false
+    @State private var isRechecking = false
+    @State private var recheckFailed = false
 
     var body: some View {
         VStack(spacing: 20) {
@@ -132,14 +141,51 @@ private struct TokiUpdateRequiredView: View {
                 .multilineTextAlignment(.center)
             }
 
-            Button(L.tr("지금 업데이트", "Update Now")) {
-                onUpdate()
+            if recheckFailed {
+                Text(L.tr("아직 업데이트가 완료되지 않았습니다.", "Update not yet complete."))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.red)
             }
-            .keyboardShortcut(.defaultAction)
+
+            if !didClickUpdate {
+                HStack(spacing: 12) {
+                    Button(L.tr("나중에", "Later")) {
+                        onDismiss()
+                    }
+                    Button(L.tr("지금 업데이트", "Update Now")) {
+                        onUpdate()
+                        didClickUpdate = true
+                        recheckFailed = false
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    Button(L.tr("나중에", "Later")) {
+                        onDismiss()
+                    }
+                    Button(L.tr("업데이트 완료 → 재확인", "Done Updating → Re-check")) {
+                        isRechecking = true
+                        recheckFailed = false
+                        onRecheck()
+                        // Give it a moment then reset rechecking state if not closed
+                        Task {
+                            try? await Task.sleep(for: .seconds(3))
+                            isRechecking = false
+                            recheckFailed = true
+                        }
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(isRechecking)
+                    .overlay {
+                        if isRechecking {
+                            ProgressView().scaleEffect(0.6)
+                        }
+                    }
+                }
+            }
         }
         .padding(24)
         .frame(width: 440)
     }
-
-    var onUpdate: () -> Void = {}
 }
