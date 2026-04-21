@@ -93,8 +93,12 @@ final class CodexUsageMonitor {
     private(set) var lastError: String?
     private(set) var isAvailable: Bool = false
     var isPolling: Bool { pollingTask != nil }
+    /// true = 일시적 서버 오류로 backoff 중. 인증 오류(401/403)는 포함하지 않음 — 재시도해도 의미 없음.
+    var isInTransientBackoff: Bool { consecutiveFailures > 0 && !isAuthError }
+    private(set) var isAuthError: Bool = false
 
     private var pollingTask: Task<Void, Never>?
+    private var sleepTask: Task<Void, Never>?
     private let aggregator: TokenAggregator
     private let settings: AppSettings
     private var consecutiveFailures = 0
@@ -121,15 +125,27 @@ final class CodexUsageMonitor {
                 guard let self else { return }
                 await self.pollOnce()
                 let interval = self.computeInterval()
-                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                self.sleepTask = Task {
+                    try? await Task.sleep(for: .seconds(interval))
+                }
+                await self.sleepTask?.value
+                self.sleepTask = nil
             }
         }
     }
 
     func stopPolling() {
+        sleepTask?.cancel()
+        sleepTask = nil
         pollingTask?.cancel()
         pollingTask = nil
         stopFileWatcher()
+    }
+
+    /// 현재 sleep 중이면 즉시 중단하고 다음 poll을 앞당깁니다.
+    func wakeForImmediatePoll() {
+        guard pollingTask != nil else { return }
+        sleepTask?.cancel()
     }
 
     // MARK: - Polling
@@ -149,11 +165,13 @@ final class CodexUsageMonitor {
             currentUsage = usage
             lastError = nil
             consecutiveFailures = 0
+            isAuthError = false
             settings.codexHasSecondaryWindow = (usage.rateLimit.secondaryWindow != nil)
             checkThresholds(usage)
         } catch let error as CodexAuthError {
             switch error {
             case .fetchFailed(401), .fetchFailed(403):
+                isAuthError = true
                 consecutiveFailures += 1
                 if consecutiveFailures >= 3 {
                     lastError = L.tr("Codex 재로그인 필요", "Codex re-login required")
@@ -183,8 +201,8 @@ final class CodexUsageMonitor {
 
     private func checkThresholds(_ usage: CodexUsageResponse) {
         UsageAlertHelpers.checkThresholds([
-            .init(bucket: .codexPrimary,   utilization: usage.rateLimit.primaryWindow.map   { Double($0.usedPercent) }, resetId: usage.rateLimit.primaryWindow.map   { String($0.resetAt) } ?? "unknown"),
-            .init(bucket: .codexSecondary, utilization: usage.rateLimit.secondaryWindow.map { Double($0.usedPercent) }, resetId: usage.rateLimit.secondaryWindow.map { String($0.resetAt) } ?? "unknown"),
+            .init(bucket: .codexPrimary,   utilization: usage.rateLimit.primaryWindow.map   { Double($0.usedPercent) }, resetId: usage.rateLimit.primaryWindow.map   { String($0.resetAt) }),
+            .init(bucket: .codexSecondary, utilization: usage.rateLimit.secondaryWindow.map { Double($0.usedPercent) }, resetId: usage.rateLimit.secondaryWindow.map { String($0.resetAt) }),
         ], providerTitle: L.tr("Codex 사용량", "Codex Usage"), settings: settings)
     }
 
@@ -213,6 +231,7 @@ final class CodexUsageMonitor {
                 guard let self else { return }
                 // Token was refreshed — reset failures and retry immediately
                 self.consecutiveFailures = 0
+                self.isAuthError = false
                 self.lastError = nil
 
                 // If polling was in a long backoff, restart it
@@ -224,7 +243,9 @@ final class CodexUsageMonitor {
                     }
                 }
 
-                await self.pollOnce()
+                // Wake the polling loop instead of calling pollOnce() directly
+                // to avoid a double-poll race with the main polling task.
+                self.wakeForImmediatePoll()
             }
         }
 
@@ -240,18 +261,17 @@ final class CodexUsageMonitor {
     // MARK: - Adaptive Interval
 
     private func computeInterval() -> TimeInterval {
+        // Backoff capped at 60s: recovers within 1 minute after transient errors/auth expiry
         if consecutiveFailures > 0 {
-            // Exponential backoff: 30s, 60s, 120s, max 300s
-            return min(30 * pow(2, Double(consecutiveFailures - 1)), 300)
+            return min(30 * pow(2, Double(consecutiveFailures - 1)), 60)
         }
+        if currentUsage == nil { return 15 }
+        // High utilization or heavy token flow → poll aggressively
         if let usage = currentUsage,
            let primary = usage.rateLimit.primaryWindow,
-           primary.usedPercent > 75 {
-            return 120
-        }
-        if aggregator.tokensPerMinute > 0 {
-            return 180
-        }
+           primary.usedPercent > 75 { return 60 }
+        if aggregator.tokensPerMinute > 5000 { return 60 }
+        if aggregator.tokensPerMinute > 0 { return 120 }
         return 300
     }
 }

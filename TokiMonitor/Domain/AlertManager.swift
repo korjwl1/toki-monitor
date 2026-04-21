@@ -7,7 +7,7 @@ final class AlertManager {
     private static let storeKey = "dashboardAlertRules"
     private var evaluationTimer: Timer?
 
-    func startEvaluation(dataProvider: @escaping () -> Double?) {
+    func startEvaluation(dataProvider: @escaping @MainActor () -> Double?) {
         evaluationTimer?.invalidate()
         evaluationTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -61,7 +61,7 @@ final class AlertManager {
 
     // MARK: - Evaluation
 
-    private func evaluateAll(dataProvider: @escaping () -> Double?) {
+    private func evaluateAll(dataProvider: @escaping @MainActor () -> Double?) {
         var all = loadAll()
         for i in all.indices where all[i].enabled {
             let value = dataProvider()

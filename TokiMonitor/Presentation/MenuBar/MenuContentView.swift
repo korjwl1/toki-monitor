@@ -267,28 +267,7 @@ struct MenuContentView: View {
     }
 
     private func usageBar(_ label: String, _ b: UsageBucket) -> some View {
-        VStack(alignment: .leading, spacing: DS.xs) {
-            HStack {
-                Text(label)
-                    .font(.system(size: DS.fontCaption))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(Int(b.utilization))%")
-                    .font(.system(size: DS.fontCaption, weight: .semibold, design: .monospaced))
-                Text("· \(b.resetCountdown)")
-                    .font(.system(size: DS.fontTiny))
-                    .foregroundStyle(.tertiary)
-            }
-            GeometryReader { g in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous).fill(.quaternary)
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(b.utilization >= 90 ? .red : b.utilization >= 75 ? .orange : b.utilization >= 50 ? .yellow : .green)
-                        .frame(width: max(g.size.width * min(b.utilization / 100, 1), 3))
-                }
-            }
-            .frame(height: 4)
-        }
+        usageProgressBar(label: label, percent: b.utilization, countdown: b.resetCountdown)
     }
 
     // MARK: - Codex Usage Widget
@@ -334,13 +313,17 @@ struct MenuContentView: View {
     }
 
     private func codexUsageBar(_ label: String, percent: Int, countdown: String) -> some View {
+        usageProgressBar(label: label, percent: Double(percent), countdown: countdown)
+    }
+
+    private func usageProgressBar(label: String, percent: Double, countdown: String) -> some View {
         VStack(alignment: .leading, spacing: DS.xs) {
             HStack {
                 Text(label)
                     .font(.system(size: DS.fontCaption))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(percent)%")
+                Text("\(Int(percent))%")
                     .font(.system(size: DS.fontCaption, weight: .semibold, design: .monospaced))
                 Text("· \(countdown)")
                     .font(.system(size: DS.fontTiny))
@@ -351,7 +334,7 @@ struct MenuContentView: View {
                     RoundedRectangle(cornerRadius: 2, style: .continuous).fill(.quaternary)
                     RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(percent >= 90 ? .red : percent >= 75 ? .orange : percent >= 50 ? .yellow : .green)
-                        .frame(width: max(g.size.width * min(Double(percent) / 100, 1), 3))
+                        .frame(width: max(g.size.width * min(percent / 100, 1), 3))
                 }
             }
             .frame(height: 4)

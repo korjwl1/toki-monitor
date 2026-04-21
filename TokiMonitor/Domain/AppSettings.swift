@@ -706,7 +706,8 @@ enum UsageAlertHelpers {
     struct BucketCheck {
         let bucket: UsageAlertBucket
         let utilization: Double?
-        let resetId: String
+        /// nil = reset window unknown; threshold check is skipped to avoid deduplication confusion.
+        let resetId: String?
     }
 
     /// threshold check 수행 후 필요 시 알림 발송.
@@ -717,14 +718,15 @@ enum UsageAlertHelpers {
         settings: AppSettings
     ) {
         for item in items {
-            guard let utilization = item.utilization else { continue }
+            guard let utilization = item.utilization,
+                  let resetId = item.resetId else { continue }
 
             if utilization >= 90,
                settings.usageAlert90Enabled,
                settings.isUsageAlertBucketEnabled(.percent90, bucket: item.bucket) {
                 let store = UsageAlertStateStore.shared
-                if !store.hasNotified(threshold: .percent90, bucket: item.bucket, resetId: item.resetId) {
-                    store.markNotified(threshold: .percent90, bucket: item.bucket, resetId: item.resetId)
+                if !store.hasNotified(threshold: .percent90, bucket: item.bucket, resetId: resetId) {
+                    store.markNotified(threshold: .percent90, bucket: item.bucket, resetId: resetId)
                     sendNotification(providerTitle: providerTitle, bucketLabel: item.bucket.displayName, threshold: 90)
                 }
                 continue
@@ -734,8 +736,8 @@ enum UsageAlertHelpers {
                settings.usageAlert75Enabled,
                settings.isUsageAlertBucketEnabled(.percent75, bucket: item.bucket) {
                 let store = UsageAlertStateStore.shared
-                if !store.hasNotified(threshold: .percent75, bucket: item.bucket, resetId: item.resetId) {
-                    store.markNotified(threshold: .percent75, bucket: item.bucket, resetId: item.resetId)
+                if !store.hasNotified(threshold: .percent75, bucket: item.bucket, resetId: resetId) {
+                    store.markNotified(threshold: .percent75, bucket: item.bucket, resetId: resetId)
                     sendNotification(providerTitle: providerTitle, bucketLabel: item.bucket.displayName, threshold: 75)
                 }
             }

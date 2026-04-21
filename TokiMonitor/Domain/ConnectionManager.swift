@@ -158,6 +158,7 @@ final class ConnectionManager {
     }
 
     /// Run a toki CLI command. Returns true if exit code 0.
+    /// Enforces a 15-second timeout to prevent indefinite hang on daemon start/stop.
     private func runToki(args: [String]) async -> Bool {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
@@ -167,12 +168,29 @@ final class ConnectionManager {
                 process.standardOutput = FileHandle.nullDevice
                 process.standardError = FileHandle.nullDevice
 
+                let lock = NSLock()
+                var didResume = false
+                func resumeOnce(_ value: Bool) {
+                    lock.lock(); defer { lock.unlock() }
+                    guard !didResume else { return }
+                    didResume = true
+                    continuation.resume(returning: value)
+                }
+
                 do {
                     try process.run()
+
+                    let timeoutItem = DispatchWorkItem {
+                        if process.isRunning { process.terminate() }
+                        resumeOnce(false)
+                    }
+                    DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 15, execute: timeoutItem)
+
                     process.waitUntilExit()
-                    continuation.resume(returning: process.terminationStatus == 0)
+                    timeoutItem.cancel()
+                    resumeOnce(process.terminationStatus == 0)
                 } catch {
-                    continuation.resume(returning: false)
+                    resumeOnce(false)
                 }
             }
         }

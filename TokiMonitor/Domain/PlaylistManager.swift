@@ -39,7 +39,7 @@ final class PlaylistManager {
 
     // MARK: - Playback
 
-    func play(playlistID: UUID, onSwitch: @escaping (String) -> Void) {
+    func play(playlistID: UUID, onSwitch: @escaping @MainActor (String) -> Void) {
         guard let playlist = playlists.first(where: { $0.id == playlistID }),
               !playlist.dashboardUIDs.isEmpty else { return }
 
@@ -75,7 +75,7 @@ final class PlaylistManager {
         currentIndex = 0
     }
 
-    func next(onSwitch: @escaping (String) -> Void) {
+    func next(onSwitch: @escaping @MainActor (String) -> Void) {
         guard let playlistID = currentPlaylistID,
               let playlist = playlists.first(where: { $0.id == playlistID })
         else { return }
@@ -83,7 +83,7 @@ final class PlaylistManager {
         onSwitch(playlist.dashboardUIDs[currentIndex])
     }
 
-    func previous(onSwitch: @escaping (String) -> Void) {
+    func previous(onSwitch: @escaping @MainActor (String) -> Void) {
         guard let playlistID = currentPlaylistID,
               let playlist = playlists.first(where: { $0.id == playlistID })
         else { return }

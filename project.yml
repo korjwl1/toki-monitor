@@ -22,8 +22,9 @@ targets:
         excludes:
           - "**/*Tests*"
           - "**/Tests/**"
-    resources:
-      - path: TokiMonitor/Resources/CharacterFrames
+          - "Resources/Animations/**"
+      - path: TokiMonitor/Resources/Animations
+        type: folder
         buildPhase: resources
     settings:
       base:

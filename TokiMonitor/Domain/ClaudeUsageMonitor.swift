@@ -73,10 +73,12 @@ final class ClaudeUsageMonitor {
     private(set) var lastError: String?
     private(set) var isAvailable: Bool = false
     var isPolling: Bool { pollingTask != nil }
+    var isInBackoff: Bool { consecutiveFailures > 0 }
 
     private let aggregator: TokenAggregator
     private let settings: AppSettings
     private var pollingTask: Task<Void, Never>?
+    private var sleepTask: Task<Void, Never>?
     private var consecutiveFailures = 0
 
     init(aggregator: TokenAggregator, settings: AppSettings) {
@@ -94,14 +96,26 @@ final class ClaudeUsageMonitor {
                 guard let self else { return }
                 await self.pollOnce()
                 let interval = self.computeInterval()
-                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                self.sleepTask = Task {
+                    try? await Task.sleep(for: .seconds(interval))
+                }
+                await self.sleepTask?.value
+                self.sleepTask = nil
             }
         }
     }
 
     func stopPolling() {
+        sleepTask?.cancel()
+        sleepTask = nil
         pollingTask?.cancel()
         pollingTask = nil
+    }
+
+    /// 현재 sleep 중이면 즉시 중단하고 다음 poll을 앞당깁니다.
+    func wakeForImmediatePoll() {
+        guard pollingTask != nil else { return }
+        sleepTask?.cancel()
     }
 
     // MARK: - Polling
@@ -144,12 +158,15 @@ final class ClaudeUsageMonitor {
 
     private func computeInterval() -> TimeInterval {
         if !isAvailable { return 60 }
+        // Backoff capped at 60s: recovers within 1 minute after transient server errors
         if consecutiveFailures > 0 {
-            return min(15 * pow(2, Double(consecutiveFailures - 1)), 300)
+            return min(15 * pow(2, Double(consecutiveFailures - 1)), 60)
         }
         if currentUsage == nil { return 15 }
-        if let usage = currentUsage, usage.maxUtilization > 75 { return 120 }
-        if aggregator.tokensPerMinute > 0 { return 180 }
+        // High utilization or heavy token flow → poll aggressively
+        if let usage = currentUsage, usage.maxUtilization > 75 { return 60 }
+        if aggregator.tokensPerMinute > 5000 { return 60 }
+        if aggregator.tokensPerMinute > 0 { return 120 }
         return 300
     }
 
@@ -157,9 +174,9 @@ final class ClaudeUsageMonitor {
 
     private func checkThresholds(_ usage: ClaudeUsageResponse) {
         UsageAlertHelpers.checkThresholds([
-            .init(bucket: .claudeFiveHour,      utilization: usage.fiveHour?.utilization,      resetId: usage.fiveHour?.resetsAt      ?? "unknown"),
-            .init(bucket: .claudeSevenDay,      utilization: usage.sevenDay?.utilization,      resetId: usage.sevenDay?.resetsAt      ?? "unknown"),
-            .init(bucket: .claudeSevenDaySonnet, utilization: usage.sevenDaySonnet?.utilization, resetId: usage.sevenDaySonnet?.resetsAt ?? "unknown"),
+            .init(bucket: .claudeFiveHour,       utilization: usage.fiveHour?.utilization,       resetId: usage.fiveHour?.resetsAt),
+            .init(bucket: .claudeSevenDay,       utilization: usage.sevenDay?.utilization,       resetId: usage.sevenDay?.resetsAt),
+            .init(bucket: .claudeSevenDaySonnet, utilization: usage.sevenDaySonnet?.utilization, resetId: usage.sevenDaySonnet?.resetsAt),
         ], providerTitle: L.panel.claudeUsage, settings: settings)
     }
 }
