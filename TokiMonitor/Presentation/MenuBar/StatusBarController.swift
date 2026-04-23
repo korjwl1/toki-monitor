@@ -323,11 +323,12 @@ final class StatusBarController {
         )
 
         let hostingView = NSHostingView(rootView: contentView)
-        hostingView.sizingOptions = [.minSize]
+        hostingView.sizingOptions = [.minSize, .intrinsicContentSize]
         if #available(macOS 14.0, *) {
             hostingView.safeAreaRegions = []
         }
-        hostingView.setFrameSize(hostingView.fittingSize)
+        hostingView.layoutSubtreeIfNeeded()
+        hostingView.setFrameSize(resolvedContentSize(for: hostingView))
         menuHostingView = hostingView
 
         let panel = NSPanel(
@@ -353,33 +354,50 @@ final class StatusBarController {
         panel.isFloatingPanel = true
 
         panel.contentView = hostingView
+        // Trigger layout now that the hosting view is mounted in a window —
+        // guarantees panel.frame.size reflects real SwiftUI content before we
+        // compute the origin.
+        panel.layoutIfNeeded()
 
         // Position below the clicked status item
         if let button = unit.statusItem.button,
            let buttonWindow = button.window {
-            // Convert button bounds to global screen coordinates for accurate positioning.
-            // Use button.window.screen to find the actual screen the status item is on,
-            // rather than NSScreen.main which points to the key-window screen (wrong on multi-display).
             let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-            let screen = buttonWindow.screen
+
+            // Identify the screen the user clicked on. The cursor position at
+            // click time is more reliable than button.window.screen, which can
+            // resolve to the primary display on multi-display setups.
+            let mouseLocation = NSEvent.mouseLocation
+            let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) })
+                ?? buttonWindow.screen
                 ?? NSScreen.screens.first(where: { $0.frame.contains(buttonFrame.origin) })
                 ?? NSScreen.main
             let screenFrame = screen?.visibleFrame ?? .zero
-            let contentSize = hostingView.fittingSize
 
-            // Set content size — panel auto-calculates frame including titlebar
-            panel.setContentSize(contentSize)
+            // NSHostingView.fittingSize can return (0, 0) on the first click
+            // before SwiftUI has resolved layout. A zero-sized panel inflates
+            // upward from its bottom-left origin once real content renders,
+            // pushing the visible panel off-screen (or onto an adjacent display
+            // on vertically stacked multi-monitor setups).
+            panel.setContentSize(resolvedContentSize(for: hostingView))
             let panelSize = panel.frame.size
 
-            // Align panel left edge to button left edge (standard macOS menu behavior)
             var x = buttonFrame.minX
+            if !(screenFrame.minX...screenFrame.maxX).contains(x) {
+                x = mouseLocation.x - panelSize.width / 2
+            }
             if x + panelSize.width > screenFrame.maxX {
                 x = screenFrame.maxX - panelSize.width - 4
             }
             if x < screenFrame.minX {
                 x = screenFrame.minX + 4
             }
-            let y = buttonFrame.minY - panelSize.height - 4
+
+            // Anchor below the menu bar of the clicked screen. Using
+            // screenFrame.maxY rather than buttonFrame.minY keeps the panel on
+            // the intended display even if buttonFrame reflects another screen's
+            // coordinates.
+            let y = screenFrame.maxY - panelSize.height - 4
             panel.setFrameOrigin(NSPoint(x: x, y: y))
         }
 
@@ -482,6 +500,15 @@ final class StatusBarController {
         }
         menuPanel?.close()
         menuPanel = nil
+    }
+
+    /// Resolves a non-zero content size from an NSHostingView, falling back
+    /// through fittingSize → intrinsicContentSize → current frame size. SwiftUI
+    /// layout occasionally hasn't settled on the first read, especially right
+    /// after `NSHostingView` is created.
+    private func resolvedContentSize(for hostingView: NSHostingView<MenuContentView>) -> NSSize {
+        let candidates = [hostingView.fittingSize, hostingView.intrinsicContentSize, hostingView.frame.size]
+        return candidates.first(where: { $0.width > 1 && $0.height > 1 }) ?? candidates[0]
     }
 
     private func statusItemFrame(_ unit: StatusItemUnit) -> NSRect? {
