@@ -37,6 +37,7 @@ final class StatusBarController {
 
     // Update Checker
     private let updateChecker = UpdateChecker()
+    private var updateCheckTimer: Timer?
     // Version Compatibility
     private let versionChecker = VersionCompatibilityChecker()
     /// Codex root가 resolve된 이후에만 polling을 시작해야 하므로 플래그로 추적
@@ -85,6 +86,7 @@ final class StatusBarController {
             if isCodexWidgetVisible { codexUsageMonitor.startPolling() }
             updateChecker.checkOnLaunch()
             versionChecker.checkOnLaunch()
+            self.schedulePeriodicUpdateCheck()
             // Rebuild after sync so status items reflect actual provider state
             rebuildStatusItems()
         }
@@ -141,6 +143,17 @@ final class StatusBarController {
     private func setupEventHandling() {
         eventStream.onEvent = { [weak self] event in
             self?.aggregator.addEvent(event)
+        }
+    }
+
+    // MARK: - Periodic Update Check
+
+    private func schedulePeriodicUpdateCheck() {
+        guard updateCheckTimer == nil else { return }
+        updateCheckTimer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateChecker.checkOnLaunch()
+            }
         }
     }
 
@@ -508,7 +521,7 @@ final class StatusBarController {
     /// after `NSHostingView` is created.
     private func resolvedContentSize(for hostingView: NSHostingView<MenuContentView>) -> NSSize {
         let candidates = [hostingView.fittingSize, hostingView.intrinsicContentSize, hostingView.frame.size]
-        return candidates.first(where: { $0.width > 1 && $0.height > 1 }) ?? candidates[0]
+        return candidates.first(where: { $0.width > 1 && $0.height > 1 }) ?? NSSize(width: 400, height: 300)
     }
 
     private func statusItemFrame(_ unit: StatusItemUnit) -> NSRect? {

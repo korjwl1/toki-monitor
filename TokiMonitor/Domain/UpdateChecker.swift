@@ -274,8 +274,9 @@ private struct UpdateDialogView: View {
                 Spacer()
                 Button(L.tr("업데이트", "Update")) {
                     var commands: [String] = []
-                    if let m = monitor { commands.append(m.brewCommand) }
+                    // toki를 먼저 업그레이드해야 toki-monitor 재시작 시 버전 불일치가 없음
                     if let t = toki { commands.append(t.brewCommand) }
+                    if let m = monitor { commands.append(m.brewCommand) }
                     onUpdate(commands)
                 }
                 .keyboardShortcut(.defaultAction)
