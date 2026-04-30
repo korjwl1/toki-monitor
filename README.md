@@ -100,6 +100,12 @@ Switch modes per provider. Right-click for Settings / Quit.
   <img src="docs/images/menubar.png" alt="Menu bar modes" width="480" />
 </p>
 
+<p align="center">
+  <img src="docs/images/sleep-demo.gif" alt="Rabbit sleeping when idle" width="320" />
+  <br>
+  <sub>The rabbit dozes off (zZ) when you stop using AI for a while.</sub>
+</p>
+
 ### Dashboard
 
 Each panel runs its own PromQL query. Identical queries are deduplicated automatically.
@@ -132,6 +138,12 @@ Not logged in? The widget shows a prompt instead of hiding — Claude shows "Cla
 - **Historical baseline** — character gets a poison effect (purple bubbles + color pulse) when usage exceeds N× your 24-hour average
 - Both effects only appear in character mode
 - Off by default. Configure in Settings → Notifications.
+
+<p align="center">
+  <img src="docs/images/hit-effect.gif" alt="Hit effect when $/min exceeds threshold" width="320" />
+  <br>
+  <sub>Star burst + shake effect fires when your spending rate crosses the threshold.</sub>
+</p>
 
 ### Settings
 

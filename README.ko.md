@@ -98,6 +98,12 @@ open /Applications/TokiMonitor.app
   <img src="docs/images/menubar.png" alt="메뉴바 모드" width="480" />
 </p>
 
+<p align="center">
+  <img src="docs/images/sleep-demo.gif" alt="대기 시 잠드는 토끼" width="320" />
+  <br>
+  <sub>일정 시간 사용이 없으면 토끼가 잠듭니다 (zZ).</sub>
+</p>
+
 ### 대시보드
 
 각 패널이 독립적으로 PromQL 쿼리를 실행합니다. 동일한 쿼리는 자동 중복 제거.
@@ -128,6 +134,12 @@ open /Applications/TokiMonitor.app
 - **이상 급증 경고** — 사용량이 24시간 평균의 N배 초과 시 캐릭터에 독 이펙트 (보라색 버블 + 색상 펄스)
 - 캐릭터 모드에서만 동작
 - 기본 꺼짐. 설정 → 알림에서 활성화.
+
+<p align="center">
+  <img src="docs/images/hit-effect.gif" alt="비용 속도 임계값 초과 시 피격 이펙트" width="320" />
+  <br>
+  <sub>$/분이 임계값을 넘으면 별 버스트 + 흔들림 이펙트가 발생합니다.</sub>
+</p>
 
 ### 동기화 (서버 모드)
 
