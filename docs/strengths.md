@@ -1,4 +1,4 @@
-# Toki Monitor — Strengths & Positioning
+# Toki Monitor — strengths and positioning
 
 **A zero-proxy, real-time menu bar AI token monitor powered by toki's Rust TSDB engine.**
 
@@ -13,25 +13,28 @@ Unlike direct file-polling tools (TokenBar, Tokscale, SessionWatcher), toki uses
 | **Data collection** | Rust daemon with kqueue/FSEvents — event-driven, 0% CPU when idle | Periodic file scanning — CPU cost scales with data |
 | **Storage** | fjall TSDB (~2.2 MB binary) — indexed, queryable | None or in-memory — lost when app closes |
 | **Query** | PromQL-style instant response | Full rescan on every query |
-| **Memory** | ~few MB (Rust, no GC) | 30-50 MB+ (Node.js runtime) or proportional to data |
+| **Memory** | ~5 MB | 20–100 MB+ |
 | **Long-term data** | O(delta) incremental updates | O(total data) full scan, degrades over time |
 | **Multi-client** | CLI + menu bar share the same daemon | Each tool scans independently |
 
 ## No proxy required
 
 Unlike proxy-based monitors (BurnRate):
-- **No network hop, no TLS interception, no tool reconfiguration.** Keep your existing CLI tools as-is.
-- **Schema-accurate data.** Structured token events with model, token breakdown, and cost consistency.
+
+- No network hop, no TLS interception, no tool reconfiguration. Keep your existing CLI tools as-is.
+- Schema-accurate data. Structured token events with model, token breakdown, and cost consistency.
 
 ## Product strengths
 
 ### Always-visible feedback
+
 - RunCat-style rabbit animation — speed proportional to token rate
 - Sleep animation (zZ) when idle, configurable delay
 - Three display modes: character animation, numeric rate, sparkline graph
 - Per-provider or aggregated status bar items
 
 ### Grafana-style dashboard
+
 - Customizable panel layout with drag-and-drop
 - Time series, bar chart, stat, gauge, and table panels
 - PromQL-powered queries via toki CLI
@@ -39,22 +42,26 @@ Unlike proxy-based monitors (BurnRate):
 - Dashboard versioning and annotations
 
 ### Anomaly detection
+
 - **Velocity alert**: icon color changes when cost/min exceeds threshold
 - **Historical baseline**: compares against 24-hour average via PromQL
 - Configurable alert method: icon color, system notification, or both
 - Custom alert colors
 
 ### Claude integration
+
 - OAuth-based usage/rate limit monitoring
 - 5-hour and 7-day usage bars with reset countdown
 - Usage threshold notifications (75%, 90%)
 
 ### Codex integration
-- Reads OAuth token from ~/.codex/auth.json (no extra login)
+
+- Reads OAuth token from `~/.codex/auth.json` (no extra login)
 - 5-hour and weekly usage bars with localized countdown
 - Auto-detects Codex CLI login availability
 
 ### UX polish
+
 - Right-click context menu (Settings, Quit)
 - Widget order customization with drag-and-drop + show/hide
 - Dashboard opens in Dock, hides when closed
@@ -63,14 +70,15 @@ Unlike proxy-based monitors (BurnRate):
 - Full Korean/English localization
 
 ### Developer-friendly
-- Open source, free, MIT license
-- Homebrew distribution (planned)
+
+- Open source, free, FSL-1.1-Apache-2.0 license (converts to Apache 2.0 on 2028-03-23)
+- Available via Homebrew tap: `brew tap korjwl1/tap && brew install --cask toki-monitor`
 - Clean Architecture: Data / Domain / Presentation layers
 - async/await throughout, unified design system
 
 ## Architecture
 
-```
+```text
 toki (Rust daemon)              Toki Monitor (Swift/SwiftUI)
 ├─ fjall TSDB                   ├─ Data        // UDS trace, CLI report, OAuth
 ├─ File watchers (kqueue)       ├─ Domain      // Aggregation, alerts, settings
@@ -82,9 +90,9 @@ Data Flow:
   toki report (PromQL) → TokiReportClient → DashboardViewModel → Charts
 ```
 
-## Competitive landscape (March 2026)
+## Competitive landscape
 
-9+ macOS menu bar apps now exist in this space. Toki Monitor's unique advantages that **no competitor replicates**:
+9+ macOS menu bar apps now exist in this space. Toki Monitor's unique advantages that no competitor replicates:
 
 1. **TSDB-backed historical analysis** — query any time range instantly
 2. **PromQL query language** — entirely unique in the menu bar app space

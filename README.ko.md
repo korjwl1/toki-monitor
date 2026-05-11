@@ -6,15 +6,20 @@
 
 <p align="center">
   <b>토큰을 태울수록 토끼가 빨라집니다.</b><br>
-  macOS 메뉴바 AI 토큰 모니터. <a href="https://github.com/korjwl1/toki">toki</a> 기반 — 유휴 시 CPU 0%, 즉시 쿼리, 존재감 없이 항상 실행.
+  macOS 메뉴바 AI 토큰 모니터. <a href="https://github.com/korjwl1/toki">toki</a> (<i>tokki</i> = 토끼) 기반 — 유휴 시 CPU 0%, 즉시 쿼리, 존재감 없이 항상 실행.
 </p>
 
+```bash
+brew tap korjwl1/tap
+brew install --cask toki-monitor
+```
+
 <p align="center">
-  <a href="https://github.com/korjwl1/toki-monitor/releases/latest"><img src="https://img.shields.io/github/v/release/korjwl1/toki-monitor?label=release" alt="Latest Release"></a>
+  <a href="https://github.com/korjwl1/toki-monitor/releases/latest"><img src="https://img.shields.io/github/v/release/korjwl1/toki-monitor?label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/homebrew-toki--monitor-brightgreen" alt="Homebrew">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" alt="macOS 14+">
   <img src="https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-green" alt="FSL-1.1-Apache-2.0">
-  <img src="https://img.shields.io/badge/swift-5.9%2B-orange" alt="Swift 5.9+">
+  <img src="https://img.shields.io/badge/swift-6.0%2B-orange" alt="Swift 6.0+">
 </p>
 
 <p align="center">
@@ -30,8 +35,6 @@
   &nbsp;&nbsp;&nbsp;
   <img src="docs/images/rabbit-sleep.gif" alt="자는 토끼" height="36" />
 </p>
-
-> [**toki**](https://github.com/korjwl1/toki) 기반 (**to**ken **i**nspector, *tokki* = 토끼) — 빠르고 가벼운 Rust 데몬으로 AI 토큰 사용량을 추적합니다.
 
 ---
 
@@ -50,10 +53,10 @@ brew install --cask toki-monitor
 ```bash
 git clone https://github.com/korjwl1/toki-monitor.git
 cd toki-monitor
-xcodebuild build -scheme TokiMonitor -configuration Release
+xcodebuild -project TokiMonitor.xcodeproj -scheme TokiMonitor -configuration Release build
 ```
 
-macOS 14+ (Sonoma), Xcode 15.2+, [toki](https://github.com/korjwl1/toki) CLI가 필요합니다.
+macOS 14+ (Sonoma), Xcode 16+, [toki](https://github.com/korjwl1/toki) CLI가 필요합니다.
 </details>
 
 ---
@@ -72,13 +75,10 @@ open /Applications/TokiMonitor.app
 
 ## 이런 분에게 추천합니다
 
-- **AI 비용을 한눈에 보고 싶다면?** 토큰을 쓸 때 토끼가 달리고, 몇 분간 안 쓰면 잠듭니다 (zZ). 아무것도 열 필요 없이 소비 속도가 항상 보입니다.
-
-- **"총 토큰"보다 더 자세한 분석이 필요하다면?** 대시보드를 여세요 — 커스텀 패널, PromQL 쿼리, 시계열 차트, 프로젝트별 파이 차트. 모델, 기간, 프로바이더별로 드릴다운 가능합니다.
-
-- **Claude랑 Codex를 같이 쓴다면?** 둘 다 나란히 보입니다 — 사용량 바, 리밋 리셋, 비용. 합산/개별 표시를 한 번에 전환.
-
-- **비용 폭주가 걱정된다면?** $/분 임계값을 설정하세요. 너무 빠르게 쓰면 아이콘이 빨간색으로, 24시간 평균보다 급증하면 주황색으로 바뀝니다.
+- AI 비용을 한눈에. 토큰을 쓸 때 토끼가 달리고, 몇 분 유휴 시 잠듭니다 (zZ) — 아무 창도 열 필요 없이 소비 속도가 항상 보입니다.
+- "총 토큰"보다 더 자세한 분석이 필요하다면? **대시보드**에서 커스텀 패널, PromQL 쿼리, 시계열 차트, 프로젝트별 파이 차트를 제공합니다. 모델, 기간, 프로바이더별 드릴다운 가능.
+- Claude와 Codex를 같이 쓴다면? 둘 다 나란히 표시 — 사용량 바, 리밋 리셋, 비용. 합산/개별 표시를 한 번에 전환.
+- 비용 폭주가 걱정된다면? $/분 임계값을 설정하세요. 너무 빠르게 쓰면 아이콘이 빨간색으로, 24시간 평균보다 급증하면 주황색으로 바뀝니다.
 
 ---
 
@@ -88,11 +88,11 @@ open /Applications/TokiMonitor.app
 
 | 모드 | 표시 내용 |
 |------|----------|
-| **캐릭터** | 토큰 속도에 비례해서 빨라지는 토끼. 시그모이드 속도 커브 (500–3,000 tok/m 구간 가속). 대기 시 수면 (zZ). HP 바로 잔여 사용량 표시 가능. |
+| **캐릭터** | 토큰 속도에 비례해서 빨라지는 토끼. 대기 시 수면 (zZ). HP 바로 잔여 사용량 표시 가능. |
 | **수치** | `1.2K/m` — 텍스트로 토큰 속도 표시 |
 | **스파크라인** | 최근 히스토리 미니 그래프 |
 
-프로바이더별로 모드 전환 가능. 우클릭으로 설정 / 종료.
+캐릭터 모드는 시그모이드 속도 커브 (500–3,000 tok/m 구간이 가장 가파름). 프로바이더별로 모드 전환 가능. 우클릭으로 설정 / 종료.
 
 <p align="center">
   <img src="docs/images/menubar.png" alt="메뉴바 모드" width="480" />
@@ -106,12 +106,14 @@ open /Applications/TokiMonitor.app
 
 ### 대시보드
 
-각 패널이 독립적으로 PromQL 쿼리를 실행합니다. 동일한 쿼리는 자동 중복 제거.
+각 패널이 독립적으로 PromQL 쿼리를 실행합니다. 동일 쿼리는 자동 중복 제거.
 
 - 시계열, 바 차트, 파이 차트, 스탯, 게이지, 테이블
-- 프로바이더 필터, 모델 필터, 시간 범위 선택
-- 프로젝트별 토큰 분석
+- 패널별 PromQL `{provider="..."}` 프로바이더 필터
+- 프로젝트별 토큰 분석 (경로 자동 복원)
+- 프리셋과 절대 시간 범위 선택
 - 대시보드 버전 관리 및 어노테이션
+- 열면 Dock에 표시, 닫으면 숨김
 
 <p align="center">
   <img src="docs/images/dashboard.png" alt="대시보드" width="640" />
@@ -141,18 +143,6 @@ open /Applications/TokiMonitor.app
   <sub>$/분이 임계값을 넘으면 별 버스트 + 흔들림 이펙트가 발생합니다.</sub>
 </p>
 
-### 동기화 (서버 모드)
-
-[toki-sync](https://github.com/korjwl1/toki-sync) 서버에 연결하여 모든 디바이스의 사용량을 한 곳에서 볼 수 있습니다.
-
-- **로컬 / 서버 전환** — 대시보드 툴바에서 로컬 데이터와 서버 집계 데이터를 전환
-- **서버 모드**: toki-sync의 PromQL 프록시에 URLSession으로 직접 쿼리 (CLI 서브프로세스 오버헤드 없음)
-- **디바이스 목록**: 등록된 모든 디바이스와 마지막 접속 시각 표시
-- **토큰 갱신**: 401 시 JWT 자동 갱신, 재로그인이 필요하면 시스템 알림
-- **HTTPS 필수**: HTTPS가 아닌 서버 URL은 거부 (localhost는 개발용으로 예외)
-
-설정 → 동기화에서 서버 URL을 입력하고 device code flow로 인증하세요 (브라우저가 열립니다). 인증 정보��� macOS 키체인에 저장되며, toki 데몬과 공유됩니��.
-
 ### 설정
 
 - 합산 또는 개별 프로바이더 표시 (독립 스타일 설정)
@@ -163,6 +153,18 @@ open /Applications/TokiMonitor.app
 - 정보 페이지: toki CLI 버전 표시, Homebrew 업데이트 확인
 - 한국어 / 영어 완전 지역화
 - macOS Tahoe에서 Liquid Glass 지원
+
+### 동기화 (서버 모드)
+
+[toki-sync](https://github.com/korjwl1/toki-sync) 서버에 연결하여 모든 디바이스의 사용량을 한 곳에서 볼 수 있습니다.
+
+- 로컬 / 서버 전환 — 대시보드 툴바에서 로컬 데이터와 서버 집계 데이터를 전환
+- 서버 모드는 toki-sync의 PromQL 프록시에 URLSession으로 직접 쿼리 (CLI 서브프로세스 오버헤드 없음)
+- 디바이스 목록 — 등록된 모든 디바이스와 마지막 접속 시각 표시
+- 토큰 갱신 — 401 시 JWT 자동 갱신, 재로그인 필요 시 시스템 알림
+- HTTPS 필수 — HTTPS가 아닌 서버 URL은 거부 (localhost는 개발용으로 예외)
+
+설정 → 동기화에서 서버 URL을 입력하고 device code flow로 인증하세요 (브라우저가 열립니다). 인증 정보는 macOS 키체인에 저장되며, toki 데몬과 공유됩니다.
 
 <p align="center">
   <img src="docs/images/settings-menubar.png" alt="설정 — 메뉴 바" width="480" />
@@ -176,25 +178,23 @@ open /Applications/TokiMonitor.app
 
 ### 왜 toki인가?
 
-다른 AI 사용량 모니터는 전부 같은 방식입니다: 타이머로 파일을 폴링하고, 전부 다시 파싱하고, 결과를 보여주고, 버립니다. 시간 범위를 바꾸면? 다시 스캔. 앱을 닫으면? 데이터 소실.
+다른 AI 사용량 모니터는 전부 같은 방식입니다: 타이머로 파일을 폴링하고, 전부 다시 파싱하고, 결과를 보여주고, 버립니다. 시간 범위를 바꾸면 다시 스캔, 앱을 닫으면 데이터 소실.
 
-[**toki**](https://github.com/korjwl1/toki)는 다릅니다. kqueue로 AI 도구의 세션 파일을 감시하는 Rust 데몬입니다 — 폴링이 아니라 이벤트 기반. 토큰이 발생하면 즉시 내장 시계열 데이터베이스(fjall TSDB)에 저장합니다. 아무 일도 없으면 CPU 사용량은 문자 그대로 0%입니다.
+[toki](https://github.com/korjwl1/toki)는 다릅니다. kqueue로 AI 도구의 세션 파일을 감시하는 Rust 데몬으로, 폴링이 아니라 이벤트 기반입니다. 토큰은 즉시 내장 시계열 데이터베이스(fjall TSDB)에 저장되고, 아무 일도 없으면 CPU 사용량은 문자 그대로 0%. 전체 토큰 히스토리가 인덱싱되어 있어 어떤 시간 범위든 PromQL로 ~7 ms에 쿼리 가능하며, ~5 MB 메모리에서 동작합니다.
 
-결과: 전체 토큰 히스토리가 인덱싱되어 있고 어떤 시간 범위든 PromQL로 ~7ms에 쿼리 가능합니다 — 파일 재스캔 없이, 대기 없이, 렉 없이. 그리고 이 모든 게 ~5MB 메모리에서 동작합니다.
+폴링/프록시 기반 모니터와의 전체 비교는 [docs/strengths.ko.md](docs/strengths.ko.md) 참조.
 
 | | toki | 다른 모든 도구 |
 |---|---|---|
 | **수집 방식** | kqueue 파일 감시 — 즉시, 유휴 시 CPU 0% | 타이머 기반 재스캔 (30초~5분 간격) |
 | **저장** | 내장 TSDB — 영구 저장, 인덱싱 | 없음 — 앱 종료 시 소실 |
-| **쿼리** | PromQL 엔진 — 어떤 범위든 ~7ms | 매번 전체 파일 재스캔 |
+| **쿼리** | PromQL 엔진 — 어떤 범위든 ~7 ms | 매번 전체 파일 재스캔 |
 | **메모리** | ~5 MB | 20~100 MB+ |
 | **아키텍처** | 하나의 데몬이 CLI + 메뉴바 + 대시보드 지원 | 각 앱이 독립적으로 재스캔 |
 
-toki는 백그라운드에서 조용히 실행됩니다 — 필요할 때까지 존재를 느끼지 못합니다. 설정 파일도, 데이터베이스 관리도 필요 없습니다. 그냥 동작합니다.
-
 ### 아키텍처
 
-```
+```text
 toki (Rust 데몬)                Toki Monitor (Swift/SwiftUI)
 ├─ fjall TSDB                   ├─ Data        // UDS, CLI, Keychain, ServerQueryClient
 ├─ kqueue 파일 감시             ├─ Domain      // 집계, 알림, SyncManager
@@ -219,9 +219,9 @@ toki (Rust 데몬)                Toki Monitor (Swift/SwiftUI)
 
 | 프로바이더 | CLI 도구 | Usage API | 상태 |
 |-----------|---------|-----------|------|
-| Anthropic | [Claude Code](https://claude.ai/code) | OAuth | ✅ |
-| OpenAI | [Codex CLI](https://github.com/openai/codex) | OAuth | ✅ |
-| Google | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | — | ⏳ 예정 |
+| Anthropic | [Claude Code](https://claude.ai/code) | OAuth | 출시 |
+| OpenAI | [Codex CLI](https://github.com/openai/codex) | OAuth | 출시 |
+| Google | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | — | 예정 |
 
 프로바이더 추가는 toki에 파서만 추가하면 됩니다 — Toki Monitor가 자동으로 인식합니다.
 
@@ -239,10 +239,12 @@ xcodebuild test -scheme TokiMonitor -destination 'platform=macOS'
 
 ## 기여
 
-기여 환영합니다!
+설치, 빌드 명령, PR 가이드라인은 [CONTRIBUTING.md](CONTRIBUTING.md) 참조.
+
+빠른 경로:
 
 1. Fork → feature branch → `main`에 PR
-2. 버그 리포트: macOS 버전, `toki --version`, 재현 방법을 포함해주세요
+2. 버그 리포트: macOS 버전, `toki --version`, 재현 방법 포함
 
 ---
 
@@ -250,7 +252,7 @@ xcodebuild test -scheme TokiMonitor -destination 'platform=macOS'
 
 메뉴바에 나만의 캐릭터를 추가할 수 있습니다. `Resources/Animations/` 아래에 폴더를 만드세요:
 
-```
+```text
 Resources/Animations/
   rabbit/              ← 기본 내장
     theme.json
@@ -312,9 +314,9 @@ Resources/Animations/
 
 ## 예정된 기능
 
-- **Gemini CLI 지원** — Google Gemini 프로바이더 연동
-- **멀티 디바이스 동기화** — ✅ toki-sync를 통한 기기 간 사용량 데이터 공유 (대시보드 서버 모드)
-- **사용량 보고서** — 주간/월간 요약, 전주 대비 및 전월 대비 분석
+- Gemini CLI 지원 — Google Gemini 프로바이더 연동
+- 멀티 디바이스 동기화 — 출시 완료, toki-sync를 통한 기기 간 사용량 데이터 공유 (대시보드 서버 모드)
+- 사용량 보고서 — 주간/월간 요약, 전주 대비 및 전월 대비 분석
 
 ---
 
