@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>A rabbit that runs as fast as you burn tokens.</b><br>
-  macOS menu bar AI token monitor, powered by <a href="https://github.com/korjwl1/toki">toki</a> (<i>tokki</i> = 토끼) — zero CPU at idle, instant queries, always running in the background.
+  macOS menu bar monitor for Claude Code and Codex CLI token usage, powered by <a href="https://github.com/korjwl1/toki">toki</a> (<i>tokki</i> = 토끼) — zero CPU at idle, instant queries, always running in the background.
 </p>
 
 ```bash

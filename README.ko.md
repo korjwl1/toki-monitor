@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>토큰을 태울수록 토끼가 빨라집니다.</b><br>
-  macOS 메뉴바 AI 토큰 모니터. <a href="https://github.com/korjwl1/toki">toki</a> (<i>tokki</i> = 토끼) 기반 — 유휴 시 CPU 0%, 즉시 쿼리, 존재감 없이 항상 실행.
+  Claude Code와 Codex CLI 토큰 사용량을 보여주는 macOS 메뉴바 모니터. <a href="https://github.com/korjwl1/toki">toki</a> (<i>tokki</i> = 토끼) 기반 — 유휴 시 CPU 0%, 즉시 쿼리, 존재감 없이 항상 실행.
 </p>
 
 ```bash
