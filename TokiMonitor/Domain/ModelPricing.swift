@@ -99,6 +99,15 @@ enum ModelPricing {
         )),
     ]
 
+    /// Fallback multipliers for Anthropic Fast mode. Mirrors toki's
+    /// `providers/claude_code::FAST_MULTIPLIER` so client-side and
+    /// server-side cost estimates agree when the CLI omits `cost_usd`.
+    /// Source: Anthropic Claude Code fast-mode pricing ($30/$150 vs $5/$25 = 6x).
+    private static let fastMultiplier: [String: Double] = [
+        "claude-opus-4-6": 6.0,
+        "claude-opus-4-7": 6.0,
+    ]
+
     /// Estimate cost from token breakdown. Returns nil if model is unknown.
     static func estimateCost(
         model: String,
@@ -109,7 +118,22 @@ enum ModelPricing {
         cachedInputTokens: UInt64? = nil
     ) -> Double? {
         let lower = model.lowercased()
-        guard let pricing = pricingTable.first(where: { lower.hasPrefix($0.prefix) })?.pricing else {
+
+        // Anthropic Fast mode: upstream toki appends "-fast" to the model name
+        // when message.usage.speed == "fast". The fallback pricing table only
+        // knows base model prefixes, so strip the suffix and apply a multiplier
+        // at the end to keep client-side and server-side estimates aligned.
+        var lookup = lower
+        var multiplier = 1.0
+        if lookup.hasSuffix("-fast") {
+            let base = String(lookup.dropLast(5))
+            if let mul = fastMultiplier[base] {
+                lookup = base
+                multiplier = mul
+            }
+        }
+
+        guard let pricing = pricingTable.first(where: { lookup.hasPrefix($0.prefix) })?.pricing else {
             return nil
         }
 
@@ -133,6 +157,6 @@ enum ModelPricing {
         // Output tokens
         cost += Double(outputTokens) * pricing.outputPerToken
 
-        return cost
+        return cost * multiplier
     }
 }
