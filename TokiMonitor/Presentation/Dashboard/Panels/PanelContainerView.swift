@@ -108,6 +108,12 @@ struct PanelContainerView<Content: View>: View {
             }
         }
         .padding(DS.md)
+        // Force the full padded rectangle to be hit-testable so .onHover fires
+        // anywhere inside the card — not just where chart pixels are drawn.
+        // Without this, the title bar / edit button area sits outside the
+        // hit region and the button disappears the moment the cursor leaves
+        // the drawn data, making it unreachable.
+        .contentShape(Rectangle())
         .modifier(PanelCardModifier(isHovered: isHovered))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
