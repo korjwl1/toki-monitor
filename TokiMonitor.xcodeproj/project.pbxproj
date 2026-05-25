@@ -85,6 +85,7 @@
 		AE7388FE3592A7411AC81393 /* VersionHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E478EB5C5691C2D6693F41 /* VersionHistorySheet.swift */; };
 		B1D657C2EEDCA875C6490B61 /* SyncClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8917E556BB8BA674083AA0D /* SyncClient.swift */; };
 		B40444463A7E8FAB10625282 /* TimeRangePickerPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18AEF7A2555230D2AF60A455 /* TimeRangePickerPopover.swift */; };
+		B7533A6F032F66AA318EECD8 /* PanelPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D13660AF9BC68A2AD56CB9 /* PanelPlugin.swift */; };
 		B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */; };
 		BCE0DA81930B1736E9AB03A5 /* TokenFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B278895C8F3233433F88309 /* TokenFormatter.swift */; };
 		BD0727E1C8B4DA7BCB2CBFD4 /* DashboardSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB0CA29129542559BD4F7E3 /* DashboardSettingsSheet.swift */; };
@@ -207,6 +208,7 @@
 		A285CEF82274757C8A327142 /* TimeSeriesModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesModels.swift; sourceTree = "<group>"; };
 		A56E6C47FB0555F57056DA13 /* frame_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_02.png; sourceTree = "<group>"; };
 		A5B5567C5B301D96AB614B4E /* PanelContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelContainerView.swift; sourceTree = "<group>"; };
+		A5D13660AF9BC68A2AD56CB9 /* PanelPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelPlugin.swift; sourceTree = "<group>"; };
 		A6C1751117D1E380839B3A0E /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		A9F74A465DDBF407B395F8AA /* TokenAggregatorLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregatorLogicTests.swift; sourceTree = "<group>"; };
 		B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClient.swift; sourceTree = "<group>"; };
@@ -406,6 +408,7 @@
 			children = (
 				03F503F3516997ED1304E8F7 /* DashboardConfig.swift */,
 				8AE667E2C864368F710D35E6 /* DashboardExtensions.swift */,
+				A5D13660AF9BC68A2AD56CB9 /* PanelPlugin.swift */,
 				A285CEF82274757C8A327142 /* TimeSeriesModels.swift */,
 				8B4247163632AC4A7FF3582B /* TokiEvent.swift */,
 				74A27A6A118A446539806BB7 /* TokiReportModels.swift */,
@@ -687,6 +690,7 @@
 				3DA3BA25D0968CA27E13ECE3 /* PanelDataExtractor.swift in Sources */,
 				8396AA1A147DFFBD23FC72C6 /* PanelDragModifier.swift in Sources */,
 				C9B1B05E770D61B3E9D3108E /* PanelEditorView.swift in Sources */,
+				B7533A6F032F66AA318EECD8 /* PanelPlugin.swift in Sources */,
 				35C19F7105186D30872BA9AA /* PanelResizeHandle.swift in Sources */,
 				FE6D7C67ACAE1D3ACB73C3A6 /* PieChartView.swift in Sources */,
 				417DA2C685E33E4F4E375DE4 /* PlaylistManager.swift in Sources */,

@@ -2,6 +2,15 @@ import Foundation
 import SwiftUI
 import Combine
 
+/// Grouping key used by `DashboardViewModel.fetchData` to batch panels that
+/// share both an interpolated PromQL query *and* a datasource selector. Two
+/// panels with the same query string but different per-query datasources
+/// (Perses style) must hit different backends, so they cannot share a group.
+fileprivate struct PanelQueryKey: Hashable {
+    let query: String
+    let datasource: DatasourceSelector?
+}
+
 @MainActor
 @Observable
 final class DashboardViewModel {
@@ -210,25 +219,41 @@ final class DashboardViewModel {
             let projectPanels = panels.filter { $0.effectiveMetric == .tokensByProject }
             let regularPanels = panels.filter { $0.effectiveMetric != .tokensByProject }
 
-            // Build interpolated queries and group by unique query string
-            var queryGroups: [String: [PanelConfig]] = [:]
+            // Build interpolated queries and group by (query, datasource) — a
+            // panel may carry a per-query datasource override (Perses style),
+            // in which case it must not be batched with panels hitting a
+            // different backend.
+            var queryGroups: [PanelQueryKey: [PanelConfig]] = [:]
             for panel in regularPanels {
                 let template = panel.effectiveQuery ?? panel.effectiveMetric.defaultQuery
                 let interpolated = interpolateQuery(template, time: time)
-                queryGroups[interpolated, default: []].append(panel)
+                let key = PanelQueryKey(query: interpolated,
+                                        datasource: panel.effectiveDatasource)
+                queryGroups[key, default: []].append(panel)
             }
 
-            // Execute all queries concurrently via the active query client
-            var queryResults: [(String, Result<TimeSeriesData, Error>)] = []
-            await withTaskGroup(of: (String, Result<TimeSeriesData, Error>).self) { group in
-                for (query, _) in queryGroups {
-                    let client = self.queryClient
+            // Execute all queries concurrently. Each group resolves its own
+            // client: per-panel datasource selector wins; otherwise the
+            // dashboard's active client is used.
+            let defaultClient = self.queryClient
+            let activeSelector = self.activeDatasource
+            var queryResults: [(PanelQueryKey, Result<TimeSeriesData, Error>)] = []
+            await withTaskGroup(of: (PanelQueryKey, Result<TimeSeriesData, Error>).self) { group in
+                for (key, _) in queryGroups {
+                    let client: any QueryDataSource = {
+                        if let ds = key.datasource,
+                           ds != activeSelector,
+                           let plugin = DatasourceRegistry.shared.resolve(ds) {
+                            return plugin
+                        }
+                        return defaultClient
+                    }()
                     group.addTask {
                         do {
-                            let result = try await client.queryPromQLAsTimeSeries(query: query, time: time)
-                            return (query, .success(result))
+                            let result = try await client.queryPromQLAsTimeSeries(query: key.query, time: time)
+                            return (key, .success(result))
                         } catch {
-                            return (query, .failure(error))
+                            return (key, .failure(error))
                         }
                     }
                 }
@@ -244,8 +269,8 @@ final class DashboardViewModel {
             }
 
             // Apply all results in one batch (single UI update)
-            for (query, result) in queryResults {
-                let affectedPanels = queryGroups[query] ?? []
+            for (key, result) in queryResults {
+                let affectedPanels = queryGroups[key] ?? []
                 switch result {
                 case .success(let data):
                     for panel in affectedPanels {

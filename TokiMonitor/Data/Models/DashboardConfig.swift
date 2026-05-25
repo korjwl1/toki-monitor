@@ -298,14 +298,46 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     // Row panel: collapsed state
     var collapsed: Bool = false
 
+    // MARK: - Perses-style fields (optional; nil means "use legacy fields")
+
+    /// Perses-style visualization plugin reference. When set, takes precedence
+    /// over `panelType` for rendering decisions.
+    var plugin: PanelPluginRef?
+
+    /// Perses-style query envelopes. When non-empty, takes precedence over
+    /// `targets` during data fetching.
+    var queries: [Query]?
+
     /// The effective metric for this panel — prefers first target's metric, falls back to legacy field
     var effectiveMetric: PanelMetric {
-        targets.first?.metric ?? metric
+        if let q = queries?.first,
+           let spec = try? JSONDecoder().decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec),
+           let m = spec.metric {
+            return m
+        }
+        return targets.first?.metric ?? metric
     }
 
     /// The effective PromQL query, if any custom query is set
     var effectiveQuery: String? {
-        targets.first?.query
+        if let q = queries?.first,
+           let spec = try? JSONDecoder().decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec) {
+            return spec.query
+        }
+        return targets.first?.query
+    }
+
+    /// Optional per-query datasource selector. Returns the first non-nil
+    /// selector across `queries`, or nil to use the dashboard default.
+    var effectiveDatasource: DatasourceSelector? {
+        guard let queries else { return nil }
+        for q in queries {
+            if let spec = try? JSONDecoder().decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec),
+               let ds = spec.datasource {
+                return ds
+            }
+        }
+        return nil
     }
 }
 
