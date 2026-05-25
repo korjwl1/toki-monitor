@@ -31,8 +31,11 @@ struct PanelEdgeResize: ViewModifier {
 
     /// Drag area thickness on a panel's edge.
     private static let stripThickness: CGFloat = 6
-    /// Side length of the bottom-right corner affordance.
-    private static let cornerSize: CGFloat = 14
+    /// Side length of the bottom-right corner affordance. Small enough that
+    /// it doesn't dominate a 1-row stat panel (~80pt tall) — drift into the
+    /// corner from a horizontal drag was making stat panels grow vertically
+    /// when the user only wanted to change width.
+    private static let cornerSize: CGFloat = 10
 
     func body(content: Content) -> some View {
         content.overlay {
@@ -41,26 +44,35 @@ struct PanelEdgeResize: ViewModifier {
                     let w = proxy.size.width
                     let h = proxy.size.height
 
+                    // Strips are laid out so edge and corner regions are
+                    // **mutually exclusive**, not overlapping. With the old
+                    // overlapping layout, the corner (which drives both
+                    // axes) sat on the bottom 14pt of the right-edge strip;
+                    // a tall stat panel is only 80pt, so a "drag right edge
+                    // a bit left" gesture often landed in the corner zone
+                    // and changed height as well. Splitting the regions
+                    // means a drag on the right edge is *only* horizontal.
                     ZStack(alignment: .topLeading) {
+                        // Right edge — everything above the corner zone.
                         ResizeHandleStrip(
                             cursor: .resizeLeftRight,
                             onDragChanged: { t in apply(translation: t, horizontal: true, vertical: false) },
                             onDragEnded: { t in commit(translation: t, horizontal: true, vertical: false) }
                         )
-                        .frame(width: Self.stripThickness, height: h)
+                        .frame(width: Self.stripThickness, height: max(0, h - Self.cornerSize))
                         .offset(x: w - Self.stripThickness, y: 0)
 
+                        // Bottom edge — everything left of the corner zone.
                         ResizeHandleStrip(
                             cursor: .resizeUpDown,
                             onDragChanged: { t in apply(translation: t, horizontal: false, vertical: true) },
                             onDragEnded: { t in commit(translation: t, horizontal: false, vertical: true) }
                         )
-                        .frame(width: w, height: Self.stripThickness)
+                        .frame(width: max(0, w - Self.cornerSize), height: Self.stripThickness)
                         .offset(x: 0, y: h - Self.stripThickness)
 
-                        // Corner is drawn last so it wins SwiftUI's
-                        // ZStack hit-test on the overlapping bottom-right
-                        // region. (SwiftUI hit-tests the last child first.)
+                        // Bottom-right corner — its own non-overlapping
+                        // square. Drives both axes.
                         ResizeHandleStrip(
                             cursor: .crosshair,
                             onDragChanged: { t in apply(translation: t, horizontal: true, vertical: true) },
