@@ -209,16 +209,8 @@ struct DashboardSettingsSheet: View {
                     Text(L.tr("이름", "Name"))
                         .font(.caption)
                         .frame(width: 60, alignment: .leading)
-                    TextField("", text: Binding(
-                        get: { variable.name },
-                        set: { newName in
-                            if let idx = viewModel.dashboardConfig.templating.list.firstIndex(where: { $0.id == variable.id }) {
-                                viewModel.dashboardConfig.templating.list[idx].name = newName
-                                viewModel.saveDashboard()
-                            }
-                        }
-                    ))
-                    .textFieldStyle(.roundedBorder)
+                    TextField("", text: bindingForVariable(variable.id, \.name))
+                        .textFieldStyle(.roundedBorder)
                 }
 
                 HStack {
@@ -228,9 +220,8 @@ struct DashboardSettingsSheet: View {
                     TextField("", text: Binding(
                         get: { variable.label ?? "" },
                         set: { newLabel in
-                            if let idx = viewModel.dashboardConfig.templating.list.firstIndex(where: { $0.id == variable.id }) {
-                                viewModel.dashboardConfig.templating.list[idx].label = newLabel.isEmpty ? nil : newLabel
-                                viewModel.saveDashboard()
+                            mutateVariable(variable.id) { v in
+                                v.label = newLabel.isEmpty ? nil : newLabel
                             }
                         }
                     ))
@@ -238,27 +229,45 @@ struct DashboardSettingsSheet: View {
                 }
 
                 HStack {
-                    Text(L.tr("값", "Values"))
+                    Text(L.tr("종류", "Plugin"))
                         .font(.caption)
                         .frame(width: 60, alignment: .leading)
-                    TextField("", text: Binding(
-                        get: { variable.query },
-                        set: { newQuery in
-                            if let idx = viewModel.dashboardConfig.templating.list.firstIndex(where: { $0.id == variable.id }) {
-                                viewModel.dashboardConfig.templating.list[idx].query = newQuery
-                                // Parse comma-separated values into options
-                                viewModel.dashboardConfig.templating.list[idx].options = newQuery
-                                    .split(separator: ",")
-                                    .map { val in
-                                        let trimmed = val.trimmingCharacters(in: .whitespaces)
-                                        return VariableOption(text: trimmed, value: trimmed)
-                                    }
-                                viewModel.saveDashboard()
+                    Picker("", selection: Binding(
+                        get: { variable.plugin?.kind ?? legacyPluginKind(variable) },
+                        set: { newKind in
+                            mutateVariable(variable.id) { v in
+                                let spec = defaultSpecData(for: newKind, currentVariable: v)
+                                v.plugin = VariablePluginRef(kind: newKind, spec: spec)
+                                // Keep legacy `type` enum aligned for v3 path / older callers.
+                                v.type = (newKind == BuiltinVariablePluginKind.interval) ? .interval : .custom
                             }
+                            viewModel.refreshVariables()
                         }
-                    ))
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.caption, design: .monospaced))
+                    )) {
+                        Text(L.tr("정적 목록", "Static List"))
+                            .tag(BuiltinVariablePluginKind.staticList)
+                        Text(L.tr("시간 간격", "Interval"))
+                            .tag(BuiltinVariablePluginKind.interval)
+                        Text(L.tr("PromQL 라벨", "PromQL Label Values"))
+                            .tag(BuiltinVariablePluginKind.tokiLabelValues)
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 220, alignment: .leading)
+                    Spacer()
+                }
+
+                pluginSpecEditor(variable)
+
+                HStack(spacing: 16) {
+                    Toggle(L.tr("다중 선택", "Multi"),
+                           isOn: bindingForVariable(variable.id, \.multi))
+                        .toggleStyle(.checkbox)
+                        .font(.caption)
+                    Toggle(L.tr("전체 옵션", "Include All"),
+                           isOn: bindingForVariable(variable.id, \.includeAll))
+                        .toggleStyle(.checkbox)
+                        .font(.caption)
+                    Spacer()
                 }
             }
         } label: {
@@ -274,6 +283,212 @@ struct DashboardSettingsSheet: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    // MARK: - Plugin-specific spec editors
+
+    @ViewBuilder
+    private func pluginSpecEditor(_ variable: DashboardVariable) -> some View {
+        let kind = variable.plugin?.kind ?? legacyPluginKind(variable)
+        switch kind {
+        case BuiltinVariablePluginKind.staticList:
+            staticListSpecEditor(variable)
+        case BuiltinVariablePluginKind.interval:
+            intervalSpecEditor(variable)
+        case BuiltinVariablePluginKind.tokiLabelValues:
+            labelValuesSpecEditor(variable)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func staticListSpecEditor(_ variable: DashboardVariable) -> some View {
+        HStack(alignment: .top) {
+            Text(L.tr("값", "Values"))
+                .font(.caption)
+                .frame(width: 60, alignment: .leading)
+            TextField(L.tr("쉼표로 구분", "comma-separated"), text: Binding(
+                get: {
+                    if let plugin = variable.plugin,
+                       let spec = try? JSONDecoder().decode(StaticListVariableSpec.self, from: plugin.spec) {
+                        return spec.values.map(\.value).joined(separator: ", ")
+                    }
+                    return variable.query
+                },
+                set: { newText in
+                    let values = newText
+                        .split(separator: ",")
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                        .map { VariableOption(text: $0, value: $0) }
+                    let spec = StaticListVariableSpec(values: values)
+                    let data = (try? JSONEncoder().encode(spec)) ?? Data()
+                    mutateVariable(variable.id) { v in
+                        v.query = newText
+                        v.options = values
+                        v.plugin = VariablePluginRef(
+                            kind: BuiltinVariablePluginKind.staticList, spec: data
+                        )
+                    }
+                    viewModel.refreshVariables()
+                }
+            ))
+            .textFieldStyle(.roundedBorder)
+            .font(.system(.caption, design: .monospaced))
+        }
+    }
+
+    private func intervalSpecEditor(_ variable: DashboardVariable) -> some View {
+        HStack(alignment: .top) {
+            Text(L.tr("간격", "Intervals"))
+                .font(.caption)
+                .frame(width: 60, alignment: .leading)
+            TextField("1m, 5m, 15m, 1h", text: Binding(
+                get: {
+                    if let plugin = variable.plugin,
+                       let spec = try? JSONDecoder().decode(IntervalVariableSpec.self, from: plugin.spec) {
+                        return spec.values.joined(separator: ", ")
+                    }
+                    return variable.query
+                },
+                set: { newText in
+                    let values = newText
+                        .split(separator: ",")
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                    let spec = IntervalVariableSpec(values: values)
+                    let data = (try? JSONEncoder().encode(spec)) ?? Data()
+                    mutateVariable(variable.id) { v in
+                        v.query = newText
+                        v.plugin = VariablePluginRef(
+                            kind: BuiltinVariablePluginKind.interval, spec: data
+                        )
+                    }
+                    viewModel.refreshVariables()
+                }
+            ))
+            .textFieldStyle(.roundedBorder)
+            .font(.system(.caption, design: .monospaced))
+        }
+    }
+
+    private func labelValuesSpecEditor(_ variable: DashboardVariable) -> some View {
+        let currentSpec: TokiLabelValuesVariableSpec = {
+            if let plugin = variable.plugin,
+               let s = try? JSONDecoder().decode(TokiLabelValuesVariableSpec.self, from: plugin.spec) {
+                return s
+            }
+            return TokiLabelValuesVariableSpec(
+                datasource: nil,
+                query: "sum by (model) (increase(usage[$__interval]))",
+                labelName: "model"
+            )
+        }()
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                Text(L.tr("쿼리", "Query"))
+                    .font(.caption)
+                    .frame(width: 60, alignment: .leading)
+                TextField("PromQL", text: Binding(
+                    get: { currentSpec.query },
+                    set: { newQuery in
+                        var s = currentSpec
+                        s.query = newQuery
+                        writeLabelValuesSpec(s, variableID: variable.id)
+                    }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.caption, design: .monospaced))
+            }
+            HStack {
+                Text(L.tr("라벨", "Label"))
+                    .font(.caption)
+                    .frame(width: 60, alignment: .leading)
+                Picker("", selection: Binding(
+                    get: { currentSpec.labelName },
+                    set: { newLabel in
+                        var s = currentSpec
+                        s.labelName = newLabel
+                        writeLabelValuesSpec(s, variableID: variable.id)
+                    }
+                )) {
+                    Text("model").tag("model")
+                    Text("project").tag("project")
+                    Text("device_id").tag("device_id")
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 200, alignment: .leading)
+                Spacer()
+            }
+        }
+    }
+
+    private func writeLabelValuesSpec(_ spec: TokiLabelValuesVariableSpec, variableID: UUID) {
+        let data = (try? JSONEncoder().encode(spec)) ?? Data()
+        mutateVariable(variableID) { v in
+            v.plugin = VariablePluginRef(
+                kind: BuiltinVariablePluginKind.tokiLabelValues, spec: data
+            )
+        }
+        viewModel.refreshVariables()
+    }
+
+    // MARK: - Variable mutation helpers
+
+    private func mutateVariable(_ id: UUID, _ change: (inout DashboardVariable) -> Void) {
+        guard let idx = viewModel.dashboardConfig.templating.list.firstIndex(where: { $0.id == id })
+        else { return }
+        change(&viewModel.dashboardConfig.templating.list[idx])
+        viewModel.saveDashboard()
+    }
+
+    private func bindingForVariable<T>(_ id: UUID, _ keyPath: WritableKeyPath<DashboardVariable, T>) -> Binding<T> {
+        Binding(
+            get: {
+                viewModel.dashboardConfig.templating.list.first(where: { $0.id == id })?[keyPath: keyPath]
+                    ?? viewModel.dashboardConfig.templating.list.first![keyPath: keyPath]
+            },
+            set: { newValue in mutateVariable(id) { v in v[keyPath: keyPath] = newValue } }
+        )
+    }
+
+    /// Fall back from the legacy `type` enum to a plugin kind when a
+    /// variable has no `plugin` ref yet (pre-v4 imports, etc.).
+    private func legacyPluginKind(_ variable: DashboardVariable) -> String {
+        switch variable.type {
+        case .interval: return BuiltinVariablePluginKind.interval
+        case .custom:   return BuiltinVariablePluginKind.staticList
+        }
+    }
+
+    /// Produce a sensible default plugin spec when the user switches plugin
+    /// kinds — preserves data when possible.
+    private func defaultSpecData(for kind: String, currentVariable v: DashboardVariable) -> Data {
+        let encoder = JSONEncoder()
+        switch kind {
+        case BuiltinVariablePluginKind.staticList:
+            let values = v.options.isEmpty
+                ? v.query.split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+                    .map { VariableOption(text: $0, value: $0) }
+                : v.options
+            return (try? encoder.encode(StaticListVariableSpec(values: values))) ?? Data()
+        case BuiltinVariablePluginKind.interval:
+            let parsed = v.query.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            let values = parsed.isEmpty ? IntervalVariableSpec().values : parsed
+            return (try? encoder.encode(IntervalVariableSpec(values: values))) ?? Data()
+        case BuiltinVariablePluginKind.tokiLabelValues:
+            return (try? encoder.encode(TokiLabelValuesVariableSpec(
+                datasource: nil,
+                query: "sum by (model) (increase(usage[$__interval]))",
+                labelName: "model"
+            ))) ?? Data()
+        default:
+            return Data()
         }
     }
 
