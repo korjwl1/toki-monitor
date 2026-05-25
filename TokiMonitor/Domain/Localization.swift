@@ -197,12 +197,6 @@ enum L {
         static var annotations: String { tr("주석", "Annotations") }
         static var addAnnotation: String { tr("주석 추가", "Add Annotation") }
         static var annotationText: String { tr("주석 내용", "Annotation text") }
-        // Alerts
-        static var alerts: String { tr("알림 규칙", "Alert Rules") }
-        static var addAlert: String { tr("알림 추가", "Add Alert") }
-        static var alertName: String { tr("알림 이름", "Alert Name") }
-        static var condition: String { tr("조건", "Condition") }
-        static var threshold: String { tr("임계값", "Threshold") }
         // Explore
         static var explore: String { tr("탐색", "Explore") }
         static var queryHistory: String { tr("쿼리 기록", "Query History") }

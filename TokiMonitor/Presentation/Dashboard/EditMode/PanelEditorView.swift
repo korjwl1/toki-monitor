@@ -14,7 +14,6 @@ struct PanelEditorView: View {
         case query
         case visualization
         case options
-        case alerts
         case links
 
         var label: String {
@@ -22,7 +21,6 @@ struct PanelEditorView: View {
             case .query: L.tr("쿼리", "Query")
             case .visualization: L.tr("시각화", "Visualization")
             case .options: L.tr("옵션", "Options")
-            case .alerts: L.dash.alerts
             case .links: L.dash.dataLinks
             }
         }
@@ -32,7 +30,6 @@ struct PanelEditorView: View {
             case .query: "terminal"
             case .visualization: "chart.xyaxis.line"
             case .options: "gearshape"
-            case .alerts: "bell"
             case .links: "link"
             }
         }
@@ -150,8 +147,6 @@ struct PanelEditorView: View {
                     visualizationTab
                 case .options:
                     optionsTab
-                case .alerts:
-                    alertsTab
                 case .links:
                     linksTab
                 }
@@ -541,42 +536,6 @@ struct PanelEditorView: View {
                     .font(.caption)
             }
             .buttonStyle(.plain)
-        }
-    }
-
-    // MARK: - Alerts Tab
-
-    private var alertsTab: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(L.dash.alerts)
-                .font(.subheadline.bold())
-
-            Text(L.tr("이 패널에 대한 알림 규칙을 설정할 수 있습니다. 메인 알림 뷰에서 관리하세요.", "Alert rules for this panel can be configured. Manage them from the main Alerts view."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            let rules = viewModel.alertManager.rules(for: panel.id)
-            if rules.isEmpty {
-                Text(L.tr("알림 규칙이 없습니다", "No alert rules"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(rules) { rule in
-                    HStack {
-                        Image(systemName: rule.state.iconName)
-                            .foregroundStyle(rule.state == .alerting ? .red : .secondary)
-                            .font(.caption)
-                        Text(rule.name)
-                            .font(.caption)
-                        Spacer()
-                        Text("\(rule.condition.displayName) \(String(format: "%.0f", rule.threshold))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(8)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                }
-            }
         }
     }
 

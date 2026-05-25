@@ -69,10 +69,7 @@ final class DashboardViewModel {
     // MARK: - Annotations
     var annotations: [DashboardAnnotation] = []
 
-    // MARK: - Alert Manager
-    let alertManager = AlertManager()
-
-    // MARK: - Version Store
+// MARK: - Version Store
     let versionStore = DashboardVersionStore()
 
 // MARK: - Explore

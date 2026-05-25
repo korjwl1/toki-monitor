@@ -65,7 +65,6 @@
 		67735C617E16379A7BE552E2 /* Variable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD76DA115AED88DEAB5DEA6 /* Variable.swift */; };
 		69295AAE29A8D4FB6FBD903E /* TokenUsageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */; };
 		6ADE9FBEEE9FC8B01BC643B5 /* VariablePluginLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C3FEAA3CC51E39C20F779C /* VariablePluginLoader.swift */; };
-		6FFE0E1FB8E6C0990D3D1F7E /* AlertManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5EDD636F883E05C6E56C0C /* AlertManager.swift */; };
 		789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB89E56D927ABD7289F04084 /* SettingsView.swift */; };
 		7A3A92BC03EC47C681AC5E76 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6576E137DF2FCFE73BE66102 /* DesignSystem.swift */; };
 		7D6BBA3AFFEEFB28562B393D /* ClaudeUsageSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47D7D33B62F737BE41C872F /* ClaudeUsageSection.swift */; };
@@ -113,7 +112,6 @@
 		ED31502F8415FBFD5DA3DA8B /* ClaudeAuthReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE42DEDC857AB657D449C5E /* ClaudeAuthReader.swift */; };
 		ED5B0A605502E2BF35B4F7AA /* DatasourceSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = D58215E739D0C0780915FF56 /* DatasourceSelector.swift */; };
 		EFD5E942872C6B776577BF93 /* DatasourceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6045F68DCAE8A0E620C714FA /* DatasourceStore.swift */; };
-		F01188D4D5B54947B6C5CFBF /* AlertListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 939B1E3BEBAB1C0FF5C3ED6B /* AlertListView.swift */; };
 		F44113AFD5BFD92DF64B478C /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA62A18D444F7F8A7D39F9B6 /* Localization.swift */; };
 		F46FA23BC5B95C607AC8D2A0 /* DetailHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F103561D8BF06FC314BAD0B9 /* DetailHeaderView.swift */; };
 		F4E2F3776A2D4DB6AEF2D86C /* AppIcon_1024.png in Resources */ = {isa = PBXBuildFile; fileRef = 689790D76D5DEE3F14EB819D /* AppIcon_1024.png */; };
@@ -149,7 +147,6 @@
 		15B1AC7C10926C1E37F7B0FF /* MenuContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuContentView.swift; sourceTree = "<group>"; };
 		18AEF7A2555230D2AF60A455 /* TimeRangePickerPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeRangePickerPopover.swift; sourceTree = "<group>"; };
 		196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenUsageModel.swift; sourceTree = "<group>"; };
-		1A5EDD636F883E05C6E56C0C /* AlertManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertManager.swift; sourceTree = "<group>"; };
 		1A83167497A1EE039A2B2494 /* TokiMonitorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiMonitorApp.swift; sourceTree = "<group>"; };
 		1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterAnimationView.swift; sourceTree = "<group>"; };
 		1CB0CA29129542559BD4F7E3 /* DashboardSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSettingsSheet.swift; sourceTree = "<group>"; };
@@ -202,7 +199,6 @@
 		85595784F39710A1BF95BC51 /* TokenAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregator.swift; sourceTree = "<group>"; };
 		8AE667E2C864368F710D35E6 /* DashboardExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExtensions.swift; sourceTree = "<group>"; };
 		8B4247163632AC4A7FF3582B /* TokiEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEvent.swift; sourceTree = "<group>"; };
-		939B1E3BEBAB1C0FF5C3ED6B /* AlertListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertListView.swift; sourceTree = "<group>"; };
 		955951A7FF5652C64A116C70 /* ClaudeUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageMonitor.swift; sourceTree = "<group>"; };
 		9CA03537C2F0CAF1D37B5252 /* TablePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TablePanelView.swift; sourceTree = "<group>"; };
 		A0132BCEBA0D76465E41F08A /* frame_00_thin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00_thin.png; sourceTree = "<group>"; };
@@ -360,7 +356,6 @@
 		5CB76EE9FE876C983A62E891 /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
-				939B1E3BEBAB1C0FF5C3ED6B /* AlertListView.swift */,
 				B9778D3435D067DAE0CE34D6 /* AnnotationListSheet.swift */,
 				3191102CF28F684FBE76F173 /* CustomDashboardView.swift */,
 				77B9855FE6D408AAA8CF6F61 /* DashboardGridLayout.swift */,
@@ -523,7 +518,6 @@
 		F742507F177D260FFECA176D /* Domain */ = {
 			isa = PBXGroup;
 			children = (
-				1A5EDD636F883E05C6E56C0C /* AlertManager.swift */,
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				6B17BA2BAF5855E537D1C1D0 /* AnimationTheme.swift */,
 				E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */,
@@ -649,8 +643,6 @@
 			files = (
 				DCECAC1B3A4EEA97415FC579 /* AboutPane.swift in Sources */,
 				DDE1EB2EC7A1FBCF494362FC /* AddPanelPopover.swift in Sources */,
-				F01188D4D5B54947B6C5CFBF /* AlertListView.swift in Sources */,
-				6FFE0E1FB8E6C0990D3D1F7E /* AlertManager.swift in Sources */,
 				4DBBE21D70D7916D7F2DC175 /* AnimationStateMapper.swift in Sources */,
 				502EEB38E57AB5717C4E6301 /* AnimationTheme.swift in Sources */,
 				C4A21221786A98400990A92C /* AnnotationListSheet.swift in Sources */,

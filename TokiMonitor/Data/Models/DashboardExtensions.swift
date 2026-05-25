@@ -25,60 +25,6 @@ struct DashboardAnnotation: Codable, Identifiable, Equatable {
     var color: String { colorHex }
 }
 
-// MARK: - Alert Rule Model
-
-enum AlertCondition: String, Codable, CaseIterable, Equatable {
-    case above
-    case below
-    case outsideRange
-
-    var displayName: String {
-        switch self {
-        case .above: L.tr("초과", "Above")
-        case .below: L.tr("미만", "Below")
-        case .outsideRange: L.tr("범위 밖", "Outside Range")
-        }
-    }
-}
-
-enum AlertState: String, Codable, CaseIterable, Equatable {
-    case ok
-    case alerting
-    case noData
-
-    var displayName: String {
-        switch self {
-        case .ok: "OK"
-        case .alerting: L.tr("경고 중", "Alerting")
-        case .noData: L.tr("데이터 없음", "No Data")
-        }
-    }
-
-    var iconName: String {
-        switch self {
-        case .ok: "checkmark.circle.fill"
-        case .alerting: "exclamationmark.triangle.fill"
-        case .noData: "questionmark.circle"
-        }
-    }
-}
-
-struct AlertRule: Codable, Identifiable, Equatable {
-    var id: UUID = UUID()
-    var panelID: UUID
-    var name: String
-    var condition: AlertCondition
-    var threshold: Double
-    var thresholdUpper: Double?  // for outsideRange
-    var evaluateEvery: TimeInterval = 60
-    var forDuration: TimeInterval = 300
-    var state: AlertState = .noData
-    var enabled: Bool = true
-    var notifyViaSystem: Bool = true
-    var lastEvaluated: Date?
-    var lastTriggered: Date?
-}
-
 // MARK: - Dashboard Version Model
 
 struct DashboardVersion: Codable, Identifiable, Equatable {

@@ -6,7 +6,6 @@ import SwiftUI
 struct PanelContainerView<Content: View>: View {
     let title: String
     let isEditing: Bool
-    var alertState: AlertState?
     var dataState: PanelDataState?
     let onDelete: () -> Void
     let onEdit: () -> Void
@@ -17,7 +16,6 @@ struct PanelContainerView<Content: View>: View {
     init(
         title: String,
         isEditing: Bool,
-        alertState: AlertState? = nil,
         dataState: PanelDataState? = nil,
         onDelete: @escaping () -> Void,
         onEdit: @escaping () -> Void,
@@ -25,7 +23,6 @@ struct PanelContainerView<Content: View>: View {
     ) {
         self.title = title
         self.isEditing = isEditing
-        self.alertState = alertState
         self.dataState = dataState
         self.onDelete = onDelete
         self.onEdit = onEdit
@@ -44,13 +41,6 @@ struct PanelContainerView<Content: View>: View {
 
                 Text(title)
                     .font(.system(size: DS.Dashboard.panelTitleFont, weight: .semibold))
-
-                // Alert state indicator
-                if let alertState {
-                    Image(systemName: alertState.iconName)
-                        .font(.system(size: DS.fontCaption))
-                        .foregroundStyle(alertStateColor(alertState))
-                }
 
                 Spacer()
 
@@ -126,19 +116,6 @@ struct PanelContainerView<Content: View>: View {
                     .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
                     .foregroundStyle(.secondary.opacity(0.4))
             }
-            // Alert border
-            if let alertState, alertState == .alerting {
-                RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous)
-                    .strokeBorder(Color.red.opacity(0.6), lineWidth: 2)
-            }
-        }
-    }
-
-    private func alertStateColor(_ state: AlertState) -> Color {
-        switch state {
-        case .ok: .green
-        case .alerting: .red
-        case .noData: .secondary
         }
     }
 }

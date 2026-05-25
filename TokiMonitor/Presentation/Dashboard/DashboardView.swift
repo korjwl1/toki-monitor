@@ -19,7 +19,6 @@ struct DashboardView: View {
 
     enum SidebarItem: Hashable {
         case explore
-        case alerts
     }
 
     init(reportClient: TokiReportClient) {
@@ -79,8 +78,6 @@ struct DashboardView: View {
                 switch sidebarSelection {
                 case .explore:
                     ExploreView(viewModel: viewModel)
-                case .alerts:
-                    AlertListView(viewModel: viewModel)
                 case nil:
                     dashboardContent
                 }
@@ -103,8 +100,6 @@ struct DashboardView: View {
             Section {
                 Label(L.dash.explore, systemImage: "magnifyingglass.circle")
                     .tag(SidebarItem.explore)
-                Label(L.dash.alerts, systemImage: "bell")
-                    .tag(SidebarItem.alerts)
             }
 
             Section(header: HStack {
@@ -323,21 +318,7 @@ struct DashboardView: View {
                 }
                 .buttonStyle(.plain)
             }
-
-            // Alert indicator
-            if let state = overallAlertState, state == .alerting {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .font(.system(size: DS.fontCaption))
-            }
         }
-    }
-
-    private var overallAlertState: AlertState? {
-        let rules = viewModel.alertManager.allRules().filter(\.enabled)
-        guard !rules.isEmpty else { return nil }
-        if rules.contains(where: { $0.state == .alerting }) { return .alerting }
-        return .ok
     }
 
     // MARK: - Data Source Picker

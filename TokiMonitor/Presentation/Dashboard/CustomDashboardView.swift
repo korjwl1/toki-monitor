@@ -140,12 +140,9 @@ struct CustomDashboardView: View {
 
     @ViewBuilder
     private func panelView(for panel: PanelConfig, containerWidth: CGFloat) -> some View {
-        let alertState = viewModel.alertManager.alertState(for: panel.id)
-
         PanelContainerView(
             title: panel.title,
             isEditing: viewModel.isEditing,
-            alertState: alertState,
             dataState: viewModel.dataState(for: panel.id),
             onDelete: { viewModel.removePanel(id: panel.id) },
             onEdit: { onEditPanel?(panel) }
