@@ -10,18 +10,6 @@ struct DashboardGridLayout {
     static let gap: CGFloat = 8
     static let defaultRowHeight: CGFloat = 80
 
-    // MARK: - Dynamic Row Height
-
-    /// Calculate row height to fill available container height
-    static func dynamicRowHeight(for panels: [PanelConfig], containerHeight: CGFloat) -> CGFloat {
-        let totalRows = totalLogicalRows(for: panels)
-        guard totalRows > 0 else { return defaultRowHeight }
-        let totalGaps = gap * CGFloat(totalRows - 1)
-        let available = containerHeight - totalGaps
-        let rowHeight = available / CGFloat(totalRows)
-        return max(rowHeight, 40) // minimum 40pt per row
-    }
-
     /// Total logical rows needed
     static func totalLogicalRows(for panels: [PanelConfig]) -> Int {
         guard !panels.isEmpty else { return 1 }
