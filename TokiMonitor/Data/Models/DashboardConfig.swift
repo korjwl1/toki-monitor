@@ -39,6 +39,51 @@ struct DashboardConfig: Codable, Equatable {
     // Settings
     var editable: Bool = true
 
+    // MARK: - Perses-style layout helpers
+    //
+    // The in-memory renderer still reads from `panels[].gridPosition`, but
+    // these accessors let downstream code address panels by id-keyed `$ref`
+    // (the Perses way) and pull positions out of a layout when one exists.
+
+    /// Panels keyed by their stable id (UUID string). Mirrors Perses'
+    /// `panels` map on disk.
+    var panelMap: [String: PanelConfig] {
+        Dictionary(uniqueKeysWithValues: panels.map { ($0.id.uuidString, $0) })
+    }
+
+    /// Panels in the order they appear in the first layout's `items`. Falls
+    /// back to `panels` order when no layout is set.
+    var panelsInLayoutOrder: [PanelConfig] {
+        guard let layout = layouts?.first else { return panels }
+        let map = panelMap
+        return layout.spec.items.compactMap { item in
+            guard let key = item.content.panelKey else { return nil }
+            return map[key]
+        }
+    }
+
+    /// The layout grid item that points at this panel, if any.
+    func gridItem(for panel: PanelConfig) -> LayoutGridItem? {
+        let key = panel.id.uuidString
+        for layout in layouts ?? [] {
+            if let item = layout.spec.items.first(where: { $0.content.panelKey == key }) {
+                return item
+            }
+        }
+        return nil
+    }
+
+    /// Effective grid position for a panel — layout-derived when available,
+    /// otherwise the panel's own `gridPosition`. Both should agree post-v4;
+    /// this just defines which side wins on disagreement (layout wins).
+    func effectiveGridPosition(for panel: PanelConfig) -> GridPosition {
+        if let item = gridItem(for: panel) {
+            return GridPosition(column: item.x, row: item.y,
+                                width: item.width, height: item.height)
+        }
+        return panel.gridPosition
+    }
+
     static func generateUID() -> String {
         let chars = "abcdefghijklmnopqrstuvwxyz0123456789"
         return String((0..<8).map { _ in chars.randomElement()! })

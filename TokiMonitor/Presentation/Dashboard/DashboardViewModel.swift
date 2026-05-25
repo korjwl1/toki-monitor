@@ -646,24 +646,62 @@ final class DashboardViewModel {
 
     func addPanel(_ panel: PanelConfig) {
         dashboardConfig.panels.append(panel)
+        syncLayoutsWithPanels()
         saveDashboard()
     }
 
     func removePanel(id: UUID) {
         dashboardConfig.panels.removeAll { $0.id == id }
+        syncLayoutsWithPanels()
         saveDashboard()
     }
 
     func updatePanel(_ panel: PanelConfig) {
         guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == panel.id }) else { return }
         dashboardConfig.panels[index] = panel
+        syncLayoutsWithPanels()
         saveDashboard()
     }
 
     func updatePanelPosition(id: UUID, position: GridPosition) {
         guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == id }) else { return }
         dashboardConfig.panels[index].gridPosition = position
+        syncLayoutsWithPanels()
         saveDashboard()
+    }
+
+    /// Keep `dashboardConfig.layouts[0].items` in sync with the canonical
+    /// `panels` array. Adds, removes, and re-positions items so the
+    /// Perses-shaped on-disk layout stays accurate. Bails out when no
+    /// layouts have been initialized yet (pre-v4 in-memory state).
+    private func syncLayoutsWithPanels() {
+        guard var layouts = dashboardConfig.layouts, !layouts.isEmpty else { return }
+        var spec = layouts[0].spec
+        let existingByKey = Dictionary(uniqueKeysWithValues:
+            spec.items.compactMap { item -> (String, LayoutGridItem)? in
+                guard let key = item.content.panelKey else { return nil }
+                return (key, item)
+            }
+        )
+        spec.items = dashboardConfig.panels.map { panel in
+            let key = panel.id.uuidString
+            // Preserve any layout-only metadata (e.g. future fields) when the
+            // panel already had an item; refresh x/y/width/height from the
+            // panel's authoritative `gridPosition`.
+            var item = existingByKey[key] ?? LayoutGridItem(
+                x: panel.gridPosition.column, y: panel.gridPosition.row,
+                width: panel.gridPosition.width, height: panel.gridPosition.height,
+                content: JSONRef(panelKey: key)
+            )
+            item.x = panel.gridPosition.column
+            item.y = panel.gridPosition.row
+            item.width = panel.gridPosition.width
+            item.height = panel.gridPosition.height
+            item.content = JSONRef(panelKey: key)
+            return item
+        }
+        layouts[0].spec = spec
+        dashboardConfig.layouts = layouts
     }
 
     // MARK: - Row Panel Management
