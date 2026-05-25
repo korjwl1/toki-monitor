@@ -31,7 +31,7 @@ struct VersionHistorySheet: View {
                 versionList
             }
         }
-        .frame(width: 520, height: 400)
+        .frame(width: 520, height: 400, alignment: .top)
     }
 
     private var versionList: some View {
@@ -43,6 +43,7 @@ struct VersionHistorySheet: View {
                     L.tr("버전 기록이 없습니다", "No version history"),
                     systemImage: "clock.arrow.circlepath"
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(versions) { version in
                     HStack {

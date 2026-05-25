@@ -13,8 +13,8 @@ struct AnnotationListSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
+            // Header — kept compact (macOS sheets usually have a slim title bar)
+            HStack(spacing: 8) {
                 Text(L.dash.annotations)
                     .font(.headline)
                 Spacer()
@@ -30,7 +30,7 @@ struct AnnotationListSheet: View {
                     .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
             .background(.bar)
 
             Divider()
@@ -41,12 +41,15 @@ struct AnnotationListSheet: View {
                 Divider()
             }
 
-            // Annotation list
+            // Annotation list — empty state must stretch to fill, otherwise
+            // the VStack falls short of the 400pt frame and SwiftUI centers
+            // it, leaving a large blank band above the header.
             if viewModel.annotations.isEmpty {
                 ContentUnavailableView(
                     L.tr("주석이 없습니다", "No annotations"),
                     systemImage: "note.text"
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
                     ForEach(viewModel.annotations) { annotation in
@@ -90,7 +93,7 @@ struct AnnotationListSheet: View {
                 .listStyle(.plain)
             }
         }
-        .frame(width: 480, height: 400)
+        .frame(width: 480, height: 400, alignment: .top)
     }
 
     private var addAnnotationForm: some View {
