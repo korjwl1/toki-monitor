@@ -83,6 +83,86 @@ struct GaugeChartSpec: Codable, Equatable, Sendable {
     var thresholds: [ThresholdSpec]
 }
 
+// MARK: - Typed accessors on PanelConfig
+//
+// Decode `panel.plugin.spec` into the kind-appropriate struct, falling back
+// to a fresh projection from `panel.options` when the spec hasn't been
+// written yet. Renderers can prefer these over `panel.options` so they
+// pick up plugin-spec changes naturally.
+
+extension PanelConfig {
+    private func decodedSpec<T: Decodable>(_ type: T.Type, expectedKind: String) -> T? {
+        guard let plugin, plugin.kind == expectedKind, !plugin.spec.isEmpty else { return nil }
+        return try? JSONDecoder().decode(type, from: plugin.spec)
+    }
+
+    var timeSeriesSpec: TimeSeriesChartSpec? {
+        if let s = decodedSpec(TimeSeriesChartSpec.self,
+                               expectedKind: BuiltinPanelPluginKind.timeSeriesChart) {
+            return s
+        }
+        guard panelType == .timeSeries,
+              let data = options.encodedSpec(forPanelPluginKind: BuiltinPanelPluginKind.timeSeriesChart)
+        else { return nil }
+        return try? JSONDecoder().decode(TimeSeriesChartSpec.self, from: data)
+    }
+
+    var statSpec: StatChartSpec? {
+        if let s = decodedSpec(StatChartSpec.self,
+                               expectedKind: BuiltinPanelPluginKind.statChart) {
+            return s
+        }
+        guard panelType == .stat,
+              let data = options.encodedSpec(forPanelPluginKind: BuiltinPanelPluginKind.statChart)
+        else { return nil }
+        return try? JSONDecoder().decode(StatChartSpec.self, from: data)
+    }
+
+    var barChartSpec: BarChartSpec? {
+        if let s = decodedSpec(BarChartSpec.self,
+                               expectedKind: BuiltinPanelPluginKind.barChart) {
+            return s
+        }
+        guard panelType == .barChart,
+              let data = options.encodedSpec(forPanelPluginKind: BuiltinPanelPluginKind.barChart)
+        else { return nil }
+        return try? JSONDecoder().decode(BarChartSpec.self, from: data)
+    }
+
+    var pieChartSpec: PieChartSpec? {
+        if let s = decodedSpec(PieChartSpec.self,
+                               expectedKind: BuiltinPanelPluginKind.pieChart) {
+            return s
+        }
+        guard panelType == .pieChart,
+              let data = options.encodedSpec(forPanelPluginKind: BuiltinPanelPluginKind.pieChart)
+        else { return nil }
+        return try? JSONDecoder().decode(PieChartSpec.self, from: data)
+    }
+
+    var tableSpec: TableChartSpec? {
+        if let s = decodedSpec(TableChartSpec.self,
+                               expectedKind: BuiltinPanelPluginKind.tableChart) {
+            return s
+        }
+        guard panelType == .table,
+              let data = options.encodedSpec(forPanelPluginKind: BuiltinPanelPluginKind.tableChart)
+        else { return nil }
+        return try? JSONDecoder().decode(TableChartSpec.self, from: data)
+    }
+
+    var gaugeSpec: GaugeChartSpec? {
+        if let s = decodedSpec(GaugeChartSpec.self,
+                               expectedKind: BuiltinPanelPluginKind.gaugeChart) {
+            return s
+        }
+        guard panelType == .gauge,
+              let data = options.encodedSpec(forPanelPluginKind: BuiltinPanelPluginKind.gaugeChart)
+        else { return nil }
+        return try? JSONDecoder().decode(GaugeChartSpec.self, from: data)
+    }
+}
+
 // MARK: - Bridge from legacy PanelDisplayOptions
 
 extension PanelDisplayOptions {
