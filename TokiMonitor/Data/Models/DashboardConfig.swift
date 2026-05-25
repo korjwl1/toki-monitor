@@ -287,6 +287,12 @@ struct DashboardVariable: Codable, Identifiable, Equatable {
     /// Sort order applied to options before the toolbar menu renders them.
     var sort: VariableSort?
 
+    /// Perses-style plugin reference. When set, the registered loader for
+    /// `plugin.kind` populates `options` instead of the legacy `query`/
+    /// hand-managed `options` array. v3 dashboards that come in without a
+    /// plugin keep their existing options unchanged.
+    var plugin: VariablePluginRef?
+
     enum VariableType: String, Codable, CaseIterable, Equatable {
         case custom
         case interval
@@ -771,6 +777,39 @@ extension DashboardConfig {
                 }
             }
             return p
+        }
+
+        // Variables: populate the Perses-style plugin reference from the
+        // legacy `type` enum. Custom → StaticListVariable (options stay as
+        // the current static list), Interval → IntervalVariable (values
+        // come from the legacy `query` field's comma-separated form, or a
+        // sensible default).
+        migrated.templating.list = migrated.templating.list.map { variable in
+            var v = variable
+            if v.plugin == nil {
+                switch v.type {
+                case .custom:
+                    let spec = StaticListVariableSpec(values: v.options)
+                    let data = (try? JSONEncoder().encode(spec)) ?? Data()
+                    v.plugin = VariablePluginRef(
+                        kind: BuiltinVariablePluginKind.staticList, spec: data
+                    )
+                case .interval:
+                    let parsed = v.query
+                        .split(separator: ",")
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                    let values = parsed.isEmpty
+                        ? IntervalVariableSpec().values
+                        : parsed
+                    let spec = IntervalVariableSpec(values: values)
+                    let data = (try? JSONEncoder().encode(spec)) ?? Data()
+                    v.plugin = VariablePluginRef(
+                        kind: BuiltinVariablePluginKind.interval, spec: data
+                    )
+                }
+            }
+            return v
         }
 
         // Build a single Grid layout. Each panel becomes one LayoutGridItem

@@ -168,9 +168,38 @@ final class DashboardViewModel {
         self.queryClient = resolveQueryClient()
         registerInlineDatasources()
         populateProviderOptions()
+        refreshVariables()
         loadAnnotations()
         loadExploreHistory()
         setupAutoRefresh()
+    }
+
+    /// Re-run all variable plugin loaders and refresh their `options` lists.
+    /// Called on dashboard load and whenever a load-triggering event occurs
+    /// (time-range change, manual refresh).
+    func refreshVariables() {
+        let time = dashboardConfig.time
+        let resolved: [String: String] = Dictionary(
+            uniqueKeysWithValues: dashboardConfig.templating.list.map {
+                ($0.name, $0.current.value.joined(separator: "|"))
+            }
+        )
+        let context = VariableLoadContext(time: time, resolvedVariables: resolved)
+        let pairs: [(UUID, VariablePluginRef)] = dashboardConfig.templating.list
+            .compactMap { v in v.plugin.map { (v.id, $0) } }
+        guard !pairs.isEmpty else { return }
+        Task { [weak self] in
+            for (varID, pluginRef) in pairs {
+                guard let loader = VariablePluginRegistry.shared.loader(for: pluginRef.kind) else { continue }
+                if let options = try? await loader.loadOptions(specData: pluginRef.spec, context: context) {
+                    guard let self else { return }
+                    if let idx = self.dashboardConfig.templating.list.firstIndex(where: { $0.id == varID }) {
+                        self.dashboardConfig.templating.list[idx].options = options
+                    }
+                }
+            }
+            self?.saveDashboard()
+        }
     }
 
     /// Clean up stale variables and populate provider options
@@ -867,6 +896,7 @@ final class DashboardViewModel {
         dashboardConfig = config
         registerInlineDatasources()
         populateProviderOptions()
+        refreshVariables()
         saveDashboard()
         configStore.activeDashboardUID = config.uid
         collapsedRows = Set(config.panels.filter(\.collapsed).map(\.id))

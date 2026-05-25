@@ -65,6 +65,7 @@
 		669753CC9D61AB01C3F2547C /* VersionCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4C36A205DFC4F7DA9CD54A9 /* VersionCompatibility.swift */; };
 		67735C617E16379A7BE552E2 /* Variable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD76DA115AED88DEAB5DEA6 /* Variable.swift */; };
 		69295AAE29A8D4FB6FBD903E /* TokenUsageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */; };
+		6ADE9FBEEE9FC8B01BC643B5 /* VariablePluginLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C3FEAA3CC51E39C20F779C /* VariablePluginLoader.swift */; };
 		6FFE0E1FB8E6C0990D3D1F7E /* AlertManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5EDD636F883E05C6E56C0C /* AlertManager.swift */; };
 		789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB89E56D927ABD7289F04084 /* SettingsView.swift */; };
 		7A3A92BC03EC47C681AC5E76 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6576E137DF2FCFE73BE66102 /* DesignSystem.swift */; };
@@ -140,6 +141,7 @@
 		01FDADF849666205452FCAA1 /* EventsChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsChart.swift; sourceTree = "<group>"; };
 		03A7FCA1C481A1421555EEF2 /* DatasourceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourceRegistry.swift; sourceTree = "<group>"; };
 		03F503F3516997ED1304E8F7 /* DashboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfig.swift; sourceTree = "<group>"; };
+		06C3FEAA3CC51E39C20F779C /* VariablePluginLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariablePluginLoader.swift; sourceTree = "<group>"; };
 		074C94EC60E9EE6F87E930EB /* PanelDragModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelDragModifier.swift; sourceTree = "<group>"; };
 		096E04F1C2D87A5D5F1C0251 /* StatPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatPanelView.swift; sourceTree = "<group>"; };
 		0C1FFE59530A1D2FC18F1651 /* frame_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00.png; sourceTree = "<group>"; };
@@ -271,6 +273,7 @@
 				8D4AD16E434B8960AFD5B678 /* Datasource */,
 				8648934AE14365594C7132F0 /* Models */,
 				6F53294CD1B846096FA8B725 /* OAuth */,
+				8F95164ED93D6B4A2CBD473E /* Variable */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -434,6 +437,14 @@
 				2913D0A5C411405B6E2BAE7E /* PromQLProxyDatasource.swift */,
 			);
 			path = Datasource;
+			sourceTree = "<group>";
+		};
+		8F95164ED93D6B4A2CBD473E /* Variable */ = {
+			isa = PBXGroup;
+			children = (
+				06C3FEAA3CC51E39C20F779C /* VariablePluginLoader.swift */,
+			);
+			path = Variable;
 			sourceTree = "<group>";
 		};
 		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
@@ -738,6 +749,7 @@
 				909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */,
 				64CFC0046724FA45053F0D8B /* UpdateChecker.swift in Sources */,
 				67735C617E16379A7BE552E2 /* Variable.swift in Sources */,
+				6ADE9FBEEE9FC8B01BC643B5 /* VariablePluginLoader.swift in Sources */,
 				669753CC9D61AB01C3F2547C /* VersionCompatibility.swift in Sources */,
 				AE7388FE3592A7411AC81393 /* VersionHistorySheet.swift in Sources */,
 			);
