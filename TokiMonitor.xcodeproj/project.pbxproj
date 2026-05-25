@@ -53,6 +53,7 @@
 		54433E5F9B3BE800677C5ECE /* SyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1837716A9BFD555E0A36B8A /* SyncSettingsView.swift */; };
 		555FD7C25C250BCAB0806025 /* NotificationsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3EB4A17B1B322A3259A1454 /* NotificationsSettingsPane.swift */; };
 		5638D116E13B29E6DC83754C /* LocalCLIDatasource.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31CF6A450F00B8FE22A493C /* LocalCLIDatasource.swift */; };
+		5A100F7481C256287B782C70 /* PromQLSuggester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10785CF25F5378B78803A23B /* PromQLSuggester.swift */; };
 		5A9B8A4604691516E084F28B /* GaugePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24D5C9A7319840C3B1F3CC6 /* GaugePanelView.swift */; };
 		5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */; };
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
@@ -142,6 +143,7 @@
 		074C94EC60E9EE6F87E930EB /* PanelDragModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelDragModifier.swift; sourceTree = "<group>"; };
 		096E04F1C2D87A5D5F1C0251 /* StatPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatPanelView.swift; sourceTree = "<group>"; };
 		0C1FFE59530A1D2FC18F1651 /* frame_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00.png; sourceTree = "<group>"; };
+		10785CF25F5378B78803A23B /* PromQLSuggester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromQLSuggester.swift; sourceTree = "<group>"; };
 		10835A353F20C9BFA10795A1 /* GlassWorkaround.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWorkaround.swift; sourceTree = "<group>"; };
 		1246B6D3F3ED7B1F2A2BB791 /* DatasourcePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourcePlugin.swift; sourceTree = "<group>"; };
 		140E82C9A015AA41CD3C0C1A /* frame_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_01.png; sourceTree = "<group>"; };
@@ -533,6 +535,7 @@
 				DA62A18D444F7F8A7D39F9B6 /* Localization.swift */,
 				7368908C5687B4CB8281CE2C /* ModelPricing.swift */,
 				F61E686B7BA4F794ABE3C325 /* PanelDataExtractor.swift */,
+				10785CF25F5378B78803A23B /* PromQLSuggester.swift */,
 				CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */,
 				37F55200D88B2D7260541C5D /* ProviderSummary.swift */,
 				4BDA0DC9C4300E5F7B2E3F2A /* SyncManager.swift */,
@@ -703,6 +706,7 @@
 				D8262FCBDC499382103DEA43 /* PanelPluginSpec.swift in Sources */,
 				FE6D7C67ACAE1D3ACB73C3A6 /* PieChartView.swift in Sources */,
 				3FC14A4CEE21EB76B9B950AA /* PromQLProxyDatasource.swift in Sources */,
+				5A100F7481C256287B782C70 /* PromQLSuggester.swift in Sources */,
 				27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */,
 				2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */,
 				46DF834236EAC2C92B2F93AE /* ProviderSummary.swift in Sources */,

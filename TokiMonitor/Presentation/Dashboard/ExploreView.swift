@@ -5,6 +5,7 @@ import Charts
 struct ExploreView: View {
     @Bindable var viewModel: DashboardViewModel
     @State private var showHistory = false
+    @FocusState private var queryFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,6 +20,7 @@ struct ExploreView: View {
                 TextField("PromQL", text: $viewModel.exploreQuery)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.caption, design: .monospaced))
+                    .focused($queryFocused)
                     .onSubmit {
                         viewModel.runExploreQuery()
                     }
@@ -44,6 +46,13 @@ struct ExploreView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
 
+            // Autocomplete suggestions — visible while the query field is
+            // focused and the suggester has anything to offer. Clicking a
+            // suggestion replaces the in-progress token; range vectors keep
+            // the cursor at the end of the bracket so the user can keep
+            // typing the duration if needed.
+            suggestionStrip
+
             Divider()
 
             // Results
@@ -68,6 +77,46 @@ struct ExploreView: View {
                     description: Text(L.tr("PromQL 쿼리를 입력하고 실행하면 결과가 표시됩니다", "Enter a PromQL query and run it to see results"))
                 )
                 .frame(maxHeight: .infinity)
+            }
+        }
+    }
+
+    // MARK: - Autocomplete Suggestions
+
+    @ViewBuilder
+    private var suggestionStrip: some View {
+        let result = PromQLSuggester.suggestions(for: viewModel.exploreQuery)
+        if queryFocused, !result.items.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(result.items.prefix(20)) { suggestion in
+                        Button {
+                            viewModel.exploreQuery = PromQLSuggester.apply(
+                                suggestion, to: viewModel.exploreQuery
+                            )
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: suggestion.kind.systemImage)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                                Text(suggestion.text)
+                                    .font(.system(.caption, design: .monospaced))
+                                if let hint = suggestion.hint {
+                                    Text(hint)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.quaternary.opacity(0.4),
+                                        in: RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
             }
         }
     }
