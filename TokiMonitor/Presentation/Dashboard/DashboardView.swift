@@ -19,7 +19,6 @@ struct DashboardView: View {
 
     enum SidebarItem: Hashable {
         case explore
-        case playlists
         case alerts
     }
 
@@ -80,8 +79,6 @@ struct DashboardView: View {
                 switch sidebarSelection {
                 case .explore:
                     ExploreView(viewModel: viewModel)
-                case .playlists:
-                    PlaylistView(viewModel: viewModel)
                 case .alerts:
                     AlertListView(viewModel: viewModel)
                 case nil:
@@ -106,8 +103,6 @@ struct DashboardView: View {
             Section {
                 Label(L.dash.explore, systemImage: "magnifyingglass.circle")
                     .tag(SidebarItem.explore)
-                Label(L.dash.playlists, systemImage: "play.rectangle")
-                    .tag(SidebarItem.playlists)
                 Label(L.dash.alerts, systemImage: "bell")
                     .tag(SidebarItem.alerts)
             }
@@ -243,11 +238,6 @@ struct DashboardView: View {
             // Unified controls bar: variables + toolbar controls
             controlsBar
 
-            // Playlist controls
-            if viewModel.playlistManager.isPlaying {
-                playlistControlBar
-            }
-
             // Main content — always show panel layout, panels handle empty state internally
             Group {
                 if let error = viewModel.errorMessage {
@@ -263,60 +253,6 @@ struct DashboardView: View {
                 }
             }
         }
-    }
-
-    // MARK: - Playlist Control Bar
-
-    private var playlistControlBar: some View {
-        HStack(spacing: DS.md) {
-            Image(systemName: "play.rectangle.fill")
-                .foregroundStyle(Color.accentColor)
-            Text(L.dash.playlists)
-                .font(.system(size: DS.fontCaption))
-
-            Spacer()
-
-            Button {
-                viewModel.playlistManager.previous { uid in
-                    viewModel.switchDashboard(uid: uid)
-                }
-            } label: {
-                Image(systemName: "backward.fill")
-                    .font(.system(size: DS.fontCaption))
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                if viewModel.playlistManager.isPlaying {
-                    viewModel.playlistManager.pause()
-                }
-            } label: {
-                Image(systemName: "pause.fill")
-                    .font(.system(size: DS.fontCaption))
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                viewModel.playlistManager.next { uid in
-                    viewModel.switchDashboard(uid: uid)
-                }
-            } label: {
-                Image(systemName: "forward.fill")
-                    .font(.system(size: DS.fontCaption))
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                viewModel.playlistManager.stop()
-            } label: {
-                Image(systemName: "stop.fill")
-                    .font(.system(size: DS.fontCaption))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, DS.lg)
-        .padding(.vertical, DS.xs)
-        .background(Color.accentColor.opacity(0.1))
     }
 
     // MARK: - Unified Controls Bar

@@ -75,10 +75,7 @@ final class DashboardViewModel {
     // MARK: - Version Store
     let versionStore = DashboardVersionStore()
 
-    // MARK: - Playlist Manager
-    let playlistManager = PlaylistManager()
-
-    // MARK: - Explore
+// MARK: - Explore
     var exploreQuery = ""
     var exploreResults: TimeSeriesData?
     var exploreQueryHistory: [ExploreQueryEntry] = []

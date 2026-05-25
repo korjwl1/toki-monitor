@@ -104,15 +104,6 @@ struct DataLink: Codable, Identifiable, Equatable {
     var openInExplore: Bool = false
 }
 
-// MARK: - Playlist Model
-
-struct DashboardPlaylist: Codable, Identifiable, Equatable {
-    var id: UUID = UUID()
-    var name: String
-    var dashboardUIDs: [String] = []
-    var interval: TimeInterval = 30  // seconds per dashboard
-}
-
 // MARK: - Explore Query History
 
 struct ExploreQueryEntry: Codable, Identifiable, Equatable {

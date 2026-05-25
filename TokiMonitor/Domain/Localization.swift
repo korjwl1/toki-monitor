@@ -211,11 +211,6 @@ enum L {
         static var versions: String { tr("버전 기록", "Version History") }
         static var restore: String { tr("복원", "Restore") }
         static var compare: String { tr("비교", "Compare") }
-        // Playlists
-        static var playlists: String { tr("재생목록", "Playlists") }
-        static var newPlaylist: String { tr("새 재생목록", "New Playlist") }
-        static var interval: String { tr("간격", "Interval") }
-        static var play: String { tr("재생", "Play") }
         static var pause: String { tr("일시정지", "Pause") }
         static var stop: String { tr("정지", "Stop") }
         // Data Links

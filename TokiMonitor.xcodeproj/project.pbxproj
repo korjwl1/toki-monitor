@@ -40,7 +40,6 @@
 		3DA3BA25D0968CA27E13ECE3 /* PanelDataExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61E686B7BA4F794ABE3C325 /* PanelDataExtractor.swift */; };
 		3FC14A4CEE21EB76B9B950AA /* PromQLProxyDatasource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2913D0A5C411405B6E2BAE7E /* PromQLProxyDatasource.swift */; };
 		40CC603230947A99EB36F064 /* TokenAggregatorLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F74A465DDBF407B395F8AA /* TokenAggregatorLogicTests.swift */; };
-		417DA2C685E33E4F4E375DE4 /* PlaylistManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9953C511BFF1317C46D027D6 /* PlaylistManager.swift */; };
 		46DF834236EAC2C92B2F93AE /* ProviderSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F55200D88B2D7260541C5D /* ProviderSummary.swift */; };
 		49DE5C8CEE473286A88906CA /* DashboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34515E784769F22E891CE8F6 /* DashboardLayout.swift */; };
 		4D10457A9F0080B845753A2D /* StatusItemUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7950516E788D89A85B45B397 /* StatusItemUnit.swift */; };
@@ -118,7 +117,6 @@
 		F44113AFD5BFD92DF64B478C /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA62A18D444F7F8A7D39F9B6 /* Localization.swift */; };
 		F46FA23BC5B95C607AC8D2A0 /* DetailHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F103561D8BF06FC314BAD0B9 /* DetailHeaderView.swift */; };
 		F4E2F3776A2D4DB6AEF2D86C /* AppIcon_1024.png in Resources */ = {isa = PBXBuildFile; fileRef = 689790D76D5DEE3F14EB819D /* AppIcon_1024.png */; };
-		F517514F5BE935557A7EA1AA /* PlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E22EEB558886ED30F51E583 /* PlaylistView.swift */; };
 		F786762BAD8B9D912858D747 /* StatPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 096E04F1C2D87A5D5F1C0251 /* StatPanelView.swift */; };
 		F7B06F96F0152C66001A51CB /* TokiReportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */; };
 		F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */; };
@@ -204,10 +202,8 @@
 		85595784F39710A1BF95BC51 /* TokenAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregator.swift; sourceTree = "<group>"; };
 		8AE667E2C864368F710D35E6 /* DashboardExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExtensions.swift; sourceTree = "<group>"; };
 		8B4247163632AC4A7FF3582B /* TokiEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEvent.swift; sourceTree = "<group>"; };
-		8E22EEB558886ED30F51E583 /* PlaylistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistView.swift; sourceTree = "<group>"; };
 		939B1E3BEBAB1C0FF5C3ED6B /* AlertListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertListView.swift; sourceTree = "<group>"; };
 		955951A7FF5652C64A116C70 /* ClaudeUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageMonitor.swift; sourceTree = "<group>"; };
-		9953C511BFF1317C46D027D6 /* PlaylistManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistManager.swift; sourceTree = "<group>"; };
 		9CA03537C2F0CAF1D37B5252 /* TablePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TablePanelView.swift; sourceTree = "<group>"; };
 		A0132BCEBA0D76465E41F08A /* frame_00_thin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00_thin.png; sourceTree = "<group>"; };
 		A285CEF82274757C8A327142 /* TimeSeriesModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesModels.swift; sourceTree = "<group>"; };
@@ -375,7 +371,6 @@
 				530B806F812350D8094AA0EC /* DashboardWindow.swift */,
 				F103561D8BF06FC314BAD0B9 /* DetailHeaderView.swift */,
 				3126EF202F535714BFCD4F20 /* ExploreView.swift */,
-				8E22EEB558886ED30F51E583 /* PlaylistView.swift */,
 				18AEF7A2555230D2AF60A455 /* TimeRangePickerPopover.swift */,
 				42E478EB5C5691C2D6693F41 /* VersionHistorySheet.swift */,
 				B1296CF4003E042DCC5B6F01 /* Charts */,
@@ -541,7 +536,6 @@
 				DA62A18D444F7F8A7D39F9B6 /* Localization.swift */,
 				7368908C5687B4CB8281CE2C /* ModelPricing.swift */,
 				F61E686B7BA4F794ABE3C325 /* PanelDataExtractor.swift */,
-				9953C511BFF1317C46D027D6 /* PlaylistManager.swift */,
 				CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */,
 				37F55200D88B2D7260541C5D /* ProviderSummary.swift */,
 				4BDA0DC9C4300E5F7B2E3F2A /* SyncManager.swift */,
@@ -712,8 +706,6 @@
 				D8262FCBDC499382103DEA43 /* PanelPluginSpec.swift in Sources */,
 				35C19F7105186D30872BA9AA /* PanelResizeHandle.swift in Sources */,
 				FE6D7C67ACAE1D3ACB73C3A6 /* PieChartView.swift in Sources */,
-				417DA2C685E33E4F4E375DE4 /* PlaylistManager.swift in Sources */,
-				F517514F5BE935557A7EA1AA /* PlaylistView.swift in Sources */,
 				3FC14A4CEE21EB76B9B950AA /* PromQLProxyDatasource.swift in Sources */,
 				27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */,
 				2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */,
