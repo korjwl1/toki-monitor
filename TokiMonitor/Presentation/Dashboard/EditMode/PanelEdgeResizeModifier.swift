@@ -2,98 +2,89 @@ import SwiftUI
 
 /// Edge-based panel resize.
 ///
-/// Each panel gets three invisible drag affordances pinned to its own
-/// boundary via `GeometryReader` + explicit `.offset` — right edge strip,
-/// bottom edge strip, bottom-right corner. Using positioned `Color.clear`
-/// rectangles (rather than `HStack { Spacer; Color.clear }`) is what
-/// guarantees the hit area is exactly the strip and does not leak into
-/// adjacent panels — the earlier Spacer-based layout had subtle hit-test
-/// bleed where dragging one panel's edge could affect a neighbor.
+/// Three invisible drag affordances on the panel's right edge, bottom edge,
+/// and bottom-right corner. Each strip is rendered via an `.overlay {
+/// GeometryReader }`, which works correctly only because the parent panel
+/// is placed by `DashboardCustomLayout` — the layout protocol gives the
+/// panel an outer frame equal to its grid cell, so `proxy.size` here is
+/// the panel size, not the container size.
 ///
-/// Each affordance:
-/// - Sets a SwiftUI hover cursor (resizeLeftRight / resizeUpDown / crosshair).
-/// - Drives the panel's `gridPosition.width` / `.height` via a `DragGesture`
-///   that snaps to the grid live, so the panel resizes as the user drags
-///   rather than only on release.
+/// Behavior:
+/// - Cursor switches to resizeLeftRight / resizeUpDown / crosshair on hover,
+///   guarded by a per-strip `pushed` state so push/pop stay balanced even
+///   when SwiftUI emits noisy hover events.
+/// - DragGesture snaps width/height to the grid every frame using the
+///   *actual* `rowHeight` (the dashboard uses an adaptive row height — a
+///   fixed 80pt assumption would misalign the snap).
+/// - In-memory updates during the drag, single `saveDashboard` commit at
+///   the end via `viewModel.commitPanelPositionChange()`.
+/// - Hit-testing is disabled while another modifier on the same panel
+///   (i.e. PanelDragModifier) is mid-drag, so the two gestures don't
+///   stomp each other.
 struct PanelEdgeResize: ViewModifier {
     let panelID: UUID
     let panelType: PanelType
     let containerWidth: CGFloat
+    let rowHeight: CGFloat
     let isEditing: Bool
     @Bindable var viewModel: DashboardViewModel
 
     /// Drag area thickness on a panel's edge.
     private static let stripThickness: CGFloat = 6
-    /// Side length of the bottom-right corner affordance (overlaps the two
-    /// edge strips so the corner can drive both axes at once).
+    /// Side length of the bottom-right corner affordance.
     private static let cornerSize: CGFloat = 14
 
     func body(content: Content) -> some View {
         content.overlay {
-            if isEditing {
+            if isEditing && viewModel.draggingPanelID != panelID {
                 GeometryReader { proxy in
                     let w = proxy.size.width
                     let h = proxy.size.height
 
                     ZStack(alignment: .topLeading) {
-                        // Right edge strip (horizontal resize)
-                        Color.clear
-                            .frame(width: Self.stripThickness, height: h)
-                            .contentShape(Rectangle())
-                            .offset(x: w - Self.stripThickness, y: 0)
-                            .onHover { hovering in
-                                setCursor(hovering ? .resizeLeftRight : nil)
-                            }
-                            .gesture(resizeGesture(horizontal: true, vertical: false))
+                        ResizeHandleStrip(
+                            cursor: .resizeLeftRight,
+                            onDragChanged: { t in apply(translation: t, horizontal: true, vertical: false) },
+                            onDragEnded: { t in commit(translation: t, horizontal: true, vertical: false) }
+                        )
+                        .frame(width: Self.stripThickness, height: h)
+                        .offset(x: w - Self.stripThickness, y: 0)
 
-                        // Bottom edge strip (vertical resize)
-                        Color.clear
-                            .frame(width: w, height: Self.stripThickness)
-                            .contentShape(Rectangle())
-                            .offset(x: 0, y: h - Self.stripThickness)
-                            .onHover { hovering in
-                                setCursor(hovering ? .resizeUpDown : nil)
-                            }
-                            .gesture(resizeGesture(horizontal: false, vertical: true))
+                        ResizeHandleStrip(
+                            cursor: .resizeUpDown,
+                            onDragChanged: { t in apply(translation: t, horizontal: false, vertical: true) },
+                            onDragEnded: { t in commit(translation: t, horizontal: false, vertical: true) }
+                        )
+                        .frame(width: w, height: Self.stripThickness)
+                        .offset(x: 0, y: h - Self.stripThickness)
 
-                        // Bottom-right corner (both axes) — drawn last so it
-                        // wins over the two edge strips where they overlap.
-                        Color.clear
-                            .frame(width: Self.cornerSize, height: Self.cornerSize)
-                            .contentShape(Rectangle())
-                            .offset(x: w - Self.cornerSize, y: h - Self.cornerSize)
-                            .onHover { hovering in
-                                setCursor(hovering ? .crosshair : nil)
-                            }
-                            .gesture(resizeGesture(horizontal: true, vertical: true))
+                        // Corner is drawn last so it wins SwiftUI's
+                        // ZStack hit-test on the overlapping bottom-right
+                        // region. (SwiftUI hit-tests the last child first.)
+                        ResizeHandleStrip(
+                            cursor: .crosshair,
+                            onDragChanged: { t in apply(translation: t, horizontal: true, vertical: true) },
+                            onDragEnded: { t in commit(translation: t, horizontal: true, vertical: true) }
+                        )
+                        .frame(width: Self.cornerSize, height: Self.cornerSize)
+                        .offset(x: w - Self.cornerSize, y: h - Self.cornerSize)
                     }
                 }
             }
         }
     }
 
-    // MARK: - Gesture
+    // MARK: - Grid math
 
-    private func resizeGesture(horizontal: Bool, vertical: Bool) -> some Gesture {
-        DragGesture(minimumDistance: 1, coordinateSpace: .local)
-            .onChanged { value in
-                apply(translation: value.translation, horizontal: horizontal, vertical: vertical)
-            }
-            .onEnded { value in
-                apply(translation: value.translation, horizontal: horizontal, vertical: vertical)
-                setCursor(nil)
-            }
-    }
-
-    /// Apply a drag translation to the panel's grid position. Width and
-    /// height are snapped to the grid every frame so the visual update
-    /// tracks the drag.
+    /// Apply a drag translation to the panel's grid position in memory.
+    /// Snaps width/height to the grid using the *adaptive* row height that
+    /// the dashboard is currently rendering with.
     private func apply(translation: CGSize, horizontal: Bool, vertical: Bool) {
         guard let panel = viewModel.dashboardConfig.panels.first(where: { $0.id == panelID })
         else { return }
 
         let cellWidth = columnWidth(in: containerWidth) + DashboardGridLayout.gap
-        let cellHeight = DashboardGridLayout.defaultRowHeight + DashboardGridLayout.gap
+        let cellHeight = rowHeight + DashboardGridLayout.gap
 
         var newWidth = panel.gridPosition.width
         var newHeight = panel.gridPosition.height
@@ -101,8 +92,6 @@ struct PanelEdgeResize: ViewModifier {
         if horizontal {
             let widthDelta = Int(round(translation.width / cellWidth))
             newWidth = max(panelType.minWidth, panel.gridPosition.width + widthDelta)
-            // Clamp to the right edge of the 24-column grid so panels can't
-            // grow past the dashboard.
             let maxWidth = DashboardGridLayout.columnCount - panel.gridPosition.column
             newWidth = min(newWidth, maxWidth)
         }
@@ -121,20 +110,62 @@ struct PanelEdgeResize: ViewModifier {
             width: newWidth,
             height: newHeight
         )
-        viewModel.updatePanelPosition(id: panelID, position: newPosition)
+        viewModel.setPanelPositionInMemory(id: panelID, position: newPosition)
+    }
+
+    /// Commit the resize on drag end — applies one more snap and persists.
+    private func commit(translation: CGSize, horizontal: Bool, vertical: Bool) {
+        apply(translation: translation, horizontal: horizontal, vertical: vertical)
+        viewModel.commitPanelPositionChange()
     }
 
     private func columnWidth(in containerWidth: CGFloat) -> CGFloat {
         let gaps = DashboardGridLayout.gap * CGFloat(DashboardGridLayout.columnCount - 1)
         return (containerWidth - gaps) / CGFloat(DashboardGridLayout.columnCount)
     }
+}
 
-    private func setCursor(_ cursor: NSCursor?) {
-        if let cursor {
-            cursor.push()
-        } else {
-            NSCursor.pop()
-        }
+// MARK: - Resize handle strip
+
+/// A single invisible drag strip with cursor management that survives
+/// SwiftUI's noisy hover events.
+///
+/// `NSCursor.push()` and `.pop()` are stack operations. If `.onHover`
+/// fires `false` while we never pushed (or `true` twice without a pop
+/// in between), the cursor stack drifts permanently — the cursor stays
+/// as a resize arrow over chart panels, or pops down into nothing.
+/// The `pushed` flag guards push and pop to only fire on actual
+/// false→true / true→false transitions.
+private struct ResizeHandleStrip: View {
+    let cursor: NSCursor
+    let onDragChanged: (CGSize) -> Void
+    let onDragEnded: (CGSize) -> Void
+
+    @State private var pushed = false
+
+    var body: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                if hovering, !pushed {
+                    cursor.push()
+                    pushed = true
+                } else if !hovering, pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
+            .onDisappear {
+                if pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .local)
+                    .onChanged { onDragChanged($0.translation) }
+                    .onEnded { onDragEnded($0.translation) }
+            )
     }
 }
 
@@ -143,6 +174,7 @@ extension View {
         panelID: UUID,
         panelType: PanelType,
         containerWidth: CGFloat,
+        rowHeight: CGFloat,
         isEditing: Bool,
         viewModel: DashboardViewModel
     ) -> some View {
@@ -150,6 +182,7 @@ extension View {
             panelID: panelID,
             panelType: panelType,
             containerWidth: containerWidth,
+            rowHeight: rowHeight,
             isEditing: isEditing,
             viewModel: viewModel
         ))

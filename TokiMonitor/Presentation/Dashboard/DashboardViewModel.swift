@@ -698,12 +698,35 @@ final class DashboardViewModel {
         saveDashboard()
     }
 
+    /// Update a panel's position and persist immediately. Use for one-shot
+    /// commits (e.g. dropping a panel into a new cell on `.onEnded`).
     func updatePanelPosition(id: UUID, position: GridPosition) {
         guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == id }) else { return }
         dashboardConfig.panels[index].gridPosition = position
         syncLayoutsWithPanels()
         saveDashboard()
     }
+
+    /// Update a panel's position in memory only — no disk persist, no
+    /// version commit. Use during continuous drag / resize so the UI
+    /// reflects the new size every frame without thrashing UserDefaults.
+    /// Pair with `commitPanelPositionChange()` on `.onEnded`.
+    func setPanelPositionInMemory(id: UUID, position: GridPosition) {
+        guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == id }) else { return }
+        dashboardConfig.panels[index].gridPosition = position
+        syncLayoutsWithPanels()
+    }
+
+    /// Persist the dashboard after a drag / resize completes. Single
+    /// `saveDashboard()` call at the end, instead of one per drag tick.
+    func commitPanelPositionChange() {
+        saveDashboard()
+    }
+
+    /// True while a panel is being moved or resized. Used by edge-resize
+    /// strips to disable their own hit-testing on the actively-dragged
+    /// panel — otherwise a drag and a resize can stomp each other.
+    var draggingPanelID: UUID?
 
     /// Bring a panel's Perses-shaped envelope fields (`plugin`, `queries`)
     /// back into sync with its legacy authoritative fields (`panelType`,

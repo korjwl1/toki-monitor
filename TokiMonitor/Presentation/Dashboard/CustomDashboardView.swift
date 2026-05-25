@@ -66,6 +66,7 @@ struct CustomDashboardView: View {
                                         .panelDrag(
                                             panelID: panel.id,
                                             containerWidth: containerWidth,
+                                            rowHeight: rowHeight,
                                             isEditing: viewModel.isEditing,
                                             viewModel: viewModel
                                         )
@@ -73,6 +74,7 @@ struct CustomDashboardView: View {
                                             panelID: panel.id,
                                             panelType: panel.panelType,
                                             containerWidth: containerWidth,
+                                            rowHeight: rowHeight,
                                             isEditing: viewModel.isEditing,
                                             viewModel: viewModel
                                         )
