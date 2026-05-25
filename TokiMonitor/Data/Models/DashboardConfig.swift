@@ -698,9 +698,9 @@ extension DashboardConfig {
         migrated.panels = migrated.panels.map { panel in
             var p = panel
             if p.plugin == nil {
-                p.plugin = PanelPluginRef(
-                    kind: BuiltinPanelPluginKind.kind(for: p.panelType)
-                )
+                let kind = BuiltinPanelPluginKind.kind(for: p.panelType)
+                let specData = p.options.encodedSpec(forPanelPluginKind: kind) ?? Data()
+                p.plugin = PanelPluginRef(kind: kind, spec: specData)
             }
             if p.queries == nil {
                 let sourceTargets = p.targets.isEmpty
