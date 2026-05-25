@@ -645,7 +645,9 @@ final class DashboardViewModel {
     // MARK: - Panel Management
 
     func addPanel(_ panel: PanelConfig) {
-        dashboardConfig.panels.append(panel)
+        var p = panel
+        Self.normalizePanel(&p)
+        dashboardConfig.panels.append(p)
         syncLayoutsWithPanels()
         saveDashboard()
     }
@@ -658,7 +660,9 @@ final class DashboardViewModel {
 
     func updatePanel(_ panel: PanelConfig) {
         guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == panel.id }) else { return }
-        dashboardConfig.panels[index] = panel
+        var p = panel
+        Self.normalizePanel(&p)
+        dashboardConfig.panels[index] = p
         syncLayoutsWithPanels()
         saveDashboard()
     }
@@ -668,6 +672,48 @@ final class DashboardViewModel {
         dashboardConfig.panels[index].gridPosition = position
         syncLayoutsWithPanels()
         saveDashboard()
+    }
+
+    /// Bring a panel's Perses-shaped envelope fields (`plugin`, `queries`)
+    /// back into sync with its legacy authoritative fields (`panelType`,
+    /// `options`, `targets`). Called on every add/update so the on-disk JSON
+    /// stays accurate after edit-mode mutations.
+    static func normalizePanel(_ panel: inout PanelConfig) {
+        // Plugin envelope: re-encode spec from current options when the kind
+        // mismatches the panel type, or when no spec has been written yet.
+        let expectedKind = BuiltinPanelPluginKind.kind(for: panel.panelType)
+        let needsPluginRebuild = panel.plugin == nil
+            || panel.plugin?.kind != expectedKind
+            || (panel.plugin?.spec.isEmpty ?? true)
+        if needsPluginRebuild {
+            let specData = panel.options.encodedSpec(forPanelPluginKind: expectedKind) ?? Data()
+            panel.plugin = PanelPluginRef(kind: expectedKind, spec: specData)
+        }
+
+        // Queries envelope: rebuild whenever the count of targets and queries
+        // diverge. Mid-edit identity is intentionally not preserved — the
+        // canonical source is `targets`.
+        let sourceTargets = panel.targets.isEmpty
+            ? [PanelTarget(refId: "A", metric: panel.metric)]
+            : panel.targets
+        if (panel.queries?.count ?? -1) != sourceTargets.count {
+            panel.queries = sourceTargets.map { target in
+                let spec = TokiPromQLQuerySpec(
+                    datasource: nil, metric: target.metric, query: target.query
+                )
+                let specData = (try? JSONEncoder().encode(spec)) ?? Data()
+                return Query(
+                    kind: BuiltinQueryKind.timeSeriesQuery,
+                    spec: QuerySpec(
+                        name: target.refId,
+                        plugin: QueryPluginRef(
+                            kind: BuiltinQueryPluginKind.tokiPromQLQuery,
+                            spec: specData
+                        )
+                    )
+                )
+            }
+        }
     }
 
     /// Keep `dashboardConfig.layouts[0].items` in sync with the canonical
