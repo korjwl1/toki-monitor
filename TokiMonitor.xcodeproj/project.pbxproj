@@ -33,7 +33,6 @@
 		2FD39BD3817670D06BE68CEF /* ProviderRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507FA6EFF17810ED320DE318 /* ProviderRegistryTests.swift */; };
 		30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */; };
 		3574E94BBA0BB4EA83DB6F40 /* Animations in Resources */ = {isa = PBXBuildFile; fileRef = 4C9D9972B2FA620BD19C947D /* Animations */; };
-		35C19F7105186D30872BA9AA /* PanelResizeHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FA1754431AB65F03A7CBB13 /* PanelResizeHandle.swift */; };
 		3A08C6B2401417D71EEA07F6 /* AnnotationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */; };
 		3B53DEBD38340CE172E5019E /* MenuBarSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4771B8F6125461E69C2CFE8 /* MenuBarSettingsPane.swift */; };
 		3C67B974F8F903F27F8D9F62 /* TokiMonitorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A83167497A1EE039A2B2494 /* TokiMonitorApp.swift */; };
@@ -102,6 +101,7 @@
 		D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */; };
 		D8262FCBDC499382103DEA43 /* PanelPluginSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF96A3601A4E4994B232C20D /* PanelPluginSpec.swift */; };
 		D9AED0BD0367047F1034D688 /* ModelPricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7368908C5687B4CB8281CE2C /* ModelPricing.swift */; };
+		DCB1716E3D21F804D2A001CB /* PanelEdgeResizeModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FE7C3DEAF56A1CA8803454 /* PanelEdgeResizeModifier.swift */; };
 		DCECAC1B3A4EEA97415FC579 /* AboutPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3489A041D9F174427EDFF7ED /* AboutPane.swift */; };
 		DDE1EB2EC7A1FBCF494362FC /* AddPanelPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC45E4DF1A7CDBFB1E6D3C49 /* AddPanelPopover.swift */; };
 		DF1E83D524D2E5D935082DA9 /* CodexUsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FAA4A976ADB25E1195013F /* CodexUsageClient.swift */; };
@@ -186,7 +186,6 @@
 		689790D76D5DEE3F14EB819D /* AppIcon_1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIcon_1024.png; sourceTree = "<group>"; };
 		6B17BA2BAF5855E537D1C1D0 /* AnimationTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationTheme.swift; sourceTree = "<group>"; };
 		6EB3ECA48F693919010308AC /* ChartPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartPanel.swift; sourceTree = "<group>"; };
-		6FA1754431AB65F03A7CBB13 /* PanelResizeHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelResizeHandle.swift; sourceTree = "<group>"; };
 		7368908C5687B4CB8281CE2C /* ModelPricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPricing.swift; sourceTree = "<group>"; };
 		74A27A6A118A446539806BB7 /* TokiReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportModels.swift; sourceTree = "<group>"; };
 		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
@@ -197,6 +196,7 @@
 		7C4A70A035115715F915852D /* QueryDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryDataSource.swift; sourceTree = "<group>"; };
 		7CD76DA115AED88DEAB5DEA6 /* Variable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Variable.swift; sourceTree = "<group>"; };
 		85595784F39710A1BF95BC51 /* TokenAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregator.swift; sourceTree = "<group>"; };
+		86FE7C3DEAF56A1CA8803454 /* PanelEdgeResizeModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEdgeResizeModifier.swift; sourceTree = "<group>"; };
 		8AE667E2C864368F710D35E6 /* DashboardExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExtensions.swift; sourceTree = "<group>"; };
 		8B4247163632AC4A7FF3582B /* TokiEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEvent.swift; sourceTree = "<group>"; };
 		955951A7FF5652C64A116C70 /* ClaudeUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageMonitor.swift; sourceTree = "<group>"; };
@@ -455,8 +455,8 @@
 				FC45E4DF1A7CDBFB1E6D3C49 /* AddPanelPopover.swift */,
 				D0A80F24970E2F377FB13231 /* DashboardEditOverlay.swift */,
 				074C94EC60E9EE6F87E930EB /* PanelDragModifier.swift */,
+				86FE7C3DEAF56A1CA8803454 /* PanelEdgeResizeModifier.swift */,
 				E131E3756214B21A8B8654B1 /* PanelEditorView.swift */,
-				6FA1754431AB65F03A7CBB13 /* PanelResizeHandle.swift */,
 			);
 			path = EditMode;
 			sourceTree = "<group>";
@@ -693,10 +693,10 @@
 				A44EE6876D0A1DB2E6036DFD /* PanelContainerView.swift in Sources */,
 				3DA3BA25D0968CA27E13ECE3 /* PanelDataExtractor.swift in Sources */,
 				8396AA1A147DFFBD23FC72C6 /* PanelDragModifier.swift in Sources */,
+				DCB1716E3D21F804D2A001CB /* PanelEdgeResizeModifier.swift in Sources */,
 				C9B1B05E770D61B3E9D3108E /* PanelEditorView.swift in Sources */,
 				B7533A6F032F66AA318EECD8 /* PanelPlugin.swift in Sources */,
 				D8262FCBDC499382103DEA43 /* PanelPluginSpec.swift in Sources */,
-				35C19F7105186D30872BA9AA /* PanelResizeHandle.swift in Sources */,
 				FE6D7C67ACAE1D3ACB73C3A6 /* PieChartView.swift in Sources */,
 				3FC14A4CEE21EB76B9B950AA /* PromQLProxyDatasource.swift in Sources */,
 				27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */,

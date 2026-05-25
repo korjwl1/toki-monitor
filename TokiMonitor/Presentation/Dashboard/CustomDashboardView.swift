@@ -63,16 +63,13 @@ struct CustomDashboardView: View {
                                     isEditing: viewModel.isEditing,
                                     viewModel: viewModel
                                 )
-                                .overlay {
-                                    if viewModel.isEditing {
-                                        PanelResizeHandle(
-                                            panelID: panel.id,
-                                            panelType: panel.panelType,
-                                            containerWidth: containerWidth,
-                                            viewModel: viewModel
-                                        )
-                                    }
-                                }
+                                .panelEdgeResize(
+                                    panelID: panel.id,
+                                    panelType: panel.panelType,
+                                    containerWidth: containerWidth,
+                                    isEditing: viewModel.isEditing,
+                                    viewModel: viewModel
+                                )
                         }
                     }
                 }
