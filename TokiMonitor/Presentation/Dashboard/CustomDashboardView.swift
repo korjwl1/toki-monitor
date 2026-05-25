@@ -15,11 +15,16 @@ struct CustomDashboardView: View {
     var body: some View {
         GeometryReader { geometry in
             let containerWidth = geometry.size.width - (DS.Dashboard.gridPadding * 2)
+            let containerHeight = geometry.size.height - (DS.Dashboard.gridPadding * 2)
             let panels = viewModel.visiblePanels
-            // Fixed row height — the grid grows downward and the ScrollView
-            // owns overflow. Resizing a panel now has a visible effect even
-            // when other panels are present.
-            let rowHeight = DashboardGridLayout.defaultRowHeight
+            // Adaptive row height: fills the viewport when the grid fits
+            // (preserves the default dashboard's spacious layout) but pins
+            // at `defaultRowHeight` once panels exceed the viewport, at
+            // which point the surrounding ScrollView takes over.
+            let rowHeight = DashboardGridLayout.adaptiveRowHeight(
+                for: panels,
+                containerHeight: containerHeight
+            )
 
             ScrollView(.vertical, showsIndicators: true) {
                 ZStack(alignment: .topLeading) {

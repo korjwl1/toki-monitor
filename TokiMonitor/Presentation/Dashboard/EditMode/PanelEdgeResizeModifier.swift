@@ -1,13 +1,20 @@
 import SwiftUI
 
-/// Edge-based panel resize. Three invisible drag strips overlay the right
-/// edge, bottom edge, and bottom-right corner of a panel; each one updates
-/// `gridPosition.width` and/or `.height` while the user drags, with grid
-/// snapping applied every frame so the panel resizes live rather than only
-/// committing on release.
+/// Edge-based panel resize.
 ///
-/// Replaces the old in-panel ↘ glyph (`PanelResizeHandle`), which placed
-/// the affordance inside the card and only updated on drag end.
+/// Each panel gets three invisible drag affordances pinned to its own
+/// boundary via `GeometryReader` + explicit `.offset` — right edge strip,
+/// bottom edge strip, bottom-right corner. Using positioned `Color.clear`
+/// rectangles (rather than `HStack { Spacer; Color.clear }`) is what
+/// guarantees the hit area is exactly the strip and does not leak into
+/// adjacent panels — the earlier Spacer-based layout had subtle hit-test
+/// bleed where dragging one panel's edge could affect a neighbor.
+///
+/// Each affordance:
+/// - Sets a SwiftUI hover cursor (resizeLeftRight / resizeUpDown / crosshair).
+/// - Drives the panel's `gridPosition.width` / `.height` via a `DragGesture`
+///   that snaps to the grid live, so the panel resizes as the user drags
+///   rather than only on release.
 struct PanelEdgeResize: ViewModifier {
     let panelID: UUID
     let panelType: PanelType
@@ -15,64 +22,52 @@ struct PanelEdgeResize: ViewModifier {
     let isEditing: Bool
     @Bindable var viewModel: DashboardViewModel
 
-    /// Drag area thickness on the panel edges. Sits just inside the dashed
-    /// border so the user lands on the affordance when targeting the visible
-    /// edge.
+    /// Drag area thickness on a panel's edge.
     private static let stripThickness: CGFloat = 6
+    /// Side length of the bottom-right corner affordance (overlaps the two
+    /// edge strips so the corner can drive both axes at once).
     private static let cornerSize: CGFloat = 14
 
     func body(content: Content) -> some View {
         content.overlay {
             if isEditing {
-                ZStack {
-                    rightEdgeStrip
-                    bottomEdgeStrip
-                    bottomRightCorner
-                }
-            }
-        }
-    }
+                GeometryReader { proxy in
+                    let w = proxy.size.width
+                    let h = proxy.size.height
 
-    // MARK: - Strips
+                    ZStack(alignment: .topLeading) {
+                        // Right edge strip (horizontal resize)
+                        Color.clear
+                            .frame(width: Self.stripThickness, height: h)
+                            .contentShape(Rectangle())
+                            .offset(x: w - Self.stripThickness, y: 0)
+                            .onHover { hovering in
+                                setCursor(hovering ? .resizeLeftRight : nil)
+                            }
+                            .gesture(resizeGesture(horizontal: true, vertical: false))
 
-    private var rightEdgeStrip: some View {
-        HStack {
-            Spacer()
-            Color.clear
-                .frame(width: Self.stripThickness)
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    setCursor(hovering ? .resizeLeftRight : nil)
-                }
-                .gesture(resizeGesture(horizontal: true, vertical: false))
-        }
-    }
+                        // Bottom edge strip (vertical resize)
+                        Color.clear
+                            .frame(width: w, height: Self.stripThickness)
+                            .contentShape(Rectangle())
+                            .offset(x: 0, y: h - Self.stripThickness)
+                            .onHover { hovering in
+                                setCursor(hovering ? .resizeUpDown : nil)
+                            }
+                            .gesture(resizeGesture(horizontal: false, vertical: true))
 
-    private var bottomEdgeStrip: some View {
-        VStack {
-            Spacer()
-            Color.clear
-                .frame(height: Self.stripThickness)
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    setCursor(hovering ? .resizeUpDown : nil)
-                }
-                .gesture(resizeGesture(horizontal: false, vertical: true))
-        }
-    }
-
-    private var bottomRightCorner: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                Color.clear
-                    .frame(width: Self.cornerSize, height: Self.cornerSize)
-                    .contentShape(Rectangle())
-                    .onHover { hovering in
-                        setCursor(hovering ? .crosshair : nil)
+                        // Bottom-right corner (both axes) — drawn last so it
+                        // wins over the two edge strips where they overlap.
+                        Color.clear
+                            .frame(width: Self.cornerSize, height: Self.cornerSize)
+                            .contentShape(Rectangle())
+                            .offset(x: w - Self.cornerSize, y: h - Self.cornerSize)
+                            .onHover { hovering in
+                                setCursor(hovering ? .crosshair : nil)
+                            }
+                            .gesture(resizeGesture(horizontal: true, vertical: true))
                     }
-                    .gesture(resizeGesture(horizontal: true, vertical: true))
+                }
             }
         }
     }
@@ -90,9 +85,9 @@ struct PanelEdgeResize: ViewModifier {
             }
     }
 
-    /// Convert a drag translation into a new `GridPosition` and commit it
-    /// through the view model. Snaps width/height to the column/row grid
-    /// on every frame so the panel grows in discrete steps.
+    /// Apply a drag translation to the panel's grid position. Width and
+    /// height are snapped to the grid every frame so the visual update
+    /// tracks the drag.
     private func apply(translation: CGSize, horizontal: Bool, vertical: Bool) {
         guard let panel = viewModel.dashboardConfig.panels.first(where: { $0.id == panelID })
         else { return }
@@ -104,23 +99,21 @@ struct PanelEdgeResize: ViewModifier {
         var newHeight = panel.gridPosition.height
 
         if horizontal {
-            let dx = translation.width
-            let widthDelta = Int(round(dx / cellWidth))
+            let widthDelta = Int(round(translation.width / cellWidth))
             newWidth = max(panelType.minWidth, panel.gridPosition.width + widthDelta)
-            // Clamp to right edge of grid.
+            // Clamp to the right edge of the 24-column grid so panels can't
+            // grow past the dashboard.
             let maxWidth = DashboardGridLayout.columnCount - panel.gridPosition.column
             newWidth = min(newWidth, maxWidth)
         }
 
         if vertical {
-            let dy = translation.height
-            let heightDelta = Int(round(dy / cellHeight))
+            let heightDelta = Int(round(translation.height / cellHeight))
             newHeight = max(panelType.minHeight, panel.gridPosition.height + heightDelta)
         }
 
-        if newWidth == panel.gridPosition.width && newHeight == panel.gridPosition.height {
-            return
-        }
+        guard newWidth != panel.gridPosition.width || newHeight != panel.gridPosition.height
+        else { return }
 
         let newPosition = GridPosition(
             column: panel.gridPosition.column,

@@ -10,6 +10,27 @@ struct DashboardGridLayout {
     static let gap: CGFloat = 8
     static let defaultRowHeight: CGFloat = 80
 
+    /// Row height to use for a given panel set in a given viewport.
+    ///
+    /// Behavior:
+    /// - If the panel grid (rows × `defaultRowHeight`) fits in the viewport,
+    ///   row height *grows* to fill the viewport so the default dashboard
+    ///   keeps the spacious layout the user has been seeing.
+    /// - If it does not fit, row height pins at `defaultRowHeight` and the
+    ///   ScrollView around the grid takes over.
+    ///
+    /// Replaces an earlier version that scaled the row height *down* to fit,
+    /// which made resize visually invisible (every drag just rebalanced the
+    /// other rows) and effectively disabled scrolling.
+    static func adaptiveRowHeight(for panels: [PanelConfig], containerHeight: CGFloat) -> CGFloat {
+        let totalRows = totalLogicalRows(for: panels)
+        guard totalRows > 0 else { return defaultRowHeight }
+        let totalGaps = gap * CGFloat(totalRows - 1)
+        let available = containerHeight - totalGaps
+        let fitted = available / CGFloat(totalRows)
+        return max(fitted, defaultRowHeight)
+    }
+
     /// Total logical rows needed
     static func totalLogicalRows(for panels: [PanelConfig]) -> Int {
         guard !panels.isEmpty else { return 1 }
