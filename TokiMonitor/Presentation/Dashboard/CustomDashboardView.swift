@@ -46,7 +46,17 @@ struct CustomDashboardView: View {
                         )
                     }
 
-                    // Panels
+                    // Panels — positioned with `.position()` (not `.offset()`).
+                    //
+                    // Why: `.offset()` is a *visual-only* transform; the
+                    // view's hit-test region stays at its original layout
+                    // origin. With every ForEach-produced panel rendered at
+                    // (0, 0) in the ZStack and only visually offset to its
+                    // grid cell, all panels' hit areas overlap at (0, 0)
+                    // and the last-drawn panel intercepts gestures meant
+                    // for any other panel — the exact "drag stat → resize
+                    // timeSeries" bug. `.position()` participates in layout,
+                    // so the hit-test region tracks the visible position.
                     ForEach(panels) { panel in
                         let frame = DashboardGridLayout.frame(
                             for: panel.gridPosition,
@@ -57,11 +67,11 @@ struct CustomDashboardView: View {
                         if panel.panelType == .rowPanel {
                             rowPanelView(panel: panel, containerWidth: containerWidth)
                                 .frame(width: frame.width, height: frame.height)
-                                .offset(x: frame.origin.x, y: frame.origin.y)
+                                .position(x: frame.midX, y: frame.midY)
                         } else {
                             panelView(for: panel, containerWidth: containerWidth)
                                 .frame(width: frame.width, height: frame.height)
-                                .offset(x: frame.origin.x, y: frame.origin.y)
+                                .position(x: frame.midX, y: frame.midY)
                                 .panelDrag(
                                     panelID: panel.id,
                                     containerWidth: containerWidth,
