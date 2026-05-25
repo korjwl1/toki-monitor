@@ -58,6 +58,9 @@ enum BuiltinVariablePluginKind {
     static let staticList = "StaticListVariable"
     /// Predefined interval steps (e.g. 1m, 5m, 15m, 1h).
     static let interval = "IntervalVariable"
+    /// Dynamic options pulled from a PromQL result's labels (model, project).
+    /// toki-monitor equivalent of Perses' PrometheusLabelValuesVariable.
+    static let tokiLabelValues = "TokiLabelValuesVariable"
 }
 
 // MARK: - Spec types

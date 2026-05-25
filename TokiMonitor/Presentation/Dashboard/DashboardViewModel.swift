@@ -184,7 +184,11 @@ final class DashboardViewModel {
                 ($0.name, $0.current.value.joined(separator: "|"))
             }
         )
-        let context = VariableLoadContext(time: time, resolvedVariables: resolved)
+        let context = VariableLoadContext(
+            time: time,
+            resolvedVariables: resolved,
+            queryClient: queryClient
+        )
         let pairs: [(UUID, VariablePluginRef)] = dashboardConfig.templating.list
             .compactMap { v in v.plugin.map { (v.id, $0) } }
         guard !pairs.isEmpty else { return }
