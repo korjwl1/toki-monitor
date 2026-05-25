@@ -729,7 +729,7 @@ struct DashboardView: View {
                     Divider()
                 }
 
-                ForEach(variable.options, id: \.value) { option in
+                ForEach(variable.sortedOptions, id: \.value) { option in
                     Button {
                         if variable.multi {
                             var current = variable.current

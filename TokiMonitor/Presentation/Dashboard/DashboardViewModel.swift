@@ -278,7 +278,9 @@ final class DashboardViewModel {
         var query = template
         query = query.replacingOccurrences(of: "$__interval", with: t.bucketString)
 
-        // Provider variable
+        // Provider variable — special-cased: expands to a label matcher
+        // expression rather than a bare value, because the query templates
+        // embed it inside `{$provider}` placeholder positions.
         let selectedProvider: String? = {
             let raw = variableValue(named: "provider")
             let filtered = raw.filter { !$0.isEmpty && $0 != "All" && $0 != "all" && $0 != "$__all" }
@@ -291,13 +293,61 @@ final class DashboardViewModel {
             query = query.replacingOccurrences(of: "$provider", with: "")
         }
 
-        // Generic variable interpolation
-        for variable in dashboardConfig.templating.list {
-            let value = variable.current.value.first ?? ""
-            query = query.replacingOccurrences(of: "${\(variable.name)}", with: value)
+        // Generic variable interpolation — supports both `${name}` and `$name`
+        // (Perses-style). Cascading: a variable's value can reference another
+        // variable via the same syntax; we iterate to a fixed point so chains
+        // resolve in one pass.
+        for _ in 0..<4 {
+            let before = query
+            for variable in dashboardConfig.templating.list where variable.name != "provider" {
+                let value = interpolatedValue(for: variable)
+                query = query.replacingOccurrences(of: "${\(variable.name)}", with: value)
+                // Bare `$name` form — only replace when followed by a
+                // non-identifier character to avoid eating part of a longer
+                // variable name. Use word boundary via regex.
+                let pattern = "\\$\(NSRegularExpression.escapedPattern(for: variable.name))(?![A-Za-z0-9_])"
+                query = query.replacingOccurrences(of: pattern, with: value,
+                                                   options: .regularExpression)
+            }
+            if query == before { break }
         }
 
         return query
+    }
+
+    /// Resolve a variable to the string that should replace `$name` /
+    /// `${name}`. Honors multi-select (joined as PromQL regex alternation),
+    /// the "All" selection (→ `customAllValue`), and the optional
+    /// `capturingRegexp` post-filter.
+    private func interpolatedValue(for variable: DashboardVariable) -> String {
+        let selection = variable.current.value
+        // "All" sentinel — emit customAllValue (default `.*`)
+        if variable.includeAll && (selection.contains("$__all") || selection.isEmpty) {
+            return variable.effectiveCustomAllValue
+        }
+
+        let filtered = selection.filter { !$0.isEmpty && $0 != "$__all" }
+        if filtered.isEmpty { return "" }
+
+        let values: [String]
+        if let pattern = variable.capturingRegexp, !pattern.isEmpty,
+           let regex = try? NSRegularExpression(pattern: pattern) {
+            values = filtered.map { raw in
+                let range = NSRange(raw.startIndex..., in: raw)
+                guard let m = regex.firstMatch(in: raw, range: range),
+                      m.numberOfRanges > 1,
+                      let r = Range(m.range(at: 1), in: raw)
+                else { return raw }
+                return String(raw[r])
+            }
+        } else {
+            values = filtered
+        }
+
+        if variable.multi && values.count > 1 {
+            return values.joined(separator: "|")
+        }
+        return values.first ?? ""
     }
 
     /// Fetch project-grouped data. toki returns "date|project" in period field.

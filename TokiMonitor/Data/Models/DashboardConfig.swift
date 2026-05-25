@@ -221,6 +221,22 @@ struct DashboardVariable: Codable, Identifiable, Equatable {
     var hide: VariableHide = .visible
     var refresh: VariableRefresh = .onDashboardLoad
 
+    // MARK: - Perses-style fields (optional for v3 backward compat — Swift's
+    // synthesized Codable does not apply default values when the JSON key is
+    // missing, so these stay Optional and read through `effective*` computed
+    // accessors below.)
+
+    /// Value substituted for `$name` when the "All" item is selected.
+    /// Defaults to `.*` (Prometheus regex match-all) via `effectiveCustomAllValue`.
+    var customAllValue: String?
+
+    /// Optional regex applied to each option's value before storage.
+    /// Use a single capture group; the group's content replaces the value.
+    var capturingRegexp: String?
+
+    /// Sort order applied to options before the toolbar menu renders them.
+    var sort: VariableSort?
+
     enum VariableType: String, Codable, CaseIterable, Equatable {
         case custom
         case interval
@@ -236,6 +252,16 @@ struct DashboardVariable: Codable, Identifiable, Equatable {
         case never = 0
         case onDashboardLoad = 1
         case onTimeRangeChanged = 2
+    }
+
+    // MARK: - Effective accessors (apply defaults when Optional is nil)
+
+    var effectiveCustomAllValue: String { customAllValue ?? ".*" }
+    var effectiveSort: VariableSort { sort ?? .none }
+
+    /// Options after `sort` is applied — the order the toolbar should render.
+    var sortedOptions: [VariableOption] {
+        effectiveSort.apply(options)
     }
 }
 

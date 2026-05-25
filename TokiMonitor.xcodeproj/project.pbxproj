@@ -62,6 +62,7 @@
 		656A44410727CE8BA928D746 /* GeneralSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 476DECAE0D1683A1642FEC9A /* GeneralSettingsPane.swift */; };
 		65AA1C3426510B47ECEC2529 /* TimeSeriesModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A285CEF82274757C8A327142 /* TimeSeriesModels.swift */; };
 		669753CC9D61AB01C3F2547C /* VersionCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4C36A205DFC4F7DA9CD54A9 /* VersionCompatibility.swift */; };
+		67735C617E16379A7BE552E2 /* Variable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD76DA115AED88DEAB5DEA6 /* Variable.swift */; };
 		69295AAE29A8D4FB6FBD903E /* TokenUsageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */; };
 		6FFE0E1FB8E6C0990D3D1F7E /* AlertManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5EDD636F883E05C6E56C0C /* AlertManager.swift */; };
 		789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB89E56D927ABD7289F04084 /* SettingsView.swift */; };
@@ -193,6 +194,7 @@
 		78A88F41ED20224F774C1ABA /* OAuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthModels.swift; sourceTree = "<group>"; };
 		7950516E788D89A85B45B397 /* StatusItemUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemUnit.swift; sourceTree = "<group>"; };
 		7C4A70A035115715F915852D /* QueryDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryDataSource.swift; sourceTree = "<group>"; };
+		7CD76DA115AED88DEAB5DEA6 /* Variable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Variable.swift; sourceTree = "<group>"; };
 		85595784F39710A1BF95BC51 /* TokenAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregator.swift; sourceTree = "<group>"; };
 		8AE667E2C864368F710D35E6 /* DashboardExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExtensions.swift; sourceTree = "<group>"; };
 		8B4247163632AC4A7FF3582B /* TokiEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEvent.swift; sourceTree = "<group>"; };
@@ -407,6 +409,7 @@
 				A285CEF82274757C8A327142 /* TimeSeriesModels.swift */,
 				8B4247163632AC4A7FF3582B /* TokiEvent.swift */,
 				74A27A6A118A446539806BB7 /* TokiReportModels.swift */,
+				7CD76DA115AED88DEAB5DEA6 /* Variable.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -722,6 +725,7 @@
 				F7B06F96F0152C66001A51CB /* TokiReportClient.swift in Sources */,
 				909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */,
 				64CFC0046724FA45053F0D8B /* UpdateChecker.swift in Sources */,
+				67735C617E16379A7BE552E2 /* Variable.swift in Sources */,
 				669753CC9D61AB01C3F2547C /* VersionCompatibility.swift in Sources */,
 				AE7388FE3592A7411AC81393 /* VersionHistorySheet.swift in Sources */,
 			);
