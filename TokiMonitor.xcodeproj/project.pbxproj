@@ -42,6 +42,7 @@
 		40CC603230947A99EB36F064 /* TokenAggregatorLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F74A465DDBF407B395F8AA /* TokenAggregatorLogicTests.swift */; };
 		417DA2C685E33E4F4E375DE4 /* PlaylistManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9953C511BFF1317C46D027D6 /* PlaylistManager.swift */; };
 		46DF834236EAC2C92B2F93AE /* ProviderSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F55200D88B2D7260541C5D /* ProviderSummary.swift */; };
+		49DE5C8CEE473286A88906CA /* DashboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34515E784769F22E891CE8F6 /* DashboardLayout.swift */; };
 		4D10457A9F0080B845753A2D /* StatusItemUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7950516E788D89A85B45B397 /* StatusItemUnit.swift */; };
 		4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */; };
 		4DA4AF6FC2656FBDABF460BB /* ClaudeUsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 955951A7FF5652C64A116C70 /* ClaudeUsageMonitor.swift */; };
@@ -159,6 +160,7 @@
 		2ADB19DAAAC2A8BD63CB59C8 /* CostChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CostChart.swift; sourceTree = "<group>"; };
 		3126EF202F535714BFCD4F20 /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
 		3191102CF28F684FBE76F173 /* CustomDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomDashboardView.swift; sourceTree = "<group>"; };
+		34515E784769F22E891CE8F6 /* DashboardLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardLayout.swift; sourceTree = "<group>"; };
 		3489A041D9F174427EDFF7ED /* AboutPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutPane.swift; sourceTree = "<group>"; };
 		37F55200D88B2D7260541C5D /* ProviderSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSummary.swift; sourceTree = "<group>"; };
 		3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -408,6 +410,7 @@
 			children = (
 				03F503F3516997ED1304E8F7 /* DashboardConfig.swift */,
 				8AE667E2C864368F710D35E6 /* DashboardExtensions.swift */,
+				34515E784769F22E891CE8F6 /* DashboardLayout.swift */,
 				A5D13660AF9BC68A2AD56CB9 /* PanelPlugin.swift */,
 				A285CEF82274757C8A327142 /* TimeSeriesModels.swift */,
 				8B4247163632AC4A7FF3582B /* TokiEvent.swift */,
@@ -662,6 +665,7 @@
 				1737EF77B92E5AA23529AFC2 /* DashboardEditOverlay.swift in Sources */,
 				19B6898855A3D644A90C6F70 /* DashboardExtensions.swift in Sources */,
 				2235B25655198D97380CBAC9 /* DashboardGridLayout.swift in Sources */,
+				49DE5C8CEE473286A88906CA /* DashboardLayout.swift in Sources */,
 				BD0727E1C8B4DA7BCB2CBFD4 /* DashboardSettingsSheet.swift in Sources */,
 				A673F7E773850A93FABC17EE /* DashboardToolbar.swift in Sources */,
 				125A70F9AEFAEA35D938E593 /* DashboardVersionStore.swift in Sources */,

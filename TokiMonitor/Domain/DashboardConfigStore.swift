@@ -26,6 +26,20 @@ final class DashboardConfigStore {
             config = DashboardConfig.migrateV2toV3(config)
             save(config)
         }
+        if config.schemaVersion < 4 {
+            config = DashboardConfig.migrateV3toV4(config)
+            // Seed activeDatasource from the legacy global enum so the
+            // dashboard remembers which backend the user was last using.
+            if config.activeDatasource == nil,
+               let raw = UserDefaults.standard.string(forKey: "dashboardDataSource"),
+               let legacy = DashboardDataSource(rawValue: raw) {
+                let kind = legacy == .server
+                    ? BuiltinDatasourceKind.promQLProxy
+                    : BuiltinDatasourceKind.localCLI
+                config.activeDatasource = DatasourceSelector(kind: kind)
+            }
+            save(config)
+        }
         return config
     }
 
@@ -42,10 +56,21 @@ final class DashboardConfigStore {
 
     func loadDashboardList() -> [DashboardConfig] {
         guard let data = UserDefaults.standard.data(forKey: Self.dashboardListKey),
-              let list = try? JSONDecoder().decode([DashboardConfig].self, from: data)
+              let raw = try? JSONDecoder().decode([DashboardConfig].self, from: data)
         else {
             return [load()]
         }
+        // Apply migrations to each entry so the in-memory list always carries
+        // the latest schema, even for entries written before this version.
+        var migrated = false
+        let list = raw.map { entry -> DashboardConfig in
+            var c = entry
+            if c.schemaVersion < 2 { c = DashboardConfig.migrateV1toV2(c); migrated = true }
+            if c.schemaVersion < 3 { c = DashboardConfig.migrateV2toV3(c); migrated = true }
+            if c.schemaVersion < 4 { c = DashboardConfig.migrateV3toV4(c); migrated = true }
+            return c
+        }
+        if migrated { saveDashboardList(list) }
         return list
     }
 
@@ -147,9 +172,9 @@ final class DashboardConfigStore {
 
     // MARK: - Default Layout (24-column grid)
 
-    /// Default dashboard with 24-column grid layout
+    /// Default dashboard with 24-column grid layout (v4 schema).
     static var defaultConfig: DashboardConfig {
-        DashboardConfig(
+        let config = DashboardConfig(
             title: "Default",
             time: TimeConfig(from: "now-24h", to: "now"),
             refresh: .off,
@@ -209,5 +234,8 @@ final class DashboardConfigStore {
             ],
             templating: DashboardConfig.defaultTemplating
         )
+        // Run through v4 migration so plugin/queries envelopes and layouts
+        // are populated consistently with persisted dashboards.
+        return DashboardConfig.migrateV3toV4(config)
     }
 }

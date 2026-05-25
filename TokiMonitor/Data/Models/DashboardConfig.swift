@@ -28,6 +28,11 @@ struct DashboardConfig: Codable, Equatable {
     // first registered default is used.
     var activeDatasource: DatasourceSelector?
 
+    // Perses-style layouts. Optional; when nil the renderer drives off
+    // `panels[].gridPosition` directly. v4+ encoders populate this so the
+    // on-disk JSON is Perses-compatible.
+    var layouts: [DashboardLayout]?
+
     // Annotations
     var annotations: [DashboardAnnotation] = []
 
@@ -672,6 +677,77 @@ extension DashboardConfig {
             }
             return p
         }
+        return migrated
+    }
+
+    /// Migrate from v3 to v4: adopt Perses-style envelopes.
+    ///
+    /// - Populates `panel.plugin` from `panel.panelType` (legacy fields kept
+    ///   for round-trip and renderer compatibility).
+    /// - Populates `panel.queries` from `panel.targets` (each `PanelTarget`
+    ///   becomes a `Query` wrapping a `TokiPromQLQuerySpec`).
+    /// - Builds a single `Grid` layout listing every panel by `$ref` so the
+    ///   on-disk JSON matches Perses' panels-map + layouts-array shape.
+    /// - Backfills `activeDatasource` from the legacy enum stored in
+    ///   `UserDefaults` (handled at the store level; this function is pure).
+    static func migrateV3toV4(_ config: DashboardConfig) -> DashboardConfig {
+        var migrated = config
+        migrated.schemaVersion = 4
+
+        // Per-panel: populate plugin + queries envelopes when missing.
+        migrated.panels = migrated.panels.map { panel in
+            var p = panel
+            if p.plugin == nil {
+                p.plugin = PanelPluginRef(
+                    kind: BuiltinPanelPluginKind.kind(for: p.panelType)
+                )
+            }
+            if p.queries == nil {
+                let sourceTargets = p.targets.isEmpty
+                    ? [PanelTarget(refId: "A", metric: p.metric)]
+                    : p.targets
+                p.queries = sourceTargets.map { target -> Query in
+                    let spec = TokiPromQLQuerySpec(
+                        datasource: nil,
+                        metric: target.metric,
+                        query: target.query
+                    )
+                    let specData = (try? JSONEncoder().encode(spec)) ?? Data()
+                    return Query(
+                        kind: BuiltinQueryKind.timeSeriesQuery,
+                        spec: QuerySpec(
+                            name: target.refId,
+                            plugin: QueryPluginRef(
+                                kind: BuiltinQueryPluginKind.tokiPromQLQuery,
+                                spec: specData
+                            )
+                        )
+                    )
+                }
+            }
+            return p
+        }
+
+        // Build a single Grid layout. Each panel becomes one LayoutGridItem
+        // referencing the panel by its id (used as the panels-map key).
+        if migrated.layouts == nil {
+            let items = migrated.panels.map { panel -> LayoutGridItem in
+                LayoutGridItem(
+                    x: panel.gridPosition.column,
+                    y: panel.gridPosition.row,
+                    width: panel.gridPosition.width,
+                    height: panel.gridPosition.height,
+                    content: JSONRef(panelKey: panel.id.uuidString)
+                )
+            }
+            migrated.layouts = [
+                DashboardLayout(
+                    kind: "Grid",
+                    spec: GridLayoutSpec(display: nil, items: items)
+                )
+            ]
+        }
+
         return migrated
     }
 

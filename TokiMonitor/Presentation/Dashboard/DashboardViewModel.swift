@@ -166,6 +166,7 @@ final class DashboardViewModel {
             self.activeDatasource = persisted
         }
         self.queryClient = resolveQueryClient()
+        registerInlineDatasources()
         populateProviderOptions()
         loadAnnotations()
         loadExploreHistory()
@@ -780,6 +781,7 @@ final class DashboardViewModel {
 
     func switchDashboard(_ config: DashboardConfig) {
         dashboardConfig = config
+        registerInlineDatasources()
         populateProviderOptions()
         saveDashboard()
         configStore.activeDashboardUID = config.uid
@@ -787,6 +789,17 @@ final class DashboardViewModel {
         loadAnnotations()
         setupAutoRefresh()
         fetchData()
+    }
+
+    /// Register dashboard-inline datasource instances with the global registry
+    /// so panels with `queries[*].plugin.spec.datasource.name` set can be
+    /// resolved against them. Called on init and every dashboard switch.
+    private func registerInlineDatasources() {
+        for (_, instance) in dashboardConfig.datasources {
+            if let plugin = DatasourceRegistry.shared.resolve(kind: instance.kind) {
+                DatasourceRegistry.shared.registerNamed(name: instance.name, plugin: plugin)
+            }
+        }
     }
 
     func switchDashboard(uid: String) {
