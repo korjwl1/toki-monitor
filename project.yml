@@ -41,7 +41,7 @@ targets:
         LSUIElement: true
         CFBundleDisplayName: Toki Monitor
         CFBundleName: TokiMonitor
-        CFBundleShortVersionString: "0.2.3"
+        CFBundleShortVersionString: "0.2.3-dev"
         CFBundleVersion: "1"
 
   TokiMonitorTests:
