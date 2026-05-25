@@ -105,6 +105,10 @@ final class DashboardViewModel {
             // Clear all cached panel data so stale results from the other source don't show
             panelData.removeAll()
             timeSeriesData = nil
+            // Re-fetch variable options too — a `TokiLabelValuesVariable`
+            // plugin reads from the active client, so switching backends
+            // can yield a different label set.
+            refreshVariables()
             fetchData()
         }
     }
@@ -883,7 +887,18 @@ final class DashboardViewModel {
     }
 
     func importDashboard() {
-        guard let imported = configStore.importFromFile() else { return }
+        guard var imported = configStore.importFromFile() else { return }
+        // Migrate imported config to v4 and normalize each panel so plugin /
+        // queries envelopes are accurate (imports might originate from
+        // older exports or be hand-edited).
+        if imported.schemaVersion < 4 {
+            imported = DashboardConfig.migrateV3toV4(imported)
+        }
+        imported.panels = imported.panels.map { panel in
+            var p = panel
+            Self.normalizePanel(&p)
+            return p
+        }
         dashboardConfig = imported
         saveDashboard()
         fetchData()
@@ -929,6 +944,11 @@ final class DashboardViewModel {
         var config = DashboardConfig()
         config.title = title
         config.templating = DashboardConfig.defaultTemplating
+        // Run through the same migration as persisted dashboards so plugin /
+        // queries / layouts envelopes are populated up-front. New dashboards
+        // start empty so this is mostly a no-op, but it keeps the invariant
+        // that any in-memory dashboard is v4-shaped.
+        config = DashboardConfig.migrateV3toV4(config)
         configStore.addDashboard(config)
         dashboardList = configStore.loadDashboardList()
         switchDashboard(config)
