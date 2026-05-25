@@ -120,6 +120,7 @@
 		F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */; };
 		FAAE9290A0103A52B4EDDA4E /* frame_01.png in Resources */ = {isa = PBXBuildFile; fileRef = 140E82C9A015AA41CD3C0C1A /* frame_01.png */; };
 		FE6D7C67ACAE1D3ACB73C3A6 /* PieChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A62B05BBA5579FF67EA1B8D /* PieChartView.swift */; };
+		FFD77509DEB84844ECD8160D /* DashboardCustomLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5104A31D681EDBBBFC0C0E /* DashboardCustomLayout.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -197,6 +198,7 @@
 		7CD76DA115AED88DEAB5DEA6 /* Variable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Variable.swift; sourceTree = "<group>"; };
 		85595784F39710A1BF95BC51 /* TokenAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregator.swift; sourceTree = "<group>"; };
 		86FE7C3DEAF56A1CA8803454 /* PanelEdgeResizeModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEdgeResizeModifier.swift; sourceTree = "<group>"; };
+		8A5104A31D681EDBBBFC0C0E /* DashboardCustomLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCustomLayout.swift; sourceTree = "<group>"; };
 		8AE667E2C864368F710D35E6 /* DashboardExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExtensions.swift; sourceTree = "<group>"; };
 		8B4247163632AC4A7FF3582B /* TokiEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEvent.swift; sourceTree = "<group>"; };
 		955951A7FF5652C64A116C70 /* ClaudeUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageMonitor.swift; sourceTree = "<group>"; };
@@ -358,6 +360,7 @@
 			children = (
 				B9778D3435D067DAE0CE34D6 /* AnnotationListSheet.swift */,
 				3191102CF28F684FBE76F173 /* CustomDashboardView.swift */,
+				8A5104A31D681EDBBBFC0C0E /* DashboardCustomLayout.swift */,
 				77B9855FE6D408AAA8CF6F61 /* DashboardGridLayout.swift */,
 				1CB0CA29129542559BD4F7E3 /* DashboardSettingsSheet.swift */,
 				D8FB627746EE1DECBC2CBA2C /* DashboardToolbar.swift */,
@@ -662,6 +665,7 @@
 				99C01AFD6FFFB72644AD3DEB /* CustomDashboardView.swift in Sources */,
 				1DF5998FCB1A3274BCB95F2A /* DashboardConfig.swift in Sources */,
 				062AE52FA18F6C3C5811BC25 /* DashboardConfigStore.swift in Sources */,
+				FFD77509DEB84844ECD8160D /* DashboardCustomLayout.swift in Sources */,
 				1737EF77B92E5AA23529AFC2 /* DashboardEditOverlay.swift in Sources */,
 				19B6898855A3D644A90C6F70 /* DashboardExtensions.swift in Sources */,
 				2235B25655198D97380CBAC9 /* DashboardGridLayout.swift in Sources */,

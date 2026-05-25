@@ -26,67 +26,62 @@ struct CustomDashboardView: View {
                 containerHeight: containerHeight
             )
 
-            ScrollView(.vertical, showsIndicators: true) {
-                ZStack(alignment: .topLeading) {
-                    // Layout anchor
-                    Color.clear
-                        .frame(
-                            width: containerWidth,
-                            height: DashboardGridLayout.totalHeight(for: panels, rowHeight: rowHeight)
-                        )
-
-                    // Edit mode grid overlay
-                    if viewModel.isEditing {
-                        DashboardEditOverlay(
-                            containerWidth: containerWidth,
-                            totalHeight: DashboardGridLayout.totalHeight(
-                                for: panels,
-                                rowHeight: rowHeight
-                            )
-                        )
-                    }
-
-                    // Panels — positioned with `.position()` (not `.offset()`).
-                    //
-                    // Why: `.offset()` is a *visual-only* transform; the
-                    // view's hit-test region stays at its original layout
-                    // origin. With every ForEach-produced panel rendered at
-                    // (0, 0) in the ZStack and only visually offset to its
-                    // grid cell, all panels' hit areas overlap at (0, 0)
-                    // and the last-drawn panel intercepts gestures meant
-                    // for any other panel — the exact "drag stat → resize
-                    // timeSeries" bug. `.position()` participates in layout,
-                    // so the hit-test region tracks the visible position.
-                    ForEach(panels) { panel in
-                        let frame = DashboardGridLayout.frame(
+            // Precompute each panel's grid frame so `DashboardCustomLayout`
+            // (and the edit-mode overlay) share a single source of truth.
+            let framesByID: [UUID: CGRect] = Dictionary(
+                uniqueKeysWithValues: panels.map { panel in
+                    (
+                        panel.id,
+                        DashboardGridLayout.frame(
                             for: panel.gridPosition,
                             in: containerWidth,
                             rowHeight: rowHeight
                         )
+                    )
+                }
+            )
+            let totalHeight = DashboardGridLayout.totalHeight(for: panels, rowHeight: rowHeight)
 
-                        if panel.panelType == .rowPanel {
-                            rowPanelView(panel: panel, containerWidth: containerWidth)
-                                .frame(width: frame.width, height: frame.height)
-                                .position(x: frame.midX, y: frame.midY)
-                        } else {
-                            panelView(for: panel, containerWidth: containerWidth)
-                                .frame(width: frame.width, height: frame.height)
-                                .position(x: frame.midX, y: frame.midY)
-                                .panelDrag(
-                                    panelID: panel.id,
-                                    containerWidth: containerWidth,
-                                    isEditing: viewModel.isEditing,
-                                    viewModel: viewModel
-                                )
-                                .panelEdgeResize(
-                                    panelID: panel.id,
-                                    panelType: panel.panelType,
-                                    containerWidth: containerWidth,
-                                    isEditing: viewModel.isEditing,
-                                    viewModel: viewModel
-                                )
+            ScrollView(.vertical, showsIndicators: true) {
+                ZStack(alignment: .topLeading) {
+                    // Edit mode grid overlay (background grid lines)
+                    if viewModel.isEditing {
+                        DashboardEditOverlay(
+                            containerWidth: containerWidth,
+                            totalHeight: totalHeight
+                        )
+                    }
+
+                    // Panels placed by `DashboardCustomLayout` via `Layout`
+                    // protocol. Each subview's outer frame matches its grid
+                    // cell exactly — no `.offset` / `.position` workarounds,
+                    // so gesture hit-test stays bounded to the right panel.
+                    DashboardCustomLayout(frames: framesByID) {
+                        ForEach(panels) { panel in
+                            Group {
+                                if panel.panelType == .rowPanel {
+                                    rowPanelView(panel: panel, containerWidth: containerWidth)
+                                } else {
+                                    panelView(for: panel, containerWidth: containerWidth)
+                                        .panelDrag(
+                                            panelID: panel.id,
+                                            containerWidth: containerWidth,
+                                            isEditing: viewModel.isEditing,
+                                            viewModel: viewModel
+                                        )
+                                        .panelEdgeResize(
+                                            panelID: panel.id,
+                                            panelType: panel.panelType,
+                                            containerWidth: containerWidth,
+                                            isEditing: viewModel.isEditing,
+                                            viewModel: viewModel
+                                        )
+                                }
+                            }
+                            .panelID(panel.id)
                         }
                     }
+                    .frame(width: containerWidth, height: totalHeight, alignment: .topLeading)
                 }
                 .padding(DS.Dashboard.gridPadding)
             }
