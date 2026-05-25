@@ -19,6 +19,15 @@ struct DashboardConfig: Codable, Equatable {
     var panels: [PanelConfig] = []
     var templating: TemplatingConfig = TemplatingConfig()
 
+    // Perses-style inline datasources scoped to this dashboard.
+    // Built-in defaults are provided by `DatasourceRegistry`; entries here
+    // override or supplement them for this dashboard only.
+    var datasources: [String: DatasourceInstance] = [:]
+
+    // The active datasource selector for this dashboard. When nil, the
+    // first registered default is used.
+    var activeDatasource: DatasourceSelector?
+
     // Annotations
     var annotations: [DashboardAnnotation] = []
 

@@ -87,10 +87,11 @@ final class DashboardViewModel {
     let configStore = DashboardConfigStore()
     private let annotationStore = AnnotationStore()
 
-    /// Current data source (local CLI vs sync server). Persisted via AppSettings.
-    var dataSource: DashboardDataSource = .local {
+    /// Current datasource selector (Perses-style). Persisted via UserDefaults.
+    /// Built-ins map to `BuiltinDatasourceKind.localCLI` / `.promQLProxy`.
+    var activeDatasource: DatasourceSelector = DatasourceSelector(kind: BuiltinDatasourceKind.localCLI) {
         didSet {
-            UserDefaults.standard.set(dataSource.rawValue, forKey: "dashboardDataSource")
+            persistActiveDatasource()
             queryClient = resolveQueryClient()
             // Clear all cached panel data so stale results from the other source don't show
             panelData.removeAll()
@@ -99,10 +100,49 @@ final class DashboardViewModel {
         }
     }
 
-    private func resolveQueryClient() -> any QueryDataSource {
-        if dataSource == .server && SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired {
-            return serverQueryClient
+    /// Legacy enum-style accessor. Bridges the old `dataSource` API used by the
+    /// toolbar picker to the new selector model so view code stays unchanged.
+    var dataSource: DashboardDataSource {
+        get { activeDatasource.kind == BuiltinDatasourceKind.promQLProxy ? .server : .local }
+        set {
+            let kind = newValue == .server ? BuiltinDatasourceKind.promQLProxy
+                                           : BuiltinDatasourceKind.localCLI
+            activeDatasource = DatasourceSelector(kind: kind)
         }
+    }
+
+    private func persistActiveDatasource() {
+        guard let data = try? JSONEncoder().encode(activeDatasource) else { return }
+        UserDefaults.standard.set(data, forKey: "activeDatasourceSelector")
+    }
+
+    private func loadPersistedDatasource() -> DatasourceSelector? {
+        // Prefer new selector key; fall back to legacy enum string.
+        if let data = UserDefaults.standard.data(forKey: "activeDatasourceSelector"),
+           let sel = try? JSONDecoder().decode(DatasourceSelector.self, from: data) {
+            return sel
+        }
+        if let raw = UserDefaults.standard.string(forKey: "dashboardDataSource"),
+           let legacy = DashboardDataSource(rawValue: raw) {
+            let kind = legacy == .server ? BuiltinDatasourceKind.promQLProxy
+                                         : BuiltinDatasourceKind.localCLI
+            return DatasourceSelector(kind: kind)
+        }
+        return nil
+    }
+
+    private func resolveQueryClient() -> any QueryDataSource {
+        // Server gating: if the selector points to the proxy but sync isn't
+        // configured or the token is expired, fall back to local.
+        if activeDatasource.kind == BuiltinDatasourceKind.promQLProxy {
+            guard SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired else {
+                return DatasourceRegistry.shared.resolve(kind: BuiltinDatasourceKind.localCLI) ?? reportClient
+            }
+        }
+        if let plugin = DatasourceRegistry.shared.resolve(activeDatasource) {
+            return plugin
+        }
+        // Last-resort fallback so the dashboard never goes black.
         return reportClient
     }
 
@@ -110,12 +150,11 @@ final class DashboardViewModel {
          serverQueryClient: ServerQueryClient = ServerQueryClient()) {
         self.reportClient = reportClient
         self.serverQueryClient = serverQueryClient
-        self.queryClient = reportClient  // default; updated below after dataSource is set
+        self.queryClient = reportClient  // default; updated below after activeDatasource is set
         self.dashboardConfig = DashboardConfigStore().load()
         self.dashboardList = DashboardConfigStore().loadDashboardList()
-        if let raw = UserDefaults.standard.string(forKey: "dashboardDataSource"),
-           let persisted = DashboardDataSource(rawValue: raw) {
-            self.dataSource = persisted
+        if let persisted = loadPersistedDatasource() {
+            self.activeDatasource = persisted
         }
         self.queryClient = resolveQueryClient()
         populateProviderOptions()
