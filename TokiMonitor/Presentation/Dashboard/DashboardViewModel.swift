@@ -81,6 +81,8 @@ final class DashboardViewModel {
     // MARK: - Auto-refresh
     private var refreshTimer: Timer?
     private var fetchTask: Task<Void, Never>?
+    private var variableRefreshTask: Task<Void, Never>?
+    private var exploreTask: Task<Void, Never>?
 
     // MARK: - Dependencies
     private let reportClient: TokiReportClient
@@ -172,6 +174,24 @@ final class DashboardViewModel {
         setupAutoRefresh()
     }
 
+    deinit {
+        // Timer.scheduledTimer puts the timer on the RunLoop which retains
+        // it until `invalidate()` is called — without this, a destroyed
+        // ViewModel still ticks fetchData() every refresh interval. The
+        // in-flight Task likewise needs cancelling so its closure body
+        // doesn't keep self alive past deinit.
+        //
+        // deinit is nonisolated under Swift 6 strict concurrency, so we
+        // hop back onto MainActor explicitly. Safe because the runtime
+        // guarantees deinit runs after the last MainActor-isolated reach.
+        MainActor.assumeIsolated {
+            refreshTimer?.invalidate()
+            fetchTask?.cancel()
+            variableRefreshTask?.cancel()
+            exploreTask?.cancel()
+        }
+    }
+
     /// Re-run all variable plugin loaders and refresh their `options` lists.
     /// Called on dashboard load and whenever a load-triggering event occurs
     /// (time-range change, manual refresh).
@@ -190,16 +210,22 @@ final class DashboardViewModel {
         let pairs: [(UUID, VariablePluginRef)] = dashboardConfig.templating.list
             .compactMap { v in v.plugin.map { (v.id, $0) } }
         guard !pairs.isEmpty else { return }
-        Task { [weak self] in
+        // Cancel any in-flight refresh so a slower previous load can't
+        // overwrite a faster, newer one (datasource switch race).
+        variableRefreshTask?.cancel()
+        variableRefreshTask = Task { [weak self] in
             for (varID, pluginRef) in pairs {
+                if Task.isCancelled { return }
                 guard let loader = VariablePluginRegistry.shared.loader(for: pluginRef.kind) else { continue }
-                if let options = try? await loader.loadOptions(specData: pluginRef.spec, context: context) {
-                    guard let self else { return }
-                    if let idx = self.dashboardConfig.templating.list.firstIndex(where: { $0.id == varID }) {
-                        self.dashboardConfig.templating.list[idx].options = options
-                    }
+                guard let options = try? await loader.loadOptions(specData: pluginRef.spec, context: context)
+                else { continue }
+                if Task.isCancelled { return }
+                guard let self else { return }
+                if let idx = self.dashboardConfig.templating.list.firstIndex(where: { $0.id == varID }) {
+                    self.dashboardConfig.templating.list[idx].options = options
                 }
             }
+            if Task.isCancelled { return }
             self?.saveDashboard()
         }
     }
@@ -246,22 +272,47 @@ final class DashboardViewModel {
         isLoading = true
         errorMessage = nil
 
-        fetchTask = Task {
+        fetchTask = Task { [weak self] in
+            guard let self else { return }
+
+            // Resolve each panel's typed PromQL spec exactly once. The
+            // previous code called `panel.effective{Metric,Query,Datasource}`
+            // three times per panel per fetch — each one JSON-decoded the
+            // same `query.spec.plugin.spec` blob.
+            struct ResolvedPanel {
+                let panel: PanelConfig
+                let metric: PanelMetric
+                let queryString: String?
+                let datasource: DatasourceSelector?
+            }
+            let resolved: [ResolvedPanel] = panels.map { panel in
+                let spec = panel.resolvedTokiQuery
+                let metric = spec?.metric ?? panel.targets.first?.metric ?? panel.metric
+                let queryString = spec?.query ?? panel.targets.first?.query
+                return ResolvedPanel(
+                    panel: panel,
+                    metric: metric,
+                    queryString: queryString,
+                    datasource: panel.effectiveDatasource
+                )
+            }
+
+            try? Task.checkCancellation()
+
             // Separate project panels (need special parsing) from regular panels
-            let projectPanels = panels.filter { $0.effectiveMetric == .tokensByProject }
-            let regularPanels = panels.filter { $0.effectiveMetric != .tokensByProject }
+            let projectPanels = resolved.filter { $0.metric == .tokensByProject }.map(\.panel)
+            let regularResolved = resolved.filter { $0.metric != .tokensByProject }
 
             // Build interpolated queries and group by (query, datasource) — a
             // panel may carry a per-query datasource override (Perses style),
             // in which case it must not be batched with panels hitting a
             // different backend.
             var queryGroups: [PanelQueryKey: [PanelConfig]] = [:]
-            for panel in regularPanels {
-                let template = panel.effectiveQuery ?? panel.effectiveMetric.defaultQuery
+            for r in regularResolved {
+                let template = r.queryString ?? r.metric.defaultQuery
                 let interpolated = interpolateQuery(template, time: time)
-                let key = PanelQueryKey(query: interpolated,
-                                        datasource: panel.effectiveDatasource)
-                queryGroups[key, default: []].append(panel)
+                let key = PanelQueryKey(query: interpolated, datasource: r.datasource)
+                queryGroups[key, default: []].append(r.panel)
             }
 
             // Execute all queries concurrently. Each group resolves its own
@@ -295,10 +346,15 @@ final class DashboardViewModel {
                 }
             }
 
+            try? Task.checkCancellation()
+            if Task.isCancelled { return }
+
             // Fetch project panels concurrently
             if !projectPanels.isEmpty {
                 await fetchProjectPanels(projectPanels, time: time)
             }
+
+            if Task.isCancelled { return }
 
             // Apply all results in one batch (single UI update)
             for (key, result) in queryResults {
@@ -316,8 +372,8 @@ final class DashboardViewModel {
             }
 
             // Backward compatibility: set global timeSeriesData from first loaded regular panel
-            if let firstLoaded = regularPanels.first(where: { panelData[$0.id]?.timeSeriesData != nil }),
-               let data = panelData[firstLoaded.id]?.timeSeriesData {
+            if let firstLoaded = regularResolved.first(where: { panelData[$0.panel.id]?.timeSeriesData != nil }),
+               let data = panelData[firstLoaded.panel.id]?.timeSeriesData {
                 self.timeSeriesData = data
                 self.enabledModels = Set(data.allModelNames)
                 self.dataVersion += 1
@@ -744,13 +800,16 @@ final class DashboardViewModel {
             panel.plugin = PanelPluginRef(kind: expectedKind, spec: specData)
         }
 
-        // Queries envelope: rebuild whenever the count of targets and queries
-        // diverge. Mid-edit identity is intentionally not preserved — the
-        // canonical source is `targets`.
+        // Queries envelope: rebuild when targets shape *or content* drifts
+        // from the queries we last emitted. The earlier count-only guard
+        // missed the common case where the user edits a single target's
+        // PromQL string — count stays the same, but `panel.queries` would
+        // still encode the old string, and `effectiveQuery` (which prefers
+        // queries over targets) would run the stale query on next fetch.
         let sourceTargets = panel.targets.isEmpty
             ? [PanelTarget(refId: "A", metric: panel.metric)]
             : panel.targets
-        if (panel.queries?.count ?? -1) != sourceTargets.count {
+        if !queriesMatch(panel.queries, targets: sourceTargets) {
             panel.queries = sourceTargets.map { target in
                 let spec = TokiPromQLQuerySpec(
                     datasource: nil, metric: target.metric, query: target.query
@@ -768,6 +827,24 @@ final class DashboardViewModel {
                 )
             }
         }
+    }
+
+    /// Compare the existing `queries` envelope to a list of targets. Returns
+    /// false if anything material differs — count, refId, metric, or
+    /// query-string-override — so `normalizePanel` rebuilds.
+    private static func queriesMatch(_ queries: [Query]?, targets: [PanelTarget]) -> Bool {
+        guard let queries, queries.count == targets.count else { return false }
+        let decoder = JSONDecoder()
+        for (q, target) in zip(queries, targets) {
+            guard q.kind == BuiltinQueryKind.timeSeriesQuery,
+                  q.spec.plugin.kind == BuiltinQueryPluginKind.tokiPromQLQuery,
+                  let spec = try? decoder.decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec)
+            else { return false }
+            if q.spec.name != target.refId { return false }
+            if spec.metric != target.metric { return false }
+            if spec.query != target.query { return false }
+        }
+        return true
     }
 
     /// Keep `dashboardConfig.layouts[0].items` in sync with the canonical
@@ -1064,14 +1141,23 @@ final class DashboardViewModel {
         saveExploreHistory()
 
         let client = queryClient
-        Task {
+        let time = dashboardConfig.time
+        let interpolated = interpolateQuery(exploreQuery, time: time)
+
+        // Cancel any in-flight explore query first — otherwise a slower
+        // previous response can race in and overwrite the result of a
+        // faster newer one (run twice → last-typed query loses).
+        exploreTask?.cancel()
+        exploreTask = Task { [weak self] in
             do {
-                let time = dashboardConfig.time
-                let interpolated = interpolateQuery(exploreQuery, time: time)
                 let data = try await client.queryPromQLAsTimeSeries(query: interpolated, time: time)
+                if Task.isCancelled { return }
+                guard let self else { return }
                 self.isExploreLoading = false
                 self.exploreResults = data
             } catch {
+                if Task.isCancelled { return }
+                guard let self else { return }
                 self.isExploreLoading = false
                 self.exploreResults = nil
             }

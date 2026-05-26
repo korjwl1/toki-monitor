@@ -58,6 +58,12 @@ final class DashboardWindowController {
     // MARK: - Window Delegate
 
     private lazy var windowDelegate = DashboardWindowDelegate { [weak self] in
+        // Drop the hostingController so NSHostingController + DashboardView
+        // + DashboardViewModel get released. Without this, the window
+        // releases (isReleasedWhenClosed=false notwithstanding via nil) but
+        // the contentViewController keeps the view tree (and its
+        // refreshTimer) alive — every show/close cycle leaks a ViewModel.
+        self?.window?.contentViewController = nil
         self?.window = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             NSApp.setActivationPolicy(.accessory)

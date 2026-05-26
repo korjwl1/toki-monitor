@@ -364,22 +364,26 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     /// `targets` during data fetching.
     var queries: [Query]?
 
+    /// Decoded `TokiPromQLQuerySpec` from this panel's first query envelope,
+    /// or nil. A single decode lookup that all three `effective*`
+    /// accessors share — calling them in a tight loop (fetchData) used
+    /// to JSON-decode the same blob three times per panel per refresh.
+    var resolvedTokiQuery: TokiPromQLQuerySpec? {
+        guard let q = queries?.first,
+              q.spec.plugin.kind == BuiltinQueryPluginKind.tokiPromQLQuery
+        else { return nil }
+        return try? JSONDecoder().decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec)
+    }
+
     /// The effective metric for this panel — prefers first target's metric, falls back to legacy field
     var effectiveMetric: PanelMetric {
-        if let q = queries?.first,
-           let spec = try? JSONDecoder().decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec),
-           let m = spec.metric {
-            return m
-        }
+        if let m = resolvedTokiQuery?.metric { return m }
         return targets.first?.metric ?? metric
     }
 
     /// The effective PromQL query, if any custom query is set
     var effectiveQuery: String? {
-        if let q = queries?.first,
-           let spec = try? JSONDecoder().decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec) {
-            return spec.query
-        }
+        if let q = resolvedTokiQuery?.query { return q }
         return targets.first?.query
     }
 
@@ -387,11 +391,13 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     /// selector across `queries`, or nil to use the dashboard default.
     var effectiveDatasource: DatasourceSelector? {
         guard let queries else { return nil }
+        let decoder = JSONDecoder()
         for q in queries {
-            if let spec = try? JSONDecoder().decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec),
-               let ds = spec.datasource {
-                return ds
-            }
+            guard q.spec.plugin.kind == BuiltinQueryPluginKind.tokiPromQLQuery,
+                  let spec = try? decoder.decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec),
+                  let ds = spec.datasource
+            else { continue }
+            return ds
         }
         return nil
     }
@@ -744,6 +750,16 @@ extension DashboardConfig {
     static func migrateV3toV4(_ config: DashboardConfig) -> DashboardConfig {
         var migrated = config
         migrated.schemaVersion = 4
+
+        // activeDatasource must be set in v4. `defaultConfig` (a fresh
+        // dashboard) reaches here without one — leaving it nil would
+        // serialize as `"activeDatasource": null` in exported JSON, and
+        // downstream code that calls `effective*` before the ViewModel
+        // assigns one would see no default. Backfill with the built-in
+        // local CLI selector.
+        if migrated.activeDatasource == nil {
+            migrated.activeDatasource = DatasourceSelector(kind: BuiltinDatasourceKind.localCLI)
+        }
 
         // Per-panel: populate plugin + queries envelopes when missing.
         migrated.panels = migrated.panels.map { panel in
