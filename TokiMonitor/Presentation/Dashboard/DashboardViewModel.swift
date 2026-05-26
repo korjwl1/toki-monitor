@@ -1013,12 +1013,10 @@ final class DashboardViewModel {
 
     func importDashboard() {
         guard var imported = configStore.importFromFile() else { return }
-        // Migrate imported config to v4 and normalize each panel so plugin /
+        // Migrate imported config and normalize each panel so plugin /
         // queries envelopes are accurate (imports might originate from
         // older exports or be hand-edited).
-        if imported.schemaVersion < 4 {
-            imported = DashboardConfig.migrateV3toV4(imported)
-        }
+        imported = DashboardMigrator.migrate(imported)
         imported.panels = imported.panels.map { panel in
             var p = panel
             Self.normalizePanel(&p)
@@ -1073,7 +1071,7 @@ final class DashboardViewModel {
         // queries / layouts envelopes are populated up-front. New dashboards
         // start empty so this is mostly a no-op, but it keeps the invariant
         // that any in-memory dashboard is v4-shaped.
-        config = DashboardConfig.migrateV3toV4(config)
+        config = DashboardMigrator.migrate(config)
         configStore.addDashboard(config)
         dashboardList = configStore.loadDashboardList()
         switchDashboard(config)

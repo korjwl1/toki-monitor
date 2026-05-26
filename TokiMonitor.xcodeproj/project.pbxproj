@@ -99,6 +99,7 @@
 		C9B1B05E770D61B3E9D3108E /* PanelEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E131E3756214B21A8B8654B1 /* PanelEditorView.swift */; };
 		CA53B87359FD3833598A2E5C /* SparklineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */; };
 		CA9C7AA78EF38E315FCBB43D /* frame_03.png in Resources */ = {isa = PBXBuildFile; fileRef = C060811529815B293611230B /* frame_03.png */; };
+		D38B80ADCF36C11E8E64C488 /* DashboardModel+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D10C2580CDF8F9EAD2AAACA /* DashboardModel+Display.swift */; };
 		D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */; };
 		D8262FCBDC499382103DEA43 /* PanelPluginSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF96A3601A4E4994B232C20D /* PanelPluginSpec.swift */; };
 		D9AED0BD0367047F1034D688 /* ModelPricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7368908C5687B4CB8281CE2C /* ModelPricing.swift */; };
@@ -110,6 +111,7 @@
 		E58E37541C010557CB0C1865 /* DatasourceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A7FCA1C481A1421555EEF2 /* DatasourceRegistry.swift */; };
 		E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0103BDEAC6066E0274029149 /* ConnectionManager.swift */; };
 		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
+		EC7E072D4B8145B6FFB1942B /* DashboardMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDF640C227D467E72826C64 /* DashboardMigrator.swift */; };
 		ED31502F8415FBFD5DA3DA8B /* ClaudeAuthReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE42DEDC857AB657D449C5E /* ClaudeAuthReader.swift */; };
 		ED5B0A605502E2BF35B4F7AA /* DatasourceSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = D58215E739D0C0780915FF56 /* DatasourceSelector.swift */; };
 		EFD5E942872C6B776577BF93 /* DatasourceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6045F68DCAE8A0E620C714FA /* DatasourceStore.swift */; };
@@ -181,6 +183,7 @@
 		5952046CCD5E92A6AE3E38A5 /* ProviderColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderColor.swift; sourceTree = "<group>"; };
 		5B278895C8F3233433F88309 /* TokenFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenFormatter.swift; sourceTree = "<group>"; };
 		5B4DCE60EE179E52F278B447 /* TokenUsageChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenUsageChart.swift; sourceTree = "<group>"; };
+		5D10C2580CDF8F9EAD2AAACA /* DashboardModel+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardModel+Display.swift"; sourceTree = "<group>"; };
 		5D82D563F2B758C1208E987E /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		6045F68DCAE8A0E620C714FA /* DatasourceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourceStore.swift; sourceTree = "<group>"; };
 		617E28351290F97E1B3742F0 /* DashboardConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfigStore.swift; sourceTree = "<group>"; };
@@ -241,6 +244,7 @@
 		DB9BDCAC76DC2C743B8CE339 /* TimeSeriesChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesChartView.swift; sourceTree = "<group>"; };
 		DC937E6C266ED917AE6D11A2 /* StatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCard.swift; sourceTree = "<group>"; };
 		DD104D8D23446C055623FC7D /* DashboardVersionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardVersionStore.swift; sourceTree = "<group>"; };
+		DFDF640C227D467E72826C64 /* DashboardMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMigrator.swift; sourceTree = "<group>"; };
 		E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
 		E131E3756214B21A8B8654B1 /* PanelEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEditorView.swift; sourceTree = "<group>"; };
 		E5FAA4A976ADB25E1195013F /* CodexUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageClient.swift; sourceTree = "<group>"; };
@@ -272,6 +276,14 @@
 				8F95164ED93D6B4A2CBD473E /* Variable */,
 			);
 			path = Data;
+			sourceTree = "<group>";
+		};
+		0E31A2DC812DEED038E06600 /* Migration */ = {
+			isa = PBXGroup;
+			children = (
+				DFDF640C227D467E72826C64 /* DashboardMigrator.swift */,
+			);
+			path = Migration;
 			sourceTree = "<group>";
 		};
 		12C6C9AB20CDE12890D87646 = {
@@ -357,6 +369,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		5134C1CBEE67AA8413E45722 /* Localization */ = {
+			isa = PBXGroup;
+			children = (
+				5D10C2580CDF8F9EAD2AAACA /* DashboardModel+Display.swift */,
+			);
+			path = Localization;
+			sourceTree = "<group>";
+		};
 		5CB76EE9FE876C983A62E891 /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
@@ -375,6 +395,7 @@
 				42E478EB5C5691C2D6693F41 /* VersionHistorySheet.swift */,
 				B1296CF4003E042DCC5B6F01 /* Charts */,
 				A94EA9B9E80F289225D4EF7F /* EditMode */,
+				5134C1CBEE67AA8413E45722 /* Localization */,
 				2A3062764644CB53A2DA4066 /* Panels */,
 			);
 			path = Dashboard;
@@ -544,6 +565,7 @@
 				196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */,
 				2419FCCD7EDF135528C44ACD /* UpdateChecker.swift */,
 				C4C36A205DFC4F7DA9CD54A9 /* VersionCompatibility.swift */,
+				0E31A2DC812DEED038E06600 /* Migration */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -673,6 +695,8 @@
 				19B6898855A3D644A90C6F70 /* DashboardExtensions.swift in Sources */,
 				2235B25655198D97380CBAC9 /* DashboardGridLayout.swift in Sources */,
 				49DE5C8CEE473286A88906CA /* DashboardLayout.swift in Sources */,
+				EC7E072D4B8145B6FFB1942B /* DashboardMigrator.swift in Sources */,
+				D38B80ADCF36C11E8E64C488 /* DashboardModel+Display.swift in Sources */,
 				BD0727E1C8B4DA7BCB2CBFD4 /* DashboardSettingsSheet.swift in Sources */,
 				A673F7E773850A93FABC17EE /* DashboardToolbar.swift in Sources */,
 				125A70F9AEFAEA35D938E593 /* DashboardVersionStore.swift in Sources */,

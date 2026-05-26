@@ -11,6 +11,12 @@ import Foundation
 protocol DatasourcePlugin: QueryDataSource {
     /// Unique identifier for this datasource plugin kind (e.g. "toki-local").
     var kind: String { get }
-    /// Human-readable name shown in the data source picker.
-    var displayName: String { get }
+}
+
+extension DatasourcePlugin {
+    /// Convenience accessor for the localized name. Presentation owns the
+    /// kind-to-string mapping (`DatasourceKindDisplay`) so this stays a
+    /// thin pass-through that Data callers can use without depending on
+    /// the Domain `Localization` helper directly.
+    var displayName: String { DatasourceKindDisplay.name(for: kind) }
 }

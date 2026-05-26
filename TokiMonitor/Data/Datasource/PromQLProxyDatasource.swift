@@ -3,7 +3,6 @@ import Foundation
 /// Plugin wrapper around `ServerQueryClient` (toki-sync PromQL proxy).
 final class PromQLProxyDatasource: DatasourcePlugin, @unchecked Sendable {
     let kind: String = BuiltinDatasourceKind.promQLProxy
-    let displayName: String = L.sync.server
 
     private let client: ServerQueryClient
 

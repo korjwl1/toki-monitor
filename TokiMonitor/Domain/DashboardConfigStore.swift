@@ -13,31 +13,27 @@ final class DashboardConfigStore {
 
     func load() -> DashboardConfig {
         guard let data = UserDefaults.standard.data(forKey: Self.userDefaultsKey),
-              var config = try? JSONDecoder().decode(DashboardConfig.self, from: data)
+              let stored = try? JSONDecoder().decode(DashboardConfig.self, from: data)
         else {
             return Self.defaultConfig
         }
-        // Migrate if needed
-        if config.schemaVersion < 2 {
-            config = DashboardConfig.migrateV1toV2(config)
-            save(config)
+        let original = stored
+        var config = DashboardMigrator.migrate(stored)
+        // Seed activeDatasource from the legacy global enum so the dashboard
+        // remembers which backend the user was last using. (The migrator
+        // backfills to localCLI; this overrides with the user's last choice
+        // if known.)
+        if config.activeDatasource?.kind == BuiltinDatasourceKind.localCLI,
+           original.activeDatasource == nil,
+           let raw = UserDefaults.standard.string(forKey: "dashboardDataSource"),
+           let legacy = DashboardDataSource(rawValue: raw) {
+            let kind = legacy == .server
+                ? BuiltinDatasourceKind.promQLProxy
+                : BuiltinDatasourceKind.localCLI
+            config.activeDatasource = DatasourceSelector(kind: kind)
         }
-        if config.schemaVersion < 3 {
-            config = DashboardConfig.migrateV2toV3(config)
-            save(config)
-        }
-        if config.schemaVersion < 4 {
-            config = DashboardConfig.migrateV3toV4(config)
-            // Seed activeDatasource from the legacy global enum so the
-            // dashboard remembers which backend the user was last using.
-            if config.activeDatasource == nil,
-               let raw = UserDefaults.standard.string(forKey: "dashboardDataSource"),
-               let legacy = DashboardDataSource(rawValue: raw) {
-                let kind = legacy == .server
-                    ? BuiltinDatasourceKind.promQLProxy
-                    : BuiltinDatasourceKind.localCLI
-                config.activeDatasource = DatasourceSelector(kind: kind)
-            }
+        if config.schemaVersion != original.schemaVersion
+            || config.activeDatasource != original.activeDatasource {
             save(config)
         }
         return config
@@ -60,17 +56,16 @@ final class DashboardConfigStore {
         else {
             return [load()]
         }
-        // Apply migrations to each entry so the in-memory list always carries
-        // the latest schema, even for entries written before this version.
-        var migrated = false
+        // Apply migrations to each entry so the in-memory list always
+        // carries the latest schema, even for entries written before this
+        // version. Persist back only if anything changed.
+        var anyMigrated = false
         let list = raw.map { entry -> DashboardConfig in
-            var c = entry
-            if c.schemaVersion < 2 { c = DashboardConfig.migrateV1toV2(c); migrated = true }
-            if c.schemaVersion < 3 { c = DashboardConfig.migrateV2toV3(c); migrated = true }
-            if c.schemaVersion < 4 { c = DashboardConfig.migrateV3toV4(c); migrated = true }
-            return c
+            let migrated = DashboardMigrator.migrate(entry)
+            if migrated.schemaVersion != entry.schemaVersion { anyMigrated = true }
+            return migrated
         }
-        if migrated { saveDashboardList(list) }
+        if anyMigrated { saveDashboardList(list) }
         return list
     }
 
@@ -234,8 +229,8 @@ final class DashboardConfigStore {
             ],
             templating: DashboardConfig.defaultTemplating
         )
-        // Run through v4 migration so plugin/queries envelopes and layouts
-        // are populated consistently with persisted dashboards.
-        return DashboardConfig.migrateV3toV4(config)
+        // Run through the migration chain so plugin/queries envelopes and
+        // layouts are populated consistently with persisted dashboards.
+        return DashboardMigrator.migrate(config)
     }
 }

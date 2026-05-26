@@ -202,19 +202,6 @@ enum RefreshInterval: String, Codable, CaseIterable, Equatable {
     case fifteenMinutes = "15m"
     case thirtyMinutes = "30m"
 
-    var displayName: String {
-        switch self {
-        case .off: L.tr("끄기", "Off")
-        case .fiveSeconds: "5s"
-        case .tenSeconds: "10s"
-        case .thirtySeconds: "30s"
-        case .oneMinute: "1m"
-        case .fiveMinutes: "5m"
-        case .fifteenMinutes: "15m"
-        case .thirtyMinutes: "30m"
-        }
-    }
-
     var interval: TimeInterval? {
         switch self {
         case .off: nil
@@ -235,21 +222,7 @@ struct TimeRangePreset: Identifiable, Equatable {
     let id: String
     let label: String
     let from: String
-
-    static var presets: [TimeRangePreset] { [
-        TimeRangePreset(id: "5m", label: L.tr("최근 5분", "Last 5 minutes"), from: "now-5m"),
-        TimeRangePreset(id: "15m", label: L.tr("최근 15분", "Last 15 minutes"), from: "now-15m"),
-        TimeRangePreset(id: "30m", label: L.tr("최근 30분", "Last 30 minutes"), from: "now-30m"),
-        TimeRangePreset(id: "1h", label: L.tr("최근 1시간", "Last 1 hour"), from: "now-1h"),
-        TimeRangePreset(id: "3h", label: L.tr("최근 3시간", "Last 3 hours"), from: "now-3h"),
-        TimeRangePreset(id: "6h", label: L.tr("최근 6시간", "Last 6 hours"), from: "now-6h"),
-        TimeRangePreset(id: "12h", label: L.tr("최근 12시간", "Last 12 hours"), from: "now-12h"),
-        TimeRangePreset(id: "24h", label: L.tr("최근 24시간", "Last 24 hours"), from: "now-24h"),
-        TimeRangePreset(id: "2d", label: L.tr("최근 2일", "Last 2 days"), from: "now-2d"),
-        TimeRangePreset(id: "7d", label: L.tr("최근 7일", "Last 7 days"), from: "now-7d"),
-        TimeRangePreset(id: "14d", label: L.tr("최근 14일", "Last 14 days"), from: "now-14d"),
-        TimeRangePreset(id: "30d", label: L.tr("최근 30일", "Last 30 days"), from: "now-30d"),
-    ] }
+    // `static var presets` lives in Presentation extension (localized labels).
 }
 
 // MARK: - Templating / Variables
@@ -486,18 +459,6 @@ enum PanelType: String, Codable, CaseIterable {
         [.stat, .timeSeries, .barChart, .pieChart, .table, .gauge]
     }
 
-    var displayName: String {
-        switch self {
-        case .stat: L.dash.statPanel
-        case .timeSeries: L.dash.timeSeriesPanel
-        case .barChart: L.dash.barChartPanel
-        case .pieChart: L.tr("파이 차트", "Pie Chart")
-        case .table: L.dash.tablePanel
-        case .gauge: L.dash.gaugePanel
-        case .rowPanel: L.tr("행", "Row")
-        }
-    }
-
     var minWidth: Int {
         switch self {
         case .stat: 4
@@ -522,17 +483,7 @@ enum PanelType: String, Codable, CaseIterable {
         }
     }
 
-    var icon: String {
-        switch self {
-        case .stat: "number.square"
-        case .timeSeries: "chart.xyaxis.line"
-        case .barChart: "chart.bar"
-        case .pieChart: "chart.pie"
-        case .table: "tablecells"
-        case .gauge: "gauge.open.with.lines.needle.33percent"
-        case .rowPanel: "rectangle.split.1x2"
-        }
-    }
+    // `displayName` and `icon` live in Presentation extension (localized).
 }
 
 // MARK: - Panel Metric
@@ -550,23 +501,6 @@ enum PanelMetric: String, Codable, CaseIterable {
     case reasoningTokens
     case modelBreakdown
     case tokensByProject
-
-    var displayName: String {
-        switch self {
-        case .totalTokens: L.dash.metricTotalTokens
-        case .totalCost: L.dash.metricTotalCost
-        case .apiCalls: L.dash.metricApiCalls
-        case .topModel: L.dash.metricTopModel
-        case .tokensByModel: L.dash.metricTokensByModel
-        case .costByModel: L.dash.metricCostByModel
-        case .eventsByModel: L.dash.metricEventsByModel
-        case .inputVsOutput: L.dash.metricInputVsOutput
-        case .cacheHitRate: L.dash.metricCacheHitRate
-        case .reasoningTokens: L.dash.metricReasoningTokens
-        case .modelBreakdown: L.dash.metricModelBreakdown
-        case .tokensByProject: L.tr("프로젝트별 토큰", "Tokens by Project")
-        }
-    }
 
     var compatiblePanelTypes: [PanelType] {
         switch self {
@@ -587,22 +521,7 @@ enum PanelMetric: String, Codable, CaseIterable {
         }
     }
 
-    var icon: String {
-        switch self {
-        case .totalTokens: "number"
-        case .totalCost: "dollarsign.circle"
-        case .apiCalls: "arrow.up.arrow.down"
-        case .topModel: "star.fill"
-        case .tokensByModel: "chart.xyaxis.line"
-        case .costByModel: "chart.xyaxis.line"
-        case .eventsByModel: "chart.bar"
-        case .inputVsOutput: "arrow.left.arrow.right"
-        case .cacheHitRate: "memorychip"
-        case .reasoningTokens: "brain"
-        case .modelBreakdown: "tablecells"
-        case .tokensByProject: "chart.pie"
-        }
-    }
+    // `displayName` and `icon` live in Presentation extension (localized).
 
     /// Default PromQL query.
     /// Uses standard PromQL syntax accepted by both the local toki CLI and
@@ -667,190 +586,13 @@ extension DashboardConfig {
 enum DashboardImportError: Error, LocalizedError {
     case invalidJSON
     case incompatibleVersion
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidJSON: L.tr("잘못된 JSON 형식입니다", "Invalid JSON format")
-        case .incompatibleVersion: L.tr("호환되지 않는 대시보드 버전입니다", "Incompatible dashboard version")
-        }
-    }
+    // `errorDescription` is provided by a Presentation extension so the
+    // localized string lookup stays out of the Data layer.
 }
 
 // MARK: - Schema Migration
 
 extension DashboardConfig {
-    /// Migrate from v1 (12-column grid) to v2 (24-column grid)
-    static func migrateV1toV2(_ config: DashboardConfig) -> DashboardConfig {
-        var migrated = config
-        migrated.schemaVersion = 2
-        migrated.panels = config.panels.map { panel in
-            var p = panel
-            // Double column positions and widths for 24-col grid
-            p.gridPosition.column *= 2
-            p.gridPosition.width *= 2
-            // Populate targets from legacy metric field
-            if p.targets.isEmpty {
-                p.targets = [PanelTarget(refId: "A", metric: p.metric)]
-            }
-            return p
-        }
-        // Add default variables if none exist
-        if migrated.templating.list.isEmpty {
-            migrated.templating = Self.defaultTemplating
-        }
-        return migrated
-    }
-
-    /// Migrate from v2 to v3: replace `toki_tokens_total` with `usage` metric in queries.
-    /// The `usage` metric works natively in local toki CLI; `ServerQueryClient` rewrites
-    /// it to `toki_tokens_total{type=~"input|output"}` for the server backend.
-    static func migrateV2toV3(_ config: DashboardConfig) -> DashboardConfig {
-        var migrated = config
-        migrated.schemaVersion = 3
-        migrated.panels = config.panels.map { panel in
-            var p = panel
-            p.targets = panel.targets.map { target in
-                var t = target
-                if var q = t.query {
-                    q = q.replacingOccurrences(
-                        of: #"toki_tokens_total\{([^}]*),\s*type=~"input\|output"\}"#,
-                        with: #"usage{$1}"#,
-                        options: .regularExpression
-                    )
-                    q = q.replacingOccurrences(
-                        of: #"toki_tokens_total\{type=~"input\|output",\s*([^}]*)\}"#,
-                        with: #"usage{$1}"#,
-                        options: .regularExpression
-                    )
-                    q = q.replacingOccurrences(
-                        of: #"toki_tokens_total\{type=~"input\|output"\}"#,
-                        with: "usage",
-                        options: .regularExpression
-                    )
-                    q = q.replacingOccurrences(of: "toki_tokens_total", with: "usage")
-                    t.query = q
-                }
-                return t
-            }
-            return p
-        }
-        return migrated
-    }
-
-    /// Migrate from v3 to v4: adopt Perses-style envelopes.
-    ///
-    /// - Populates `panel.plugin` from `panel.panelType` (legacy fields kept
-    ///   for round-trip and renderer compatibility).
-    /// - Populates `panel.queries` from `panel.targets` (each `PanelTarget`
-    ///   becomes a `Query` wrapping a `TokiPromQLQuerySpec`).
-    /// - Builds a single `Grid` layout listing every panel by `$ref` so the
-    ///   on-disk JSON matches Perses' panels-map + layouts-array shape.
-    /// - Backfills `activeDatasource` from the legacy enum stored in
-    ///   `UserDefaults` (handled at the store level; this function is pure).
-    static func migrateV3toV4(_ config: DashboardConfig) -> DashboardConfig {
-        var migrated = config
-        migrated.schemaVersion = 4
-
-        // activeDatasource must be set in v4. `defaultConfig` (a fresh
-        // dashboard) reaches here without one — leaving it nil would
-        // serialize as `"activeDatasource": null` in exported JSON, and
-        // downstream code that calls `effective*` before the ViewModel
-        // assigns one would see no default. Backfill with the built-in
-        // local CLI selector.
-        if migrated.activeDatasource == nil {
-            migrated.activeDatasource = DatasourceSelector(kind: BuiltinDatasourceKind.localCLI)
-        }
-
-        // Per-panel: populate plugin + queries envelopes when missing.
-        migrated.panels = migrated.panels.map { panel in
-            var p = panel
-            if p.plugin == nil {
-                let kind = BuiltinPanelPluginKind.kind(for: p.panelType)
-                let specData = p.options.encodedSpec(forPanelPluginKind: kind) ?? Data()
-                p.plugin = PanelPluginRef(kind: kind, spec: specData)
-            }
-            if p.queries == nil {
-                let sourceTargets = p.targets.isEmpty
-                    ? [PanelTarget(refId: "A", metric: p.metric)]
-                    : p.targets
-                p.queries = sourceTargets.map { target -> Query in
-                    let spec = TokiPromQLQuerySpec(
-                        datasource: nil,
-                        metric: target.metric,
-                        query: target.query
-                    )
-                    let specData = (try? JSONEncoder().encode(spec)) ?? Data()
-                    return Query(
-                        kind: BuiltinQueryKind.timeSeriesQuery,
-                        spec: QuerySpec(
-                            name: target.refId,
-                            plugin: QueryPluginRef(
-                                kind: BuiltinQueryPluginKind.tokiPromQLQuery,
-                                spec: specData
-                            )
-                        )
-                    )
-                }
-            }
-            return p
-        }
-
-        // Variables: populate the Perses-style plugin reference from the
-        // legacy `type` enum. Custom → StaticListVariable (options stay as
-        // the current static list), Interval → IntervalVariable (values
-        // come from the legacy `query` field's comma-separated form, or a
-        // sensible default).
-        migrated.templating.list = migrated.templating.list.map { variable in
-            var v = variable
-            if v.plugin == nil {
-                switch v.type {
-                case .custom:
-                    let spec = StaticListVariableSpec(values: v.options)
-                    let data = (try? JSONEncoder().encode(spec)) ?? Data()
-                    v.plugin = VariablePluginRef(
-                        kind: BuiltinVariablePluginKind.staticList, spec: data
-                    )
-                case .interval:
-                    let parsed = v.query
-                        .split(separator: ",")
-                        .map { $0.trimmingCharacters(in: .whitespaces) }
-                        .filter { !$0.isEmpty }
-                    let values = parsed.isEmpty
-                        ? IntervalVariableSpec().values
-                        : parsed
-                    let spec = IntervalVariableSpec(values: values)
-                    let data = (try? JSONEncoder().encode(spec)) ?? Data()
-                    v.plugin = VariablePluginRef(
-                        kind: BuiltinVariablePluginKind.interval, spec: data
-                    )
-                }
-            }
-            return v
-        }
-
-        // Build a single Grid layout. Each panel becomes one LayoutGridItem
-        // referencing the panel by its id (used as the panels-map key).
-        if migrated.layouts == nil {
-            let items = migrated.panels.map { panel -> LayoutGridItem in
-                LayoutGridItem(
-                    x: panel.gridPosition.column,
-                    y: panel.gridPosition.row,
-                    width: panel.gridPosition.width,
-                    height: panel.gridPosition.height,
-                    content: JSONRef(panelKey: panel.id.uuidString)
-                )
-            }
-            migrated.layouts = [
-                DashboardLayout(
-                    kind: "Grid",
-                    spec: GridLayoutSpec(display: nil, items: items)
-                )
-            ]
-        }
-
-        return migrated
-    }
-
     static var defaultTemplating: TemplatingConfig {
         let providerOptions = ProviderRegistry.configurableProviders.compactMap { provider -> VariableOption? in
             guard let tokiId = provider.tokiProviderId else { return nil }
