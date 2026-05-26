@@ -1,16 +1,16 @@
 import Foundation
 
-// MARK: - Variable kinds (Perses-style)
+// MARK: - Variable plugin model (used by DashboardVariable)
+//
+// An earlier draft of this file also introduced a `Variable` tagged-union
+// (`TextVariable` / `ListVariable`) intended to fully replace the legacy
+// `DashboardVariable`. That replacement never landed — every call site
+// still uses `DashboardVariable` and the union was dead code with zero
+// references. Removed; only the shared plugin/sort vocabulary stays.
 
-/// Top-level Perses variable kind. Only two kinds exist; all dynamism lives
-/// inside `ListVariable.spec.plugin`.
-enum VariableKind: String, Codable, Sendable, Equatable {
-    case textVariable = "TextVariable"
-    case listVariable = "ListVariable"
-}
-
-/// Sort order applied to `ListVariableSpec.options` before they reach the UI.
-/// Mirrors Perses' `sort` enum.
+/// Sort order applied to a variable's options before they reach the UI.
+/// Mirrors Perses' `sort` enum so an exported dashboard can carry the
+/// same vocabulary.
 enum VariableSort: String, Codable, CaseIterable, Sendable, Equatable {
     case none = "none"
     case alphabeticalAsc = "alphabetical-asc"
@@ -43,10 +43,8 @@ enum VariableSort: String, Codable, CaseIterable, Sendable, Equatable {
     }
 }
 
-// MARK: - Plugin (variable side)
-
-/// Reference to a variable plugin (e.g. `StaticListVariable`, `IntervalVariable`).
-/// `spec` is a typed JSON-encoded blob decoded by the plugin factory.
+/// Reference to a variable plugin (e.g. `StaticListVariable`).
+/// `spec` is a typed JSON-encoded blob decoded by the plugin loader.
 struct VariablePluginRef: Codable, Equatable, Sendable {
     var kind: String
     var spec: Data = Data()
@@ -63,63 +61,7 @@ enum BuiltinVariablePluginKind {
     static let tokiLabelValues = "TokiLabelValuesVariable"
 }
 
-// MARK: - Spec types
-
-struct TextVariableSpec: Codable, Equatable, Sendable {
-    var name: String
-    var value: String = ""
-    /// If true, the variable is fixed and not exposed in the toolbar.
-    var constant: Bool = false
-    var displayName: String?
-    var hidden: Bool = false
-}
-
-struct ListVariableSpec: Codable, Equatable, Sendable {
-    var name: String
-    var displayName: String?
-    var description: String?
-    var hidden: Bool = false
-
-    /// User's current selection (multiple values when `allowMultiple == true`).
-    var current: VariableSelection = VariableSelection()
-
-    /// Options resolved by the plugin (cached). Updated on plugin refresh.
-    var options: [VariableOption] = []
-
-    var allowAllValue: Bool = false
-    var allowMultiple: Bool = false
-    /// Value substituted for `$var` when the user has the "All" item selected.
-    /// Defaults to `.*` to match Prometheus regex semantics.
-    var customAllValue: String = ".*"
-    /// Optional regex applied to each plugin-produced value before storage.
-    var capturingRegexp: String?
-    var sort: VariableSort = .none
-
-    var plugin: VariablePluginRef
-}
-
-// MARK: - Variable (tagged union)
-
-/// Perses-style dashboard variable. Either a `TextVariable` (static value) or
-/// a `ListVariable` (plugin-resolved options + selection).
-struct Variable: Codable, Equatable, Sendable, Identifiable {
-    var id: UUID = UUID()
-    var kind: VariableKind
-    /// Set when `kind == .textVariable`.
-    var text: TextVariableSpec?
-    /// Set when `kind == .listVariable`.
-    var list: ListVariableSpec?
-
-    /// The variable's machine name (used in `$name` interpolation).
-    var name: String {
-        switch kind {
-        case .textVariable: return text?.name ?? ""
-        case .listVariable: return list?.name ?? ""
-        }
-    }
-}
-
-// MARK: - Static plugin specs
+// MARK: - Plugin spec types
 
 /// Spec for `StaticListVariable` — user supplies the options directly.
 struct StaticListVariableSpec: Codable, Equatable, Sendable {

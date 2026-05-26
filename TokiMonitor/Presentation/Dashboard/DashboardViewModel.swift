@@ -410,17 +410,40 @@ final class DashboardViewModel {
         // (Perses-style). Cascading: a variable's value can reference another
         // variable via the same syntax; we iterate to a fixed point so chains
         // resolve in one pass.
+        //
+        // Build the bare-form regex objects once per call (instead of
+        // recompiling per fixpoint iteration × variable). The old code did
+        // `templating.list.count × 4` `NSRegularExpression` constructions
+        // per panel fetch — a 5-variable dashboard cost 20 regex compiles
+        // per refresh just for interpolation.
+        struct Compiled {
+            let variable: DashboardVariable
+            let value: String
+            let bareForm: NSRegularExpression?
+        }
+        let compiled: [Compiled] = dashboardConfig.templating.list
+            .filter { $0.name != "provider" }
+            .map { v in
+                let escaped = NSRegularExpression.escapedPattern(for: v.name)
+                let pattern = "\\$\(escaped)(?![A-Za-z0-9_])"
+                return Compiled(
+                    variable: v,
+                    value: interpolatedValue(for: v),
+                    bareForm: try? NSRegularExpression(pattern: pattern)
+                )
+            }
+
         for _ in 0..<4 {
             let before = query
-            for variable in dashboardConfig.templating.list where variable.name != "provider" {
-                let value = interpolatedValue(for: variable)
-                query = query.replacingOccurrences(of: "${\(variable.name)}", with: value)
-                // Bare `$name` form — only replace when followed by a
-                // non-identifier character to avoid eating part of a longer
-                // variable name. Use word boundary via regex.
-                let pattern = "\\$\(NSRegularExpression.escapedPattern(for: variable.name))(?![A-Za-z0-9_])"
-                query = query.replacingOccurrences(of: pattern, with: value,
-                                                   options: .regularExpression)
+            for c in compiled {
+                query = query.replacingOccurrences(of: "${\(c.variable.name)}", with: c.value)
+                if let regex = c.bareForm {
+                    let range = NSRange(query.startIndex..., in: query)
+                    query = regex.stringByReplacingMatches(
+                        in: query, range: range,
+                        withTemplate: NSRegularExpression.escapedTemplate(for: c.value)
+                    )
+                }
             }
             if query == before { break }
         }
@@ -547,18 +570,26 @@ final class DashboardViewModel {
         }
     }
 
-    /// Cache for resolved project names to avoid repeated FileManager.fileExists calls.
-    private static var projectNameCache: [String: String] = [:]
+    /// Cache for resolved project names to avoid repeated FileManager.fileExists
+    /// calls. `NSCache` bounds the size automatically (system evicts under
+    /// memory pressure) — replaces the previous unbounded `[String: String]`
+    /// dictionary that grew indefinitely across project paths.
+    private static let projectNameCache: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>()
+        cache.countLimit = 256
+        return cache
+    }()
 
     /// Extract last folder name from toki project paths.
     /// Claude Code encodes paths with - instead of /. Recover by splitting on -
     /// then greedily rebuilding the path, trying / then - then _ as joiners.
     static func cleanProjectName(_ raw: String) -> String {
-        if let cached = projectNameCache[raw] {
-            return cached
+        let key = raw as NSString
+        if let cached = projectNameCache.object(forKey: key) {
+            return cached as String
         }
         let result = resolveProjectName(raw)
-        projectNameCache[raw] = result
+        projectNameCache.setObject(result as NSString, forKey: key)
         return result
     }
 

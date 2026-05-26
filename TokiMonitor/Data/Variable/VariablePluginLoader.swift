@@ -14,14 +14,14 @@ protocol VariablePluginLoader: Sendable {
 
 /// Context handed to a loader so it can scope its query (interpolating other
 /// variable values, hitting the active datasource, etc.).
-struct VariableLoadContext: @unchecked Sendable {
+struct VariableLoadContext: Sendable {
     var time: TimeConfig
     /// Already-resolved variable values (`$name` → joined string) so loaders
     /// can interpolate dependencies in `matchers` / `expr` fields.
     var resolvedVariables: [String: String]
     /// Pre-resolved query client for the dashboard's active datasource.
-    /// Loaders that need to execute PromQL use this rather than touching
-    /// the registry directly (which is `@MainActor`-isolated).
+    /// `QueryDataSource: Sendable`, so this stays naturally Sendable —
+    /// no `@unchecked` needed.
     var queryClient: (any QueryDataSource)?
 }
 

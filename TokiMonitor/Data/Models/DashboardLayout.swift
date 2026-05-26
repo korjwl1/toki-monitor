@@ -40,8 +40,16 @@ struct LayoutGridItem: Codable, Equatable, Sendable {
     var content: JSONRef
 }
 
-/// JSON Pointer reference (`{"$ref": "#/spec/panels/<key>"}`). Encoded with
-/// the literal `$ref` key, decoded back to a typed value.
+/// Reference to a panel by id.
+///
+/// The serialized form `{"$ref": "#/spec/panels/<uuid>"}` is *shaped* like
+/// a JSON Pointer (RFC 6901) so the on-disk layout looks Perses-style,
+/// but the path does not resolve against our actual JSON tree — our
+/// `panels` field is an *array*, not a map keyed by uuid. We don't
+/// promise Perses interoperability (one-way export was dropped), so the
+/// pointer here is effectively an opaque "panel id" sentinel that we
+/// resolve in `DashboardCustomLayout` via `panelKey`. Keeping the same
+/// on-disk shape lets old configs decode without migration.
 struct JSONRef: Codable, Equatable, Sendable {
     var ref: String
 
@@ -55,8 +63,7 @@ struct JSONRef: Codable, Equatable, Sendable {
         case ref = "$ref"
     }
 
-    /// Extract the panel map key from the ref string, if it points to a
-    /// panel under `#/spec/panels/`.
+    /// Extract the panel id from the ref string.
     var panelKey: String? {
         let prefix = "#/spec/panels/"
         guard ref.hasPrefix(prefix) else { return nil }

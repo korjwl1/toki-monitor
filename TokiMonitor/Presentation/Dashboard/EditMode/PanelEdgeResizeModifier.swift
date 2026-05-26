@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Edge-based panel resize.
 ///
@@ -139,45 +140,56 @@ struct PanelEdgeResize: ViewModifier {
 
 // MARK: - Resize handle strip
 
-/// A single invisible drag strip with cursor management that survives
-/// SwiftUI's noisy hover events.
+/// A single invisible drag strip.
 ///
-/// `NSCursor.push()` and `.pop()` are stack operations. If `.onHover`
-/// fires `false` while we never pushed (or `true` twice without a pop
-/// in between), the cursor stack drifts permanently — the cursor stays
-/// as a resize arrow over chart panels, or pops down into nothing.
-/// The `pushed` flag guards push and pop to only fire on actual
-/// false→true / true→false transitions.
+/// Cursor management is delegated to AppKit via `addCursorRect(_:cursor:)`
+/// rather than `NSCursor.push()` / `.pop()`. push/pop are stack ops, and
+/// `.onHover` emits noisy false→true→false toggles (especially when a
+/// panel re-lays out mid-hover) that can leave the cursor stack
+/// permanently off-balance — chart panels stuck with a resize arrow, or
+/// the stack popping below the system default. Cursor rects, by
+/// contrast, are *declarative*: AppKit takes over once the mouse enters
+/// the view's bounding rect and restores the previous cursor when it
+/// leaves. No state, no drift.
 private struct ResizeHandleStrip: View {
     let cursor: NSCursor
     let onDragChanged: (CGSize) -> Void
     let onDragEnded: (CGSize) -> Void
 
-    @State private var pushed = false
-
     var body: some View {
-        Color.clear
+        CursorRectView(cursor: cursor)
             .contentShape(Rectangle())
-            .onHover { hovering in
-                if hovering, !pushed {
-                    cursor.push()
-                    pushed = true
-                } else if !hovering, pushed {
-                    NSCursor.pop()
-                    pushed = false
-                }
-            }
-            .onDisappear {
-                if pushed {
-                    NSCursor.pop()
-                    pushed = false
-                }
-            }
             .gesture(
                 DragGesture(minimumDistance: 1, coordinateSpace: .local)
                     .onChanged { onDragChanged($0.translation) }
                     .onEnded { onDragEnded($0.translation) }
             )
+    }
+}
+
+/// AppKit-backed view that sets a cursor rectangle covering its entire
+/// bounds. SwiftUI re-asks for `resetCursorRects` whenever layout
+/// changes, so the rect stays in sync as panels resize.
+private struct CursorRectView: NSViewRepresentable {
+    let cursor: NSCursor
+
+    func makeNSView(context: Context) -> CursorAwareView {
+        let view = CursorAwareView()
+        view.cursor = cursor
+        return view
+    }
+
+    func updateNSView(_ nsView: CursorAwareView, context: Context) {
+        nsView.cursor = cursor
+        nsView.window?.invalidateCursorRects(for: nsView)
+    }
+}
+
+private final class CursorAwareView: NSView {
+    var cursor: NSCursor = .arrow
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: cursor)
     }
 }
 
