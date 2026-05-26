@@ -9,6 +9,46 @@ import Foundation
 // extension keeps Data declarative and lets the strings live next to the
 // views that consume them.
 
+extension PanelDisplayOptions.ColorMode {
+    var displayName: String {
+        switch self {
+        case .value:      L.tr("값", "Value")
+        case .background: L.tr("배경", "Background")
+        case .none:       L.tr("없음", "None")
+        }
+    }
+}
+
+extension PanelDisplayOptions.GraphMode {
+    var displayName: String {
+        switch self {
+        case .none: L.tr("없음", "None")
+        case .area: L.tr("영역", "Area")
+        case .line: L.tr("선", "Line")
+        }
+    }
+}
+
+extension PanelDisplayOptions.LegendPosition {
+    var displayName: String {
+        switch self {
+        case .bottom: L.tr("아래", "Bottom")
+        case .right:  L.tr("오른쪽", "Right")
+        case .hidden: L.tr("숨김", "Hidden")
+        }
+    }
+}
+
+extension PanelDisplayOptions.TooltipMode {
+    var displayName: String {
+        switch self {
+        case .single: L.tr("단일", "Single")
+        case .all:    L.tr("전체", "All")
+        case .hidden: L.tr("숨김", "Hidden")
+        }
+    }
+}
+
 extension RefreshInterval {
     var displayName: String {
         switch self {

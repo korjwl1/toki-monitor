@@ -114,7 +114,6 @@ final class SyncManager {
         try? process.run()
         process.waitUntilExit()
 
-        client.invalidateCache()
         state = .notConfigured
     }
 

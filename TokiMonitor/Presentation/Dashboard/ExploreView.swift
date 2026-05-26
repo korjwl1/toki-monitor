@@ -6,6 +6,12 @@ struct ExploreView: View {
     @Bindable var viewModel: DashboardViewModel
     @State private var showHistory = false
     @FocusState private var queryFocused: Bool
+    /// Cached suggestion list. Recomputed only on actual query text
+    /// changes (via `.onChange`) instead of every body re-evaluation —
+    /// SwiftUI re-runs `body` for unrelated state too (focus, loading,
+    /// etc.), and the suggester tokenization + filter shouldn't ride
+    /// along on those.
+    @State private var cachedSuggestions: (token: String, items: [PromQLSuggestion]) = ("", [])
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,6 +29,12 @@ struct ExploreView: View {
                     .focused($queryFocused)
                     .onSubmit {
                         viewModel.runExploreQuery()
+                    }
+                    .onChange(of: viewModel.exploreQuery) { _, newValue in
+                        cachedSuggestions = PromQLSuggester.suggestions(for: newValue)
+                    }
+                    .onAppear {
+                        cachedSuggestions = PromQLSuggester.suggestions(for: viewModel.exploreQuery)
                     }
 
                 Button {
@@ -85,7 +97,7 @@ struct ExploreView: View {
 
     @ViewBuilder
     private var suggestionStrip: some View {
-        let result = PromQLSuggester.suggestions(for: viewModel.exploreQuery)
+        let result = cachedSuggestions
         if queryFocused, !result.items.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {

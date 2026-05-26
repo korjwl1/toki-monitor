@@ -57,20 +57,31 @@ struct PanelFetchCoordinator {
             queryGroups[key, default: []].append(r.panel)
         }
 
-        // Execute concurrently. Per-query datasource selector wins;
-        // otherwise the dashboard's active client is used.
+        // Execute concurrently, but cap in-flight tasks. `LocalCLIDatasource`
+        // forks a `toki` subprocess per query, so an unbounded task group
+        // on a 50-panel dashboard would briefly spawn 50 processes and
+        // could thrash the system. 8 in flight matches typical CPU
+        // parallelism and keeps subprocess pressure bounded without
+        // serializing fast PromQL-proxy queries unnecessarily.
         let registry = datasourceRegistry
+        let resolveClient: (PanelQueryKey) -> any QueryDataSource = { key in
+            if let ds = key.datasource,
+               ds != activeDatasource,
+               let plugin = registry.resolve(ds) {
+                return plugin
+            }
+            return defaultClient
+        }
         var queryResults: [(PanelQueryKey, Result<TimeSeriesData, Error>)] = []
+        let maxConcurrent = 8
+        let pendingKeys = Array(queryGroups.keys)
         await withTaskGroup(of: (PanelQueryKey, Result<TimeSeriesData, Error>).self) { group in
-            for (key, _) in queryGroups {
-                let client: any QueryDataSource = {
-                    if let ds = key.datasource,
-                       ds != activeDatasource,
-                       let plugin = registry.resolve(ds) {
-                        return plugin
-                    }
-                    return defaultClient
-                }()
+            var nextIndex = 0
+            func enqueueNext() {
+                guard nextIndex < pendingKeys.count else { return }
+                let key = pendingKeys[nextIndex]
+                nextIndex += 1
+                let client = resolveClient(key)
                 group.addTask {
                     do {
                         let result = try await client.queryPromQLAsTimeSeries(query: key.query, time: time)
@@ -80,8 +91,10 @@ struct PanelFetchCoordinator {
                     }
                 }
             }
+            for _ in 0..<min(maxConcurrent, pendingKeys.count) { enqueueNext() }
             for await result in group {
                 queryResults.append(result)
+                enqueueNext()
             }
         }
 

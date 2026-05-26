@@ -31,15 +31,26 @@ enum VariableResolver {
 
         // Provider — special-cased: expands to `provider="X"` so panel
         // templates can write `usage{$provider}` and get valid PromQL.
+        // Uses a word-boundary regex so `$providerExtra` (or any
+        // identifier sharing the `$provider` prefix) is not partially
+        // matched — `replacingOccurrences(of:)` has no concept of token
+        // boundaries and would corrupt the longer identifier.
         let providerValues = value(named: "provider", in: variables)
         let provider = providerValues
             .filter { !$0.isEmpty && $0 != "All" && $0 != "all" && $0 != "$__all" }
             .first(where: { ["claude_code", "codex"].contains($0) })
-        if let provider {
-            query = query.replacingOccurrences(of: "$provider", with: "provider=\"\(provider)\"")
-        } else {
+        let providerBoundary = try? NSRegularExpression(pattern: "\\$provider(?![A-Za-z0-9_])")
+        if let provider, let regex = providerBoundary {
+            let replacement = NSRegularExpression.escapedTemplate(for: "provider=\"\(provider)\"")
+            let range = NSRange(query.startIndex..., in: query)
+            query = regex.stringByReplacingMatches(in: query, range: range, withTemplate: replacement)
+        } else if let regex = providerBoundary {
+            // `, $provider` cleanup keeps a literal-string pass since the
+            // surrounding comma+space is what we are stripping, not the
+            // identifier alone.
             query = query.replacingOccurrences(of: ", $provider", with: "")
-            query = query.replacingOccurrences(of: "$provider", with: "")
+            let range = NSRange(query.startIndex..., in: query)
+            query = regex.stringByReplacingMatches(in: query, range: range, withTemplate: "")
         }
 
         // Generic interpolation — precompile bare-form regex per variable.
@@ -60,7 +71,15 @@ enum VariableResolver {
                 )
             }
 
-        for _ in 0..<4 {
+        // Fixed-point interpolation with cycle bound. 4 passes is enough
+        // for any normal dashboard ($a → $b → $c → $d → final). If the
+        // template still mutates at the final iteration, there's a
+        // cycle (e.g. $a contains "$b" and $b contains "$a"); we log
+        // and return the current state rather than spinning forever or
+        // truncating silently.
+        let maxIterations = 4
+        var converged = false
+        for i in 0..<maxIterations {
             let before = query
             for c in compiled {
                 query = query.replacingOccurrences(of: "${\(c.variable.name)}", with: c.value)
@@ -72,9 +91,17 @@ enum VariableResolver {
                     )
                 }
             }
-            if query == before { break }
+            if query == before {
+                converged = true
+                break
+            }
+            if i == maxIterations - 1 {
+                #if DEBUG
+                print("[VariableResolver] interpolation did not converge in \(maxIterations) passes — possible variable cycle. Template: \(template)")
+                #endif
+            }
         }
-
+        _ = converged
         return query
     }
 

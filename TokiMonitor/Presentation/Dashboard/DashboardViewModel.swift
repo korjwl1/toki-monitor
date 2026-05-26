@@ -26,6 +26,10 @@ final class DashboardViewModel {
         set {
             dashboardConfig.time = newValue
             saveDashboard()
+            // Variables with `.onTimeRangeChanged` reload their option set
+            // before the panel fetch so the new time window's labels are
+            // available to subsequent query interpolation.
+            refreshVariables(onTimeRangeChange: true)
             fetchData()
         }
     }
@@ -200,7 +204,17 @@ final class DashboardViewModel {
     /// Re-run all variable plugin loaders and refresh their `options` lists.
     /// Called on dashboard load and whenever a load-triggering event occurs
     /// (time-range change, manual refresh).
-    func refreshVariables() {
+    ///
+    /// Loads happen in parallel and the results are written back **atomically**
+    /// at the end. Earlier this loop mutated `templating.list` after each
+    /// `await`, which let an interleaving user edit (variable add/remove)
+    /// be clobbered by `saveDashboard()` at the end of the loop.
+    ///
+    /// `onTimeRangeChange` filters the set to variables with the
+    /// `.onTimeRangeChanged` refresh policy. The default (`false`)
+    /// includes both `.onDashboardLoad` and `.onTimeRangeChanged`. The
+    /// `.never` policy is always skipped.
+    func refreshVariables(onTimeRangeChange: Bool = false) {
         let time = dashboardConfig.time
         let resolved: [String: String] = Dictionary(
             uniqueKeysWithValues: dashboardConfig.templating.list.map {
@@ -213,6 +227,13 @@ final class DashboardViewModel {
             queryClient: queryClient
         )
         let pairs: [(UUID, VariablePluginRef)] = dashboardConfig.templating.list
+            .filter { v in
+                switch v.refresh {
+                case .never: return false
+                case .onTimeRangeChanged: return true
+                case .onDashboardLoad: return !onTimeRangeChange
+                }
+            }
             .compactMap { v in v.plugin.map { (v.id, $0) } }
         guard !pairs.isEmpty else { return }
         // Cancel any in-flight refresh so a slower previous load can't
@@ -220,19 +241,25 @@ final class DashboardViewModel {
         variableRefreshTask?.cancel()
         let registry = variablePluginRegistry
         variableRefreshTask = Task { [weak self] in
+            // Collect all results before touching the model — keeps the
+            // writeback atomic with respect to concurrent user edits.
+            var results: [(UUID, [VariableOption])] = []
+            results.reserveCapacity(pairs.count)
             for (varID, pluginRef) in pairs {
                 if Task.isCancelled { return }
                 guard let loader = registry.loader(for: pluginRef.kind) else { continue }
                 guard let options = try? await loader.loadOptions(specData: pluginRef.spec, context: context)
                 else { continue }
-                if Task.isCancelled { return }
-                guard let self else { return }
+                results.append((varID, options))
+            }
+            if Task.isCancelled { return }
+            guard let self else { return }
+            for (varID, options) in results {
                 if let idx = self.dashboardConfig.templating.list.firstIndex(where: { $0.id == varID }) {
                     self.dashboardConfig.templating.list[idx].options = options
                 }
             }
-            if Task.isCancelled { return }
-            self?.saveDashboard()
+            self.saveDashboard()
         }
     }
 
@@ -306,6 +333,11 @@ final class DashboardViewModel {
             }
             if Task.isCancelled { return }
 
+            // Final cancel check before the writeback — without it a
+            // newer fetch arriving between the previous checkpoint and
+            // the dictionary assignment could be clobbered by stale
+            // results landing here.
+            if Task.isCancelled { return }
             for (id, state) in results { self.panelData[id] = state }
 
             // Backward compatibility: global timeSeriesData from first
@@ -347,7 +379,14 @@ final class DashboardViewModel {
     private func fetchProjectPanels(_ panels: [PanelConfig], time: TimeConfig) async {
         let template = PanelMetric.tokensByProject.defaultQuery
         let query = interpolateQuery(template, time: time)
-        let isServer = queryClient is ServerQueryClient
+        // After the datasource refactor, `queryClient` is always a
+        // `DatasourcePlugin` wrapper (never a bare `ServerQueryClient`),
+        // so the old `is ServerQueryClient` check evaluated false in
+        // server mode too and silently routed every project panel
+        // through the local CLI. Check the plugin type instead, with
+        // the wrapped `ServerQueryClient` case retained as a safety net
+        // for any future direct injection.
+        let isServer = queryClient is PromQLProxyDatasource || queryClient is ServerQueryClient
 
         if isServer {
             // Server mode: use PromQL query via server proxy
@@ -485,8 +524,39 @@ final class DashboardViewModel {
     }
 
     func addVariable(_ variable: DashboardVariable) {
-        dashboardConfig.templating.list.append(variable)
+        var v = variable
+        Self.normalizeVariable(&v)
+        dashboardConfig.templating.list.append(v)
         saveDashboard()
+        refreshVariables()
+    }
+
+    /// Backfill a variable's `plugin` envelope so `refreshVariables`'s
+    /// plugin-loader path can find it. The settings sheet creates
+    /// variables with `plugin == nil`; without this step they would
+    /// silently never refresh (the loader loop `compactMap`s on `plugin`).
+    /// Mirrors `DashboardMigrator.migrateV3toV4`'s variable branch.
+    static func normalizeVariable(_ v: inout DashboardVariable) {
+        guard v.plugin == nil else { return }
+        switch v.type {
+        case .custom:
+            let spec = StaticListVariableSpec(values: v.options)
+            let data = (try? JSONEncoder().encode(spec)) ?? Data()
+            v.plugin = VariablePluginRef(
+                kind: BuiltinVariablePluginKind.staticList, spec: data
+            )
+        case .interval:
+            let parsed = v.query
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            let values = parsed.isEmpty ? IntervalVariableSpec().values : parsed
+            let spec = IntervalVariableSpec(values: values)
+            let data = (try? JSONEncoder().encode(spec)) ?? Data()
+            v.plugin = VariablePluginRef(
+                kind: BuiltinVariablePluginKind.interval, spec: data
+            )
+        }
     }
 
     func removeVariable(id: UUID) {
@@ -839,7 +909,16 @@ final class DashboardViewModel {
     /// Register dashboard-inline datasource instances with the global registry
     /// so panels with `queries[*].plugin.spec.datasource.name` set can be
     /// resolved against them. Called on init and every dashboard switch.
+    ///
+    /// Clears previously-registered names first so a stale name from
+    /// dashboard A (e.g. "prod") doesn't resolve against dashboard B,
+    /// which would otherwise let a removed datasource keep serving panels.
+    ///
+    /// Per-instance spec differentiation is not yet wired (each name
+    /// still aliases the kind's default plugin), but the unregister step
+    /// at least bounds the surface to "names declared by this dashboard."
     private func registerInlineDatasources() {
+        datasourceRegistry.clearNamed()
         for (_, instance) in dashboardConfig.datasources {
             if let plugin = datasourceRegistry.resolve(kind: instance.kind) {
                 datasourceRegistry.registerNamed(name: instance.name, plugin: plugin)

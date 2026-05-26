@@ -25,6 +25,19 @@ struct PanelDragModifier: ViewModifier {
             .scaleEffect(isDragging ? 0.98 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: isDragging)
             .gesture(dragGesture, isEnabled: isEditing)
+            // SwiftUI does not call `.onEnded` when a gesture is disabled
+            // mid-drag (e.g. `isEditing` flips false from a hotkey). Reset
+            // the in-flight visual state explicitly so the panel doesn't
+            // stay translucent at a stale offset.
+            .onChange(of: isEditing) { _, newValue in
+                if !newValue && isDragging {
+                    isDragging = false
+                    dragOffset = .zero
+                    if viewModel.draggingPanelID == panelID {
+                        viewModel.draggingPanelID = nil
+                    }
+                }
+            }
     }
 
     private var dragGesture: some Gesture {
@@ -64,7 +77,14 @@ struct PanelDragModifier: ViewModifier {
                 // Clamp column so panel doesn't overflow
                 let maxColumn = DashboardGridLayout.columnCount - panel.gridPosition.width
                 let clampedColumn = max(0, min(maxColumn, snapped.column))
-                let clampedRow = max(0, snapped.row)
+                // Clamp row against an upper bound so an overshoot drag
+                // (e.g. user fling past the dashboard) doesn't push the
+                // row index into the millions — `snapToGrid` itself has
+                // no row ceiling, and a runaway row blows up
+                // `DashboardGridLayout.totalHeight` on the next render.
+                let logicalRows = DashboardGridLayout.totalLogicalRows(for: viewModel.dashboardConfig.panels)
+                let maxRow = max(logicalRows, panel.gridPosition.row + 1) + Self.dragRowSlack
+                let clampedRow = max(0, min(maxRow, snapped.row))
 
                 let newPosition = GridPosition(
                     column: clampedColumn,
@@ -77,6 +97,11 @@ struct PanelDragModifier: ViewModifier {
                 dragOffset = .zero
             }
     }
+
+    /// Extra rows beyond the current dashboard footprint that a single drag
+    /// is allowed to land in. Lets the user position below existing
+    /// content without inviting unbounded row indices.
+    private static let dragRowSlack: Int = 8
 }
 
 extension View {

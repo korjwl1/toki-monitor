@@ -16,6 +16,7 @@ struct DashboardView: View {
     @State private var dashboardToDelete: DashboardConfig?
     @State private var isEditingTitle = false
     @State private var preEditConfig: DashboardConfig?
+    @FocusState private var titleFieldFocused: Bool
 
     enum SidebarItem: Hashable {
         case explore
@@ -168,6 +169,13 @@ struct DashboardView: View {
                         .frame(minHeight: 28)
                         .contentShape(Rectangle())
                         .onTapGesture {
+                            // Discard any pending edit-mode snapshot — it
+                            // was captured against the *previous* dashboard,
+                            // and applying it after the switch would overwrite
+                            // the newly-selected dashboard with the old one's
+                            // state if the user then pressed Cancel.
+                            preEditConfig = nil
+                            if viewModel.isEditing { viewModel.isEditing = false }
                             viewModel.switchDashboard(dashboard)
                             sidebarSelection = nil
                         }
@@ -292,6 +300,8 @@ struct DashboardView: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: DS.fontTitle, weight: .semibold))
                 .frame(maxWidth: 200)
+                .focused($titleFieldFocused)
+                .onAppear { titleFieldFocused = true }
                 .onSubmit {
                     isEditingTitle = false
                     viewModel.saveDashboard()
@@ -299,6 +309,17 @@ struct DashboardView: View {
                 }
                 .onExitCommand {
                     isEditingTitle = false
+                }
+                // Persist on focus loss too — onSubmit only fires for
+                // Enter, so clicking out of the field used to leave the
+                // in-memory title change unsaved until the next side
+                // effect happened to call `saveDashboard()`.
+                .onChange(of: titleFieldFocused) { _, focused in
+                    if !focused && isEditingTitle {
+                        isEditingTitle = false
+                        viewModel.saveDashboard()
+                        viewModel.reloadDashboardList()
+                    }
                 }
             } else {
                 Text(viewModel.dashboardConfig.title)

@@ -13,7 +13,19 @@ enum DashboardMigrator {
     /// Run the full migration chain on a config. Each step is idempotent
     /// when its `schemaVersion` precondition is already met, so calling
     /// `migrate(_:)` on an already-current config is a no-op.
+    ///
+    /// Configs with `schemaVersion > currentVersion` are left untouched
+    /// (this build downgrade-loaded a future-shaped JSON). The newer
+    /// shape may carry fields we don't know about, but Codable tolerates
+    /// unknown keys, and overwriting the version would risk losing
+    /// information when the user upgrades again.
     static func migrate(_ config: DashboardConfig) -> DashboardConfig {
+        if config.schemaVersion > currentVersion {
+            #if DEBUG
+            print("[DashboardMigrator] config schemaVersion=\(config.schemaVersion) is newer than supported \(currentVersion); leaving untouched.")
+            #endif
+            return config
+        }
         var c = config
         if c.schemaVersion < 2 { c = migrateV1toV2(c) }
         if c.schemaVersion < 3 { c = migrateV2toV3(c) }

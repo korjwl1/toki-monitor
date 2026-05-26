@@ -50,9 +50,6 @@ final class SyncClient {
     private let service = "toki-sync"
     private let account = "credentials"
 
-    /// In-memory credential cache to avoid repeated Keychain reads.
-    private var cachedCredentials: SyncCredentials?
-
     // MARK: - Keychain
 
     func load() -> SyncCredentials? {
@@ -72,11 +69,6 @@ final class SyncClient {
         return creds
     }
 
-    /// Invalidate the in-memory credential cache, forcing the next `load()` to read from Keychain.
-    func invalidateCache() {
-        cachedCredentials = nil
-    }
-
     func save(_ creds: SyncCredentials) throws {
         let data = try JSONEncoder().encode(creds)
         let baseQuery: [CFString: Any] = [
@@ -94,7 +86,6 @@ final class SyncClient {
         guard status == errSecSuccess else {
             throw SyncClientError.keychainError(status)
         }
-        invalidateCache()
     }
 
     func delete() {
@@ -104,7 +95,6 @@ final class SyncClient {
             kSecAttrAccount: account,
         ]
         SecItemDelete(query as CFDictionary)
-        invalidateCache()
     }
 
     // MARK: - HTTP Login
@@ -155,7 +145,6 @@ final class SyncClient {
             deviceName:   deviceName
         )
         try save(creds)
-        invalidateCache()
         return creds
     }
 
@@ -264,7 +253,6 @@ final class SyncClient {
         updated.accessToken  = access
         updated.refreshToken = refresh
         try save(updated)
-        invalidateCache()
         return updated
     }
 }

@@ -24,32 +24,67 @@ import SwiftUI
 /// that rect, so `GeometryReader` inside an `.overlay` reports the
 /// panel size and the resize strip sits on the panel's actual edge.
 struct DashboardCustomLayout: Layout {
+    /// Cached extents derived from `frames`. Recomputing `maxX` / `maxY`
+    /// from a `[UUID: CGRect]` per pass costs O(panels) work that the
+    /// `Layout` protocol's cache slot exists to amortize — drag-induced
+    /// reflows can run this many times per second on a busy dashboard.
+    struct Cache {
+        let maxX: CGFloat
+        let maxY: CGFloat
+    }
+
     /// Grid frame for each panel, keyed by panel id. Computed by the
     /// caller using `DashboardGridLayout.frame(for:in:rowHeight:)`.
     let frames: [UUID: CGRect]
 
+    func makeCache(subviews: Subviews) -> Cache {
+        Cache(
+            maxX: frames.values.map(\.maxX).max() ?? 0,
+            maxY: frames.values.map(\.maxY).max() ?? 0
+        )
+    }
+
+    func updateCache(_ cache: inout Cache, subviews: Subviews) {
+        cache = makeCache(subviews: subviews)
+    }
+
     func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
-        cache: inout ()
+        cache: inout Cache
     ) -> CGSize {
-        let maxY = frames.values.map(\.maxY).max() ?? 0
-        // Width is whatever the container offers; height grows with the
-        // bottom-most panel so the surrounding ScrollView can overflow.
-        return CGSize(
-            width: proposal.width ?? frames.values.map(\.maxX).max() ?? 0,
-            height: maxY
-        )
+        // Width respects the container's proposal so the layout shrinks
+        // gracefully if the parent constrains us; falls back to the
+        // panel grid's intrinsic right edge otherwise. Height grows with
+        // the bottom-most panel, but is also capped by `proposal.height`
+        // when one is given — without the cap, embedding this layout
+        // outside the dashboard's ScrollView (snapshot tests, previews)
+        // overflows the proposed container.
+        let intrinsicWidth = proposal.width ?? cache.maxX
+        let intrinsicHeight = cache.maxY
+        let height: CGFloat
+        if let proposedHeight = proposal.height, proposedHeight.isFinite {
+            height = min(intrinsicHeight, proposedHeight)
+        } else {
+            height = intrinsicHeight
+        }
+        return CGSize(width: intrinsicWidth, height: height)
     }
 
     func placeSubviews(
         in bounds: CGRect,
         proposal: ProposedViewSize,
         subviews: Subviews,
-        cache: inout ()
+        cache: inout Cache
     ) {
         for subview in subviews {
-            guard let id = subview[PanelIDKey.self], let f = frames[id] else { continue }
+            guard let id = subview[PanelIDKey.self] else {
+                #if DEBUG
+                assertionFailure("Subview in DashboardCustomLayout is missing `.panelID(_:)`")
+                #endif
+                continue
+            }
+            guard let f = frames[id] else { continue }
             subview.place(
                 at: CGPoint(x: bounds.minX + f.minX, y: bounds.minY + f.minY),
                 anchor: .topLeading,

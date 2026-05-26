@@ -88,9 +88,15 @@ struct TokiLabelValuesVariableSpec: Codable, Equatable, Sendable {
 struct TokiLabelValuesVariableLoader: VariablePluginLoader {
     var kind: String { BuiltinVariablePluginKind.tokiLabelValues }
 
+    /// Labels this loader understands. Anything else is rejected at the
+    /// spec level so a typo (e.g. "Model") surfaces as an empty option
+    /// list immediately, rather than after a misleading query roundtrip.
+    private static let supportedLabels: Set<String> = ["model", "project"]
+
     func loadOptions(specData: Data, context: VariableLoadContext) async throws -> [VariableOption] {
         guard let spec = try? JSONDecoder().decode(TokiLabelValuesVariableSpec.self, from: specData)
         else { return [] }
+        guard Self.supportedLabels.contains(spec.labelName) else { return [] }
 
         // Resolve the client: per-spec datasource wins, else context default.
         let client: (any QueryDataSource)? = await MainActor.run {
@@ -119,9 +125,13 @@ struct TokiLabelValuesVariableLoader: VariablePluginLoader {
         }
 
         let data = try await client.queryPromQLAsTimeSeries(query: query, time: context.time)
-        // toki's TimeSeriesData carries label values as `allModelNames` for
-        // both model and project queries (the project loader stashes project
-        // names in the model slot — see DashboardViewModel.fetchProjectPanels).
+        // toki's TimeSeriesData stores both model and project label values
+        // in `allModelNames` — the project fetch path stashes project
+        // names in the model slot (see DashboardViewModel.fetchProjectPanels),
+        // so the loader's role is to validate the requested label and
+        // expose whatever the query produced. The user's PromQL is
+        // expected to target the correct label dimension (e.g. a
+        // `tokens_by_project_*` metric for `labelName: "project"`).
         return data.allModelNames.map { VariableOption(text: $0, value: $0) }
     }
 }

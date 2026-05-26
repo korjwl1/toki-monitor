@@ -7,6 +7,12 @@ struct DashboardSettingsSheet: View {
     @State private var selectedTab: SettingsTab = .general
     @State private var tagsText: String = ""
     @State private var jsonString: String = ""
+    /// Debounce task for text-field keystrokes — instead of writing the
+    /// whole dashboard JSON to UserDefaults on every character, coalesce
+    /// writes within a short window. On dismiss we flush any pending
+    /// save synchronously so closing the sheet never loses an in-flight
+    /// edit.
+    @State private var pendingSave: Task<Void, Never>?
 
     enum SettingsTab: String, CaseIterable {
         case general
@@ -37,8 +43,11 @@ struct DashboardSettingsSheet: View {
                 Text(L.dash.dashboardSettings)
                     .font(.headline)
                 Spacer()
-                Button(L.dash.done) { dismiss() }
-                    .keyboardShortcut(.defaultAction)
+                Button(L.dash.done) {
+                    flushPendingSave()
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -98,6 +107,27 @@ struct DashboardSettingsSheet: View {
         .onAppear {
             tagsText = viewModel.dashboardConfig.tags.joined(separator: ", ")
         }
+        .onDisappear { flushPendingSave() }
+    }
+
+    /// Coalesce keystroke saves within ~300ms so a fast typist doesn't
+    /// re-encode + re-write the entire dashboard JSON on every character.
+    private func scheduleSave() {
+        pendingSave?.cancel()
+        pendingSave = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if Task.isCancelled { return }
+            viewModel.saveDashboard()
+        }
+    }
+
+    /// Cancel any pending debounced save and persist immediately. Called
+    /// on Done / sheet dismiss so closing the sheet always commits the
+    /// latest in-memory edits.
+    private func flushPendingSave() {
+        pendingSave?.cancel()
+        pendingSave = nil
+        viewModel.saveDashboard()
     }
 
     // MARK: - General Tab
@@ -110,7 +140,7 @@ struct DashboardSettingsSheet: View {
                     .font(.subheadline.bold())
                 TextField(L.dash.title, text: Binding(
                     get: { viewModel.dashboardConfig.title },
-                    set: { viewModel.dashboardConfig.title = $0; viewModel.saveDashboard() }
+                    set: { viewModel.dashboardConfig.title = $0; scheduleSave() }
                 ))
                 .textFieldStyle(.roundedBorder)
             }
@@ -121,7 +151,7 @@ struct DashboardSettingsSheet: View {
                     .font(.subheadline.bold())
                 TextField(L.dash.description, text: Binding(
                     get: { viewModel.dashboardConfig.description ?? "" },
-                    set: { viewModel.dashboardConfig.description = $0.isEmpty ? nil : $0; viewModel.saveDashboard() }
+                    set: { viewModel.dashboardConfig.description = $0.isEmpty ? nil : $0; scheduleSave() }
                 ), axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(3...6)
@@ -138,7 +168,7 @@ struct DashboardSettingsSheet: View {
                             .split(separator: ",")
                             .map { $0.trimmingCharacters(in: .whitespaces) }
                             .filter { !$0.isEmpty }
-                        viewModel.saveDashboard()
+                        scheduleSave()
                     }
             }
 
@@ -209,7 +239,7 @@ struct DashboardSettingsSheet: View {
                     Text(L.tr("이름", "Name"))
                         .font(.caption)
                         .frame(width: 60, alignment: .leading)
-                    TextField("", text: bindingForVariable(variable.id, \.name))
+                    TextField("", text: bindingForVariable(variable, \.name))
                         .textFieldStyle(.roundedBorder)
                 }
 
@@ -260,11 +290,11 @@ struct DashboardSettingsSheet: View {
 
                 HStack(spacing: 16) {
                     Toggle(L.tr("다중 선택", "Multi"),
-                           isOn: bindingForVariable(variable.id, \.multi))
+                           isOn: bindingForVariable(variable, \.multi))
                         .toggleStyle(.checkbox)
                         .font(.caption)
                     Toggle(L.tr("전체 옵션", "Include All"),
-                           isOn: bindingForVariable(variable.id, \.includeAll))
+                           isOn: bindingForVariable(variable, \.includeAll))
                         .toggleStyle(.checkbox)
                         .font(.caption)
                     Spacer()
@@ -440,14 +470,23 @@ struct DashboardSettingsSheet: View {
         guard let idx = viewModel.dashboardConfig.templating.list.firstIndex(where: { $0.id == id })
         else { return }
         change(&viewModel.dashboardConfig.templating.list[idx])
-        viewModel.saveDashboard()
+        scheduleSave()
     }
 
-    private func bindingForVariable<T>(_ id: UUID, _ keyPath: WritableKeyPath<DashboardVariable, T>) -> Binding<T> {
-        Binding(
+    /// Binding that reads the latest persisted state of a variable, falling
+    /// back to the **captured snapshot** if the variable has just been
+    /// removed mid-render. The earlier implementation force-unwrapped
+    /// `templating.list.first!` here, which crashed if the last variable
+    /// was deleted while SwiftUI was still re-evaluating its editor row.
+    private func bindingForVariable<T>(
+        _ snapshot: DashboardVariable,
+        _ keyPath: WritableKeyPath<DashboardVariable, T>
+    ) -> Binding<T> {
+        let id = snapshot.id
+        return Binding(
             get: {
                 viewModel.dashboardConfig.templating.list.first(where: { $0.id == id })?[keyPath: keyPath]
-                    ?? viewModel.dashboardConfig.templating.list.first![keyPath: keyPath]
+                    ?? snapshot[keyPath: keyPath]
             },
             set: { newValue in mutateVariable(id) { v in v[keyPath: keyPath] = newValue } }
         )

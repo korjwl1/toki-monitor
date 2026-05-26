@@ -35,6 +35,14 @@ final class DatasourceRegistry {
         named[DatasourceSelector(kind: plugin.kind, name: name)] = plugin
     }
 
+    /// Remove all registered named instances. Called by dashboard-scope
+    /// callers (e.g. `DashboardViewModel.registerInlineDatasources` on
+    /// switch) so a previous dashboard's inline datasource names don't
+    /// leak into the next. Built-in defaults are *not* affected.
+    func clearNamed() {
+        named.removeAll(keepingCapacity: true)
+    }
+
     // MARK: - Resolution
 
     /// Resolve a selector to a plugin. Named instance wins over default.

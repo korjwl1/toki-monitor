@@ -9,14 +9,47 @@ final class DashboardConfigStore {
     private static let dashboardListKey = "dashboardList"
     private static let activeDashboardKey = "activeDashboardUID"
 
+    /// One-shot cleanup of UserDefaults keys from features that have been
+    /// removed (alerts, playlists). Lazily fires the first time this
+    /// type is touched per process. Skips the work if the keys are
+    /// already gone, so the cost is one Defaults read per app launch.
+    private static let purgeRemovedFeatureKeysOnce: Void = {
+        let removed = ["dashboardAlertRules", "dashboardPlaylists"]
+        for key in removed where UserDefaults.standard.object(forKey: key) != nil {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }()
+
+    init() {
+        // Touch the static so the cleanup runs once per app launch.
+        _ = Self.purgeRemovedFeatureKeysOnce
+    }
+
     // MARK: - Single Dashboard (backward compatible)
 
     func load() -> DashboardConfig {
-        guard let data = UserDefaults.standard.data(forKey: Self.userDefaultsKey),
-              let stored = try? JSONDecoder().decode(DashboardConfig.self, from: data)
-        else {
-            return Self.defaultConfig
+        // Prefer the single-dashboard key (legacy / "active" surface).
+        if let data = UserDefaults.standard.data(forKey: Self.userDefaultsKey),
+           let stored = try? JSONDecoder().decode(DashboardConfig.self, from: data) {
+            return migrateAndPersist(stored)
         }
+        // No single-config blob, but the user may already have a
+        // dashboard list from a newer build. Reading the list as the
+        // source of truth here avoids the "active dashboard suddenly
+        // becomes Default" drift where the two keys disagreed.
+        if let data = UserDefaults.standard.data(forKey: Self.dashboardListKey),
+           let list = try? JSONDecoder().decode([DashboardConfig].self, from: data),
+           !list.isEmpty {
+            let activeUID = UserDefaults.standard.string(forKey: Self.activeDashboardKey)
+            let chosen = list.first(where: { $0.uid == activeUID }) ?? list[0]
+            return migrateAndPersist(chosen)
+        }
+        return Self.defaultConfig
+    }
+
+    /// Run the migrator + datasource backfill on a stored config, persisting
+    /// the result if anything changed. Shared by `load()`'s two source paths.
+    private func migrateAndPersist(_ stored: DashboardConfig) -> DashboardConfig {
         let original = stored
         var config = DashboardMigrator.migrate(stored)
         // Seed activeDatasource from the legacy global enum so the dashboard

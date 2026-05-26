@@ -164,7 +164,7 @@ struct CustomDashboardView: View {
     @ViewBuilder
     private func panelContent(for panel: PanelConfig) -> some View {
         let data = viewModel.dataState(for: panel.id).timeSeriesData
-        let isEmpty = data == nil || data!.allModelNames.isEmpty
+        let isEmpty = data?.allModelNames.isEmpty ?? true
         switch panel.panelType {
         case .stat:
             statContent(for: panel.effectiveMetric, data: data)
@@ -411,15 +411,6 @@ struct CustomDashboardView: View {
         } else {
             return .dateTime.month(.defaultDigits).day(.defaultDigits)
         }
-    }
-
-    private var emptyDataView: some View {
-        ContentUnavailableView(
-            L.tr("데이터 없음", "No Data"),
-            systemImage: "chart.line.downtrend.xyaxis",
-            description: Text(L.tr("해당 기간에 데이터가 없습니다", "No data for this period"))
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var noModelSelected: some View {

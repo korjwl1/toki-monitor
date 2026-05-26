@@ -209,7 +209,6 @@ struct SyncSettingsView: View {
         do {
             try SyncClient.shared.renameDevice(trimmed)
             editingDeviceName = trimmed
-            SyncClient.shared.invalidateCache()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -708,7 +707,6 @@ private struct SyncLoginSheet: View {
             await MainActor.run {
                 if process.terminationStatus == 0 {
                     // Success — CLI handled everything (credentials, settings, browser auth)
-                    SyncClient.shared.invalidateCache()
                     SyncManager.shared.reload()
                     onComplete()
                 } else {

@@ -15,6 +15,13 @@ struct DashboardLayout: Codable, Equatable, Sendable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case kind, spec
     }
+
+    /// Equality ignores the transient `id` since it is regenerated on each
+    /// decode (excluded from `CodingKeys`). Two layouts that round-trip
+    /// through JSON should compare equal even though their `id`s differ.
+    static func == (lhs: DashboardLayout, rhs: DashboardLayout) -> Bool {
+        lhs.kind == rhs.kind && lhs.spec == rhs.spec
+    }
 }
 
 struct GridLayoutSpec: Codable, Equatable, Sendable {
@@ -63,10 +70,21 @@ struct JSONRef: Codable, Equatable, Sendable {
         case ref = "$ref"
     }
 
-    /// Extract the panel id from the ref string.
+    /// Extract the panel id from the ref string. Validates the suffix is
+    /// a parseable UUID string — a corrupted on-disk config with a
+    /// garbage suffix (e.g. trailing whitespace, accidental edit) would
+    /// otherwise silently match nothing in `panelMap`, making the
+    /// affected panel "disappear" with no diagnostic.
     var panelKey: String? {
         let prefix = "#/spec/panels/"
         guard ref.hasPrefix(prefix) else { return nil }
-        return String(ref.dropFirst(prefix.count))
+        let suffix = String(ref.dropFirst(prefix.count))
+        guard UUID(uuidString: suffix) != nil else {
+            #if DEBUG
+            print("[JSONRef] panelKey suffix is not a UUID: \(suffix)")
+            #endif
+            return nil
+        }
+        return suffix
     }
 }

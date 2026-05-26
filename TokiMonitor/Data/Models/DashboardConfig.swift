@@ -8,7 +8,12 @@ struct DashboardConfig: Codable, Equatable {
     var title: String = "Default"
     var description: String?
     var tags: [String] = []
-    var schemaVersion: Int = 3
+    // Match `DashboardMigrator.currentVersion` so freshly-constructed
+    // configs (e.g. `DashboardConfig()` inside the VM) are already
+    // v4-shaped. Anything legacy still loads via the migrator chain,
+    // but in-memory creators no longer rely on a follow-up migrate to
+    // populate the v4 envelopes.
+    var schemaVersion: Int = 4
     var version: Int = 1
 
     // Time configuration
@@ -341,9 +346,11 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     var queries: [Query]?
 
     /// Decoded `TokiPromQLQuerySpec` from this panel's first query envelope,
-    /// or nil. A single decode lookup that all three `effective*`
-    /// accessors share — calling them in a tight loop (fetchData) used
-    /// to JSON-decode the same blob three times per panel per refresh.
+    /// or nil. Returned fresh on every access — Swift structs can't cache
+    /// computed values without a separate class wrapper, and panel fetch
+    /// frequency (≈ once per refresh interval) doesn't warrant that.
+    /// Callers in a tight loop should bind the result locally instead
+    /// of reading it repeatedly.
     var resolvedTokiQuery: TokiPromQLQuerySpec? {
         guard let q = queries?.first,
               q.spec.plugin.kind == BuiltinQueryPluginKind.tokiPromQLQuery
@@ -434,9 +441,18 @@ struct PanelDisplayOptions: Codable, Equatable {
     }
 }
 
-struct ThresholdStep: Codable, Equatable {
+struct ThresholdStep: Codable, Equatable, Identifiable {
+    /// Stable identity so SwiftUI's `ForEach` keeps row identity across
+    /// reorder/insert/delete. Previously the editor iterated with
+    /// `id: \.offset`, which renumbered rows on every mutation and
+    /// animated identity churn through the whole list.
+    var id: UUID = UUID()
     var value: Double
     var color: String  // hex color or named color
+
+    enum CodingKeys: String, CodingKey {
+        case value, color
+    }
 }
 
 struct GridPosition: Codable, Equatable {

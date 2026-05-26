@@ -181,7 +181,7 @@ struct PanelEditorVisualizationTab: View {
                 .font(.subheadline.bold())
             Picker("", selection: $panel.options.colorMode) {
                 ForEach(PanelDisplayOptions.ColorMode.allCases, id: \.rawValue) { mode in
-                    Text(mode.rawValue.capitalized).tag(mode)
+                    Text(mode.displayName).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
@@ -190,7 +190,7 @@ struct PanelEditorVisualizationTab: View {
                 .font(.subheadline.bold())
             Picker("", selection: $panel.options.graphMode) {
                 ForEach(PanelDisplayOptions.GraphMode.allCases, id: \.rawValue) { mode in
-                    Text(mode.rawValue.capitalized).tag(mode)
+                    Text(mode.displayName).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
@@ -204,14 +204,14 @@ struct PanelEditorVisualizationTab: View {
             if panel.options.showLegend {
                 Picker(L.tr("범례 위치", "Legend position"), selection: $panel.options.legendPosition) {
                     ForEach(PanelDisplayOptions.LegendPosition.allCases, id: \.rawValue) { pos in
-                        Text(pos.rawValue.capitalized).tag(pos)
+                        Text(pos.displayName).tag(pos)
                     }
                 }
             }
 
             Picker(L.tr("툴팁 모드", "Tooltip mode"), selection: $panel.options.tooltipMode) {
                 ForEach(PanelDisplayOptions.TooltipMode.allCases, id: \.rawValue) { mode in
-                    Text(mode.rawValue.capitalized).tag(mode)
+                    Text(mode.displayName).tag(mode)
                 }
             }
 
@@ -237,7 +237,7 @@ struct PanelEditorVisualizationTab: View {
 
             Picker(L.tr("툴팁 모드", "Tooltip mode"), selection: $panel.options.tooltipMode) {
                 ForEach(PanelDisplayOptions.TooltipMode.allCases, id: \.rawValue) { mode in
-                    Text(mode.rawValue.capitalized).tag(mode)
+                    Text(mode.displayName).tag(mode)
                 }
             }
         }
@@ -301,27 +301,29 @@ struct PanelEditorOptionsTab: View {
             Text(L.tr("임계값", "Thresholds"))
                 .font(.subheadline.bold())
 
-            ForEach(Array(panel.options.thresholds.enumerated()), id: \.offset) { index, _ in
-                HStack {
-                    TextField(L.tr("값", "Value"), value: Binding(
-                        get: { panel.options.thresholds[index].value },
-                        set: { panel.options.thresholds[index].value = $0 }
-                    ), format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 80)
+            ForEach(panel.options.thresholds) { threshold in
+                if let index = panel.options.thresholds.firstIndex(where: { $0.id == threshold.id }) {
+                    HStack {
+                        TextField(L.tr("값", "Value"), value: Binding(
+                            get: { panel.options.thresholds[index].value },
+                            set: { panel.options.thresholds[index].value = $0 }
+                        ), format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 80)
 
-                    TextField(L.tr("색상", "Color"), text: Binding(
-                        get: { panel.options.thresholds[index].color },
-                        set: { panel.options.thresholds[index].color = $0 }
-                    ))
-                    .textFieldStyle(.roundedBorder)
+                        TextField(L.tr("색상", "Color"), text: Binding(
+                            get: { panel.options.thresholds[index].color },
+                            set: { panel.options.thresholds[index].color = $0 }
+                        ))
+                        .textFieldStyle(.roundedBorder)
 
-                    Button(role: .destructive) {
-                        panel.options.thresholds.remove(at: index)
-                    } label: {
-                        Image(systemName: "minus.circle")
+                        Button(role: .destructive) {
+                            panel.options.thresholds.remove(at: index)
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
