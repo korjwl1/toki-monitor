@@ -478,9 +478,12 @@ enum PanelType: String, Codable, CaseIterable {
         [.stat, .timeSeries, .barChart, .pieChart, .table, .gauge]
     }
 
+    /// Minimum grid width (columns). Stat cards default to width=6 in the
+    /// stock dashboard, and the design constraint is "user can shrink to
+    /// half the default" — hence stat minWidth=3.
     var minWidth: Int {
         switch self {
-        case .stat: 4
+        case .stat: 3
         case .timeSeries: 6
         case .barChart: 6
         case .pieChart: 6
@@ -490,15 +493,32 @@ enum PanelType: String, Codable, CaseIterable {
         }
     }
 
+    /// Minimum grid height (rows). Stat panels are vertically locked
+    /// (their resize handle never drives the height axis — see
+    /// `PanelEdgeResize`), so minHeight=1 is just the floor used when
+    /// constructing a panel programmatically. For non-stat panels the
+    /// minimum is half the default chart height so users can compress
+    /// them when stacking many panels.
     var minHeight: Int {
         switch self {
         case .stat: 1
-        case .timeSeries: 3
-        case .barChart: 3
-        case .pieChart: 3
-        case .table: 3
-        case .gauge: 2
+        case .timeSeries: 1
+        case .barChart: 1
+        case .pieChart: 1
+        case .table: 1
+        case .gauge: 1
         case .rowPanel: 1
+        }
+    }
+
+    /// Whether this panel type is allowed to resize vertically. Stat
+    /// cards are deliberately fixed-height (they show a single value;
+    /// growing the tile doesn't change the readout), so their edge
+    /// resize handle exposes only the horizontal axis.
+    var allowsVerticalResize: Bool {
+        switch self {
+        case .stat: false
+        default:    true
         }
     }
 

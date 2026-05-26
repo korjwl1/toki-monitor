@@ -16,7 +16,6 @@ struct DashboardView: View {
     @State private var dashboardToDelete: DashboardConfig?
     @State private var isEditingTitle = false
     @State private var preEditConfig: DashboardConfig?
-    @FocusState private var titleFieldFocused: Bool
 
     enum SidebarItem: Hashable {
         case explore
@@ -42,9 +41,6 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showAnnotationList) {
                 AnnotationListSheet(viewModel: viewModel)
-            }
-            .popover(isPresented: $showAddPanel) {
-                AddPanelPopover(viewModel: viewModel)
             }
             .alert(
                 L.tr("대시보드 삭제", "Delete Dashboard"),
@@ -300,8 +296,6 @@ struct DashboardView: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: DS.fontTitle, weight: .semibold))
                 .frame(maxWidth: 200)
-                .focused($titleFieldFocused)
-                .onAppear { titleFieldFocused = true }
                 .onSubmit {
                     isEditingTitle = false
                     viewModel.saveDashboard()
@@ -309,17 +303,6 @@ struct DashboardView: View {
                 }
                 .onExitCommand {
                     isEditingTitle = false
-                }
-                // Persist on focus loss too — onSubmit only fires for
-                // Enter, so clicking out of the field used to leave the
-                // in-memory title change unsaved until the next side
-                // effect happened to call `saveDashboard()`.
-                .onChange(of: titleFieldFocused) { _, focused in
-                    if !focused && isEditingTitle {
-                        isEditingTitle = false
-                        viewModel.saveDashboard()
-                        viewModel.reloadDashboardList()
-                    }
                 }
             } else {
                 Text(viewModel.dashboardConfig.title)
@@ -544,6 +527,13 @@ struct DashboardView: View {
                     .modifier(ToolbarPillModifier())
             }
             .buttonStyle(.plain)
+            // Anchor the popover to the actual + button so it appears
+            // beneath it, instead of drifting to the main content area
+            // (which can land outside the dashboard window entirely on
+            // smaller layouts).
+            .popover(isPresented: $showAddPanel, arrowEdge: .bottom) {
+                AddPanelPopover(viewModel: viewModel)
+            }
 
             // Add row button
             Button {

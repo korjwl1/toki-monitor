@@ -30,15 +30,6 @@ struct PanelEdgeResize: ViewModifier {
     let isEditing: Bool
     @Bindable var viewModel: DashboardViewModel
 
-    /// Captured at the first `.onChanged` of a resize gesture. The drag
-    /// translation is cumulative from gesture start, so the new size must
-    /// be computed against the *original* position — not the live
-    /// `panel.gridPosition`, which has already been mutated by prior
-    /// frames via `setPanelPositionInMemory`. Reading the live value as
-    /// baseline causes the panel to grow one cell per frame after the
-    /// first cell-crossing (runaway resize).
-    @State private var initialPosition: GridPosition?
-
     /// Drag area thickness on a panel's edge.
     private static let stripThickness: CGFloat = 6
     /// Side length of the bottom-right corner affordance. Small enough that
@@ -46,38 +37,44 @@ struct PanelEdgeResize: ViewModifier {
     /// corner from a horizontal drag was making stat panels grow vertically
     /// when the user only wanted to change width.
     private static let cornerSize: CGFloat = 10
-    /// Upper bound on panel height (in rows). Without this, a runaway
-    /// vertical drag could push the persisted height arbitrarily large.
-    /// 48 rows ≈ 4 viewport heights at default row height — plenty for any
-    /// legitimate panel, hard ceiling against bug-driven growth.
-    private static let maxPanelHeight: Int = 48
 
     func body(content: Content) -> some View {
-        content
-            .overlay {
-                if isEditing && viewModel.draggingPanelID != panelID {
-                    GeometryReader { proxy in
-                        let w = proxy.size.width
-                        let h = proxy.size.height
+        content.overlay {
+            if isEditing && viewModel.draggingPanelID != panelID {
+                GeometryReader { proxy in
+                    let w = proxy.size.width
+                    let h = proxy.size.height
+                    let allowsVertical = panelType.allowsVerticalResize
 
-                        // Strips are laid out so edge and corner regions are
-                        // **mutually exclusive**, not overlapping. With the old
-                        // overlapping layout, the corner (which drives both
-                        // axes) sat on the bottom 14pt of the right-edge strip;
-                        // a tall stat panel is only 80pt, so a "drag right edge
-                        // a bit left" gesture often landed in the corner zone
-                        // and changed height as well. Splitting the regions
-                        // means a drag on the right edge is *only* horizontal.
-                        ZStack(alignment: .topLeading) {
-                            // Right edge — everything above the corner zone.
-                            ResizeHandleStrip(
-                                cursor: .resizeLeftRight,
-                                onDragChanged: { t in apply(translation: t, horizontal: true, vertical: false) },
-                                onDragEnded: { t in commit(translation: t, horizontal: true, vertical: false) }
-                            )
-                            .frame(width: Self.stripThickness, height: max(0, h - Self.cornerSize))
-                            .offset(x: w - Self.stripThickness, y: 0)
+                    // Strips are laid out so edge and corner regions are
+                    // **mutually exclusive**, not overlapping. With the old
+                    // overlapping layout, the corner (which drives both
+                    // axes) sat on the bottom 14pt of the right-edge strip;
+                    // a tall stat panel is only 80pt, so a "drag right edge
+                    // a bit left" gesture often landed in the corner zone
+                    // and changed height as well. Splitting the regions
+                    // means a drag on the right edge is *only* horizontal.
+                    //
+                    // For panel types that do not allow vertical resize
+                    // (stat cards) we skip the bottom-edge and corner
+                    // strips entirely and let the right-edge strip own
+                    // the full panel height — there is no corner zone to
+                    // carve out.
+                    ZStack(alignment: .topLeading) {
+                        // Right edge — full panel height for vertically
+                        // locked types, otherwise stops above the corner.
+                        ResizeHandleStrip(
+                            cursor: .resizeLeftRight,
+                            onDragChanged: { t in apply(translation: t, horizontal: true, vertical: false) },
+                            onDragEnded: { t in commit(translation: t, horizontal: true, vertical: false) }
+                        )
+                        .frame(
+                            width: Self.stripThickness,
+                            height: allowsVertical ? max(0, h - Self.cornerSize) : h
+                        )
+                        .offset(x: w - Self.stripThickness, y: 0)
 
+                        if allowsVertical {
                             // Bottom edge — everything left of the corner zone.
                             ResizeHandleStrip(
                                 cursor: .resizeUpDown,
@@ -100,17 +97,7 @@ struct PanelEdgeResize: ViewModifier {
                     }
                 }
             }
-            // Edit mode toggling off mid-resize doesn't call `.onEnded` on
-            // the strip's gesture — the overlay just disappears. Revert any
-            // in-flight in-memory mutation to the captured baseline so a
-            // partially-resized panel doesn't get silently committed on the
-            // next save.
-            .onChange(of: isEditing) { _, newValue in
-                if !newValue, let baseline = initialPosition {
-                    viewModel.setPanelPositionInMemory(id: panelID, position: baseline)
-                    initialPosition = nil
-                }
-            }
+        }
     }
 
     // MARK: - Grid math
@@ -122,39 +109,30 @@ struct PanelEdgeResize: ViewModifier {
         guard let panel = viewModel.dashboardConfig.panels.first(where: { $0.id == panelID })
         else { return }
 
-        // Capture the pre-drag position on the first `.onChanged`. All
-        // subsequent frames compute against this baseline so the cumulative
-        // `translation` doesn't compound with prior in-memory mutations.
-        let baseline = initialPosition ?? panel.gridPosition
-        if initialPosition == nil {
-            initialPosition = baseline
-        }
-
         let cellWidth = columnWidth(in: containerWidth) + DashboardGridLayout.gap
         let cellHeight = rowHeight + DashboardGridLayout.gap
 
-        var newWidth = baseline.width
-        var newHeight = baseline.height
+        var newWidth = panel.gridPosition.width
+        var newHeight = panel.gridPosition.height
 
         if horizontal {
             let widthDelta = Int(round(translation.width / cellWidth))
-            newWidth = max(panelType.minWidth, baseline.width + widthDelta)
-            let maxWidth = DashboardGridLayout.columnCount - baseline.column
+            newWidth = max(panelType.minWidth, panel.gridPosition.width + widthDelta)
+            let maxWidth = DashboardGridLayout.columnCount - panel.gridPosition.column
             newWidth = min(newWidth, maxWidth)
         }
 
         if vertical {
             let heightDelta = Int(round(translation.height / cellHeight))
-            newHeight = max(panelType.minHeight, baseline.height + heightDelta)
-            newHeight = min(newHeight, Self.maxPanelHeight)
+            newHeight = max(panelType.minHeight, panel.gridPosition.height + heightDelta)
         }
 
         guard newWidth != panel.gridPosition.width || newHeight != panel.gridPosition.height
         else { return }
 
         let newPosition = GridPosition(
-            column: baseline.column,
-            row: baseline.row,
+            column: panel.gridPosition.column,
+            row: panel.gridPosition.row,
             width: newWidth,
             height: newHeight
         )
@@ -165,7 +143,6 @@ struct PanelEdgeResize: ViewModifier {
     private func commit(translation: CGSize, horizontal: Bool, vertical: Bool) {
         apply(translation: translation, horizontal: horizontal, vertical: vertical)
         viewModel.commitPanelPositionChange()
-        initialPosition = nil
     }
 
     private func columnWidth(in containerWidth: CGFloat) -> CGFloat {

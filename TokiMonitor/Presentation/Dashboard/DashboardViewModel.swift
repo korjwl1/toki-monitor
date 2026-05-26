@@ -633,6 +633,7 @@ final class DashboardViewModel {
     func updatePanelPosition(id: UUID, position: GridPosition) {
         guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == id }) else { return }
         dashboardConfig.panels[index].gridPosition = position
+        resolveOverlaps(anchorPanelID: id)
         syncLayoutsWithPanels()
         saveDashboard()
     }
@@ -644,7 +645,84 @@ final class DashboardViewModel {
     func setPanelPositionInMemory(id: UUID, position: GridPosition) {
         guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == id }) else { return }
         dashboardConfig.panels[index].gridPosition = position
+        resolveOverlaps(anchorPanelID: id)
         syncLayoutsWithPanels()
+    }
+
+    /// Push every panel that collides with the anchor (the just-resized
+    /// or just-moved panel) downward. The anchor stays at its new
+    /// position; other panels yield by setting their `row` to
+    /// `anchor.row + anchor.height`. The pass repeats greedily so a
+    /// pushed panel can in turn push panels below it (cascade).
+    ///
+    /// Without this, growing a panel vertically leaves panels in the
+    /// rows immediately below it visually overlapping the grown panel
+    /// — see the screenshot in PR feedback. The reflow keeps the grid
+    /// non-overlapping at the cost of cell positions changing on
+    /// resize, which mirrors how Grafana / Perses behave.
+    private func resolveOverlaps(anchorPanelID: UUID) {
+        guard let anchorIdx = dashboardConfig.panels.firstIndex(where: { $0.id == anchorPanelID })
+        else { return }
+        // Snapshot all positions; mutate via this dict to avoid index drift.
+        var positions: [UUID: GridPosition] = Dictionary(
+            uniqueKeysWithValues: dashboardConfig.panels.map { ($0.id, $0.gridPosition) }
+        )
+        let anchorPos = positions[anchorPanelID]!
+
+        // Process every other panel in (row, column) order so a panel
+        // higher up gets settled before the one it might subsequently
+        // push. The anchor is treated as immovable; everything else
+        // can fall.
+        let others = dashboardConfig.panels
+            .filter { $0.id != anchorPanelID }
+            .map(\.id)
+            .sorted { (a, b) in
+                let pa = positions[a]!
+                let pb = positions[b]!
+                if pa.row != pb.row { return pa.row < pb.row }
+                return pa.column < pb.column
+            }
+
+        // Each settled panel becomes a new immovable rect against which
+        // later panels must also clear. Cascades naturally because the
+        // settled set grows row by row.
+        var settled: [(id: UUID, rect: GridPosition)] = [(anchorPanelID, anchorPos)]
+        for id in others {
+            var pos = positions[id]!
+            var changed = true
+            // Fixed-point: each push may now overlap a different
+            // settled rect, so loop until clear of everything.
+            while changed {
+                changed = false
+                for s in settled where Self.rectsOverlap(pos, s.rect) {
+                    pos.row = s.rect.row + s.rect.height
+                    changed = true
+                }
+            }
+            positions[id] = pos
+            settled.append((id, pos))
+        }
+
+        // Write the resolved positions back into the model.
+        for i in 0..<dashboardConfig.panels.count {
+            if let p = positions[dashboardConfig.panels[i].id],
+               p != dashboardConfig.panels[i].gridPosition {
+                dashboardConfig.panels[i].gridPosition = p
+            }
+        }
+        _ = anchorIdx // silence unused-var when anchor is not re-fetched
+    }
+
+    /// Inclusive grid-cell overlap between two `GridPosition` rects.
+    /// Treats positions as half-open `[col, col+w) × [row, row+h)`.
+    private static func rectsOverlap(_ a: GridPosition, _ b: GridPosition) -> Bool {
+        let aRight  = a.column + a.width
+        let bRight  = b.column + b.width
+        let aBottom = a.row + a.height
+        let bBottom = b.row + b.height
+        let colsOverlap = a.column < bRight && b.column < aRight
+        let rowsOverlap = a.row    < bBottom && b.row    < aBottom
+        return colsOverlap && rowsOverlap
     }
 
     /// Persist the dashboard after a drag / resize completes. Single
