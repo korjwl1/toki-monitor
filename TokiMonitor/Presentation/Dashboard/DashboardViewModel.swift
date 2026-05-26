@@ -91,6 +91,12 @@ final class DashboardViewModel {
     private var queryClient: any QueryDataSource
     let configStore = DashboardConfigStore()
     private let annotationStore = AnnotationStore()
+    // Singletons-as-DI: defaults to `.shared` so existing call sites still
+    // work, but tests can inject a stub. Replaces direct `.shared` reaches
+    // scattered across the ViewModel.
+    private let datasourceRegistry: DatasourceRegistry
+    private let variablePluginRegistry: VariablePluginRegistry
+    private let syncManager: SyncManager
 
     /// Current datasource selector (Perses-style). Persisted via UserDefaults.
     /// Built-ins map to `BuiltinDatasourceKind.localCLI` / `.promQLProxy`.
@@ -144,11 +150,11 @@ final class DashboardViewModel {
         // Server gating: if the selector points to the proxy but sync isn't
         // configured or the token is expired, fall back to local.
         if activeDatasource.kind == BuiltinDatasourceKind.promQLProxy {
-            guard SyncManager.shared.isConfigured && !SyncManager.shared.isTokenExpired else {
-                return DatasourceRegistry.shared.resolve(kind: BuiltinDatasourceKind.localCLI) ?? reportClient
+            guard syncManager.isConfigured && !syncManager.isTokenExpired else {
+                return datasourceRegistry.resolve(kind: BuiltinDatasourceKind.localCLI) ?? reportClient
             }
         }
-        if let plugin = DatasourceRegistry.shared.resolve(activeDatasource) {
+        if let plugin = datasourceRegistry.resolve(activeDatasource) {
             return plugin
         }
         // Last-resort fallback so the dashboard never goes black.
@@ -156,9 +162,15 @@ final class DashboardViewModel {
     }
 
     init(reportClient: TokiReportClient = TokiReportClient(),
-         serverQueryClient: ServerQueryClient = ServerQueryClient()) {
+         serverQueryClient: ServerQueryClient = ServerQueryClient(),
+         datasourceRegistry: DatasourceRegistry = .shared,
+         variablePluginRegistry: VariablePluginRegistry = .shared,
+         syncManager: SyncManager = .shared) {
         self.reportClient = reportClient
         self.serverQueryClient = serverQueryClient
+        self.datasourceRegistry = datasourceRegistry
+        self.variablePluginRegistry = variablePluginRegistry
+        self.syncManager = syncManager
         self.queryClient = reportClient  // default; updated below after activeDatasource is set
         self.dashboardConfig = DashboardConfigStore().load()
         self.dashboardList = DashboardConfigStore().loadDashboardList()
@@ -213,10 +225,11 @@ final class DashboardViewModel {
         // Cancel any in-flight refresh so a slower previous load can't
         // overwrite a faster, newer one (datasource switch race).
         variableRefreshTask?.cancel()
+        let registry = variablePluginRegistry
         variableRefreshTask = Task { [weak self] in
             for (varID, pluginRef) in pairs {
                 if Task.isCancelled { return }
-                guard let loader = VariablePluginRegistry.shared.loader(for: pluginRef.kind) else { continue }
+                guard let loader = registry.loader(for: pluginRef.kind) else { continue }
                 guard let options = try? await loader.loadOptions(specData: pluginRef.spec, context: context)
                 else { continue }
                 if Task.isCancelled { return }
@@ -320,13 +333,14 @@ final class DashboardViewModel {
             // dashboard's active client is used.
             let defaultClient = self.queryClient
             let activeSelector = self.activeDatasource
+            let registry = self.datasourceRegistry
             var queryResults: [(PanelQueryKey, Result<TimeSeriesData, Error>)] = []
             await withTaskGroup(of: (PanelQueryKey, Result<TimeSeriesData, Error>).self) { group in
                 for (key, _) in queryGroups {
                     let client: any QueryDataSource = {
                         if let ds = key.datasource,
                            ds != activeSelector,
-                           let plugin = DatasourceRegistry.shared.resolve(ds) {
+                           let plugin = registry.resolve(ds) {
                             return plugin
                         }
                         return defaultClient
@@ -968,8 +982,8 @@ final class DashboardViewModel {
     /// resolved against them. Called on init and every dashboard switch.
     private func registerInlineDatasources() {
         for (_, instance) in dashboardConfig.datasources {
-            if let plugin = DatasourceRegistry.shared.resolve(kind: instance.kind) {
-                DatasourceRegistry.shared.registerNamed(name: instance.name, plugin: plugin)
+            if let plugin = datasourceRegistry.resolve(kind: instance.kind) {
+                datasourceRegistry.registerNamed(name: instance.name, plugin: plugin)
             }
         }
     }

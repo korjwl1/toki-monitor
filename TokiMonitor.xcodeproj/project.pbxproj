@@ -66,6 +66,7 @@
 		67735C617E16379A7BE552E2 /* Variable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD76DA115AED88DEAB5DEA6 /* Variable.swift */; };
 		69295AAE29A8D4FB6FBD903E /* TokenUsageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196E4E973580CB5B1A9B79FA /* TokenUsageModel.swift */; };
 		6ADE9FBEEE9FC8B01BC643B5 /* VariablePluginLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C3FEAA3CC51E39C20F779C /* VariablePluginLoader.swift */; };
+		744E9D2F6C3F98C9545BD816 /* PanelEditorTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 073C92E2E4545D890FE747CC /* PanelEditorTabs.swift */; };
 		789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB89E56D927ABD7289F04084 /* SettingsView.swift */; };
 		7A3A92BC03EC47C681AC5E76 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6576E137DF2FCFE73BE66102 /* DesignSystem.swift */; };
 		7D6BBA3AFFEEFB28562B393D /* ClaudeUsageSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47D7D33B62F737BE41C872F /* ClaudeUsageSection.swift */; };
@@ -143,6 +144,7 @@
 		03A7FCA1C481A1421555EEF2 /* DatasourceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourceRegistry.swift; sourceTree = "<group>"; };
 		03F503F3516997ED1304E8F7 /* DashboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfig.swift; sourceTree = "<group>"; };
 		06C3FEAA3CC51E39C20F779C /* VariablePluginLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariablePluginLoader.swift; sourceTree = "<group>"; };
+		073C92E2E4545D890FE747CC /* PanelEditorTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEditorTabs.swift; sourceTree = "<group>"; };
 		074C94EC60E9EE6F87E930EB /* PanelDragModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelDragModifier.swift; sourceTree = "<group>"; };
 		096E04F1C2D87A5D5F1C0251 /* StatPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatPanelView.swift; sourceTree = "<group>"; };
 		0C1FFE59530A1D2FC18F1651 /* frame_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00.png; sourceTree = "<group>"; };
@@ -484,6 +486,7 @@
 				D0A80F24970E2F377FB13231 /* DashboardEditOverlay.swift */,
 				074C94EC60E9EE6F87E930EB /* PanelDragModifier.swift */,
 				86FE7C3DEAF56A1CA8803454 /* PanelEdgeResizeModifier.swift */,
+				073C92E2E4545D890FE747CC /* PanelEditorTabs.swift */,
 				E131E3756214B21A8B8654B1 /* PanelEditorView.swift */,
 			);
 			path = EditMode;
@@ -728,6 +731,7 @@
 				3DA3BA25D0968CA27E13ECE3 /* PanelDataExtractor.swift in Sources */,
 				8396AA1A147DFFBD23FC72C6 /* PanelDragModifier.swift in Sources */,
 				DCB1716E3D21F804D2A001CB /* PanelEdgeResizeModifier.swift in Sources */,
+				744E9D2F6C3F98C9545BD816 /* PanelEditorTabs.swift in Sources */,
 				C9B1B05E770D61B3E9D3108E /* PanelEditorView.swift in Sources */,
 				B7533A6F032F66AA318EECD8 /* PanelPlugin.swift in Sources */,
 				D8262FCBDC499382103DEA43 /* PanelPluginSpec.swift in Sources */,
