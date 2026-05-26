@@ -174,6 +174,76 @@ final class SyncClient {
     }
 
     /// POST /token/refresh. Saves updated credentials to Keychain on success.
+    // MARK: - /me/devices
+
+    /// Raw device record returned by the sync server's `/me/devices`
+    /// endpoint. Lifted out of `SyncSettingsView` so views don't have to
+    /// hand-roll HTTP + 401 retry.
+    struct DeviceRecord: Sendable {
+        let id: String
+        let name: String
+        let deviceKey: String
+        /// Unix epoch seconds. `nil` when the server didn't include the
+        /// field or it was 0; serialized form may be Int, Double, or
+        /// string depending on the backend, so we normalize here.
+        let lastSeenAt: TimeInterval?
+    }
+
+    /// Fetch the user's device list. Handles 401 → refresh-and-retry once,
+    /// like `ServerQueryClient` does for /api/v1/toki/query.
+    func listDevices() async throws -> [DeviceRecord] {
+        guard let creds = load() else { throw SyncClientError.invalidCredentials }
+        return try await fetchDevices(creds: creds, retryOn401: true)
+    }
+
+    private func fetchDevices(creds: SyncCredentials, retryOn401: Bool) async throws -> [DeviceRecord] {
+        guard let url = URL(string: "\(creds.httpURL)/me/devices") else {
+            throw SyncClientError.invalidURL
+        }
+        var req = URLRequest(url: url, timeoutInterval: 15)
+        req.setValue("Bearer \(creds.accessToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse else {
+            throw SyncClientError.invalidResponse
+        }
+
+        if http.statusCode == 401, retryOn401 {
+            let refreshed = try await refreshAccessToken(creds)
+            return try await fetchDevices(creds: refreshed, retryOn401: false)
+        }
+
+        guard http.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
+            throw SyncClientError.serverError(body)
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let deviceArray = json["devices"] as? [[String: Any]] else {
+            throw SyncClientError.invalidResponse
+        }
+
+        return deviceArray.map { d in
+            DeviceRecord(
+                id:         d["id"]         as? String ?? "-",
+                name:       d["name"]       as? String ?? "-",
+                deviceKey:  d["device_key"] as? String ?? "",
+                lastSeenAt: Self.parseEpoch(d["last_seen_at"])
+            )
+        }
+    }
+
+    private static func parseEpoch(_ value: Any?) -> TimeInterval? {
+        if let n = value as? NSNumber {
+            let v = n.doubleValue
+            return v > 0 ? v : nil
+        }
+        if let s = value as? String, let v = Double(s), v > 0 {
+            return v
+        }
+        return nil
+    }
+
     func refreshAccessToken(_ creds: SyncCredentials) async throws -> SyncCredentials {
         guard let url = URL(string: "\(creds.httpURL)/token/refresh") else { throw SyncClientError.invalidURL }
         var req = URLRequest(url: url, timeoutInterval: 15)

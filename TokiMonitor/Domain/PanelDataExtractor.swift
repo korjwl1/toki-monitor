@@ -108,7 +108,7 @@ enum PanelDataExtractor {
         var totals: [String: UInt64] = [:]
         for point in data.points {
             for model in point.models {
-                let name = DashboardViewModel.cleanProjectName(model.model)
+                let name = ProjectNameResolver.cleanProjectName(model.model)
                 totals[name, default: 0] += model.totalTokens
             }
         }

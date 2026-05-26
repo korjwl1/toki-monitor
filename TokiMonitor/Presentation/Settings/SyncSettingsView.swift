@@ -484,98 +484,36 @@ private struct DeviceListSheet: View {
     }
 
     private func fetchDevices() async {
-        guard let creds = SyncClient.shared.load() else {
-            errorMessage = L.tr("동기화가 설정되지 않았습니다", "Sync is not configured")
-            isLoading = false
-            return
-        }
-
-        let urlString = "\(creds.httpURL)/me/devices"
-        guard let url = URL(string: urlString) else {
-            errorMessage = L.tr("잘못된 URL", "Invalid URL")
-            isLoading = false
-            return
-        }
-
-        var req = URLRequest(url: url, timeoutInterval: 15)
-        req.setValue("Bearer \(creds.accessToken)", forHTTPHeaderField: "Authorization")
-
         do {
-            let (data, resp) = try await URLSession.shared.data(for: req)
-            guard let http = resp as? HTTPURLResponse else {
-                errorMessage = L.tr("잘못된 응답", "Invalid response")
-                isLoading = false
-                return
+            let records = try await SyncClient.shared.listDevices()
+            devices = records.map { record in
+                DeviceInfo(
+                    id: record.id,
+                    deviceKey: record.deviceKey,
+                    name: record.name,
+                    lastSeenText: relativeTime(from: record.lastSeenAt)
+                )
             }
-
-            if http.statusCode == 401 {
-                // Try refresh
-                do {
-                    let updated = try await SyncClient.shared.refreshAccessToken(creds)
-                    var retryReq = URLRequest(url: url, timeoutInterval: 15)
-                    retryReq.setValue("Bearer \(updated.accessToken)", forHTTPHeaderField: "Authorization")
-                    let (retryData, retryResp) = try await URLSession.shared.data(for: retryReq)
-                    guard let retryHttp = retryResp as? HTTPURLResponse, retryHttp.statusCode == 200 else {
-                        errorMessage = L.tr("기기 목록을 불러올 수 없습니다", "Failed to load device list")
-                        isLoading = false
-                        return
-                    }
-                    parseDevices(from: retryData)
-                } catch {
-                    errorMessage = L.tr("토큰 만료. 다시 로그인하세요.", "Token expired. Please re-login.")
-                }
-                isLoading = false
-                return
+        } catch let err as SyncClientError {
+            if case .invalidCredentials = err {
+                errorMessage = L.tr("동기화가 설정되지 않았습니다", "Sync is not configured")
+            } else if case .refreshFailed = err {
+                errorMessage = L.tr("토큰 만료. 다시 로그인하세요.", "Token expired. Please re-login.")
+            } else {
+                errorMessage = err.errorDescription ?? L.tr("기기 목록을 불러올 수 없습니다", "Failed to load device list")
             }
-
-            guard http.statusCode == 200 else {
-                let body = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
-                errorMessage = body
-                isLoading = false
-                return
-            }
-
-            parseDevices(from: data)
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 
-    private func parseDevices(from data: Data) {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let deviceArray = json["devices"] as? [[String: Any]] else {
-            errorMessage = L.tr("응답 파싱 실패", "Failed to parse response")
-            return
-        }
-
-        devices = deviceArray.map { d in
-            let id = d["id"] as? String ?? "-"
-            let name = d["name"] as? String ?? "-"
-            let deviceKey = d["device_key"] as? String ?? ""
-
-            // last_seen_at may be Int, Int64, Double, or String
-            let lastSeenTs: TimeInterval?
-            if let n = d["last_seen_at"] as? NSNumber {
-                lastSeenTs = n.doubleValue
-            } else if let s = d["last_seen_at"] as? String, let v = Double(s) {
-                lastSeenTs = v
-            } else {
-                lastSeenTs = nil
-            }
-
-            let lastSeenText: String
-            if let ts = lastSeenTs, ts > 0 {
-                let date = Date(timeIntervalSince1970: ts)
-                let rel = RelativeDateTimeFormatter()
-                rel.unitsStyle = .abbreviated
-                lastSeenText = rel.localizedString(for: date, relativeTo: Date())
-            } else {
-                lastSeenText = "-"
-            }
-
-            return DeviceInfo(id: id, deviceKey: deviceKey, name: name, lastSeenText: lastSeenText)
-        }
+    private func relativeTime(from epoch: TimeInterval?) -> String {
+        guard let ts = epoch else { return "-" }
+        let date = Date(timeIntervalSince1970: ts)
+        let rel = RelativeDateTimeFormatter()
+        rel.unitsStyle = .abbreviated
+        return rel.localizedString(for: date, relativeTo: Date())
     }
 }
 
