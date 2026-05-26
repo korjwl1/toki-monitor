@@ -103,12 +103,19 @@ struct TokiLabelValuesVariableLoader: VariablePluginLoader {
         guard let client else { return [] }
 
         // Cascading interpolation — both `${name}` and bare `$name` forms.
+        // The value is escaped as a regex *template* before substitution
+        // so that values like `claude|gpt` (multi-select alternation) or
+        // `.*` (customAllValue) aren't reinterpreted as regex template
+        // metacharacters — they were producing garbage interpolations
+        // before this.
         var query = spec.query
         for (name, value) in context.resolvedVariables {
             query = query.replacingOccurrences(of: "${\(name)}", with: value)
             let pattern = "\\$\(NSRegularExpression.escapedPattern(for: name))(?![A-Za-z0-9_])"
-            query = query.replacingOccurrences(of: pattern, with: value,
-                                               options: .regularExpression)
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            let template = NSRegularExpression.escapedTemplate(for: value)
+            let range = NSRange(query.startIndex..., in: query)
+            query = regex.stringByReplacingMatches(in: query, range: range, withTemplate: template)
         }
 
         let data = try await client.queryPromQLAsTimeSeries(query: query, time: context.time)

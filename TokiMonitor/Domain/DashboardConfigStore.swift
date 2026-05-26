@@ -124,11 +124,16 @@ final class DashboardConfigStore {
     private func uniqueTitle(_ base: String, in list: [DashboardConfig]) -> String {
         let existingTitles = Set(list.map(\.title))
         if !existingTitles.contains(base) { return base }
-        for i in 1... {
+        // Explicit upper bound. In practice the user would never have
+        // 1000 dashboards named the same thing, but `for i in 1...`
+        // (infinite range) is an audit smell — bound it so a future
+        // bug that fills `list` can't hang the app.
+        for i in 1...1000 {
             let candidate = "\(base) \(i)"
             if !existingTitles.contains(candidate) { return candidate }
         }
-        return base
+        // Fallback: timestamp suffix.
+        return "\(base) \(Int(Date().timeIntervalSince1970))"
     }
 
     // MARK: - JSON File Import/Export

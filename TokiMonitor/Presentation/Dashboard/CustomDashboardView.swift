@@ -327,12 +327,7 @@ struct CustomDashboardView: View {
     }
 
     private func isSameBucket(_ a: Date, _ b: Date, _ bucketSecs: Int) -> Bool {
-        if bucketSecs < 3600 {
-            return Calendar.current.isDate(a, equalTo: b, toGranularity: .minute)
-        } else if bucketSecs < 86400 {
-            return Calendar.current.isDate(a, equalTo: b, toGranularity: .hour)
-        }
-        return Calendar.current.isDate(a, inSameDayAs: b)
+        BarChartTime.isSameBucket(a, b, bucketSecs: bucketSecs)
     }
 
     private func formatBarDate(_ date: Date) -> String {
@@ -483,6 +478,16 @@ struct BarChartTooltipOverlay: View {
     }
 
     private func isSameBucket(_ a: Date, _ b: Date) -> Bool {
+        BarChartTime.isSameBucket(a, b, bucketSecs: bucketSecs)
+    }
+}
+
+/// Bucket-equality helper used by both the bar chart hover lookup and
+/// the tooltip overlay's date lookup. Two separate copies had grown
+/// over time — extracted here so a future granularity tweak only has
+/// one place to land.
+enum BarChartTime {
+    static func isSameBucket(_ a: Date, _ b: Date, bucketSecs: Int) -> Bool {
         if bucketSecs < 3600 {
             return Calendar.current.isDate(a, equalTo: b, toGranularity: .minute)
         } else if bucketSecs < 86400 {

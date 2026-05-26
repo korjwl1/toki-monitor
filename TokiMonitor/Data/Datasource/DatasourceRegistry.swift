@@ -52,12 +52,14 @@ final class DatasourceRegistry {
     /// All registered kinds (e.g. for UI pickers).
     var kinds: [String] { Array(defaults.keys).sorted() }
 
-    /// All plugin instances for which a default exists, sorted by their
-    /// display name. Used by data source pickers; sort is locale-stable
-    /// because `DatasourceKindDisplay.name(for:)` returns the localized
-    /// string for the current run (not stored cross-session).
+    /// All plugin instances for which a default exists, sorted by `kind`.
+    /// Used by data source pickers; sorting by `kind` (not `displayName`)
+    /// keeps order stable across locale changes — display names come
+    /// from `DatasourceKindDisplay.name(for:)` which returns localized
+    /// strings, so sorting on them would re-shuffle the picker when the
+    /// user switches language.
     var allDefaults: [any DatasourcePlugin] {
-        defaults.values.sorted { $0.displayName < $1.displayName }
+        defaults.values.sorted { $0.kind < $1.kind }
     }
 
     // MARK: - Built-ins

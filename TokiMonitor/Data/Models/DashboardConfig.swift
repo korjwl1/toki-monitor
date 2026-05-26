@@ -193,6 +193,9 @@ struct TimeConfig: Codable, Equatable {
 // MARK: - Refresh Interval
 
 enum RefreshInterval: String, Codable, CaseIterable, Equatable {
+    /// Empty-string raw value matches what existing user configs already
+    /// have on disk; changing it to `"off"` would require a Codable
+    /// migrator. Keeping `""` is intentional, not an oversight.
     case off = ""
     case fiveSeconds = "5s"
     case tenSeconds = "10s"

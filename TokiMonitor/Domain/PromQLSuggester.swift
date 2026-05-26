@@ -105,7 +105,13 @@ enum PromQLSuggester {
         }
 
         let lower = token.lowercased()
-        let matches = all.filter { $0.text.lowercased().hasPrefix(lower) && $0.text != token }
+        // Case-insensitive prefix match *and* case-insensitive identity
+        // check — typing "MAX" should still surface the lowercase
+        // `max` suggestion (the original code compared `$0.text != token`
+        // case-sensitively, leaking duplicates).
+        let matches = all.filter {
+            $0.text.lowercased().hasPrefix(lower) && $0.text.lowercased() != lower
+        }
         return (token, matches)
     }
 

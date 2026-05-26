@@ -80,7 +80,7 @@ final class DashboardViewModel {
     private let serverQueryClient: ServerQueryClient
     /// Active query client, swapped when `dataSource` changes.
     private var queryClient: any QueryDataSource
-    let configStore = DashboardConfigStore()
+    private let configStore = DashboardConfigStore()
     private let annotationStore = AnnotationStore()
     // Singletons-as-DI: defaults to `.shared` so existing call sites still
     // work, but tests can inject a stub. Replaces direct `.shared` reaches
@@ -782,6 +782,22 @@ final class DashboardViewModel {
 
     func exportDashboard() {
         configStore.exportToFile(dashboardConfig)
+    }
+
+    /// Wrapper for the dashboard-list editor (reorder-on-confirm).
+    func saveEditedDashboardList(_ list: [DashboardConfig]) {
+        configStore.saveDashboardList(list)
+    }
+
+    /// Export a *specific* dashboard from the list, not necessarily the
+    /// currently-active one. Used by the sidebar's per-row export menu.
+    func exportDashboardToFile(_ config: DashboardConfig) {
+        configStore.exportToFile(config)
+    }
+
+    /// Reload the dashboard list cache from disk after an external mutation.
+    func reloadDashboardList() {
+        dashboardList = configStore.loadDashboardList()
     }
 
     func importDashboard() {

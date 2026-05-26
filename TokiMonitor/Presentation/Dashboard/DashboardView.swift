@@ -111,7 +111,7 @@ struct DashboardView: View {
                             // 완료: @State 배열을 store에 저장
                             viewModel.isEditingDashboardList = false
                             viewModel.dashboardList = editableDashboardList
-                            viewModel.configStore.saveDashboardList(editableDashboardList)
+                            viewModel.saveEditedDashboardList(editableDashboardList)
                         } else {
                             // 편집 시작: viewModel 배열을 @State로 복사
                             editableDashboardList = viewModel.dashboardList
@@ -183,7 +183,7 @@ struct DashboardView: View {
                                 Label(L.dash.duplicate, systemImage: "doc.on.doc")
                             }
                             Button {
-                                viewModel.configStore.exportToFile(dashboard)
+                                viewModel.exportDashboardToFile(dashboard)
                             } label: {
                                 Label(L.tr("JSON 내보내기", "Export JSON"), systemImage: "square.and.arrow.up")
                             }
@@ -208,7 +208,7 @@ struct DashboardView: View {
                     }
                     Button {
                         viewModel.importDashboard()
-                        viewModel.dashboardList = viewModel.configStore.loadDashboardList()
+                        viewModel.reloadDashboardList()
                     } label: {
                         Label(L.tr("JSON에서 가져오기", "Import from JSON"), systemImage: "square.and.arrow.down")
                     }
@@ -295,7 +295,7 @@ struct DashboardView: View {
                 .onSubmit {
                     isEditingTitle = false
                     viewModel.saveDashboard()
-                    viewModel.dashboardList = viewModel.configStore.loadDashboardList()
+                    viewModel.reloadDashboardList()
                 }
                 .onExitCommand {
                     isEditingTitle = false
@@ -600,25 +600,6 @@ struct DashboardView: View {
         .fixedSize()
     }
 
-    // MARK: - Variable Bar
-
-    private var variableBar: some View {
-        HStack(spacing: DS.md) {
-            ForEach(viewModel.variables) { variable in
-                if variable.hide != .hidden {
-                    variableControl(for: variable)
-                }
-            }
-            Spacer()
-        }
-        .padding(.horizontal, DS.lg)
-        .padding(.vertical, DS.sm)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(DS.dividerColor).frame(height: 0.5)
-        }
-    }
-
     @ViewBuilder
     private func variableControl(for variable: DashboardVariable) -> some View {
         HStack(spacing: DS.xs) {
@@ -715,12 +696,6 @@ struct DashboardView: View {
         }
     }
 
-    private var emptyView: some View {
-        ContentUnavailableView(
-            L.dash.loading,
-            systemImage: "chart.xyaxis.line"
-        )
-    }
 }
 
 // MARK: - Toolbar Pill Modifier (glass on macOS 26+, quaternary fallback)
