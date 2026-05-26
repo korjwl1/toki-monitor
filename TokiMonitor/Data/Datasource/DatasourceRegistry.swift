@@ -1,19 +1,19 @@
 import Foundation
 
-/// Runtime registry that resolves a `DatasourceSelector` (kind + optional name)
-/// to a concrete `DatasourcePlugin` instance. Mirrors Perses' plugin loader.
+/// Runtime registry that resolves a `DatasourceSelector` (kind + optional
+/// name) to a concrete `DatasourcePlugin` instance.
 ///
-/// For now plugins are registered statically at boot. When `name` is nil,
-/// the registry returns the default instance for that `kind`.
+/// Symmetric with `VariablePluginRegistry`: both are just "kind →
+/// instance" maps. An earlier draft also held a `Factory` closure dict
+/// so a registered kind could mint *new* instances from a JSON spec, but
+/// nothing in the app calls that path — every consumer asks for the
+/// default or a named instance the registry already holds. The factory
+/// dict was dead code and made the registry look more complex than its
+/// sibling.
 @MainActor
 final class DatasourceRegistry {
     static let shared = DatasourceRegistry()
 
-    /// Factory closure: receives the spec data (may be empty for built-ins
-    /// that need no configuration) and produces a plugin instance.
-    typealias Factory = (Data) throws -> any DatasourcePlugin
-
-    private var factories: [String: Factory] = [:]
     private var defaults: [String: any DatasourcePlugin] = [:]
     private var named: [DatasourceSelector: any DatasourcePlugin] = [:]
 
@@ -23,16 +23,14 @@ final class DatasourceRegistry {
 
     // MARK: - Registration
 
-    func register(kind: String, factory: @escaping Factory) {
-        factories[kind] = factory
-    }
-
-    /// Set the default plugin instance for a kind (used when selector.name is nil).
+    /// Set the default plugin instance for a kind (used when
+    /// `selector.name` is nil).
     func setDefault(_ plugin: any DatasourcePlugin) {
         defaults[plugin.kind] = plugin
     }
 
-    /// Register a named instance (looked up by selector with matching kind + name).
+    /// Register a named instance (looked up by selector with matching
+    /// kind + name).
     func registerNamed(name: String, plugin: any DatasourcePlugin) {
         named[DatasourceSelector(kind: plugin.kind, name: name)] = plugin
     }
@@ -54,7 +52,10 @@ final class DatasourceRegistry {
     /// All registered kinds (e.g. for UI pickers).
     var kinds: [String] { Array(defaults.keys).sorted() }
 
-    /// All plugin instances for which a default exists.
+    /// All plugin instances for which a default exists, sorted by their
+    /// display name. Used by data source pickers; sort is locale-stable
+    /// because `DatasourceKindDisplay.name(for:)` returns the localized
+    /// string for the current run (not stored cross-session).
     var allDefaults: [any DatasourcePlugin] {
         defaults.values.sorted { $0.displayName < $1.displayName }
     }
@@ -62,15 +63,9 @@ final class DatasourceRegistry {
     // MARK: - Built-ins
 
     private func registerBuiltins() {
-        // Local toki CLI — always available.
-        let local = LocalCLIDatasource()
-        setDefault(local)
-        register(kind: BuiltinDatasourceKind.localCLI) { _ in LocalCLIDatasource() }
-
+        setDefault(LocalCLIDatasource())
         // toki-sync PromQL proxy — registered unconditionally; gated by
         // `SyncManager.shared.isConfigured` at call sites.
-        let proxy = PromQLProxyDatasource()
-        setDefault(proxy)
-        register(kind: BuiltinDatasourceKind.promQLProxy) { _ in PromQLProxyDatasource() }
+        setDefault(PromQLProxyDatasource())
     }
 }

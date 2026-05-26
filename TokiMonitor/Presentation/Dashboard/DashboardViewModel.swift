@@ -2,15 +2,6 @@ import Foundation
 import SwiftUI
 import Combine
 
-/// Grouping key used by `DashboardViewModel.fetchData` to batch panels that
-/// share both an interpolated PromQL query *and* a datasource selector. Two
-/// panels with the same query string but different per-query datasources
-/// (Perses style) must hit different backends, so they cannot share a group.
-fileprivate struct PanelQueryKey: Hashable {
-    let query: String
-    let datasource: DatasourceSelector?
-}
-
 @MainActor
 @Observable
 final class DashboardViewModel {
@@ -97,6 +88,7 @@ final class DashboardViewModel {
     private let datasourceRegistry: DatasourceRegistry
     private let variablePluginRegistry: VariablePluginRegistry
     private let syncManager: SyncManager
+    private let fetchCoordinator: PanelFetchCoordinator
 
     /// Current datasource selector (Perses-style). Persisted via UserDefaults.
     /// Built-ins map to `BuiltinDatasourceKind.localCLI` / `.promQLProxy`.
@@ -171,6 +163,7 @@ final class DashboardViewModel {
         self.datasourceRegistry = datasourceRegistry
         self.variablePluginRegistry = variablePluginRegistry
         self.syncManager = syncManager
+        self.fetchCoordinator = PanelFetchCoordinator(datasourceRegistry: datasourceRegistry)
         self.queryClient = reportClient  // default; updated below after activeDatasource is set
         self.dashboardConfig = DashboardConfigStore().load()
         self.dashboardList = DashboardConfigStore().loadDashboardList()
@@ -275,119 +268,50 @@ final class DashboardViewModel {
     func fetchData() {
         fetchTask?.cancel()
 
-        let panels = dashboardConfig.panels.filter { $0.panelType != .rowPanel }
+        let allPanels = dashboardConfig.panels.filter { $0.panelType != .rowPanel }
         let time = dashboardConfig.time
+        let variables = dashboardConfig.templating.list
 
         // Mark all panels as loading (no stale data preserved)
-        for panel in panels {
+        for panel in allPanels {
             panelData[panel.id] = .loading(previous: nil)
         }
         isLoading = true
         errorMessage = nil
 
+        // Project panels need toki's special `period: "<ts>|<project>"`
+        // parsing in local mode — kept on the VM. Regular panels flow
+        // through `PanelFetchCoordinator`.
+        let projectPanels = allPanels.filter { panelTokensByProject($0) }
+        let regularPanels = allPanels.filter { !panelTokensByProject($0) }
+
+        let coordinator = fetchCoordinator
+        let defaultClient = queryClient
+        let activeSelector = activeDatasource
+
         fetchTask = Task { [weak self] in
+            let results = await coordinator.fetchRegular(
+                panels: regularPanels,
+                time: time,
+                variables: variables,
+                activeDatasource: activeSelector,
+                defaultClient: defaultClient
+            )
+
+            if Task.isCancelled { return }
             guard let self else { return }
 
-            // Resolve each panel's typed PromQL spec exactly once. The
-            // previous code called `panel.effective{Metric,Query,Datasource}`
-            // three times per panel per fetch — each one JSON-decoded the
-            // same `query.spec.plugin.spec` blob.
-            struct ResolvedPanel {
-                let panel: PanelConfig
-                let metric: PanelMetric
-                let queryString: String?
-                let datasource: DatasourceSelector?
-            }
-            let resolved: [ResolvedPanel] = panels.map { panel in
-                let spec = panel.resolvedTokiQuery
-                let metric = spec?.metric ?? panel.targets.first?.metric ?? panel.metric
-                let queryString = spec?.query ?? panel.targets.first?.query
-                return ResolvedPanel(
-                    panel: panel,
-                    metric: metric,
-                    queryString: queryString,
-                    datasource: panel.effectiveDatasource
-                )
-            }
-
-            try? Task.checkCancellation()
-
-            // Separate project panels (need special parsing) from regular panels
-            let projectPanels = resolved.filter { $0.metric == .tokensByProject }.map(\.panel)
-            let regularResolved = resolved.filter { $0.metric != .tokensByProject }
-
-            // Build interpolated queries and group by (query, datasource) — a
-            // panel may carry a per-query datasource override (Perses style),
-            // in which case it must not be batched with panels hitting a
-            // different backend.
-            var queryGroups: [PanelQueryKey: [PanelConfig]] = [:]
-            for r in regularResolved {
-                let template = r.queryString ?? r.metric.defaultQuery
-                let interpolated = interpolateQuery(template, time: time)
-                let key = PanelQueryKey(query: interpolated, datasource: r.datasource)
-                queryGroups[key, default: []].append(r.panel)
-            }
-
-            // Execute all queries concurrently. Each group resolves its own
-            // client: per-panel datasource selector wins; otherwise the
-            // dashboard's active client is used.
-            let defaultClient = self.queryClient
-            let activeSelector = self.activeDatasource
-            let registry = self.datasourceRegistry
-            var queryResults: [(PanelQueryKey, Result<TimeSeriesData, Error>)] = []
-            await withTaskGroup(of: (PanelQueryKey, Result<TimeSeriesData, Error>).self) { group in
-                for (key, _) in queryGroups {
-                    let client: any QueryDataSource = {
-                        if let ds = key.datasource,
-                           ds != activeSelector,
-                           let plugin = registry.resolve(ds) {
-                            return plugin
-                        }
-                        return defaultClient
-                    }()
-                    group.addTask {
-                        do {
-                            let result = try await client.queryPromQLAsTimeSeries(query: key.query, time: time)
-                            return (key, .success(result))
-                        } catch {
-                            return (key, .failure(error))
-                        }
-                    }
-                }
-
-                for await result in group {
-                    queryResults.append(result)
-                }
-            }
-
-            try? Task.checkCancellation()
-            if Task.isCancelled { return }
-
-            // Fetch project panels concurrently
             if !projectPanels.isEmpty {
-                await fetchProjectPanels(projectPanels, time: time)
+                await self.fetchProjectPanels(projectPanels, time: time)
             }
-
             if Task.isCancelled { return }
 
-            // Apply all results in one batch (single UI update)
-            for (key, result) in queryResults {
-                let affectedPanels = queryGroups[key] ?? []
-                switch result {
-                case .success(let data):
-                    for panel in affectedPanels {
-                        self.panelData[panel.id] = .loaded(data)
-                    }
-                case .failure(let error):
-                    for panel in affectedPanels {
-                        self.panelData[panel.id] = .error(error.localizedDescription)
-                    }
-                }
-            }
+            for (id, state) in results { self.panelData[id] = state }
 
-            // Backward compatibility: set global timeSeriesData from first loaded regular panel
-            if let firstLoaded = regularResolved.first(where: { panelData[$0.panel.id]?.timeSeriesData != nil }),
-               let data = panelData[firstLoaded.panel.id]?.timeSeriesData {
+            // Backward compatibility: global timeSeriesData from first
+            // loaded regular panel. Order matches user's panel order.
+            if let firstLoaded = regularPanels.first(where: { self.panelData[$0.id]?.timeSeriesData != nil }),
+               let data = self.panelData[firstLoaded.id]?.timeSeriesData {
                 self.timeSeriesData = data
                 self.enabledModels = Set(data.allModelNames)
                 self.dataVersion += 1
@@ -397,107 +321,26 @@ final class DashboardViewModel {
         }
     }
 
-    // MARK: - Query Interpolation
-
-    func interpolateQuery(_ template: String, time: TimeConfig? = nil) -> String {
-        let t = time ?? dashboardConfig.time
-
-        var query = template
-        query = query.replacingOccurrences(of: "$__interval", with: t.bucketString)
-
-        // Provider variable — special-cased: expands to a label matcher
-        // expression rather than a bare value, because the query templates
-        // embed it inside `{$provider}` placeholder positions.
-        let selectedProvider: String? = {
-            let raw = variableValue(named: "provider")
-            let filtered = raw.filter { !$0.isEmpty && $0 != "All" && $0 != "all" && $0 != "$__all" }
-            return filtered.first(where: { ["claude_code", "codex"].contains($0) })
-        }()
-        if let provider = selectedProvider {
-            query = query.replacingOccurrences(of: "$provider", with: "provider=\"\(provider)\"")
-        } else {
-            query = query.replacingOccurrences(of: ", $provider", with: "")
-            query = query.replacingOccurrences(of: "$provider", with: "")
-        }
-
-        // Generic variable interpolation — supports both `${name}` and `$name`
-        // (Perses-style). Cascading: a variable's value can reference another
-        // variable via the same syntax; we iterate to a fixed point so chains
-        // resolve in one pass.
-        //
-        // Build the bare-form regex objects once per call (instead of
-        // recompiling per fixpoint iteration × variable). The old code did
-        // `templating.list.count × 4` `NSRegularExpression` constructions
-        // per panel fetch — a 5-variable dashboard cost 20 regex compiles
-        // per refresh just for interpolation.
-        struct Compiled {
-            let variable: DashboardVariable
-            let value: String
-            let bareForm: NSRegularExpression?
-        }
-        let compiled: [Compiled] = dashboardConfig.templating.list
-            .filter { $0.name != "provider" }
-            .map { v in
-                let escaped = NSRegularExpression.escapedPattern(for: v.name)
-                let pattern = "\\$\(escaped)(?![A-Za-z0-9_])"
-                return Compiled(
-                    variable: v,
-                    value: interpolatedValue(for: v),
-                    bareForm: try? NSRegularExpression(pattern: pattern)
-                )
-            }
-
-        for _ in 0..<4 {
-            let before = query
-            for c in compiled {
-                query = query.replacingOccurrences(of: "${\(c.variable.name)}", with: c.value)
-                if let regex = c.bareForm {
-                    let range = NSRange(query.startIndex..., in: query)
-                    query = regex.stringByReplacingMatches(
-                        in: query, range: range,
-                        withTemplate: NSRegularExpression.escapedTemplate(for: c.value)
-                    )
-                }
-            }
-            if query == before { break }
-        }
-
-        return query
+    /// Resolve a panel's effective metric without three JSON decodes.
+    /// Used by `fetchData` to split project panels from regular ones.
+    private func panelTokensByProject(_ panel: PanelConfig) -> Bool {
+        if let m = panel.resolvedTokiQuery?.metric { return m == .tokensByProject }
+        return (panel.targets.first?.metric ?? panel.metric) == .tokensByProject
     }
 
-    /// Resolve a variable to the string that should replace `$name` /
-    /// `${name}`. Honors multi-select (joined as PromQL regex alternation),
-    /// the "All" selection (→ `customAllValue`), and the optional
-    /// `capturingRegexp` post-filter.
-    private func interpolatedValue(for variable: DashboardVariable) -> String {
-        let selection = variable.current.value
-        // "All" sentinel — emit customAllValue (default `.*`)
-        if variable.includeAll && (selection.contains("$__all") || selection.isEmpty) {
-            return variable.effectiveCustomAllValue
-        }
+    // MARK: - Query Interpolation
+    //
+    // Delegated to `Domain/VariableResolver` — the interpolation logic
+    // is pure (templating list + time → string) and lived in the VM only
+    // for historical reasons. Tests can hit `VariableResolver.interpolate`
+    // directly without spinning up a ViewModel.
 
-        let filtered = selection.filter { !$0.isEmpty && $0 != "$__all" }
-        if filtered.isEmpty { return "" }
-
-        let values: [String]
-        if let pattern = variable.capturingRegexp, !pattern.isEmpty,
-           let regex = try? NSRegularExpression(pattern: pattern) {
-            values = filtered.map { raw in
-                let range = NSRange(raw.startIndex..., in: raw)
-                guard let m = regex.firstMatch(in: raw, range: range),
-                      m.numberOfRanges > 1,
-                      let r = Range(m.range(at: 1), in: raw)
-                else { return raw }
-                return String(raw[r])
-            }
-        } else {
-            values = filtered
-        }
-
-        if variable.multi && values.count > 1 {
-            return values.joined(separator: "|")
-        }
-        return values.first ?? ""
+    func interpolateQuery(_ template: String, time: TimeConfig? = nil) -> String {
+        VariableResolver.interpolate(
+            template: template,
+            time: time ?? dashboardConfig.time,
+            variables: dashboardConfig.templating.list
+        )
     }
 
     /// Fetch project-grouped data. toki returns "date|project" in period field.
