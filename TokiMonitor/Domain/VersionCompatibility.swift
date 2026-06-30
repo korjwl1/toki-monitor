@@ -26,16 +26,37 @@ final class VersionCompatibilityChecker {
         return major
     }
 
-    /// Check version on launch. If toki is installed but major version is too old,
-    /// shows an update-required modal and disables query features.
-    /// If toki is not installed, does nothing (toki-monitor can still work via daemon).
-    func checkOnLaunch() {
-        Task {
-            guard let major = await installedTokiMajorVersion() else { return }
-            if major < requiredTokiMajorVersion {
-                showUpdateRequiredModal(installedMajor: major)
-            }
+    /// UserDefaults key remembering the last (installed → required) situation the
+    /// user dismissed, so we don't re-pop the modal on every single launch.
+    private static let dismissedSituationKey = "TokiCompatModalDismissedSituation"
+
+    private static func situationKey(installedMajor: Int) -> String {
+        "\(installedMajor)<\(requiredTokiMajorVersion)"
+    }
+
+    /// Check version on launch. If toki is installed but its major version is too
+    /// old, show an update-required modal (once per situation — see below).
+    /// If toki is absent, do nothing (toki-monitor still works via the daemon).
+    ///
+    /// Returns `true` when toki is compatible (or absent), `false` when it is
+    /// outdated. The caller uses this to avoid stacking the separate app-update
+    /// window on top of this modal.
+    @discardableResult
+    func checkOnLaunch() async -> Bool {
+        guard let major = await installedTokiMajorVersion() else { return true }
+        guard major < requiredTokiMajorVersion else { return true }
+
+        // Don't nag every launch: if the user already dismissed this exact
+        // (installed → required) situation, stay quiet until it changes (e.g. a
+        // future required-version bump, or a partial toki upgrade).
+        let situation = Self.situationKey(installedMajor: major)
+        if UserDefaults.standard.string(forKey: Self.dismissedSituationKey) == situation {
+            return false
         }
+        if updateWindow == nil {
+            showUpdateRequiredModal(installedMajor: major)
+        }
+        return false
     }
 
     // MARK: - Modal
@@ -60,6 +81,8 @@ final class VersionCompatibilityChecker {
     func recheckVersion() async -> Bool {
         guard let major = await installedTokiMajorVersion() else { return false }
         if major >= requiredTokiMajorVersion {
+            // Situation resolved — forget any remembered dismissal.
+            UserDefaults.standard.removeObject(forKey: Self.dismissedSituationKey)
             updateWindow?.close()
             updateWindow = nil
             return true
@@ -68,6 +91,14 @@ final class VersionCompatibilityChecker {
     }
 
     private func showUpdateRequiredModal(installedMajor: Int) {
+        // Never stack a second modal over an existing one (orphans the old one,
+        // which then can no longer be closed).
+        if updateWindow != nil {
+            NSApp.activate(ignoringOtherApps: true)
+            updateWindow?.makeKeyAndOrderFront(nil)
+            return
+        }
+
         let view = TokiUpdateRequiredView(
             installedVersion: "v\(installedMajor).x",
             requiredVersion: "v\(requiredTokiMajorVersion)",
@@ -77,6 +108,11 @@ final class VersionCompatibilityChecker {
                 Task { await self.recheckVersion() }
             },
             onDismiss: { [weak self] in
+                // Remember the dismissal so we don't re-pop on every launch.
+                UserDefaults.standard.set(
+                    Self.situationKey(installedMajor: installedMajor),
+                    forKey: Self.dismissedSituationKey
+                )
                 self?.updateWindow?.close()
                 self?.updateWindow = nil
             }

@@ -93,6 +93,16 @@ final class UpdateChecker {
     // MARK: - Update Window
 
     private func showUpdateWindow(monitor: UpdateInfo?, toki: UpdateInfo?) {
+        // Never stack a second window over an existing one: overwriting
+        // `updateWindow` would orphan the previous window (isReleasedWhenClosed
+        // = false), and dismissWindow() could no longer reach it — the root of
+        // the "update window won't close" reports. Reuse the open one instead.
+        if updateWindow != nil {
+            NSApp.activate(ignoringOtherApps: true)
+            updateWindow?.makeKeyAndOrderFront(nil)
+            return
+        }
+
         let view = UpdateDialogView(
             monitor: monitor,
             toki: toki,
@@ -186,7 +196,10 @@ final class UpdateChecker {
               let releases = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
         else { return nil }
 
-        // Find first non-prerelease, non-draft release
+        // Pick the HIGHEST stable version. GitHub returns releases sorted by
+        // publish date, not version, so a backported older point-release
+        // published after a newer one would otherwise be treated as "latest".
+        var best: GitHubRelease?
         for release in releases {
             let prerelease = release["prerelease"] as? Bool ?? false
             let draft = release["draft"] as? Bool ?? false
@@ -195,29 +208,20 @@ final class UpdateChecker {
             guard let tagName = release["tag_name"] as? String else { continue }
             // Strip "v" prefix: "v0.1.2" → "0.1.2"
             let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
-            let notes = release["body"] as? String
-            return GitHubRelease(version: version, notes: notes)
+            if SemVer.isPrerelease(version) { continue }
+            let candidate = GitHubRelease(version: version, notes: release["body"] as? String)
+            if let current = best {
+                if SemVer.core(version) > SemVer.core(current.version) { best = candidate }
+            } else {
+                best = candidate
+            }
         }
 
-        return nil
+        return best
     }
 
     private func isNewerStable(latest: String, current: String) -> Bool {
-        let preReleaseSuffixes = ["alpha", "beta", "rc", "dev", "pre"]
-        let lower = latest.lowercased()
-        if preReleaseSuffixes.contains(where: { lower.contains($0) }) { return false }
-        // Strip revision suffix (e.g. "0.1.2_1" → "0.1.2")
-        let cleanLatest = latest.split(separator: "_").first.map(String.init) ?? latest
-        let cleanCurrent = current.split(separator: "_").first.map(String.init) ?? current
-        let lParts = cleanLatest.split(separator: ".").compactMap { Int($0) }
-        let cParts = cleanCurrent.split(separator: ".").compactMap { Int($0) }
-        for i in 0..<max(lParts.count, cParts.count) {
-            let l = i < lParts.count ? lParts[i] : 0
-            let c = i < cParts.count ? cParts[i] : 0
-            if l > c { return true }
-            if l < c { return false }
-        }
-        return false
+        SemVer.isNewerStable(latest: latest, current: current)
     }
 }
 

@@ -84,11 +84,19 @@ final class StatusBarController {
             await CodexAuthReader.resolveCodexRoot()
             codexRootResolved = true
             if isCodexWidgetVisible { codexUsageMonitor.startPolling() }
-            updateChecker.checkOnLaunch()
-            versionChecker.checkOnLaunch()
             self.schedulePeriodicUpdateCheck()
             // Rebuild after sync so status items reflect actual provider state
             rebuildStatusItems()
+
+            // Update prompts run in their own task so a slow `toki --version`
+            // never delays the status-item rebuild above. Check toki
+            // compatibility first; only surface the app-update window when toki
+            // is compatible, so the compat modal and the update window never
+            // stack on top of each other on launch.
+            Task {
+                let tokiCompatible = await versionChecker.checkOnLaunch()
+                if tokiCompatible { updateChecker.checkOnLaunch() }
+            }
         }
 
         // Build initial status items (will be rebuilt after sync completes)
