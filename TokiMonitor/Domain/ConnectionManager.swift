@@ -20,15 +20,20 @@ final class ConnectionManager {
     private(set) var state: ConnectionState = .disconnected
 
     private let eventStream: TokiEventStream
-    private var reconnectAttempts = 0
-    private let maxReconnectAttempts = 3
+    /// Number of fast (3/6/9s) attempts before falling back to the slow retry.
+    private let maxFastAttempts = 3
+    /// Interval for the slow persistent retry once fast attempts are exhausted.
+    private let slowRetryInterval: TimeInterval = 30
     private var reconnectTask: Task<Void, Never>?
 
     init(eventStream: TokiEventStream) {
         self.eventStream = eventStream
         eventStream.onConnected = { [weak self] in
-            self?.state = .connected
-            self?.reconnectAttempts = 0
+            guard let self else { return }
+            self.state = .connected
+            // Stop any in-flight reconnect loop now that we're up.
+            self.reconnectTask?.cancel()
+            self.reconnectTask = nil
         }
         eventStream.onDisconnect = { [weak self] in
             self?.eventStream.stop()
@@ -37,21 +42,41 @@ final class ConnectionManager {
         }
     }
 
+    /// Persistent reconnect loop. Fast backoff (3/6/9s) for the first few
+    /// attempts, then a slow steady retry — the monitor is the daemon's lifecycle
+    /// manager on this machine, so a daemon that comes back minutes later must
+    /// still be picked up. A single loop runs at a time; `onConnected` tears it down.
     private func attemptReconnect() {
-        guard reconnectAttempts < maxReconnectAttempts else {
-            reconnectAttempts = 0
-            return
-        }
-        reconnectAttempts += 1
-        let delay = Double(reconnectAttempts) * 3.0 // 3s, 6s, 9s
-        reconnectTask?.cancel()
-        reconnectTask = Task {
-            try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled else { return }
-            let running = await isDaemonRunning()
-            if running, !Task.isCancelled {
-                connect()
+        guard reconnectTask == nil else { return }
+        reconnectTask = Task { [weak self] in
+            var attempt = 0
+            while !Task.isCancelled {
+                attempt += 1
+                let delay = attempt <= (self?.maxFastAttempts ?? 3)
+                    ? Double(attempt) * 3.0
+                    : (self?.slowRetryInterval ?? 30)
+                try? await Task.sleep(for: .seconds(delay))
+                guard let self, !Task.isCancelled, !self.state.isConnected else {
+                    self?.reconnectTask = nil
+                    return
+                }
+                if await self.isDaemonRunning() {
+                    guard !Task.isCancelled, !self.state.isConnected else {
+                        self.reconnectTask = nil
+                        return
+                    }
+                    self.connect()
+                    // Give the stream a moment to establish. onConnected cancels this
+                    // task on success; if it didn't connect, loop and retry.
+                    try? await Task.sleep(for: .seconds(2))
+                    if self.state.isConnected {
+                        self.reconnectTask = nil
+                        return
+                    }
+                }
+                // Daemon still down (or connect didn't take) → keep looping.
             }
+            self?.reconnectTask = nil
         }
     }
 
