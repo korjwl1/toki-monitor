@@ -101,21 +101,26 @@ final class TokiEventStream {
     private static let pidPath = "/tmp/toki-monitor-trace.pid"
 
     private func killStaleTokiTrace() {
-        // Try PID file first
+        // Try PID file first — kill() is a fast non-blocking syscall, fine on main.
         if let pidStr = try? String(contentsOfFile: Self.pidPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
            let pid = Int32(pidStr) {
             kill(pid, SIGTERM)
             try? FileManager.default.removeItem(atPath: Self.pidPath)
             return
         }
-        // Fallback: pkill for processes from before PID file was introduced
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        process.arguments = ["-f", "toki trace --sink uds:///tmp/toki-monitor.sock"]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
-        process.waitUntilExit()
+        // Fallback: pkill for processes from before the PID file was introduced.
+        // Spawning + waiting on a subprocess would block the main thread, so run
+        // it off-main. This legacy path targets processes by command line, so a
+        // fresh trace we're about to launch (not yet running) is unaffected.
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+            process.arguments = ["-f", "toki trace --sink uds:///tmp/toki-monitor.sock"]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try? process.run()
+            process.waitUntilExit()
+        }
     }
 
     private func writePidFile(_ pid: Int32) {

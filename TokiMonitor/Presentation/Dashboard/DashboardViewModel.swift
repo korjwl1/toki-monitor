@@ -299,9 +299,10 @@ final class DashboardViewModel {
         let time = dashboardConfig.time
         let variables = dashboardConfig.templating.list
 
-        // Mark all panels as loading (no stale data preserved)
+        // Mark all panels as loading, keeping the current data as `previous` so
+        // charts render the last values during refresh instead of blinking empty.
         for panel in allPanels {
-            panelData[panel.id] = .loading(previous: nil)
+            panelData[panel.id] = .loading(previous: panelData[panel.id]?.timeSeriesData)
         }
         isLoading = true
         errorMessage = nil
@@ -1172,6 +1173,13 @@ final class DashboardViewModel {
         .purple, .teal, .indigo, .mint, .pink, .brown, .cyan
     ]
 
+    // Cache the unknown-model → palette-index map so we don't re-sort and
+    // re-filter allModelNames on every colorForModel call (invoked per row/series
+    // during view body evaluation). @ObservationIgnored so refreshing the cache
+    // doesn't register as an observable mutation.
+    @ObservationIgnored private var colorCacheVersion: Int = -1
+    @ObservationIgnored private var unknownModelIndex: [String: Int] = [:]
+
     func colorForModel(_ model: String) -> Color {
         let lower = model.lowercased()
         // Check known models first
@@ -1180,12 +1188,20 @@ final class DashboardViewModel {
                 return known.color
             }
         }
-        // Fallback: stable index from ALL models
-        let allModels = (timeSeriesData?.allModelNames ?? []).sorted()
-        let unknownModels = allModels.filter { m in
-            !Self.knownModelColors.contains(where: { m.lowercased().contains($0.prefix) })
+        // Fallback: stable index from ALL models. Recompute the ordering only
+        // when the underlying data changes (dataVersion bump).
+        if colorCacheVersion != dataVersion {
+            colorCacheVersion = dataVersion
+            var idx: [String: Int] = [:]
+            var next = 0
+            for m in (timeSeriesData?.allModelNames ?? []).sorted()
+            where !Self.knownModelColors.contains(where: { m.lowercased().contains($0.prefix) }) {
+                idx[m] = next
+                next += 1
+            }
+            unknownModelIndex = idx
         }
-        let index = unknownModels.firstIndex(of: model) ?? 0
+        let index = unknownModelIndex[model] ?? 0
         return Self.fallbackPalette[index % Self.fallbackPalette.count]
     }
 

@@ -34,10 +34,13 @@ struct MenuContentView: View {
         VStack(alignment: .leading, spacing: DS.sm) {
             switch connectionManager.state {
             case .connected:
+                // Compute summaries once per body pass and thread it through,
+                // instead of rebuilding it inside every widget row.
+                let summaries = buildDisplaySummaries()
                 let items = orderedWidgetItems()
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
                     if i > 0 { Divider().padding(.horizontal, DS.md) }
-                    widgetView(for: item)
+                    widgetView(for: item, summaries: summaries)
                 }
             case .starting:
                 startingWidget
@@ -55,9 +58,6 @@ struct MenuContentView: View {
         } else {
             order = settings.resolvedWidgetOrder()
         }
-
-        let summaries = buildDisplaySummaries()
-        let summaryIds = Set(summaries.map(\.provider.id))
 
         // All widgets for enabled providers should show, regardless of data availability
         let enabledIds = Set(ProviderRegistry.configurableProviders
@@ -77,7 +77,7 @@ struct MenuContentView: View {
     }
 
     @ViewBuilder
-    private func widgetView(for item: MenuWidgetItem) -> some View {
+    private func widgetView(for item: MenuWidgetItem, summaries: [ProviderSummary]) -> some View {
         if item.id == MenuWidgetItem.claudeUsageId {
             if let monitor = usageMonitor {
                 if let usage = monitor.currentUsage {
@@ -103,7 +103,6 @@ struct MenuContentView: View {
                 }
             }
         } else {
-            let summaries = buildDisplaySummaries()
             if let s = summaries.first(where: { $0.provider.id == item.id }) {
                 providerWidget(s)
             }
