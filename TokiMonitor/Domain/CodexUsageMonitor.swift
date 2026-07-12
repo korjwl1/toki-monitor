@@ -103,6 +103,7 @@ final class CodexUsageMonitor {
     private let settings: AppSettings
     private var consecutiveFailures = 0
     private var fileWatcher: DispatchSourceFileSystemObject?
+    private var rearmTask: Task<Void, Never>?
 
     init(aggregator: TokenAggregator, settings: AppSettings) {
         self.aggregator = aggregator
@@ -139,6 +140,8 @@ final class CodexUsageMonitor {
         sleepTask = nil
         pollingTask?.cancel()
         pollingTask = nil
+        rearmTask?.cancel()
+        rearmTask = nil
         stopFileWatcher()
     }
 
@@ -226,31 +229,64 @@ final class CodexUsageMonitor {
             close(fd)
         }
 
-        source.setEventHandler { [weak self] in
+        source.setEventHandler { [weak self, weak source] in
+            // Read the event flags synchronously (valid only inside the handler).
+            let flags = source?.data ?? []
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                // Token was refreshed — reset failures and retry immediately
-                self.consecutiveFailures = 0
-                self.isAuthError = false
-                self.lastError = nil
-
-                // If polling was in a long backoff, restart it
-                if self.pollingTask == nil || CodexAuthReader.isAvailable != self.isAvailable {
-                    self.isAvailable = CodexAuthReader.isAvailable
-                    if self.isAvailable && self.pollingTask == nil {
-                        self.startPolling()
-                        return
-                    }
+                // logout→login deletes and recreates auth.json, so our fd points at
+                // a stale inode and will never fire again. Re-arm on the new file.
+                // Codex's in-place refresh (write) keeps the inode, so no re-arm needed there.
+                if flags.contains(.delete) || flags.contains(.rename) {
+                    self.rearmWatcherWhenFileReappears()
                 }
-
-                // Wake the polling loop instead of calling pollOnce() directly
-                // to avoid a double-poll race with the main polling task.
-                self.wakeForImmediatePoll()
+                self.handleAuthFileChange()
             }
         }
 
         source.resume()
         fileWatcher = source
+    }
+
+    /// After the watched auth.json is deleted/replaced, wait for the new file to
+    /// appear (login) and re-arm the watcher on its inode. Falls back to the normal
+    /// poll cadence if the file never reappears within the window.
+    private func rearmWatcherWhenFileReappears() {
+        rearmTask?.cancel()
+        rearmTask = Task { [weak self] in
+            for _ in 0..<60 {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, !Task.isCancelled else { return }
+                if CodexAuthReader.isAvailable {
+                    self.startFileWatcher()   // re-open on the new inode
+                    self.handleAuthFileChange()
+                    return
+                }
+            }
+        }
+    }
+
+    /// Common handling for any auth.json change: clear error state, sync
+    /// availability, and either (re)start polling or wake the existing loop.
+    private func handleAuthFileChange() {
+        consecutiveFailures = 0
+        isAuthError = false
+        lastError = nil
+
+        let nowAvailable = CodexAuthReader.isAvailable
+        isAvailable = nowAvailable
+        guard nowAvailable else {
+            currentUsage = nil
+            return
+        }
+
+        if pollingTask == nil {
+            startPolling()
+        } else {
+            // Wake the polling loop instead of calling pollOnce() directly
+            // to avoid a double-poll race with the main polling task.
+            wakeForImmediatePoll()
+        }
     }
 
     private func stopFileWatcher() {
