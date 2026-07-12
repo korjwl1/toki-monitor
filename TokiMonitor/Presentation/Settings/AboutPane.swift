@@ -151,22 +151,10 @@ struct AboutPane: View {
     }
 
     /// Returns true only if `latest` is a stable release newer than `current`.
-    /// Ignores pre-release tags (alpha, beta, rc).
+    /// Delegates to the shared `SemVer` utility (single source of truth — used to
+    /// be duplicated here and in UpdateChecker with subtle drift).
     private func isNewerStable(latest: String, current: String) -> Bool {
-        let preReleaseSuffixes = ["alpha", "beta", "rc", "dev", "pre"]
-        let lower = latest.lowercased()
-        if preReleaseSuffixes.contains(where: { lower.contains($0) }) { return false }
-        let cleanLatest = latest.split(separator: "_").first.map(String.init) ?? latest
-        let cleanCurrent = current.split(separator: "_").first.map(String.init) ?? current
-        let lParts = cleanLatest.split(separator: ".").compactMap { Int($0) }
-        let cParts = cleanCurrent.split(separator: ".").compactMap { Int($0) }
-        for i in 0..<max(lParts.count, cParts.count) {
-            let l = i < lParts.count ? lParts[i] : 0
-            let c = i < cParts.count ? cParts[i] : 0
-            if l > c { return true }
-            if l < c { return false }
-        }
-        return false
+        SemVer.isNewerStable(latest: latest, current: current)
     }
 
     private static let brewPath: String = {

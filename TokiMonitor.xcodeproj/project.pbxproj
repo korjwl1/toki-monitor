@@ -57,6 +57,7 @@
 		5638D116E13B29E6DC83754C /* LocalCLIDatasource.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31CF6A450F00B8FE22A493C /* LocalCLIDatasource.swift */; };
 		5A100F7481C256287B782C70 /* PromQLSuggester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10785CF25F5378B78803A23B /* PromQLSuggester.swift */; };
 		5A9B8A4604691516E084F28B /* GaugePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24D5C9A7319840C3B1F3CC6 /* GaugePanelView.swift */; };
+		5C5E8E33DBFD060EB0916AD9 /* SemVer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C95A0813C9EB083B73F3EBAB /* SemVer.swift */; };
 		5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */; };
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
 		64CFC0046724FA45053F0D8B /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2419FCCD7EDF135528C44ACD /* UpdateChecker.swift */; };
@@ -118,6 +119,7 @@
 		EC7E072D4B8145B6FFB1942B /* DashboardMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDF640C227D467E72826C64 /* DashboardMigrator.swift */; };
 		ED31502F8415FBFD5DA3DA8B /* ClaudeAuthReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE42DEDC857AB657D449C5E /* ClaudeAuthReader.swift */; };
 		ED5B0A605502E2BF35B4F7AA /* DatasourceSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = D58215E739D0C0780915FF56 /* DatasourceSelector.swift */; };
+		EE77CFE802FBAEF03819DC89 /* SemVerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF5888CCD28F87F72FA58269 /* SemVerTests.swift */; };
 		EFD5E942872C6B776577BF93 /* DatasourceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6045F68DCAE8A0E620C714FA /* DatasourceStore.swift */; };
 		F44113AFD5BFD92DF64B478C /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA62A18D444F7F8A7D39F9B6 /* Localization.swift */; };
 		F46FA23BC5B95C607AC8D2A0 /* DetailHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F103561D8BF06FC314BAD0B9 /* DetailHeaderView.swift */; };
@@ -231,11 +233,13 @@
 		BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapper.swift; sourceTree = "<group>"; };
 		BDE38973AE985102C6A597D9 /* TokiMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TokiMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BF5888CCD28F87F72FA58269 /* SemVerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemVerTests.swift; sourceTree = "<group>"; };
 		C060811529815B293611230B /* frame_03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_03.png; sourceTree = "<group>"; };
 		C4771B8F6125461E69C2CFE8 /* MenuBarSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarSettingsPane.swift; sourceTree = "<group>"; };
 		C4C36A205DFC4F7DA9CD54A9 /* VersionCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionCompatibility.swift; sourceTree = "<group>"; };
 		C5FCD7A5A0184D4B77CE6B64 /* VariableResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableResolver.swift; sourceTree = "<group>"; };
 		C89A62671E6B8235B289897B /* frame_05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_05.png; sourceTree = "<group>"; };
+		C95A0813C9EB083B73F3EBAB /* SemVer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemVer.swift; sourceTree = "<group>"; };
 		CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRegistry.swift; sourceTree = "<group>"; };
 		CBE42DEDC857AB657D449C5E /* ClaudeAuthReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAuthReader.swift; sourceTree = "<group>"; };
 		D0A80F24970E2F377FB13231 /* DashboardEditOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardEditOverlay.swift; sourceTree = "<group>"; };
@@ -478,6 +482,7 @@
 				472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */,
 				D1F563B39918F892ABDEDA17 /* ModelPricingTests.swift */,
 				507FA6EFF17810ED320DE318 /* ProviderRegistryTests.swift */,
+				BF5888CCD28F87F72FA58269 /* SemVerTests.swift */,
 				A9F74A465DDBF407B395F8AA /* TokenAggregatorLogicTests.swift */,
 			);
 			path = Domain;
@@ -570,6 +575,7 @@
 				10785CF25F5378B78803A23B /* PromQLSuggester.swift */,
 				CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */,
 				37F55200D88B2D7260541C5D /* ProviderSummary.swift */,
+				C95A0813C9EB083B73F3EBAB /* SemVer.swift */,
 				4BDA0DC9C4300E5F7B2E3F2A /* SyncManager.swift */,
 				85595784F39710A1BF95BC51 /* TokenAggregator.swift */,
 				5B278895C8F3233433F88309 /* TokenFormatter.swift */,
@@ -751,6 +757,7 @@
 				46DF834236EAC2C92B2F93AE /* ProviderSummary.swift in Sources */,
 				1ABD9FFEA542EBFB957B76CD /* ProvidersSettingsPane.swift in Sources */,
 				A2DD4AB9FA9CE5CF0EF7B0C2 /* QueryDataSource.swift in Sources */,
+				5C5E8E33DBFD060EB0916AD9 /* SemVer.swift in Sources */,
 				18D9C1A849E7985D98AA3927 /* ServerQueryClient.swift in Sources */,
 				789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */,
 				30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */,
@@ -795,6 +802,7 @@
 				4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */,
 				7DA0347019C7908CB10BB85F /* ModelPricingTests.swift in Sources */,
 				2FD39BD3817670D06BE68CEF /* ProviderRegistryTests.swift in Sources */,
+				EE77CFE802FBAEF03819DC89 /* SemVerTests.swift in Sources */,
 				40CC603230947A99EB36F064 /* TokenAggregatorLogicTests.swift in Sources */,
 				EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */,
 				5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */,

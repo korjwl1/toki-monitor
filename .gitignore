@@ -10,3 +10,4 @@ build/
 !.claude/skills/
 .spec-mix/
 specs/
+.build/

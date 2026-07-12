@@ -23,8 +23,11 @@ struct AnimationStateMapperTests {
 
     @Test("Idle rate returns zero interval")
     func idleInterval() {
+        // Idle threshold is minRate = 10_000 tok/m (see AnimationStateMapper);
+        // rates below it are idle and produce no animation (zero interval).
         #expect(mapper.interval(for: 0) == 0)
-        #expect(mapper.interval(for: 50000) == 0)
+        #expect(mapper.interval(for: 5000) == 0)
+        #expect(mapper.interval(for: 9999) == 0)
     }
 
     @Test("Higher rate produces shorter interval (faster animation)")
