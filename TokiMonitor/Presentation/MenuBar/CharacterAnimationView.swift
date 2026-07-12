@@ -380,7 +380,9 @@ final class CharacterAnimationRenderer {
             self?.shakeCharacter(on: button, amplitude: 1.2, duration: 0.5)
         }
 
-        // Purple silhouette flash — 2 pulses starting at burst time
+        // Purple silhouette flash — 2 pulses starting at burst time.
+        // One Core Animation keyframe on the layer's opacity replaces the old
+        // per-step asyncAfter loop (was ~26 main-queue closures per batch).
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
             guard let self else { return }
 
@@ -395,18 +397,13 @@ final class CharacterAnimationRenderer {
             }
             overlay.frame = imgRect
 
-            let pulseDuration = 0.5
-            for pulse in 0..<2 {
-                let pulseStart = Double(pulse) * pulseDuration
-                let steps = 12
-                for i in 0...steps {
-                    let t = Double(i) / Double(steps)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + pulseStart + t * pulseDuration) { [weak overlay] in
-                        let blend = t < 0.5 ? t * 2 : (1 - t) * 2
-                        overlay?.alphaValue = CGFloat(blend * 0.55)
-                    }
-                }
-            }
+            let pulse = CAKeyframeAnimation(keyPath: "opacity")
+            pulse.values = [0.0, 0.55, 0.0, 0.55, 0.0]
+            pulse.keyTimes = [0.0, 0.25, 0.5, 0.75, 1.0]
+            pulse.duration = 1.0
+            pulse.calculationMode = .linear
+            overlay.alphaValue = 0
+            overlay.layer?.add(pulse, forKey: "poisonPulse")
         }
 
         let count = Int.random(in: 2...3)
@@ -421,73 +418,71 @@ final class CharacterAnimationRenderer {
             let size: CGFloat = CGFloat.random(in: 3...5)
 
             // Random point inside ellipse, with minimum spacing
-            var x: CGFloat = 0
-            var y: CGFloat = 0
+            var cx = centerX
+            var cy = centerY
             for _ in 0..<20 {
                 let angle = CGFloat.random(in: 0...(2 * .pi))
                 let r = sqrt(CGFloat.random(in: 0...1))  // uniform distribution inside circle
                 let px = centerX + r * radiusX * cos(angle)
                 let py = centerY + r * radiusY * sin(angle)
+                cx = px
+                cy = py
                 let tooClose = placedCenters.contains { abs($0.x - px) < 4 && abs($0.y - py) < 4 }
                 if !tooClose {
-                    x = px - size / 2
-                    y = py - size / 2
                     placedCenters.append(CGPoint(x: px, y: py))
                     break
                 }
-                x = px - size / 2
-                y = py - size / 2
             }
 
-            let dot = PoisonBubbleView(frame: NSRect(x: x, y: y, width: size, height: size))
+            let dot = PoisonBubbleView(frame: NSRect(x: cx - size / 2, y: cy - size / 2, width: size, height: size))
             dot.alphaValue = 0
             button.addSubview(dot)
             poisonBubbles.append(dot)
 
-            let cx = x + size / 2
-            let cy = y + size / 2
             let lifetime = Double.random(in: 0.8...1.2)
-            let steps = 24
-            let stepTime = lifetime / Double(steps)
-
-            for i in 0...steps {
-                let t = Double(i) / Double(steps)
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * stepTime) { [weak dot] in
-                    guard let dot else { return }
-
-                    if t < 0.3 {
-                        // Phase 1: appear and grow
-                        let scale = CGFloat(t / 0.3)
-                        let s = size * scale
-                        dot.frame = NSRect(x: cx - s / 2, y: cy - s / 2, width: s, height: s)
-                        dot.alphaValue = CGFloat(t / 0.3)
-                    } else if t < 0.6 {
-                        // Phase 2: hold + slight wobble
-                        let wobble = sin(CGFloat(t) * 6 * .pi) * 0.5
-                        dot.frame = NSRect(x: cx - size / 2 + wobble, y: cy - size / 2, width: size, height: size)
-                        dot.alphaValue = 1.0
-                    } else {
-                        // Phase 3: burst — expand rapidly and fade
-                        let burstT = CGFloat((t - 0.6) / 0.4)
-                        let burstSize = size * (1.0 + burstT * 1.5)
-                        dot.frame = NSRect(x: cx - burstSize / 2, y: cy - burstSize / 2,
-                                           width: burstSize, height: burstSize)
-                        dot.alphaValue = 1.0 - burstT
-                    }
-                    dot.needsDisplay = true
-                }
-            }
-
-            // Cleanup
-            DispatchQueue.main.asyncAfter(deadline: .now() + lifetime + 0.1) { [weak self, weak dot] in
-                dot?.removeFromSuperview()
-                if let dot {
-                    self?.poisonBubbles.removeAll { $0 === dot }
-                }
-                // Prune any zombie entries (deallocated views)
-                self?.poisonBubbles.removeAll { $0.superview == nil }
-            }
+            animatePoisonBubble(dot, size: size, cx: cx, cy: cy, lifetime: lifetime)
         }
+    }
+
+    /// Drives one poison bubble's grow → hold → burst lifecycle with AppKit
+    /// animations instead of ~25 per-frame asyncAfter closures. Core Animation
+    /// interpolates each phase on the render server, so we only schedule a few
+    /// main-queue closures (the phase transitions and cleanup) per bubble.
+    private func animatePoisonBubble(_ dot: PoisonBubbleView, size: CGFloat, cx: CGFloat, cy: CGFloat, lifetime: Double) {
+        func frame(_ s: CGFloat) -> NSRect {
+            NSRect(x: cx - s / 2, y: cy - s / 2, width: s, height: s)
+        }
+
+        let grow = lifetime * 0.3
+        let hold = lifetime * 0.3
+        let burst = lifetime * 0.4
+
+        dot.frame = frame(size * 0.01)
+        dot.alphaValue = 0
+
+        // Phase 1: appear and grow to full size.
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = grow
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            dot.animator().frame = frame(size)
+            dot.animator().alphaValue = 1
+        }, completionHandler: { [weak self, weak dot] in
+            // Phase 2: brief hold, then Phase 3: burst outward and fade.
+            DispatchQueue.main.asyncAfter(deadline: .now() + hold) { [weak self, weak dot] in
+                guard let dot else { return }
+                NSAnimationContext.runAnimationGroup({ ctx in
+                    ctx.duration = burst
+                    ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                    dot.animator().frame = frame(size * 2.5)
+                    dot.animator().alphaValue = 0
+                }, completionHandler: { [weak self, weak dot] in
+                    dot?.removeFromSuperview()
+                    if let dot { self?.poisonBubbles.removeAll { $0 === dot } }
+                    // Prune any zombie entries (deallocated views)
+                    self?.poisonBubbles.removeAll { $0.superview == nil }
+                })
+            }
+        })
     }
 
     private func tintedImage(_ image: NSImage, color: NSColor) -> NSImage {
