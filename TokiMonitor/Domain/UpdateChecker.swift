@@ -13,6 +13,7 @@ final class UpdateChecker {
 
     init() {
         currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        cleanupTempScripts()
     }
 
     /// Check on launch. Skips if already checked within 24 hours.
@@ -61,6 +62,12 @@ final class UpdateChecker {
     private func checkMonitor() async -> UpdateInfo? {
         guard let release = await fetchLatestGitHubRelease(repo: "korjwl1/toki-monitor") else { return nil }
         guard isNewerStable(latest: release.version, current: currentVersion) else { return nil }
+        // Gate the prompt on the tap: `brew upgrade` installs from the tap cask,
+        // so a GitHub release that the tap hasn't been bumped to yet can't be
+        // delivered. Don't nag daily for something brew can't install.
+        guard await tapCanDeliver(version: release.version, tapFilePath: "Casks/toki-monitor.rb", label: "monitor cask") else {
+            return nil
+        }
 
         return UpdateInfo(
             name: "Toki Monitor",
@@ -81,6 +88,9 @@ final class UpdateChecker {
 
         guard let release = await fetchLatestGitHubRelease(repo: "korjwl1/toki") else { return nil }
         guard isNewerStable(latest: release.version, current: installed) else { return nil }
+        guard await tapCanDeliver(version: release.version, tapFilePath: "Formula/toki.rb", label: "toki formula") else {
+            return nil
+        }
 
         return UpdateInfo(
             name: "toki CLI",
@@ -88,6 +98,47 @@ final class UpdateChecker {
             releaseNotes: release.notes,
             brewCommand: "brew update && brew upgrade toki"
         )
+    }
+
+    /// True when the tap already carries `version` (or newer), i.e. `brew upgrade`
+    /// can actually install it. Reads the raw formula/cask file from the tap repo
+    /// on GitHub (fast, always current) and parses its `version "x.y.z"`. If the
+    /// tap can't be read, err on the side of NOT prompting.
+    private func tapCanDeliver(version: String, tapFilePath: String, label: String) async -> Bool {
+        guard let tapVersion = await fetchTapFileVersion(path: tapFilePath) else {
+            print("[UpdateChecker] tap \(label) version unavailable; deferring update prompt for \(version)")
+            return false
+        }
+        guard SemVer.core(tapVersion) >= SemVer.core(version) else {
+            print("[UpdateChecker] release \(version) not yet in tap \(label) (tap has \(tapVersion)); deferring prompt")
+            return false
+        }
+        return true
+    }
+
+    /// Fetches `https://raw.githubusercontent.com/korjwl1/homebrew-tap/main/<path>`
+    /// and extracts the `version "x.y.z"` field.
+    private func fetchTapFileVersion(path: String) async -> String? {
+        guard let url = URL(string: "https://raw.githubusercontent.com/korjwl1/homebrew-tap/main/\(path)") else {
+            return nil
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let text = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        // Match: version "0.2.4"
+        guard let range = text.range(of: #"version\s+"([^"]+)""#, options: .regularExpression) else {
+            return nil
+        }
+        let matched = String(text[range])
+        guard let vRange = matched.range(of: #""([^"]+)""#, options: .regularExpression) else {
+            return nil
+        }
+        return String(matched[vRange]).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
     }
 
     // MARK: - Update Window
@@ -162,16 +213,46 @@ final class UpdateChecker {
         updateWindow = nil
     }
 
+    private static let updateScriptPath = NSTemporaryDirectory() + "toki-update.command"
+
     private func runBrewCommands(_ commands: [String]) {
         let combined = commands.joined(separator: " && ")
-        // Write a temp script and open it in Terminal
-        let scriptPath = NSTemporaryDirectory() + "toki-update.command"
-        let scriptContent = "#!/bin/bash\n\(combined) && killall TokiMonitor 2>/dev/null && sleep 1 && open -a TokiMonitor\nosascript -e 'tell application \"Terminal\" to close (every window whose name contains \"toki-update\")' &\nexit 0\n"
-        try? scriptContent.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+        // The script ONLY runs brew upgrade. The cask postflight is the single
+        // owner of the app restart (killall + open) — doing it here too caused a
+        // duplicate-restart race (the "duplicate update window" reports). On
+        // success we close the Terminal window (the cask relaunches the app mid-
+        // flow — expected); on failure we keep it open so the user sees why.
+        let scriptContent = """
+        #!/bin/bash
+        echo "Updating Toki Monitor…"
+        echo
+        if \(combined); then
+          echo
+          echo "Update complete. Toki Monitor will relaunch automatically."
+          # The cask postflight restarts the app; just close this window.
+          osascript -e 'tell application "Terminal" to close (every window whose name contains "toki-update")' &
+          exit 0
+        else
+          status=$?
+          echo
+          echo "Update failed (exit $status). Review the errors above."
+          echo "Press any key to close this window."
+          read -n 1 -s
+          exit $status
+        fi
+
+        """
+        try? scriptContent.write(toFile: Self.updateScriptPath, atomically: true, encoding: .utf8)
         // Make executable
-        chmod(scriptPath, 0o755)
+        chmod(Self.updateScriptPath, 0o755)
         // Open .command file — macOS opens it in Terminal automatically
-        NSWorkspace.shared.open(URL(fileURLWithPath: scriptPath))
+        NSWorkspace.shared.open(URL(fileURLWithPath: Self.updateScriptPath))
+    }
+
+    /// Remove a leftover update script from a previous run. The cask postflight
+    /// kills this app mid-update, so the script can't clean up after itself.
+    private func cleanupTempScripts() {
+        try? FileManager.default.removeItem(atPath: Self.updateScriptPath)
     }
 
     // MARK: - GitHub API
@@ -190,11 +271,31 @@ final class UpdateChecker {
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = 10
 
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200,
-              let releases = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
-        else { return nil }
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            print("[UpdateChecker] GitHub release check for \(repo) failed: \(error.localizedDescription)")
+            return nil
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else { return nil }
+        guard httpResponse.statusCode == 200 else {
+            // 403 with a zero rate-limit-remaining header = unauthenticated
+            // 60/hr limit exhausted. Surface it so missed checks are diagnosable.
+            if httpResponse.statusCode == 403,
+               httpResponse.value(forHTTPHeaderField: "X-RateLimit-Remaining") == "0" {
+                print("[UpdateChecker] GitHub API rate limit reached (60/hr) checking \(repo); update check skipped")
+            } else {
+                print("[UpdateChecker] GitHub release check for \(repo) returned HTTP \(httpResponse.statusCode)")
+            }
+            return nil
+        }
+        guard let releases = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            print("[UpdateChecker] GitHub release response for \(repo) was not the expected JSON array")
+            return nil
+        }
 
         // Pick the HIGHEST stable version. GitHub returns releases sorted by
         // publish date, not version, so a backported older point-release
