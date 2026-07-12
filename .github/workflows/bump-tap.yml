@@ -1,0 +1,65 @@
+name: Bump Homebrew cask
+
+# Opens a cask-bump PR against korjwl1/homebrew-tap whenever a release is
+# published, so the tap version never drifts behind the GitHub release (the
+# in-app UpdateChecker only prompts when the tap can actually deliver the build).
+#
+# Requires a repo secret `TAP_REPO_TOKEN`: a PAT with write access to
+# korjwl1/homebrew-tap (contents + pull-requests). The built-in GITHUB_TOKEN
+# cannot push to another repository. Until that secret is registered this
+# workflow will fail at the "Checkout tap" step and the manual fallback in the
+# bump-version skill still applies.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  bump-cask:
+    runs-on: macos-latest
+    steps:
+      - name: Resolve version and asset
+        id: meta
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "asset=TokiMonitor-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Download release asset and compute sha256
+        id: sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${{ steps.meta.outputs.asset }}" --dir .
+          SHA=$(shasum -a 256 "${{ steps.meta.outputs.asset }}" | awk '{print $1}')
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tap
+        uses: actions/checkout@v4
+        with:
+          repository: korjwl1/homebrew-tap
+          token: ${{ secrets.TAP_REPO_TOKEN }}
+          path: tap
+
+      - name: Update cask
+        run: |
+          CASK=tap/Casks/toki-monitor.rb
+          sed -i '' -E "s/^  version \".*\"/  version \"${{ steps.meta.outputs.version }}\"/" "$CASK"
+          sed -i '' -E "s/^  sha256 \".*\"/  sha256 \"${{ steps.sha.outputs.sha256 }}\"/" "$CASK"
+
+      - name: Open PR against tap
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.TAP_REPO_TOKEN }}
+          path: tap
+          branch: bump-toki-monitor-${{ steps.meta.outputs.version }}
+          title: "toki-monitor ${{ steps.meta.outputs.version }}"
+          commit-message: "bump toki-monitor to ${{ steps.meta.outputs.version }}"
+          body: |
+            Automated cask bump for toki-monitor v${{ steps.meta.outputs.version }}.
+            Triggered by release ${{ github.event.release.html_url }}.

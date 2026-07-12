@@ -52,23 +52,37 @@ gh release create "v<VERSION>" \
   --generate-notes
 ```
 
-## Step 6 — Update Homebrew cask
+## Step 6 — Confirm the Homebrew cask bump
 
-1. Compute the SHA-256 of the zip:
+Publishing the release (Step 5) triggers the `.github/workflows/bump-tap.yml`
+workflow, which computes the zip's SHA-256, updates `version` + `sha256` in the
+tap cask, and opens a PR against `korjwl1/homebrew-tap`. **Do not** edit the
+local tap file or push to tap `main` directly — that hand-editing was the source
+of version drift this workflow exists to eliminate.
+
+1. Wait for the workflow to open the PR (a few minutes after publish):
    ```bash
-   shasum -a 256 "build/Build/Products/Release/TokiMonitor-<VERSION>.zip"
+   gh run list --repo korjwl1/toki-monitor --workflow bump-tap.yml --limit 1
+   gh pr list --repo korjwl1/homebrew-tap --search "toki-monitor <VERSION>"
    ```
-2. Edit the cask file at the **local tap path**:
-   `/opt/homebrew/Library/Taps/korjwl1/homebrew-tap/Casks/toki-monitor.rb`
-   - Update `version` to the new version string (no `v` prefix).
-   - Update `sha256` to the new hash.
-3. Commit and push in the tap repo:
+2. Review the PR (correct `version` and `sha256`), then merge it:
    ```bash
-   cd /opt/homebrew/Library/Taps/korjwl1/homebrew-tap
-   git add Casks/toki-monitor.rb
-   git commit -m "bump toki-monitor to <VERSION>"
-   git push origin main
+   gh pr merge --repo korjwl1/homebrew-tap --squash <PR_NUMBER>
    ```
+
+### Manual fallback (only if the workflow can't run)
+
+The workflow needs a `TAP_REPO_TOKEN` repo secret (PAT with write access to
+`korjwl1/homebrew-tap`). Until that secret is registered — or if the run fails —
+bump the cask by hand:
+
+```bash
+shasum -a 256 "build/Build/Products/Release/TokiMonitor-<VERSION>.zip"
+# In korjwl1/homebrew-tap (a clean checkout, NOT the /opt/homebrew tap copy),
+# set version + sha256 in Casks/toki-monitor.rb, then open a PR:
+gh pr create --repo korjwl1/homebrew-tap --title "toki-monitor <VERSION>" \
+  --body "Manual cask bump for v<VERSION>."
+```
 
 ## Step 7 — Clean up
 
@@ -76,4 +90,5 @@ gh release create "v<VERSION>" \
 rm -rf build
 ```
 
-Print a final summary with the version, GitHub release URL, and confirmation that the cask was updated.
+Print a final summary with the version, GitHub release URL, and the tap PR
+(URL + merge status).
