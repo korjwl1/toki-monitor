@@ -72,6 +72,9 @@ final class ClaudeUsageMonitor {
     private(set) var currentUsage: ClaudeUsageResponse?
     private(set) var lastError: String?
     private(set) var isAvailable: Bool = false
+    /// true = logged in previously but the Keychain token is expired/unreadable
+    /// (re-login required). Drives a fast poll interval so re-login is caught quickly.
+    private(set) var isAuthMissing: Bool = false
     var isPolling: Bool { pollingTask != nil }
     var isInBackoff: Bool { consecutiveFailures > 0 }
 
@@ -84,7 +87,6 @@ final class ClaudeUsageMonitor {
     init(aggregator: TokenAggregator, settings: AppSettings) {
         self.aggregator = aggregator
         self.settings = settings
-        self.isAvailable = ClaudeAuthReader.isAvailable
     }
 
     // MARK: - Start/Stop
@@ -121,13 +123,26 @@ final class ClaudeUsageMonitor {
     // MARK: - Polling
 
     private func pollOnce() async {
-        // Re-check availability each poll (user may install/login to Claude Code later)
-        isAvailable = ClaudeAuthReader.isAvailable
+        // Single off-main Keychain read → both availability and token validity.
+        let creds = await ClaudeAuthReader.read()
+        isAvailable = creds.hasOAuth
 
-        guard let token = ClaudeAuthReader.readAccessToken() else {
-            if isAvailable { lastError = nil }
+        guard let token = creds.accessToken else {
+            // No valid token. Distinguish "never logged in" from "expired".
+            currentUsage = nil
+            consecutiveFailures = 0
+            if creds.hasOAuth {
+                // Logged in before but token expired/unreadable → surface re-login.
+                isAuthMissing = true
+                lastError = L.tr("Claude 재로그인 필요", "Claude re-login required")
+            } else {
+                isAuthMissing = false
+                lastError = nil
+            }
             return
         }
+
+        isAuthMissing = false
 
         do {
             let usage = try await ClaudeUsageClient.fetchUsage(accessToken: token)
@@ -158,6 +173,9 @@ final class ClaudeUsageMonitor {
 
     private func computeInterval() -> TimeInterval {
         if !isAvailable { return 60 }
+        // Token expired: poll fast so re-login is picked up within ~20s even if
+        // no tokens are flowing (the token-activity wake handles the flowing case).
+        if isAuthMissing { return 20 }
         // Backoff capped at 60s: recovers within 1 minute after transient server errors
         if consecutiveFailures > 0 {
             return min(15 * pow(2, Double(consecutiveFailures - 1)), 60)
