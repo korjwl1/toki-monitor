@@ -105,7 +105,6 @@ final class StatusBarController {
         // Observe
         observeTokenRate()
         observeSettings()
-        observeTokenActivity()
     }
 
     // MARK: - First Launch & Daemon
@@ -227,6 +226,7 @@ final class StatusBarController {
         }
 
         updateAllDisplays()
+        updateReportActive()
     }
 
     private func updateAllDisplays() {
@@ -426,6 +426,9 @@ final class StatusBarController {
         menuPanel = panel
         lastPanelUnit = unit
 
+        // Popover consumes the report data — make sure it's flowing.
+        updateReportActive()
+
         // Observation-driven refresh: update rootView only when data actually changes
         scheduleObservationRefresh(for: unit)
 
@@ -521,6 +524,9 @@ final class StatusBarController {
         }
         menuPanel?.close()
         menuPanel = nil
+
+        // Popover closed — stop the report poll unless a sparkline still needs it.
+        updateReportActive()
     }
 
     /// Resolves a non-zero content size from an NSHostingView, falling back
@@ -543,25 +549,13 @@ final class StatusBarController {
     /// token rate가 0→nonzero로 전환될 때 usage monitor sleep을 즉시 중단하고 poll 앞당김.
     private var wasTokenActive = false
 
-    private func observeTokenActivity() {
-        withObservationTracking {
-            _ = aggregator.tokensPerMinute
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                let isActive = self.aggregator.tokensPerMinute > 0
-                if isActive && !self.wasTokenActive {
-                    // 토큰이 흐르기 시작했다 = 연결이 살아있다.
-                    // 에러 backoff 중인 monitor만 즉시 재시도.
-                    if self.usageMonitor.isInBackoff { self.usageMonitor.wakeForImmediatePoll() }
-                    if self.codexUsageMonitor.isInTransientBackoff { self.codexUsageMonitor.wakeForImmediatePoll() }
-                }
-                self.wasTokenActive = isActive
-                self.observeTokenActivity()
-            }
-        }
-    }
-
+    /// Single observer over the aggregator's rate/history fields. Refreshes the
+    /// menu-bar displays and, on a 0→positive token transition, wakes BOTH usage
+    /// monitors immediately. A live token stream means the CLI is authenticated
+    /// again — so this is how re-login (Claude or Codex) is caught within ~1-2s,
+    /// regardless of whether the monitor was in backoff or in an auth-expired state.
+    /// `wakeForImmediatePoll()` is a no-op when a monitor isn't polling, so the
+    /// unconditional wake is safe.
     private func observeTokenRate() {
         withObservationTracking {
             _ = aggregator.tokensPerMinute
@@ -571,8 +565,15 @@ final class StatusBarController {
             _ = aggregator.spendAlert
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.updateAllDisplays()
-                self?.observeTokenRate()
+                guard let self else { return }
+                let isActive = self.aggregator.tokensPerMinute > 0
+                if isActive && !self.wasTokenActive {
+                    self.usageMonitor.wakeForImmediatePoll()
+                    self.codexUsageMonitor.wakeForImmediatePoll()
+                }
+                self.wasTokenActive = isActive
+                self.updateAllDisplays()
+                self.observeTokenRate()
             }
         }
     }
@@ -601,6 +602,8 @@ final class StatusBarController {
 
                 // 위젯 visibility 변경 시 polling 동기화
                 self.syncPollingState()
+                // 애니메이션 스타일 변경(sparkline 여부)에 따라 report poll 동기화
+                self.updateReportActive()
 
                 // Rebuild items if display mode or provider enablement changed
                 let needsRebuild = self.needsRebuild()
@@ -687,6 +690,23 @@ final class StatusBarController {
         } else {
             codexUsageMonitor.stopPolling()
         }
+    }
+
+    /// Report data (periodic `toki query`) is only consumed by the open popover
+    /// and by the sparkline menu-bar style. Character/numeric styles run purely
+    /// off the real-time trace stream and the HP bar comes from the usage
+    /// monitors, so neither needs the report poll.
+    private var needsReportData: Bool {
+        if menuPanel != nil { return true }
+        for unit in units {
+            let style = unit.providerId.map { settings.effectiveStyle(for: $0) } ?? settings.animationStyle
+            if style == .sparkline { return true }
+        }
+        return false
+    }
+
+    private func updateReportActive() {
+        aggregator.setReportActive(needsReportData)
     }
 
     private var isClaudeWidgetVisible: Bool {

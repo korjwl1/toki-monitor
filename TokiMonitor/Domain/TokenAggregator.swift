@@ -92,6 +92,10 @@ final class TokenAggregator {
     private var reportTimer: Timer?
     private let reportClient = TokiReportClient()
     private let reportRefreshInterval: TimeInterval = 10
+    /// Whether any consumer (open popover or a visible sparkline unit) needs the
+    /// periodic `toki query` report data. When false, the report timer is idle
+    /// so we don't fork a subprocess every 10s for nobody.
+    private(set) var isReportActive = false
 
     // Timers are cleaned up via stopSampling(), called by StatusBarController's sleep handler.
 
@@ -123,14 +127,8 @@ final class TokenAggregator {
             }
         }
 
-        reportTimer?.invalidate()
-        reportTimer = Timer.scheduledTimer(withTimeInterval: reportRefreshInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.fetchReportData()
-            }
-        }
-
-        fetchReportData()
+        syncReportTimer()
+        if isReportActive { fetchReportData() }
         fetchHistoricalBaseline()
     }
 
@@ -141,20 +139,42 @@ final class TokenAggregator {
         reportTimer = nil
     }
 
+    /// Enable/disable the periodic report poll. Called by StatusBarController when
+    /// the popover opens/closes or the menu-bar style changes (sparkline needs it).
+    func setReportActive(_ active: Bool) {
+        guard active != isReportActive else { return }
+        isReportActive = active
+        syncReportTimer()
+        if active, rateTimer != nil { fetchReportData() }
+    }
+
+    /// (Re)installs the report timer to match `isReportActive`. Only runs while
+    /// sampling is active (rateTimer present); sleep/wake toggles the timer via
+    /// stopSampling/startSampling while `isReportActive` is preserved.
+    private func syncReportTimer() {
+        reportTimer?.invalidate()
+        reportTimer = nil
+        guard rateTimer != nil, isReportActive else { return }
+        reportTimer = Timer.scheduledTimer(withTimeInterval: reportRefreshInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.fetchReportData()
+            }
+        }
+    }
+
     // MARK: - Historical Baseline (Level 2)
 
     private func fetchHistoricalBaseline() {
         Task { [weak self] in
             guard let self else { return }
-            // Instant query: the [1h] range vector scans last 1 hour per bucket over full DB.
-            // For historical baseline we want 24h of 1h buckets.
-            let sinceFmt = DateFormatter()
-            sinceFmt.dateFormat = "yyyyMMddHHmmss"
-            sinceFmt.timeZone = TimeZone(identifier: "UTC")
-            let sinceStr = sinceFmt.string(from: Date().addingTimeInterval(-86400)) // 24h ago
-            let query = "usage[1h] by (model)"
+            // The range-vector duration IS the lookback window here (queryPromQL
+            // ignores `since`). Use [24h] so the sum actually covers 24 hours;
+            // the old [1h] summed a single hour but divided by 24h → ~24x too low,
+            // which made the elevated-spend alert misfire.
+            let windowHours = 24.0
+            let query = "usage[24h] by (model)"
 
-            guard let pointsByDate = try? await self.reportClient.queryPromQL(query: query, since: sinceStr) else { return }
+            guard let pointsByDate = try? await self.reportClient.queryPromQL(query: query) else { return }
 
             // Sum total cost across all points
             var totalCost: Double = 0
@@ -164,8 +184,8 @@ final class TokenAggregator {
                 }
             }
 
-            // Average cost per minute over 24h
-            self.historicalAvgCostPerMinute = totalCost / (24 * 60)
+            // Average cost per minute over the actual window.
+            self.historicalAvgCostPerMinute = totalCost / (windowHours * 60)
         }
     }
 
