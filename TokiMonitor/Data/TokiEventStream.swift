@@ -28,14 +28,19 @@ final class TokiEventStream {
     }
 
     func start() {
-        // Kill stale toki trace from previous app run
-        killStaleTokiTrace()
-
-        guard listener.start() else {
-            onDisconnect?()
-            return
+        // Kill any stale `toki trace` from a previous run BEFORE launching the
+        // replacement. The fallback pkill matches by command line, so it must
+        // finish first — otherwise it could kill the process we just launched.
+        // The PID-file fast path completes synchronously inside this call.
+        Task { [weak self] in
+            await self?.killStaleTokiTrace()
+            guard let self else { return }
+            guard self.listener.start() else {
+                self.onDisconnect?()
+                return
+            }
+            self.launchTokiTrace()
         }
-        launchTokiTrace()
     }
 
     func stop() {
@@ -100,7 +105,7 @@ final class TokiEventStream {
 
     private static let pidPath = "/tmp/toki-monitor-trace.pid"
 
-    private func killStaleTokiTrace() {
+    private func killStaleTokiTrace() async {
         // Try PID file first — kill() is a fast non-blocking syscall, fine on main.
         if let pidStr = try? String(contentsOfFile: Self.pidPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
            let pid = Int32(pidStr) {
@@ -110,16 +115,20 @@ final class TokiEventStream {
         }
         // Fallback: pkill for processes from before the PID file was introduced.
         // Spawning + waiting on a subprocess would block the main thread, so run
-        // it off-main. This legacy path targets processes by command line, so a
-        // fresh trace we're about to launch (not yet running) is unaffected.
-        DispatchQueue.global(qos: .utility).async {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-            process.arguments = ["-f", "toki trace --sink uds:///tmp/toki-monitor.sock"]
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-            try? process.run()
-            process.waitUntilExit()
+        // it off-main and await its completion. This legacy path targets processes
+        // by command line, so it must finish before start() launches the new trace
+        // (which shares that command line) — otherwise it could kill the new one.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global(qos: .utility).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+                process.arguments = ["-f", "toki trace --sink uds:///tmp/toki-monitor.sock"]
+                process.standardOutput = FileHandle.nullDevice
+                process.standardError = FileHandle.nullDevice
+                try? process.run()
+                process.waitUntilExit()
+                continuation.resume()
+            }
         }
     }
 
