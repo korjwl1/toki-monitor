@@ -160,6 +160,8 @@ final class CodexUsageMonitor {
             currentUsage = nil
             return
         }
+        // Re-arm the watcher if a prior delete tore it down and it never came back.
+        ensureWatcherArmed()
 
         do {
             let token = try CodexAuthReader.readAccessToken()
@@ -235,9 +237,11 @@ final class CodexUsageMonitor {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 // logout→login deletes and recreates auth.json, so our fd points at
-                // a stale inode and will never fire again. Re-arm on the new file.
+                // a now-stale inode and will never fire again. Tear the source down
+                // immediately (closing the fd) and re-arm once the new file appears.
                 // Codex's in-place refresh (write) keeps the inode, so no re-arm needed there.
                 if flags.contains(.delete) || flags.contains(.rename) {
+                    self.stopFileWatcher()
                     self.rearmWatcherWhenFileReappears()
                 }
                 self.handleAuthFileChange()
@@ -292,6 +296,15 @@ final class CodexUsageMonitor {
     private func stopFileWatcher() {
         fileWatcher?.cancel()
         fileWatcher = nil
+    }
+
+    /// Safety net for the case where auth.json was deleted and the re-arm window
+    /// elapsed before the user logged back in: if the watcher isn't armed but the
+    /// file now exists, re-arm it so later auth changes are caught promptly
+    /// instead of waiting up to the idle poll interval.
+    private func ensureWatcherArmed() {
+        guard fileWatcher == nil, CodexAuthReader.isAvailable else { return }
+        startFileWatcher()
     }
 
     // MARK: - Adaptive Interval
