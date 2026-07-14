@@ -25,6 +25,11 @@ final class ConnectionManager {
     /// Interval for the slow persistent retry once fast attempts are exhausted.
     private let slowRetryInterval: TimeInterval = 30
     private var reconnectTask: Task<Void, Never>?
+    /// Bumped each time a new reconnect loop is created. A loop only clears the
+    /// shared `reconnectTask` handle if its captured generation is still current,
+    /// so a canceled older loop can't null out a newer loop's handle (which would
+    /// orphan the newer loop and let a third one stack on top).
+    private var reconnectGeneration = 0
 
     init(eventStream: TokiEventStream) {
         self.eventStream = eventStream
@@ -48,6 +53,8 @@ final class ConnectionManager {
     /// still be picked up. A single loop runs at a time; `onConnected` tears it down.
     private func attemptReconnect() {
         guard reconnectTask == nil else { return }
+        reconnectGeneration += 1
+        let generation = reconnectGeneration
         reconnectTask = Task { [weak self] in
             var attempt = 0
             while !Task.isCancelled {
@@ -57,12 +64,12 @@ final class ConnectionManager {
                     : (self?.slowRetryInterval ?? 30)
                 try? await Task.sleep(for: .seconds(delay))
                 guard let self, !Task.isCancelled, !self.state.isConnected else {
-                    self?.reconnectTask = nil
+                    self?.clearReconnectTask(generation: generation)
                     return
                 }
                 if await self.isDaemonRunning() {
                     guard !Task.isCancelled, !self.state.isConnected else {
-                        self.reconnectTask = nil
+                        self.clearReconnectTask(generation: generation)
                         return
                     }
                     self.connect()
@@ -70,14 +77,22 @@ final class ConnectionManager {
                     // task on success; if it didn't connect, loop and retry.
                     try? await Task.sleep(for: .seconds(2))
                     if self.state.isConnected {
-                        self.reconnectTask = nil
+                        self.clearReconnectTask(generation: generation)
                         return
                     }
                 }
                 // Daemon still down (or connect didn't take) → keep looping.
             }
-            self?.reconnectTask = nil
+            self?.clearReconnectTask(generation: generation)
         }
+    }
+
+    /// Clear the shared reconnect handle, but only if the caller's loop is still
+    /// the current generation. Prevents a canceled older loop from nulling out a
+    /// newer loop's handle.
+    private func clearReconnectTask(generation: Int) {
+        guard generation == reconnectGeneration else { return }
+        reconnectTask = nil
     }
 
     /// Check if daemon is running and auto-connect if so.
