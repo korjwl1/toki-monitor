@@ -104,6 +104,11 @@ final class CodexUsageMonitor {
     private var consecutiveFailures = 0
     private var fileWatcher: DispatchSourceFileSystemObject?
     private var rearmTask: Task<Void, Never>?
+    /// Bumped on every (re)start. The usage fetch awaits a non-cancellation-aware
+    /// URLSession call, so a stopped/restarted loop can resume mid-poll after the
+    /// request returns; the generation check makes such a stale loop bail out
+    /// instead of mutating shared state or clobbering the newer loop's `sleepTask`.
+    private var pollGeneration = 0
 
     init(aggregator: TokenAggregator, settings: AppSettings) {
         self.aggregator = aggregator
@@ -121,10 +126,15 @@ final class CodexUsageMonitor {
         isAvailable = true
         stopPolling()
         startFileWatcher()
+        pollGeneration += 1
+        let generation = pollGeneration
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self else { return }
-                await self.pollOnce()
+                guard let self, generation == self.pollGeneration else { return }
+                await self.pollOnce(generation: generation)
+                // A concurrent stop/restart supersedes this loop — bail before
+                // clobbering the newer loop's sleepTask.
+                guard generation == self.pollGeneration, !Task.isCancelled else { return }
                 let interval = self.computeInterval()
                 self.sleepTask = Task {
                     try? await Task.sleep(for: .seconds(interval))
@@ -153,7 +163,7 @@ final class CodexUsageMonitor {
 
     // MARK: - Polling
 
-    private func pollOnce() async {
+    private func pollOnce(generation: Int) async {
         // Re-check availability (user might delete auth.json)
         guard CodexAuthReader.isAvailable else {
             isAvailable = false
@@ -167,6 +177,7 @@ final class CodexUsageMonitor {
             let token = try CodexAuthReader.readAccessToken()
             let accountId = CodexAuthReader.readAccountId()
             let usage = try await CodexUsageClient.fetchUsage(accessToken: token, accountId: accountId)
+            guard generation == pollGeneration, !Task.isCancelled else { return }
             currentUsage = usage
             lastError = nil
             consecutiveFailures = 0
