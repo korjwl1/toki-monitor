@@ -41,63 +41,129 @@ final class UpdateChecker {
         let monitor = await monitorResult
         let toki = await tokiResult
 
-        if monitor == nil && toki == nil {
-            if force { showUpToDateAlert() }
+        let monitorInfo = monitor.info
+        let tokiInfo = toki.info
+
+        // An installable update for either component → show the update window.
+        if monitorInfo != nil || tokiInfo != nil {
+            // Don't nag about same versions (unless force)
+            if !force {
+                let lastNotified = UserDefaults.standard.string(forKey: Self.lastNotifiedKey)
+                let key = [monitorInfo?.version, tokiInfo?.version].compactMap { $0 }.joined(separator: "+")
+                if lastNotified == key { return }
+                UserDefaults.standard.set(key, forKey: Self.lastNotifiedKey)
+            }
+            showUpdateWindow(monitor: monitorInfo, toki: tokiInfo)
             return
         }
 
-        // Don't nag about same versions (unless force)
-        if !force {
-            let lastNotified = UserDefaults.standard.string(forKey: Self.lastNotifiedKey)
-            let key = [monitor?.version, toki?.version].compactMap { $0 }.joined(separator: "+")
-            if lastNotified == key { return }
-            UserDefaults.standard.set(key, forKey: Self.lastNotifiedKey)
+        // Nothing installable. Background checks stay silent; a forced "Check Now"
+        // explains WHY nothing installed rather than always claiming "up to date".
+        guard force else { return }
+        switch Self.forcedResolution(monitor.kind, toki.kind) {
+        case .pending:
+            showInfoAlert(
+                title: L.tr("업데이트 준비 중", "Update pending"),
+                text: L.tr(
+                    "새 버전이 있지만 아직 Homebrew에 반영되지 않았습니다. 잠시 후 다시 시도해 주세요.",
+                    "A newer version exists but isn't available through Homebrew yet. Try again shortly."
+                )
+            )
+        case .failed:
+            showInfoAlert(
+                title: L.tr("업데이트 확인 실패", "Update check failed"),
+                text: L.tr(
+                    "업데이트를 확인하지 못했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.",
+                    "Couldn't check for updates. Check your connection and try again."
+                )
+            )
+        case .update, .upToDate:
+            showUpToDateAlert()
         }
-
-        showUpdateWindow(monitor: monitor, toki: toki)
     }
 
     // MARK: - Version Checks
 
-    private func checkMonitor() async -> UpdateInfo? {
-        guard let release = await fetchLatestGitHubRelease(repo: "korjwl1/toki-monitor") else { return nil }
-        guard isNewerStable(latest: release.version, current: currentVersion) else { return nil }
+    /// Outcome of checking one component (app or CLI) for updates.
+    private enum CheckOutcome {
+        case upToDate
+        case updateAvailable(UpdateInfo)
+        /// A newer release exists but the Homebrew tap can't deliver it yet.
+        case pendingInHomebrew
+        /// The check couldn't complete (network/API/parse failure).
+        case checkFailed
+
+        var info: UpdateInfo? {
+            if case .updateAvailable(let i) = self { return i }
+            return nil
+        }
+
+        var kind: CheckKind {
+            switch self {
+            case .updateAvailable: .update
+            case .pendingInHomebrew: .pending
+            case .checkFailed: .failed
+            case .upToDate: .upToDate
+            }
+        }
+    }
+
+    /// Payload-free classification used to resolve what a forced check reports.
+    enum CheckKind: Equatable { case update, pending, failed, upToDate }
+
+    /// Decide what a *forced* "Check Now" should tell the user given both
+    /// component outcomes. An installable update wins; otherwise a pending
+    /// Homebrew bump is more informative than a failure, which is more
+    /// informative than "up to date".
+    nonisolated static func forcedResolution(_ a: CheckKind, _ b: CheckKind) -> CheckKind {
+        if a == .update || b == .update { return .update }
+        if a == .pending || b == .pending { return .pending }
+        if a == .failed || b == .failed { return .failed }
+        return .upToDate
+    }
+
+    private func checkMonitor() async -> CheckOutcome {
+        guard let release = await fetchLatestGitHubRelease(repo: "korjwl1/toki-monitor") else { return .checkFailed }
+        guard isNewerStable(latest: release.version, current: currentVersion) else { return .upToDate }
         // Gate the prompt on the tap: `brew upgrade` installs from the tap cask,
         // so a GitHub release that the tap hasn't been bumped to yet can't be
         // delivered. Don't nag daily for something brew can't install.
         guard await tapCanDeliver(version: release.version, tapFilePath: "Casks/toki-monitor.rb", label: "monitor cask") else {
-            return nil
+            return .pendingInHomebrew
         }
 
-        return UpdateInfo(
+        return .updateAvailable(UpdateInfo(
             name: "Toki Monitor",
             version: release.version,
             releaseNotes: release.notes,
             brewCommand: "brew update && brew upgrade --cask toki-monitor"
-        )
+        ))
     }
 
-    private func checkToki() async -> UpdateInfo? {
+    private func checkToki() async -> CheckOutcome {
         guard let data = try? await CLIProcessRunner.run(
             executable: TokiPath.resolved, arguments: ["--version"]
-        ) else { return nil }
+        ) else {
+            // toki CLI not installed / not runnable → nothing to offer for it.
+            return .upToDate
+        }
         let installed = String(data: data, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "toki ", with: "") ?? ""
-        guard !installed.isEmpty else { return nil }
+        guard !installed.isEmpty else { return .upToDate }
 
-        guard let release = await fetchLatestGitHubRelease(repo: "korjwl1/toki") else { return nil }
-        guard isNewerStable(latest: release.version, current: installed) else { return nil }
+        guard let release = await fetchLatestGitHubRelease(repo: "korjwl1/toki") else { return .checkFailed }
+        guard isNewerStable(latest: release.version, current: installed) else { return .upToDate }
         guard await tapCanDeliver(version: release.version, tapFilePath: "Formula/toki.rb", label: "toki formula") else {
-            return nil
+            return .pendingInHomebrew
         }
 
-        return UpdateInfo(
+        return .updateAvailable(UpdateInfo(
             name: "toki CLI",
             version: release.version,
             releaseNotes: release.notes,
             brewCommand: "brew update && brew upgrade toki"
-        )
+        ))
     }
 
     /// True when the tap already carries `version` (or newer), i.e. `brew upgrade`
@@ -193,6 +259,17 @@ final class UpdateChecker {
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         updateWindow = window
+    }
+
+    /// Simple informational alert (forced-check "pending"/"failed" outcomes).
+    private func showInfoAlert(title: String, text: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = text
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     private func showUpToDateAlert() {
