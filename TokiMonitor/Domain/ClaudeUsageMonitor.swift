@@ -83,6 +83,15 @@ final class ClaudeUsageMonitor {
     private var pollingTask: Task<Void, Never>?
     private var sleepTask: Task<Void, Never>?
     private var consecutiveFailures = 0
+    /// The last Keychain read failed transiently (not "logged out"). Drives a
+    /// fast retry without wiping usage or showing the re-login prompt.
+    private var authReadUnreadable = false
+    /// Bumped on every (re)start. The Keychain read (`withCheckedContinuation`
+    /// around a subprocess) is not cancellation-aware, so a stopped/restarted
+    /// loop can resume mid-poll after its subprocess returns; the generation
+    /// check makes such a stale loop bail out instead of mutating shared state
+    /// or clobbering the newer loop's `sleepTask`.
+    private var pollGeneration = 0
 
     init(aggregator: TokenAggregator, settings: AppSettings) {
         self.aggregator = aggregator
@@ -93,10 +102,15 @@ final class ClaudeUsageMonitor {
 
     func startPolling() {
         stopPolling()
+        pollGeneration += 1
+        let generation = pollGeneration
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self else { return }
-                await self.pollOnce()
+                guard let self, generation == self.pollGeneration else { return }
+                await self.pollOnce(generation: generation)
+                // A concurrent stop/restart supersedes this loop — bail before
+                // clobbering the newer loop's sleepTask.
+                guard generation == self.pollGeneration, !Task.isCancelled else { return }
                 let interval = self.computeInterval()
                 self.sleepTask = Task {
                     try? await Task.sleep(for: .seconds(interval))
@@ -122,30 +136,49 @@ final class ClaudeUsageMonitor {
 
     // MARK: - Polling
 
-    private func pollOnce() async {
-        // Single off-main Keychain read → both availability and token validity.
-        let creds = await ClaudeAuthReader.read()
-        isAvailable = creds.hasOAuth
-
-        guard let token = creds.accessToken else {
-            // No valid token. Distinguish "never logged in" from "expired".
+    private func pollOnce(generation: Int) async {
+        // Single off-main Keychain read → availability, token validity, and
+        // transient-failure status, all from one invocation.
+        let result = await ClaudeAuthReader.read()
+        // The read isn't cancellation-aware; if we were superseded while it ran,
+        // drop the result without touching shared state.
+        guard generation == pollGeneration, !Task.isCancelled else { return }
+        let token: String
+        switch result {
+        case .credentials(let validToken):
+            authReadUnreadable = false
+            isAvailable = true
+            isAuthMissing = false
+            token = validToken
+        case .expired:
+            // Logged in before but token expired/empty → surface re-login.
+            authReadUnreadable = false
+            isAvailable = true
             currentUsage = nil
             consecutiveFailures = 0
-            if creds.hasOAuth {
-                // Logged in before but token expired/unreadable → surface re-login.
-                isAuthMissing = true
-                lastError = L.tr("Claude 재로그인 필요", "Claude re-login required")
-            } else {
-                isAuthMissing = false
-                lastError = nil
-            }
+            isAuthMissing = true
+            lastError = L.tr("Claude 재로그인 필요", "Claude re-login required")
+            return
+        case .missing:
+            // Never logged in → not available, no prompt.
+            authReadUnreadable = false
+            isAvailable = false
+            currentUsage = nil
+            consecutiveFailures = 0
+            isAuthMissing = false
+            lastError = nil
+            return
+        case .unreadable(let reason):
+            // Transient read failure — keep prior usage/state, retry fast, no
+            // prompt. Do NOT touch isAvailable/isAuthMissing/currentUsage.
+            authReadUnreadable = true
+            print("[ClaudeUsageMonitor] Keychain read unreadable, keeping prior state: \(reason)")
             return
         }
 
-        isAuthMissing = false
-
         do {
             let usage = try await ClaudeUsageClient.fetchUsage(accessToken: token)
+            guard generation == pollGeneration, !Task.isCancelled else { return }
             currentUsage = usage
             lastError = nil
             consecutiveFailures = 0
@@ -153,7 +186,9 @@ final class ClaudeUsageMonitor {
             checkThresholds(usage)
         } catch let error as OAuthError {
             if case .usageFetchFailed(401) = error {
-                lastError = nil // Token invalid/expired — Claude Code will refresh it
+                handleAuthRejected()
+            } else if case .usageFetchFailed(403) = error {
+                handleAuthRejected()
             } else if case .usageFetchFailed(429) = error {
                 lastError = nil // Rate limited — retry on next poll
             } else {
@@ -169,12 +204,25 @@ final class ClaudeUsageMonitor {
         }
     }
 
+    /// The server rejected a token that looked locally valid (revoked, or an
+    /// expiry we couldn't see). Mirror the Codex auth-error path: clear usage,
+    /// show the re-login state, and drop to the fast (~20s) retry interval.
+    private func handleAuthRejected() {
+        currentUsage = nil
+        isAuthMissing = true
+        consecutiveFailures = 0
+        lastError = L.tr("Claude 재로그인 필요", "Claude re-login required")
+    }
+
     // MARK: - Adaptive Interval
 
     private func computeInterval() -> TimeInterval {
+        // Transient Keychain read failure: retry soon to recover, don't back off.
+        if authReadUnreadable { return 20 }
         if !isAvailable { return 60 }
-        // Token expired: poll fast so re-login is picked up within ~20s even if
-        // no tokens are flowing (the token-activity wake handles the flowing case).
+        // Token expired or server-rejected: poll fast so re-login is picked up
+        // within ~20s even if no tokens are flowing (the token-activity wake
+        // handles the flowing case).
         if isAuthMissing { return 20 }
         // Backoff capped at 60s: recovers within 1 minute after transient server errors
         if consecutiveFailures > 0 {
