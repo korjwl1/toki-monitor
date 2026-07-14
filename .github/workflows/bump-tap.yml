@@ -49,8 +49,15 @@ jobs:
       - name: Update cask
         run: |
           CASK=tap/Casks/toki-monitor.rb
-          sed -i '' -E "s/^  version \".*\"/  version \"${{ steps.meta.outputs.version }}\"/" "$CASK"
-          sed -i '' -E "s/^  sha256 \".*\"/  sha256 \"${{ steps.sha.outputs.sha256 }}\"/" "$CASK"
+          VERSION="${{ steps.meta.outputs.version }}"
+          SHA="${{ steps.sha.outputs.sha256 }}"
+          sed -i '' -E "s/^  version \".*\"/  version \"${VERSION}\"/" "$CASK"
+          sed -i '' -E "s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" "$CASK"
+          # sed exits 0 even when nothing matched, so a changed cask layout could
+          # leave a no-op or half-updated file (new version, stale sha). Assert the
+          # exact expected lines are now present, else fail instead of opening a bad PR.
+          grep -qF "  version \"${VERSION}\"" "$CASK" || { echo "::error::cask version not updated to ${VERSION}"; exit 1; }
+          grep -qF "  sha256 \"${SHA}\"" "$CASK" || { echo "::error::cask sha256 not updated to ${SHA}"; exit 1; }
 
       - name: Open PR against tap
         uses: peter-evans/create-pull-request@v6

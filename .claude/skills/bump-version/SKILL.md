@@ -78,9 +78,24 @@ bump the cask by hand:
 
 ```bash
 shasum -a 256 "build/Build/Products/Release/TokiMonitor-<VERSION>.zip"
-# In korjwl1/homebrew-tap (a clean checkout, NOT the /opt/homebrew tap copy),
-# set version + sha256 in Casks/toki-monitor.rb, then open a PR:
-gh pr create --repo korjwl1/homebrew-tap --title "toki-monitor <VERSION>" \
+
+# Work in a CLEAN checkout of the tap, NOT the /opt/homebrew tap copy:
+git clone https://github.com/korjwl1/homebrew-tap.git
+cd homebrew-tap
+git checkout -b bump-toki-monitor-<VERSION>
+
+# Edit the two lines in Casks/toki-monitor.rb:
+#   version "<VERSION>"
+#   sha256  "<SHA256 from shasum above>"
+
+git add Casks/toki-monitor.rb
+git commit -m "bump toki-monitor to <VERSION>"
+git push -u origin bump-toki-monitor-<VERSION>
+
+# --head is required: gh must open the PR from the branch you just pushed.
+gh pr create --repo korjwl1/homebrew-tap \
+  --head bump-toki-monitor-<VERSION> \
+  --title "toki-monitor <VERSION>" \
   --body "Manual cask bump for v<VERSION>."
 ```
 
