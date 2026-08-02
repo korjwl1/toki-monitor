@@ -23,7 +23,7 @@ final class WindowStatsTests: XCTestCase {
         return WindowRow(
             kind: kind, limitId: kind == "session" ? "five_hour" : "seven_day",
             account: account, windowEndMs: end, rawResetsAtMs: end,
-            windowMinutes: windowMinutes, peakPct: peak,
+            windowMinutes: windowMinutes, peakPct: peak, lastPct: peak,
             observedTsMs: end - 1000, firstSeenMs: end - 3_600_000,
             finalized: finalized, maxedOut: maxed,
             limitReachedKind: maxed ? max(limitReachedKind, 1) : limitReachedKind,
@@ -112,8 +112,10 @@ final class WindowStatsTests: XCTestCase {
     }
 
     func testAdviceDowngradeOnConsistentlyLowPeaks() {
+        // Downgrade needs the FULL 28-day lookback observed (stricter than
+        // upgrade by design).
         var rows: [(provider: String, row: WindowRow)] = []
-        for d in 0..<20 {
+        for d in 0..<28 {
             rows.append(("claude_code", row(endOffsetDays: Double(d), peak: Double(10 + d % 10))))
         }
         let s = WindowStats.segments(rows: rows, nowMs: nowMs)[0]
@@ -163,6 +165,27 @@ final class WindowStatsTests: XCTestCase {
         XCTAssertTrue(s.sawCreditOverflow)
         guard case .upgrade = s.advice else {
             return XCTFail("expected upgrade, got \(s.advice)")
+        }
+    }
+
+    func testAdviceOnlyForCurrentTierSegment() {
+        var rows: [(provider: String, row: WindowRow)] = []
+        // Old tier: 15 days of heavy maxing, ending 10 days ago.
+        for d in 13..<28 {
+            rows.append(("claude_code", row(endOffsetDays: Double(d), peak: 100, maxed: true, timeTo100Ms: 3_600_000, plan: "pro")))
+        }
+        // Current tier: recent, calm.
+        for d in 0..<13 {
+            rows.append(("claude_code", row(endOffsetDays: Double(d), peak: 30, plan: "max_5x")))
+        }
+        let segs = WindowStats.segments(rows: rows, nowMs: nowMs)
+        let old = segs.first { $0.plan == "pro" }!
+        let current = segs.first { $0.plan == "max_5x" }!
+        // The abandoned tier must not scream "upgrade" — evidence only.
+        XCTAssertEqual(old.advice, .evidenceOnly)
+        // The current tier has <14 days → collecting.
+        guard case .collecting = current.advice else {
+            return XCTFail("expected collecting, got \(current.advice)")
         }
     }
 

@@ -43,8 +43,24 @@ struct WindowStatsSegment: Equatable, Hashable {
     let sawCreditOverflow: Bool
     /// Days between the oldest and newest finalized window in this segment.
     let observedDays: Double
+    /// Anchor of the newest window (current-segment detection).
+    let newestWindowEndMs: Int64
 
     let advice: TierAdvice
+
+    func replacingAdvice(_ advice: TierAdvice) -> WindowStatsSegment {
+        WindowStatsSegment(
+            provider: provider, kind: kind, plan: plan, account: account,
+            activeWindowCount: activeWindowCount, maxedCount: maxedCount,
+            medianTimeTo100Sec: medianTimeTo100Sec,
+            p50Peak: p50Peak, p90Peak: p90Peak, p95Peak: p95Peak,
+            p95IsCensored: p95IsCensored,
+            meanPeakActive: meanPeakActive, approxOverallMean: approxOverallMean,
+            dutyCycle: dutyCycle, impliedDemandP90: impliedDemandP90,
+            sawCreditOverflow: sawCreditOverflow, observedDays: observedDays,
+            newestWindowEndMs: newestWindowEndMs, advice: advice
+        )
+    }
 }
 
 enum TierAdvice: Equatable, Hashable {
@@ -79,7 +95,7 @@ enum WindowStats {
             groups[key, default: []].append((provider, row))
         }
 
-        return groups.values.compactMap { group -> WindowStatsSegment? in
+        var segments = groups.values.compactMap { group -> WindowStatsSegment? in
             guard let first = group.first else { return nil }
             let rows = group.map(\.1)
             return segment(
@@ -91,7 +107,24 @@ enum WindowStats {
                 nowMs: nowMs
             )
         }
-        .sorted { ($0.provider, $0.kind) < ($1.provider, $1.kind) }
+
+        // Advice applies only to the CURRENT tier/account segment (the one
+        // containing the newest window per provider+kind); historical segments
+        // keep their numbers but show evidence only — recommending against a
+        // tier the user already left is noise (plan §2 tier gating).
+        var newestByKey: [String: Int64] = [:]
+        for s in segments {
+            let key = "\(s.provider)|\(s.kind)"
+            newestByKey[key] = max(newestByKey[key] ?? 0, s.newestWindowEndMs)
+        }
+        segments = segments.map { s in
+            let key = "\(s.provider)|\(s.kind)"
+            if s.newestWindowEndMs < (newestByKey[key] ?? 0) {
+                return s.replacingAdvice(.evidenceOnly)
+            }
+            return s
+        }
+        return segments.sorted { ($0.provider, $0.kind) < ($1.provider, $1.kind) }
     }
 
     static func segment(
@@ -164,6 +197,7 @@ enum WindowStats {
             impliedDemandP90: percentile(implied, 0.9),
             sawCreditOverflow: active.contains { $0.limitReachedKind == 2 },
             observedDays: observedDays,
+            newestWindowEndMs: newest,
             advice: .evidenceOnly // placeholder, replaced below
         )
         return withAdvice(seg)
@@ -205,7 +239,10 @@ enum WindowStats {
                     "윈도우 60% 지점 이전에 상습적으로 소진",
                     "Chronically exhausted before 60% of the window"
                 ))
-            } else if s.maxedCount == 0, let p95 = s.p95Peak, p95 < 40, !s.p95IsCensored {
+            } else if s.maxedCount == 0, s.observedDays >= 28 - 1,
+                      let p95 = s.p95Peak, p95 < 40, !s.p95IsCensored {
+                // Downgrade is deliberately stricter than upgrade: it needs the
+                // full 28-day lookback with zero exhaustion (plan §2).
                 advice = .downgrade(reason: L.tr(
                     "28일간 소진 0회, p95 peak \(Int(p95))%",
                     "0 maxed windows in 28d, p95 peak \(Int(p95))%"
@@ -219,17 +256,7 @@ enum WindowStats {
             }
         }
 
-        return WindowStatsSegment(
-            provider: s.provider, kind: s.kind, plan: s.plan, account: s.account,
-            activeWindowCount: s.activeWindowCount, maxedCount: s.maxedCount,
-            medianTimeTo100Sec: s.medianTimeTo100Sec,
-            p50Peak: s.p50Peak, p90Peak: s.p90Peak, p95Peak: s.p95Peak,
-            p95IsCensored: s.p95IsCensored,
-            meanPeakActive: s.meanPeakActive, approxOverallMean: s.approxOverallMean,
-            dutyCycle: s.dutyCycle, impliedDemandP90: s.impliedDemandP90,
-            sawCreditOverflow: s.sawCreditOverflow, observedDays: s.observedDays,
-            advice: advice
-        )
+        return s.replacingAdvice(advice)
     }
 
     /// Nearest-rank percentile on a pre-sorted array.

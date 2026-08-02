@@ -96,6 +96,8 @@ final class CodexUsageMonitor {
     /// true = 일시적 서버 오류로 backoff 중. 인증 오류(401/403)는 포함하지 않음 — 재시도해도 의미 없음.
     var isInTransientBackoff: Bool { consecutiveFailures > 0 && !isAuthError }
     private(set) var isAuthError: Bool = false
+    /// true = a daemon answered but predates the WINDOWS command.
+    private(set) var daemonUnsupported: Bool = false
 
     private var pollingTask: Task<Void, Never>?
     private var sleepTask: Task<Void, Never>?
@@ -170,12 +172,18 @@ final class CodexUsageMonitor {
         // idle case (no open window rows to display).
         let daemonResult = await TokiWindowsClient.fetch(maxAgeMs: 120_000)
         guard generation == pollGeneration, !Task.isCancelled else { return }
-        if case .success(let resp) = daemonResult {
+        switch daemonResult {
+        case .success(let resp):
+            daemonUnsupported = false
             let nowMs = resp.nowMs ?? Int64(Date().timeIntervalSince1970 * 1000)
             if let entry = resp.providers?["codex"],
                applyDaemonEntry(entry, nowMs: nowMs) {
                 return
             }
+        case .unsupported:
+            daemonUnsupported = true
+        case .daemonDown:
+            break
         }
 
         // Re-check availability (user might delete auth.json)
@@ -249,17 +257,21 @@ final class CodexUsageMonitor {
         func window(_ row: WindowRow) -> CodexUsageWindow {
             let resetAt = Int(row.rawResetsAtMs / 1000)
             return CodexUsageWindow(
-                usedPercent: Int(row.peakPct.rounded()),
+                usedPercent: Int(row.livePct.rounded()),
                 limitWindowSeconds: row.windowMinutes * 60,
                 resetAfterSeconds: max(0, resetAt - Int(nowMs / 1000)),
                 resetAt: resetAt
             )
         }
         // Session-length window → primary, weekly → secondary; plans with only
-        // a weekly limit (e.g. prolite) surface it as primary, matching the
-        // provider's own presentation.
-        let session = open.first { $0.kind == "session" }
-        let weekly = open.first { $0.kind == "weekly" }
+        // a weekly limit (e.g. prolite) surface it as primary. Among multiple
+        // limit ids the main "codex" limit outranks model-specific ones.
+        func pick(_ kind: String) -> WindowRow? {
+            let candidates = open.filter { $0.kind == kind }
+            return candidates.first { $0.limitId == "codex" } ?? candidates.first
+        }
+        let session = pick("session")
+        let weekly = pick("weekly")
         let primary = session ?? weekly
         let secondary = (session != nil) ? weekly : nil
         guard let primary else { return false }

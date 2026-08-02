@@ -42,6 +42,23 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
         return TimeSeriesData(points: points, granularity: granularity)
     }
 
+    /// Fetch merged multi-device window rows from the server (windows metric,
+    /// scope=self). The server's rows are the field-wise merge of every synced
+    /// device — the authoritative statistics source for multi-device accounts.
+    func queryWindows(startEpoch: Int, endEpoch: Int) async throws -> [(provider: String, row: WindowRow)] {
+        let creds = try await requireCredentials()
+        let data = try await tokiQuery("windows", start: startEpoch, end: endEpoch,
+                                       step: "1h", creds: creds, retryOn401: true)
+        struct Envelope: Decodable {
+            let windows: [String: [WindowRow]]?
+        }
+        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+              let providers = envelope.windows else {
+            return []
+        }
+        return providers.flatMap { name, rows in rows.map { (name, $0) } }
+    }
+
     // MARK: - HTTP
 
     /// Query /api/v1/toki/query — returns toki-format JSON (same as local CLI).

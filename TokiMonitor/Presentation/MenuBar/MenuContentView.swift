@@ -304,6 +304,12 @@ struct MenuContentView: View {
                         codexUsageBar(row.0, percent: row.1, countdown: row.2)
                     }
                 }
+                if codexUsageMonitor?.daemonUnsupported == true {
+                    Text(L.tr("toki 업데이트 시 수집이 daemon으로 일원화됩니다 (v2.3+)",
+                              "Update toki (v2.3+) to unify collection in the daemon"))
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
         .padding(.leading, DS.sm)

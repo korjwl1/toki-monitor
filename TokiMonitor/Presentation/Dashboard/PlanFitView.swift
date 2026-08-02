@@ -16,6 +16,8 @@ struct PlanFitView: View {
     @State private var isLoading = false
     @State private var loadError: String?
     @State private var firstSeen: Date?
+    /// true = rows came from the sync server (multi-device merged statistics).
+    @State private var usingServerData = false
 
     var body: some View {
         ScrollView {
@@ -52,6 +54,11 @@ struct PlanFitView: View {
                 ))
                 .font(.system(size: DS.fontCaption))
                 .foregroundStyle(.secondary)
+                if usingServerData {
+                    Text(L.tr("동기화 서버 데이터 (전체 디바이스 병합)", "Sync-server data (all devices merged)"))
+                        .font(.system(size: DS.fontTiny))
+                        .foregroundStyle(.tertiary)
+                }
             }
             Spacer()
             Button {
@@ -204,7 +211,16 @@ struct PlanFitView: View {
         let now = Int(Date().timeIntervalSince1970)
         let start = now - Int(WindowStats.lookbackDays * 86_400)
         do {
-            let fetched = try await reportClient.queryWindows(startEpoch: start, endEpoch: now)
+            var fetched = try await reportClient.queryWindows(startEpoch: start, endEpoch: now)
+            usingServerData = false
+            // Multi-device accounts: the server's rows are the field-wise merge
+            // of every synced device — prefer them when sync is configured and
+            // the fetch succeeds; the local daemon remains the fallback.
+            if let serverRows = try? await ServerQueryClient().queryWindows(startEpoch: start, endEpoch: now),
+               !serverRows.isEmpty {
+                fetched = serverRows
+                usingServerData = true
+            }
             rows = fetched
             segments = WindowStats.segments(rows: fetched)
             firstSeen = fetched.map(\.row.firstSeenMs).min()

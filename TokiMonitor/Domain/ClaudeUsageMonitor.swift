@@ -280,7 +280,7 @@ final class ClaudeUsageMonitor {
         func bucket(_ limitId: String) -> UsageBucket? {
             open.first { $0.limitId == limitId }.map {
                 UsageBucket(
-                    utilization: $0.peakPct,
+                    utilization: $0.livePct,
                     resetsAt: Self.isoString(fromMs: $0.rawResetsAtMs)
                 )
             }
@@ -289,7 +289,7 @@ final class ClaudeUsageMonitor {
             fiveHour: bucket("five_hour"),
             sevenDay: bucket("seven_day"),
             sevenDaySonnet: bucket("seven_day_sonnet"),
-            extraUsage: nil
+            extraUsage: entry.extraUsageEnabled.map { ExtraUsage(isEnabled: $0) }
         )
         authReadUnreadable = false
         isAvailable = true

@@ -12,6 +12,9 @@ struct WindowRow: Codable, Sendable, Equatable, Hashable {
     let rawResetsAtMs: Int64
     let windowMinutes: Int
     let peakPct: Double
+    /// Latest raw utilization — the live-display value (can decrease across
+    /// server-side resets / credit refills, unlike the monotone peak).
+    let lastPct: Double?
     let observedTsMs: Int64
     let firstSeenMs: Int64
     let finalized: Bool
@@ -31,6 +34,7 @@ struct WindowRow: Codable, Sendable, Equatable, Hashable {
         case rawResetsAtMs = "raw_resets_at_ms"
         case windowMinutes = "window_minutes"
         case peakPct = "peak_pct"
+        case lastPct = "last_pct"
         case observedTsMs = "observed_ts_ms"
         case firstSeenMs = "first_seen_ms"
         case finalized
@@ -43,11 +47,14 @@ struct WindowRow: Codable, Sendable, Equatable, Hashable {
         case plan
     }
 
-    /// An open window is the provider's *current* state: utilization is
-    /// monotone within a window, so its peak equals the live percentage.
+    /// An open window is the provider's *current* state.
     func isOpen(nowMs: Int64) -> Bool {
         !finalized && rawResetsAtMs > nowMs
     }
+
+    /// Live utilization: the latest raw value when the daemon provides it
+    /// (older daemons omit last_pct — fall back to the peak).
+    var livePct: Double { lastPct ?? peakPct }
 }
 
 struct WindowsProviderEntry: Codable, Sendable {
@@ -57,6 +64,7 @@ struct WindowsProviderEntry: Codable, Sendable {
     let lastPollMs: Int64?
     let plan: String?
     let pollingEnabled: Bool?
+    let extraUsageEnabled: Bool?
 
     enum CodingKeys: String, CodingKey {
         case windows
@@ -65,6 +73,7 @@ struct WindowsProviderEntry: Codable, Sendable {
         case lastPollMs = "last_poll_ms"
         case plan
         case pollingEnabled = "polling_enabled"
+        case extraUsageEnabled = "extra_usage_enabled"
     }
 }
 
