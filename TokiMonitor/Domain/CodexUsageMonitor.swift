@@ -164,6 +164,20 @@ final class CodexUsageMonitor {
     // MARK: - Polling
 
     private func pollOnce(generation: Int) async {
+        // Daemon-first: Codex windows are extracted passively from rollout
+        // files the daemon already watches — zero API calls. The direct
+        // wham/usage path below remains for old daemons, daemon-down, and the
+        // idle case (no open window rows to display).
+        let daemonResult = await TokiWindowsClient.fetch(maxAgeMs: 120_000)
+        guard generation == pollGeneration, !Task.isCancelled else { return }
+        if case .success(let resp) = daemonResult {
+            let nowMs = resp.nowMs ?? Int64(Date().timeIntervalSince1970 * 1000)
+            if let entry = resp.providers?["codex"],
+               applyDaemonEntry(entry, nowMs: nowMs) {
+                return
+            }
+        }
+
         // Re-check availability (user might delete auth.json)
         guard CodexAuthReader.isAvailable else {
             isAvailable = false
@@ -211,6 +225,64 @@ final class CodexUsageMonitor {
             lastError = error.localizedDescription
             consecutiveFailures += 1
         }
+    }
+
+    /// Apply a daemon WINDOWS entry. Returns false when the daemon has nothing
+    /// live to show (no open rows — e.g. idle: passive extraction has no rows
+    /// until usage flows), letting the direct path serve that tick.
+    private func applyDaemonEntry(_ entry: WindowsProviderEntry, nowMs: Int64) -> Bool {
+        switch entry.authStatus {
+        case "ok":
+            break
+        case "missing":
+            isAvailable = false
+            currentUsage = nil
+            lastError = nil
+            return true
+        default: // unreadable — keep prior state
+            return true
+        }
+
+        let open = entry.windows.filter { $0.isOpen(nowMs: nowMs) }
+        guard !open.isEmpty else { return false }
+
+        func window(_ row: WindowRow) -> CodexUsageWindow {
+            let resetAt = Int(row.rawResetsAtMs / 1000)
+            return CodexUsageWindow(
+                usedPercent: Int(row.peakPct.rounded()),
+                limitWindowSeconds: row.windowMinutes * 60,
+                resetAfterSeconds: max(0, resetAt - Int(nowMs / 1000)),
+                resetAt: resetAt
+            )
+        }
+        // Session-length window → primary, weekly → secondary; plans with only
+        // a weekly limit (e.g. prolite) surface it as primary, matching the
+        // provider's own presentation.
+        let session = open.first { $0.kind == "session" }
+        let weekly = open.first { $0.kind == "weekly" }
+        let primary = session ?? weekly
+        let secondary = (session != nil) ? weekly : nil
+        guard let primary else { return false }
+
+        let reached = open.contains { $0.limitReachedKind > 0 }
+        let usage = CodexUsageResponse(
+            planType: primary.plan,
+            rateLimit: CodexRateLimit(
+                allowed: !reached,
+                limitReached: reached,
+                primaryWindow: window(primary),
+                secondaryWindow: secondary.map(window)
+            ),
+            credits: nil
+        )
+        isAvailable = true
+        currentUsage = usage
+        lastError = nil
+        consecutiveFailures = 0
+        isAuthError = false
+        settings.codexHasSecondaryWindow = (usage.rateLimit.secondaryWindow != nil)
+        checkThresholds(usage)
+        return true
     }
 
     // MARK: - Threshold Alerts

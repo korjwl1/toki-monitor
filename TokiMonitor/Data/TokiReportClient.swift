@@ -13,15 +13,38 @@ final class TokiReportClient: Sendable, QueryDataSource {
         return TokiReportParser.parseReport(data)
     }
 
-    /// Run a PromQL query via `toki query` (top-level command).
-    /// The `since`/`until` parameters are accepted for API compatibility but ignored —
-    /// the PromQL range vector (e.g. `[1h]`) determines the time window.
+    /// Run a PromQL query via `toki query`, bounding the scan with
+    /// --start/--end when given. (These were previously accepted but silently
+    /// dropped, so TokenAggregator's graph-range fetch scanned all history.)
     func queryPromQL(query: String, since: String? = nil, until: String? = nil) async throws -> [Date: [TokiModelSummary]] {
+        var arguments = ["query", "-z", "UTC", "--output-format", "json"]
+        if let since { arguments += ["--start", since] }
+        if let until { arguments += ["--end", until] }
+        arguments.append(query)
         let data = try await CLIProcessRunner.run(
             executable: TokiPath.resolved,
-            arguments: ["query", "-z", "UTC", "--output-format", "json", query]
+            arguments: arguments
         )
         return TokiReportParser.parseReport(data)
+    }
+
+    /// Fetch rate-limit window rows via `toki query windows` for the plan-fit
+    /// statistics view. Returns (provider, row) pairs.
+    func queryWindows(startEpoch: Int, endEpoch: Int) async throws -> [(provider: String, row: WindowRow)] {
+        let data = try await CLIProcessRunner.run(
+            executable: TokiPath.resolved,
+            arguments: ["query", "-z", "UTC", "--output-format", "json",
+                        "--start", "\(startEpoch)", "--end", "\(endEpoch)", "windows"]
+        )
+        // Envelope: {"information": {...}, "providers": {"<name>": [WindowRow...]}}
+        struct Envelope: Decodable {
+            let providers: [String: [WindowRow]]?
+        }
+        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+              let providers = envelope.providers else {
+            return []
+        }
+        return providers.flatMap { name, rows in rows.map { (name, $0) } }
     }
 
     /// Run a range query via `toki query --start/--end/--step` (Prometheus/VM query_range compatible).

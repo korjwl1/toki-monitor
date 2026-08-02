@@ -77,6 +77,10 @@ final class ClaudeUsageMonitor {
     private(set) var isAuthMissing: Bool = false
     var isPolling: Bool { pollingTask != nil }
     var isInBackoff: Bool { consecutiveFailures > 0 }
+    /// true = a daemon answered but predates the WINDOWS command (or has window
+    /// tracking disabled). Live data still flows via the legacy direct path;
+    /// the UI can hint that updating toki unifies collection in the daemon.
+    private(set) var daemonUnsupported: Bool = false
 
     private let aggregator: TokenAggregator
     private let settings: AppSettings
@@ -131,12 +135,41 @@ final class ClaudeUsageMonitor {
     /// 현재 sleep 중이면 즉시 중단하고 다음 poll을 앞당깁니다.
     func wakeForImmediatePoll() {
         guard pollingTask != nil else { return }
+        // A token-flow wake implies possible re-login: ask the daemon for a
+        // forced revalidation (max_age=0) on the poll this wake triggers.
+        forceFreshNext = true
         sleepTask?.cancel()
     }
+
+    /// Next daemon fetch must revalidate (set by wakeForImmediatePoll).
+    private var forceFreshNext = false
 
     // MARK: - Polling
 
     private func pollOnce(generation: Int) async {
+        // Daemon-first: the daemon owns Claude window collection (single
+        // poller, single call budget, works while this app is closed). The
+        // direct Keychain+HTTP path below survives as the fallback for old
+        // daemons and daemon-down, re-detected every tick.
+        let maxAge: Int64 = forceFreshNext ? 0 : 120_000
+        forceFreshNext = false
+        let daemonResult = await TokiWindowsClient.fetch(maxAgeMs: maxAge)
+        guard generation == pollGeneration, !Task.isCancelled else { return }
+        switch daemonResult {
+        case .success(let resp):
+            daemonUnsupported = false
+            let nowMs = resp.nowMs ?? Int64(Date().timeIntervalSince1970 * 1000)
+            if let entry = resp.providers?["claude_code"],
+               applyDaemonEntry(entry, nowMs: nowMs) {
+                return
+            }
+            // No claude entry / daemon can't serve live state → legacy path.
+        case .unsupported:
+            daemonUnsupported = true
+        case .daemonDown:
+            break
+        }
+
         // Single off-main Keychain read → availability, token validity, and
         // transient-failure status, all from one invocation.
         let result = await ClaudeAuthReader.read()
@@ -202,6 +235,77 @@ final class ClaudeUsageMonitor {
             consecutiveFailures += 1
             if consecutiveFailures >= 3 { lastError = error.localizedDescription }
         }
+    }
+
+    /// Apply a daemon WINDOWS entry to this monitor's state machine. Returns
+    /// false when the daemon cannot serve live Claude state (polling disabled,
+    /// or no data yet) so the caller falls through to the direct path.
+    /// The auth_status mapping mirrors ClaudeAuthReader's classification
+    /// exactly — the UI state machine (isAuthMissing / isAvailable / lastError)
+    /// is preserved, just fed from daemon-sourced values.
+    private func applyDaemonEntry(_ entry: WindowsProviderEntry, nowMs: Int64) -> Bool {
+        guard entry.pollingEnabled == true else { return false }
+
+        switch entry.authStatus {
+        case "ok":
+            break
+        case "expired":
+            authReadUnreadable = false
+            isAvailable = true
+            currentUsage = nil
+            consecutiveFailures = 0
+            isAuthMissing = true
+            lastError = L.tr("Claude 재로그인 필요", "Claude re-login required")
+            return true
+        case "missing":
+            authReadUnreadable = false
+            isAvailable = false
+            currentUsage = nil
+            consecutiveFailures = 0
+            isAuthMissing = false
+            lastError = nil
+            return true
+        default: // "unreadable" — keep prior state, retry fast (same as legacy)
+            authReadUnreadable = true
+            return true
+        }
+
+        let open = entry.windows.filter { $0.isOpen(nowMs: nowMs) }
+        // Auth is fine but the daemon has neither polled nor stored anything —
+        // a just-started daemon. Let the direct path cover this tick.
+        if open.isEmpty && (entry.lastSuccessMs ?? 0) == 0 {
+            return false
+        }
+
+        func bucket(_ limitId: String) -> UsageBucket? {
+            open.first { $0.limitId == limitId }.map {
+                UsageBucket(
+                    utilization: $0.peakPct,
+                    resetsAt: Self.isoString(fromMs: $0.rawResetsAtMs)
+                )
+            }
+        }
+        let usage = ClaudeUsageResponse(
+            fiveHour: bucket("five_hour"),
+            sevenDay: bucket("seven_day"),
+            sevenDaySonnet: bucket("seven_day_sonnet"),
+            extraUsage: nil
+        )
+        authReadUnreadable = false
+        isAvailable = true
+        isAuthMissing = false
+        currentUsage = usage
+        lastError = nil
+        consecutiveFailures = 0
+        settings.claudeHasSevenDaySonnet = (usage.sevenDaySonnet != nil)
+        checkThresholds(usage)
+        return true
+    }
+
+    private static func isoString(fromMs ms: Int64) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: Date(timeIntervalSince1970: Double(ms) / 1000))
     }
 
     /// The server rejected a token that looked locally valid (revoked, or an

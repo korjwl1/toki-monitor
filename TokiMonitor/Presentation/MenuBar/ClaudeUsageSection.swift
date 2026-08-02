@@ -26,6 +26,12 @@ struct ClaudeUsageSection: View {
                 if let sonnet = usage.sevenDaySonnet {
                     usageBar(label: "7일 Sonnet", bucket: sonnet)
                 }
+                if monitor.daemonUnsupported {
+                    Text(L.tr("toki 업데이트 시 수집이 daemon으로 일원화됩니다 (v2.3+)",
+                              "Update toki (v2.3+) to unify collection in the daemon"))
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
                 if usage.extraUsage?.isEnabled == true {
                     HStack(spacing: 4) {
                         Image(systemName: "bolt.fill")

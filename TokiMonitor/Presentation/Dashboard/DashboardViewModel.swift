@@ -80,7 +80,7 @@ final class DashboardViewModel {
     private var exploreTask: Task<Void, Never>?
 
     // MARK: - Dependencies
-    private let reportClient: TokiReportClient
+    let reportClient: TokiReportClient
     private let serverQueryClient: ServerQueryClient
     /// Active query client, swapped when `dataSource` changes.
     private var queryClient: any QueryDataSource

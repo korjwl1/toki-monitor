@@ -19,6 +19,7 @@ struct DashboardView: View {
 
     enum SidebarItem: Hashable {
         case explore
+        case planFit
     }
 
     init(reportClient: TokiReportClient) {
@@ -75,6 +76,8 @@ struct DashboardView: View {
                 switch sidebarSelection {
                 case .explore:
                     ExploreView(viewModel: viewModel)
+                case .planFit:
+                    PlanFitView(reportClient: viewModel.reportClient)
                 case nil:
                     dashboardContent
                 }
@@ -97,6 +100,8 @@ struct DashboardView: View {
             Section {
                 Label(L.dash.explore, systemImage: "magnifyingglass.circle")
                     .tag(SidebarItem.explore)
+                Label(L.tr("요금제 적합도", "Plan Fit"), systemImage: "gauge.with.needle")
+                    .tag(SidebarItem.planFit)
             }
 
             Section(header: HStack {
