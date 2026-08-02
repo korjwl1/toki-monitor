@@ -50,12 +50,17 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
         let data = try await tokiQuery("windows", start: startEpoch, end: endEpoch,
                                        step: "1h", creds: creds, retryOn401: true)
         struct Envelope: Decodable {
+            let schema: Int?
             let windows: [String: [WindowRow]]?
         }
-        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
-              let providers = envelope.windows else {
-            return []
+        // Decode/schema failures must THROW: an HTTP-200 body we cannot read
+        // is a failed source, and mapping it to [] made Plan Fit display
+        // \"no data yet\" over real errors (and set serverFailed=false).
+        let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+        if let schema = envelope.schema, schema != 1 {
+            throw ServerQueryError.invalidResponse
         }
+        let providers = envelope.windows ?? [:]
         return providers.flatMap { name, rows in rows.map { (name, $0) } }
     }
 

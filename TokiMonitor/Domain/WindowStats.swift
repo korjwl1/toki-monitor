@@ -161,10 +161,12 @@ enum WindowStats {
         guard !active.isEmpty else { return nil }
 
         let maxed = active.filter(\.maxedOut)
-        let wellCovered = active.filter { $0.lastSampleGapMs <= coverageGapLimitMs }
-        // Percentiles use well-covered windows; censored (maxed) windows are
-        // exact at ">=100", so they stay in the sample — percentiles below the
-        // censoring fraction are unaffected, and we flag p95 when censored.
+        // Percentile sample: well-covered windows PLUS every maxed window —
+        // a maxed row is exact at \">=100\" no matter how large its sample
+        // gap (dropping 100% rows for low coverage computed p95=30 against a
+        // true p95 of 100). Low-coverage non-maxed rows stay excluded: their
+        // peaks are lower bounds of unknown looseness.
+        let wellCovered = active.filter { $0.lastSampleGapMs <= coverageGapLimitMs || $0.maxedOut }
         let peaks = wellCovered.map(\.peakPct).sorted()
         let censoredFraction = Double(maxed.count) / Double(active.count)
 
@@ -184,7 +186,12 @@ enum WindowStats {
         // 28 days have anchors only 21 days apart, which under-counted the
         // observation period (and delayed the 28-day downgrade gate).
         let windowLenMs = Int64((active.first?.windowMinutes ?? 0)) * 60_000
-        let observedDays = Double(newest - oldest + windowLenMs) / 86_400_000
+        // Capped at the lookback: a boundary weekly anchor plus one window
+        // length can read 35 days, deflating per-week rates by ~20%.
+        let observedDays = min(
+            Double(newest - oldest + windowLenMs) / 86_400_000,
+            lookbackDays
+        )
 
         let meanPeakActive = active.isEmpty
             ? nil
