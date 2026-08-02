@@ -169,6 +169,9 @@ final class ClaudeUsageMonitor {
             let nowMs = resp.nowMs ?? Int64(Date().timeIntervalSince1970 * 1000)
             if let entry = resp.providers?["claude_code"],
                applyDaemonEntry(entry, nowMs: nowMs) {
+                // The daemon served stale data and is refreshing in the
+                // background — follow up shortly instead of sleeping minutes.
+                if resp.refreshing == true { retryShortlyOnce = true }
                 return
             }
             // No claude entry / daemon can't serve live state → legacy path.
@@ -341,7 +344,14 @@ final class ClaudeUsageMonitor {
 
     // MARK: - Adaptive Interval
 
+    /// One-shot short retry after a daemon `refreshing:true` response.
+    private var retryShortlyOnce = false
+
     private func computeInterval() -> TimeInterval {
+        if retryShortlyOnce {
+            retryShortlyOnce = false
+            return 3
+        }
         // Transient Keychain read failure: retry soon to recover, don't back off.
         if authReadUnreadable { return 20 }
         if !isAvailable { return 60 }

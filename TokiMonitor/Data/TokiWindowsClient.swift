@@ -23,6 +23,9 @@ struct WindowRow: Codable, Sendable, Equatable, Hashable {
     let timeTo100Ms: Int64        // -1 = never reached 100%
     let activeMs: Int64
     let lastSampleGapMs: Int64
+    /// Coverage fraction ×1000 (present since daemon v2.3; optional for
+    /// forward-compat with responses that omit it).
+    let sampledActiveFraction: Int?
     let nSamples: Int
     let plan: String
 
@@ -43,6 +46,7 @@ struct WindowRow: Codable, Sendable, Equatable, Hashable {
         case timeTo100Ms = "time_to_100_ms"
         case activeMs = "active_ms"
         case lastSampleGapMs = "last_sample_gap_ms"
+        case sampledActiveFraction = "sampled_active_fraction"
         case nSamples = "n_samples"
         case plan
     }
@@ -122,6 +126,11 @@ private actor WindowsFetchCoordinator {
 
     private var cached: (atMs: Int64, result: WindowsFetchResult)?
     private var inflight: Task<WindowsFetchResult, Never>?
+    /// Monotone request generation: a forced request may start while a normal
+    /// one is still running; only the NEWEST completion may write the cache
+    /// (and only the owner may clear `inflight`), so a slow older request can
+    /// never roll the cache back over a fresher forced result.
+    private var generation: UInt64 = 0
 
     func fetch(socketPath: String, maxAgeMs: Int64?) async -> WindowsFetchResult {
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
@@ -132,13 +141,17 @@ private actor WindowsFetchCoordinator {
         if !forced, let inflight {
             return await inflight.value
         }
+        generation += 1
+        let myGeneration = generation
         let task = Task.detached(priority: .utility) {
             TokiWindowsClient.fetchBlocking(socketPath: socketPath, maxAgeMs: maxAgeMs)
         }
         inflight = task
         let result = await task.value
-        inflight = nil
-        cached = (Int64(Date().timeIntervalSince1970 * 1000), result)
+        if generation == myGeneration {
+            inflight = nil
+            cached = (Int64(Date().timeIntervalSince1970 * 1000), result)
+        }
         return result
     }
 }
@@ -243,6 +256,11 @@ enum TokiWindowsClient {
             return .daemonDown
         }
         if resp.ok {
+            // A schema we don't understand must be a typed miss, not a
+            // silently-misdecoded success.
+            if let schema = resp.schema, schema != 1 {
+                return .unavailable
+            }
             return .success(resp)
         }
         // Only "unknown command" proves an old binary. A current daemon with

@@ -94,6 +94,18 @@ enum WindowStats {
         let cutoff = nowMs - Int64(lookbackDays * 86_400_000)
         let eligible = rows.filter { $0.row.finalized && $0.row.windowEndMs >= cutoff }
 
+        // Current tier/account per (provider, kind, limit) — considers OPEN
+        // rows too: right after a plan change the newest finalized row still
+        // belongs to the old tier (for weekly limits up to 7 days), and advice
+        // against an abandoned tier is noise.
+        var currentSegmentKey: [String: (plan: String, account: String, endMs: Int64)] = [:]
+        for (provider, row) in rows where row.windowEndMs >= cutoff {
+            let key = [provider, row.kind, row.limitId].joined(separator: "|")
+            if row.windowEndMs > (currentSegmentKey[key]?.endMs ?? 0) {
+                currentSegmentKey[key] = (row.plan, row.account, row.windowEndMs)
+            }
+        }
+
         var groups: [String: [(String, WindowRow)]] = [:]
         for (provider, row) in eligible {
             let key = [provider, row.kind, row.limitId, row.plan, row.account].joined(separator: "|")
@@ -118,14 +130,10 @@ enum WindowStats {
         // containing the newest window per provider+kind); historical segments
         // keep their numbers but show evidence only — recommending against a
         // tier the user already left is noise (plan §2 tier gating).
-        var newestByKey: [String: Int64] = [:]
-        for s in segments {
-            let key = "\(s.provider)|\(s.kind)|\(s.limitId)"
-            newestByKey[key] = max(newestByKey[key] ?? 0, s.newestWindowEndMs)
-        }
         segments = segments.map { s in
             let key = "\(s.provider)|\(s.kind)|\(s.limitId)"
-            if s.newestWindowEndMs < (newestByKey[key] ?? 0) {
+            if let current = currentSegmentKey[key],
+               s.plan != current.plan || s.account != current.account {
                 return s.replacingAdvice(.evidenceOnly)
             }
             return s
@@ -142,9 +150,14 @@ enum WindowStats {
         rows: [WindowRow],
         nowMs: Int64
     ) -> WindowStatsSegment? {
-        // Active window := has usage (a row only exists after a >0% observation)
-        // AND either recorded activity or a nonzero peak.
-        let active = rows.filter { $0.activeMs > 0 || $0.peakPct > 0 }
+        // Sample definition differs by kind. Session windows only exist while
+        // used, so zero rows are noise. Weekly windows always exist — the
+        // Claude poller records genuine zero-use weeks, and DROPPING them
+        // biases the weekly mean and percentiles upward (a fully idle account
+        // would lose its segment entirely).
+        let active = kind == "weekly"
+            ? rows
+            : rows.filter { $0.activeMs > 0 || $0.peakPct > 0 }
         guard !active.isEmpty else { return nil }
 
         let maxed = active.filter(\.maxedOut)
@@ -167,7 +180,11 @@ enum WindowStats {
 
         let oldest = active.map(\.windowEndMs).min() ?? nowMs
         let newest = active.map(\.windowEndMs).max() ?? nowMs
-        let observedDays = Double(newest - oldest) / 86_400_000
+        // End-anchor span PLUS one window length: four weekly windows covering
+        // 28 days have anchors only 21 days apart, which under-counted the
+        // observation period (and delayed the 28-day downgrade gate).
+        let windowLenMs = Int64((active.first?.windowMinutes ?? 0)) * 60_000
+        let observedDays = Double(newest - oldest + windowLenMs) / 86_400_000
 
         let meanPeakActive = active.isEmpty
             ? nil
@@ -182,7 +199,10 @@ enum WindowStats {
             approxOverall = active.map(\.peakPct).reduce(0, +) / max(slots, 1)
         }
 
-        let wallMs = min(Int64(lookbackDays * 86_400_000), max(nowMs - oldest, 1))
+        // Wall clock from the OLDEST WINDOW'S START (not its end): dividing
+        // four windows' activity by an end-to-now span overstated duty cycle
+        // by up to one window length.
+        let wallMs = min(Int64(lookbackDays * 86_400_000), max(nowMs - (oldest - windowLenMs), 1))
         let dutyCycle = min(1.0, Double(active.map(\.activeMs).reduce(0, +)) / Double(wallMs))
 
         let medianT100 = percentile(t100s, 0.5)
@@ -224,8 +244,10 @@ enum WindowStats {
             let weeks = max(s.observedDays / 7, 1)
             let maxedPerWeek = Double(s.maxedCount) / weeks
             let windowMinutes: Double = s.kind == "session" ? 300 : 10_080
-            let chronicEarlyExhaustion =
-                (s.medianTimeTo100Sec ?? .infinity) < windowMinutes * 60 * 0.6
+            // "Chronic" requires recurrence: with one max-out the median IS
+            // that single sample, and this branch bypassed the 2-per-week gate.
+            let chronicEarlyExhaustion = s.maxedCount >= 2
+                && (s.medianTimeTo100Sec ?? .infinity) < windowMinutes * 60 * 0.6
 
             if s.sawCreditOverflow {
                 advice = .upgrade(reason: L.tr(

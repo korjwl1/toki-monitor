@@ -178,6 +178,9 @@ final class CodexUsageMonitor {
             let nowMs = resp.nowMs ?? Int64(Date().timeIntervalSince1970 * 1000)
             if let entry = resp.providers?["codex"],
                applyDaemonEntry(entry, nowMs: nowMs) {
+                // The daemon served stale data and is refreshing in the
+                // background — follow up shortly instead of sleeping minutes.
+                if resp.refreshing == true { retryShortlyOnce = true }
                 return
             }
         case .unsupported:
@@ -417,7 +420,14 @@ final class CodexUsageMonitor {
 
     // MARK: - Adaptive Interval
 
+    /// One-shot short retry after a daemon `refreshing:true` response.
+    private var retryShortlyOnce = false
+
     private func computeInterval() -> TimeInterval {
+        if retryShortlyOnce {
+            retryShortlyOnce = false
+            return 3
+        }
         // Backoff capped at 60s: recovers within 1 minute after transient errors/auth expiry
         if consecutiveFailures > 0 {
             return min(30 * pow(2, Double(consecutiveFailures - 1)), 60)

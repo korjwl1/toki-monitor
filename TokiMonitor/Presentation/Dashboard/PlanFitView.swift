@@ -205,24 +205,35 @@ struct PlanFitView: View {
         defer { isLoading = false }
         let now = Int(Date().timeIntervalSince1970)
         let start = now - Int(WindowStats.lookbackDays * 86_400)
-        // Both sources are attempted independently: a broken local CLI must
-        // not gate the sync server (which may be the one holding the data),
-        // and vice versa. Server rows (field-wise merge of every synced
-        // device) win when present.
-        let localRows = (try? await reportClient.queryWindows(startEpoch: start, endEpoch: now)) ?? []
-        let serverRows = (try? await serverClient.queryWindows(startEpoch: start, endEpoch: now)) ?? []
-        let fetched: [(provider: String, row: WindowRow)]
-        if !serverRows.isEmpty {
-            fetched = serverRows
-            usingServerData = true
-        } else {
-            fetched = localRows
-            usingServerData = false
+        // Both sources fetched in PARALLEL and arbitrated PER PROVIDER: the
+        // server (multi-device merge) wins for providers it actually has, but
+        // a server that only knows Claude must not discard richer local
+        // Codex history — and a broken local CLI must not gate the server.
+        async let localAsync = fetchLocal(start: start, end: now)
+        async let serverAsync = fetchServer(start: start, end: now)
+        let (localRows, localFailed) = await localAsync
+        let (serverRows, serverFailed) = await serverAsync
+
+        var serverProviders = Set<String>()
+        for entry in serverRows { serverProviders.insert(entry.provider) }
+        var fetched = serverRows
+        for entry in localRows where !serverProviders.contains(entry.provider) {
+            fetched.append(entry)
         }
-        if fetched.isEmpty && localRows.isEmpty && serverRows.isEmpty {
+        usingServerData = !serverRows.isEmpty
+
+        if fetched.isEmpty {
             segments = []
             historyBySegment = [:]
-            loadError = nil // empty state renders guidance; hard error only stays if nothing ever loads
+            // Distinguish "both sources answered: no data yet" (guidance
+            // empty-state) from "every source FAILED" (real error): masking
+            // a missing CLI or a server 500 as 'no data' hides the problem.
+            loadError = (localFailed && serverFailed)
+                ? L.tr(
+                    "윈도우 데이터를 불러오지 못했습니다 — toki daemon(v2.3+)과 동기화 서버 연결을 확인하세요",
+                    "Could not load window data — check toki daemon (v2.3+) and sync-server connectivity"
+                )
+                : nil
             return
         }
         let segs = WindowStats.segments(rows: fetched)
@@ -243,6 +254,16 @@ struct PlanFitView: View {
         segments = segs
         historyBySegment = history
         loadError = nil
+    }
+
+    private func fetchLocal(start: Int, end: Int) async -> ([(provider: String, row: WindowRow)], failed: Bool) {
+        do { return (try await reportClient.queryWindows(startEpoch: start, endEpoch: end), false) }
+        catch { return ([], true) }
+    }
+
+    private func fetchServer(start: Int, end: Int) async -> ([(provider: String, row: WindowRow)], failed: Bool) {
+        do { return (try await serverClient.queryWindows(startEpoch: start, endEpoch: end), false) }
+        catch { return ([], true) }
     }
 
     private func providerTitle(_ name: String) -> String {

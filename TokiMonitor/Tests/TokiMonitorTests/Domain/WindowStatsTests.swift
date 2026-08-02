@@ -29,7 +29,7 @@ final class WindowStatsTests: XCTestCase {
             finalized: finalized, maxedOut: maxed,
             limitReachedKind: maxed ? max(limitReachedKind, 1) : limitReachedKind,
             timeTo100Ms: timeTo100Ms, activeMs: activeMs,
-            lastSampleGapMs: gapMs, nSamples: 10, plan: plan
+            lastSampleGapMs: gapMs, sampledActiveFraction: 1000, nSamples: 10, plan: plan
         )
     }
 

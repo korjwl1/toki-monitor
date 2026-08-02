@@ -40,10 +40,11 @@ final class TokiReportClient: Sendable, QueryDataSource {
         struct Envelope: Decodable {
             let providers: [String: [WindowRow]]?
         }
-        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
-              let providers = envelope.providers else {
-            return []
-        }
+        // A non-empty payload that fails to decode is an ERROR (schema
+        // mismatch, old CLI) — swallowing it here made every failure look
+        // like "no data yet" upstream.
+        let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+        let providers = envelope.providers ?? [:]
         return providers.flatMap { name, rows in rows.map { (name, $0) } }
     }
 
