@@ -178,9 +178,10 @@ final class CodexUsageMonitor {
             let nowMs = resp.nowMs ?? Int64(Date().timeIntervalSince1970 * 1000)
             if let entry = resp.providers?["codex"],
                applyDaemonEntry(entry, nowMs: nowMs) {
-                // The daemon served stale data and is refreshing in the
-                // background — follow up shortly instead of sleeping minutes.
-                if resp.refreshing == true { retryShortlyOnce = true }
+                // NOTE: resp.refreshing is a CLAUDE-poller signal (the
+                // daemon's bounded revalidation timed out); Codex is passive
+                // file extraction — reacting here put this monitor into a 3s
+                // poll loop whenever the Claude poller was slow.
                 return
             }
         case .unsupported:
@@ -240,9 +241,17 @@ final class CodexUsageMonitor {
         }
     }
 
+    /// Last time the direct (wham) path ran while daemon rows were stale —
+    /// bounds the fallback probes to ~2/hour during idle.
+    private var lastStaleDirectProbe: Date = .distantPast
+
     /// Apply a daemon WINDOWS entry. Returns false when the daemon has nothing
     /// live to show (no open rows — e.g. idle: passive extraction has no rows
-    /// until usage flows), letting the direct path serve that tick.
+    /// until usage flows), or when its rows are STALE and a direct probe is
+    /// due: Codex auth expiry is invisible to the daemon (auth.json carries
+    /// no expiry; the passive path never gets a 401), so an open weekly row
+    /// could mask a dead login for up to 7 days. The occasional direct call
+    /// is the only 401 detector.
     private func applyDaemonEntry(_ entry: WindowsProviderEntry, nowMs: Int64) -> Bool {
         switch entry.authStatus {
         case "ok":
@@ -265,6 +274,13 @@ final class CodexUsageMonitor {
 
         let open = entry.windows.filter { $0.isOpen(nowMs: nowMs) }
         guard !open.isEmpty else { return false }
+
+        let newestObservedMs = open.map(\.observedTsMs).max() ?? 0
+        let staleMs = nowMs - newestObservedMs
+        if staleMs > 30 * 60_000, Date().timeIntervalSince(lastStaleDirectProbe) > 30 * 60 {
+            lastStaleDirectProbe = Date()
+            return false // direct path verifies the token (401 → re-login UI)
+        }
 
         func window(_ row: WindowRow) -> CodexUsageWindow {
             let resetAt = Int(row.rawResetsAtMs / 1000)
@@ -420,14 +436,7 @@ final class CodexUsageMonitor {
 
     // MARK: - Adaptive Interval
 
-    /// One-shot short retry after a daemon `refreshing:true` response.
-    private var retryShortlyOnce = false
-
     private func computeInterval() -> TimeInterval {
-        if retryShortlyOnce {
-            retryShortlyOnce = false
-            return 3
-        }
         // Backoff capped at 60s: recovers within 1 minute after transient errors/auth expiry
         if consecutiveFailures > 0 {
             return min(30 * pow(2, Double(consecutiveFailures - 1)), 60)
