@@ -7,6 +7,7 @@ final class WindowStatsTests: XCTestCase {
 
     private func row(
         kind: String = "session",
+        limitId: String? = nil,
         endOffsetDays: Double,
         peak: Double,
         maxed: Bool = false,
@@ -21,7 +22,7 @@ final class WindowStatsTests: XCTestCase {
     ) -> WindowRow {
         let end = nowMs - Int64(endOffsetDays * 86_400_000)
         return WindowRow(
-            kind: kind, limitId: kind == "session" ? "five_hour" : "seven_day",
+            kind: kind, limitId: limitId ?? (kind == "session" ? "five_hour" : "seven_day"),
             account: account, windowEndMs: end, rawResetsAtMs: end,
             windowMinutes: windowMinutes, peakPct: peak, lastPct: peak,
             observedTsMs: end - 1000, firstSeenMs: end - 3_600_000,
@@ -166,6 +167,24 @@ final class WindowStatsTests: XCTestCase {
         guard case .upgrade = s.advice else {
             return XCTFail("expected upgrade, got \(s.advice)")
         }
+    }
+
+    func testWeeklyLimitsNeverBlend() {
+        // seven_day and seven_day_sonnet are both kind "weekly" but measure
+        // DIFFERENT limits — one week maxing both must not count as 2 max-outs
+        // of a single statistic.
+        var rows: [(provider: String, row: WindowRow)] = []
+        for d in 0..<16 {
+            rows.append(("claude_code", row(kind: "weekly", limitId: "seven_day", endOffsetDays: Double(d), peak: 90, windowMinutes: 10_080)))
+            rows.append(("claude_code", row(kind: "weekly", limitId: "seven_day_sonnet", endOffsetDays: Double(d), peak: 20, windowMinutes: 10_080)))
+        }
+        let segs = WindowStats.segments(rows: rows, nowMs: nowMs)
+        XCTAssertEqual(segs.count, 2)
+        let overall = segs.first { $0.limitId == "seven_day" }!
+        let sonnet = segs.first { $0.limitId == "seven_day_sonnet" }!
+        XCTAssertEqual(overall.activeWindowCount, 16)
+        XCTAssertEqual(overall.p95Peak, 90)
+        XCTAssertEqual(sonnet.p95Peak, 20)
     }
 
     func testAdviceOnlyForCurrentTierSegment() {

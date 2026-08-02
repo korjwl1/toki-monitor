@@ -182,8 +182,10 @@ final class CodexUsageMonitor {
             }
         case .unsupported:
             daemonUnsupported = true
+        case .unavailable:
+            daemonUnsupported = false
         case .daemonDown:
-            break
+            daemonUnsupported = false
         }
 
         // Re-check availability (user might delete auth.json)
@@ -247,6 +249,13 @@ final class CodexUsageMonitor {
             currentUsage = nil
             lastError = nil
             return true
+        case "expired":
+            // Mirror the legacy 401 path: surface re-login instead of freezing
+            // stale usage forever (the daemon path must not swallow this).
+            isAvailable = true
+            isAuthError = true
+            lastError = L.tr("Codex 재로그인 필요", "Codex re-login required")
+            return true
         default: // unreadable — keep prior state
             return true
         }
@@ -256,10 +265,14 @@ final class CodexUsageMonitor {
 
         func window(_ row: WindowRow) -> CodexUsageWindow {
             let resetAt = Int(row.rawResetsAtMs / 1000)
+            // Clamp before Int(): a buggy wire double must degrade, not trap.
+            let pct = row.livePct.isFinite ? min(max(row.livePct, 0), 999) : 0
             return CodexUsageWindow(
-                usedPercent: Int(row.livePct.rounded()),
+                usedPercent: Int(pct.rounded()),
                 limitWindowSeconds: row.windowMinutes * 60,
-                resetAfterSeconds: max(0, resetAt - Int(nowMs / 1000)),
+                // Wall clock, not the daemon's response timestamp — a cached
+                // response (max_age 120s) would overstate the countdown.
+                resetAfterSeconds: max(0, resetAt - Int(Date().timeIntervalSince1970)),
                 resetAt: resetAt
             )
         }

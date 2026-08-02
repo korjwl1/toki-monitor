@@ -16,6 +16,11 @@ import Foundation
 struct WindowStatsSegment: Equatable, Hashable {
     let provider: String
     let kind: String            // "session" | "weekly"
+    /// Provider limit id ("five_hour", "seven_day", "seven_day_sonnet",
+    /// "codex", ...). Segments never mix limit ids: seven_day and
+    /// seven_day_sonnet are both "weekly" but measure different limits —
+    /// blending them corrupts counts and percentiles alike.
+    let limitId: String
     let plan: String
     let account: String
 
@@ -50,7 +55,7 @@ struct WindowStatsSegment: Equatable, Hashable {
 
     func replacingAdvice(_ advice: TierAdvice) -> WindowStatsSegment {
         WindowStatsSegment(
-            provider: provider, kind: kind, plan: plan, account: account,
+            provider: provider, kind: kind, limitId: limitId, plan: plan, account: account,
             activeWindowCount: activeWindowCount, maxedCount: maxedCount,
             medianTimeTo100Sec: medianTimeTo100Sec,
             p50Peak: p50Peak, p90Peak: p90Peak, p95Peak: p95Peak,
@@ -91,7 +96,7 @@ enum WindowStats {
 
         var groups: [String: [(String, WindowRow)]] = [:]
         for (provider, row) in eligible {
-            let key = [provider, row.kind, row.plan, row.account].joined(separator: "|")
+            let key = [provider, row.kind, row.limitId, row.plan, row.account].joined(separator: "|")
             groups[key, default: []].append((provider, row))
         }
 
@@ -101,6 +106,7 @@ enum WindowStats {
             return segment(
                 provider: first.0,
                 kind: first.1.kind,
+                limitId: first.1.limitId,
                 plan: first.1.plan,
                 account: first.1.account,
                 rows: rows,
@@ -114,22 +120,23 @@ enum WindowStats {
         // tier the user already left is noise (plan §2 tier gating).
         var newestByKey: [String: Int64] = [:]
         for s in segments {
-            let key = "\(s.provider)|\(s.kind)"
+            let key = "\(s.provider)|\(s.kind)|\(s.limitId)"
             newestByKey[key] = max(newestByKey[key] ?? 0, s.newestWindowEndMs)
         }
         segments = segments.map { s in
-            let key = "\(s.provider)|\(s.kind)"
+            let key = "\(s.provider)|\(s.kind)|\(s.limitId)"
             if s.newestWindowEndMs < (newestByKey[key] ?? 0) {
                 return s.replacingAdvice(.evidenceOnly)
             }
             return s
         }
-        return segments.sorted { ($0.provider, $0.kind) < ($1.provider, $1.kind) }
+        return segments.sorted { ($0.provider, $0.kind, $0.limitId) < ($1.provider, $1.kind, $1.limitId) }
     }
 
     static func segment(
         provider: String,
         kind: String,
+        limitId: String,
         plan: String,
         account: String,
         rows: [WindowRow],
@@ -182,6 +189,7 @@ enum WindowStats {
         let seg = WindowStatsSegment(
             provider: provider,
             kind: kind,
+            limitId: limitId,
             plan: plan,
             account: account,
             activeWindowCount: active.count,
@@ -229,7 +237,11 @@ enum WindowStats {
                     "주당 \(String(format: "%.1f", maxedPerWeek))회 한도 소진",
                     "Hitting the limit \(String(format: "%.1f", maxedPerWeek))×/week"
                 ))
-            } else if let demand = s.impliedDemandP90, demand > 100 {
+            } else if let demand = s.impliedDemandP90, demand > 120, s.maxedCount >= 2 {
+                // Margin + min-sample: implied demand is >=100 by construction
+                // for ANY maxed window, so without these a single max-out in
+                // 28 days would flip the advice (and make the deliberate
+                // 2-per-week threshold above unreachable).
                 advice = .upgrade(reason: L.tr(
                     "수요가 현재 한도의 ~\(Int(demand))%",
                     "Demand is ~\(Int(demand))% of the current limit"

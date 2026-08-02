@@ -99,6 +99,9 @@ enum WindowsFetchResult: Sendable {
     /// binary) — callers fall back to direct provider polling and surface an
     /// update hint.
     case unsupported
+    /// A current daemon with window tracking turned off, or a transient
+    /// daemon-side error — fall back silently, no update hint.
+    case unavailable
     /// No daemon / socket unreachable.
     case daemonDown
 }
@@ -208,10 +211,19 @@ enum TokiWindowsClient {
         } else {
             request += "{}\n"
         }
-        let sent = request.withCString { cstr in
-            write(fd, cstr, strlen(cstr))
+        // Write the full request: a partial write would reach the daemon as a
+        // garbled command and come back as a misleading error reply.
+        var ok = true
+        request.withCString { cstr in
+            var offset = 0
+            let total = strlen(cstr)
+            while offset < total {
+                let n = write(fd, cstr + offset, total - offset)
+                if n <= 0 { ok = false; return }
+                offset += n
+            }
         }
-        guard sent > 0 else { return .daemonDown }
+        guard ok else { return .daemonDown }
 
         // Read a single JSON line (bounded at 1 MiB).
         var buffer = Data()
@@ -233,9 +245,12 @@ enum TokiWindowsClient {
         if resp.ok {
             return .success(resp)
         }
-        // The daemon replied but rejected the command: an old binary answers
-        // "unknown command: WINDOWS"; a daemon with tracking disabled reports
-        // that in its error too. Both mean "use the legacy path".
-        return .unsupported
+        // Only "unknown command" proves an old binary. A current daemon with
+        // tracking disabled (or any other daemon-side error) must not trigger
+        // the "update toki" hint.
+        if resp.error?.contains("unknown command") == true {
+            return .unsupported
+        }
+        return .unavailable
     }
 }

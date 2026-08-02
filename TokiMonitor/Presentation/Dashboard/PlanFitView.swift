@@ -12,12 +12,12 @@ struct PlanFitView: View {
     let reportClient: TokiReportClient
 
     @State private var segments: [WindowStatsSegment] = []
-    @State private var rows: [(provider: String, row: WindowRow)] = []
+    @State private var historyBySegment: [WindowStatsSegment: [WindowRow]] = [:]
     @State private var isLoading = false
     @State private var loadError: String?
-    @State private var firstSeen: Date?
     /// true = rows came from the sync server (multi-device merged statistics).
     @State private var usingServerData = false
+    private let serverClient = ServerQueryClient()
 
     var body: some View {
         ScrollView {
@@ -93,7 +93,7 @@ struct PlanFitView: View {
             HStack(spacing: DS.sm) {
                 Text(providerTitle(s.provider))
                     .font(.system(size: DS.fontBody, weight: .semibold))
-                Text(kindLabel(s.kind))
+                Text(limitLabel(s))
                     .font(.system(size: DS.fontCaption))
                     .padding(.horizontal, DS.sm).padding(.vertical, 2)
                     .background(Capsule().fill(.quaternary))
@@ -144,17 +144,8 @@ struct PlanFitView: View {
     }
 
     private func peakHistoryChart(for s: WindowStatsSegment) -> some View {
-        let history = rows
-            .filter {
-                $0.provider == s.provider && $0.row.kind == s.kind
-                    && $0.row.plan == s.plan && $0.row.account == s.account
-                    && $0.row.finalized
-            }
-            .map(\.row)
-            .sorted { $0.windowEndMs < $1.windowEndMs }
-            .suffix(60)
-
-        return Chart(Array(history), id: \.windowEndMs) { row in
+        let history = historyBySegment[s] ?? []
+        return Chart(history, id: \.windowEndMs) { row in
             BarMark(
                 x: .value("Reset", Date(timeIntervalSince1970: Double(row.windowEndMs) / 1000)),
                 y: .value("Peak %", row.peakPct)
@@ -206,32 +197,52 @@ struct PlanFitView: View {
     // MARK: - Data
 
     private func load() async {
+        // .task re-fires on every appearance and the CLI subprocess is not
+        // cancellation-aware — a second load racing the first could interleave
+        // partial state. One at a time.
+        guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
         let now = Int(Date().timeIntervalSince1970)
         let start = now - Int(WindowStats.lookbackDays * 86_400)
-        do {
-            var fetched = try await reportClient.queryWindows(startEpoch: start, endEpoch: now)
+        // Both sources are attempted independently: a broken local CLI must
+        // not gate the sync server (which may be the one holding the data),
+        // and vice versa. Server rows (field-wise merge of every synced
+        // device) win when present.
+        let localRows = (try? await reportClient.queryWindows(startEpoch: start, endEpoch: now)) ?? []
+        let serverRows = (try? await serverClient.queryWindows(startEpoch: start, endEpoch: now)) ?? []
+        let fetched: [(provider: String, row: WindowRow)]
+        if !serverRows.isEmpty {
+            fetched = serverRows
+            usingServerData = true
+        } else {
+            fetched = localRows
             usingServerData = false
-            // Multi-device accounts: the server's rows are the field-wise merge
-            // of every synced device — prefer them when sync is configured and
-            // the fetch succeeds; the local daemon remains the fallback.
-            if let serverRows = try? await ServerQueryClient().queryWindows(startEpoch: start, endEpoch: now),
-               !serverRows.isEmpty {
-                fetched = serverRows
-                usingServerData = true
-            }
-            rows = fetched
-            segments = WindowStats.segments(rows: fetched)
-            firstSeen = fetched.map(\.row.firstSeenMs).min()
-                .map { Date(timeIntervalSince1970: Double($0) / 1000) }
-            loadError = nil
-        } catch {
-            loadError = L.tr(
-                "윈도우 데이터를 불러오지 못했습니다 — toki daemon(v2.3+)이 실행 중인지 확인하세요",
-                "Could not load window data — check that toki daemon (v2.3+) is running"
-            )
         }
+        if fetched.isEmpty && localRows.isEmpty && serverRows.isEmpty {
+            segments = []
+            historyBySegment = [:]
+            loadError = nil // empty state renders guidance; hard error only stays if nothing ever loads
+            return
+        }
+        let segs = WindowStats.segments(rows: fetched)
+        var history: [WindowStatsSegment: [WindowRow]] = [:]
+        for s in segs {
+            history[s] = fetched
+                .filter {
+                    $0.provider == s.provider && $0.row.kind == s.kind
+                        && $0.row.limitId == s.limitId
+                        && $0.row.plan == s.plan && $0.row.account == s.account
+                        && $0.row.finalized
+                }
+                .map(\.row)
+                .sorted { $0.windowEndMs < $1.windowEndMs }
+                .suffix(60)
+                .map { $0 }
+        }
+        segments = segs
+        historyBySegment = history
+        loadError = nil
     }
 
     private func providerTitle(_ name: String) -> String {
@@ -242,8 +253,17 @@ struct PlanFitView: View {
         }
     }
 
-    private func kindLabel(_ kind: String) -> String {
-        kind == "session" ? L.tr("5시간", "5-hour") : L.tr("주간", "Weekly")
+    private func limitLabel(_ s: WindowStatsSegment) -> String {
+        switch s.limitId {
+        case "five_hour": return L.tr("5시간", "5-hour")
+        case "seven_day": return L.tr("주간", "Weekly")
+        case "seven_day_sonnet": return L.tr("주간 · Sonnet", "Weekly · Sonnet")
+        case "seven_day_opus": return L.tr("주간 · Opus", "Weekly · Opus")
+        case "codex", "": return s.kind == "session" ? L.tr("5시간", "5-hour") : L.tr("주간", "Weekly")
+        default:
+            let base = s.kind == "session" ? L.tr("5시간", "5-hour") : L.tr("주간", "Weekly")
+            return "\(base) · \(s.limitId)"
+        }
     }
 
     private func percentileText(_ s: WindowStatsSegment) -> String {

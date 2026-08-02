@@ -174,8 +174,11 @@ final class ClaudeUsageMonitor {
             // No claude entry / daemon can't serve live state → legacy path.
         case .unsupported:
             daemonUnsupported = true
+        case .unavailable:
+            daemonUnsupported = false
         case .daemonDown:
-            break
+            // No daemon at all: the update hint would be misleading.
+            daemonUnsupported = false
         }
 
         // Single off-main Keychain read → availability, token validity, and
@@ -245,6 +248,10 @@ final class ClaudeUsageMonitor {
         }
     }
 
+    /// KEEP IN SYNC with the legacy switch in pollOnce below: the two paths
+    /// consume different shapes (wire string vs ClaudeAuthResult) but must
+    /// drive the SAME state machine — drift here already produced a real bug
+    /// in the Codex twin (expired silently swallowed).
     /// Apply a daemon WINDOWS entry to this monitor's state machine. Returns
     /// false when the daemon cannot serve live Claude state (polling disabled,
     /// or no data yet) so the caller falls through to the direct path.
@@ -312,7 +319,9 @@ final class ClaudeUsageMonitor {
 
     nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
+        // Fractional seconds so UsageBucket.resetDate's FIRST parser accepts
+        // daemon-sourced strings (plain form made every parse fail once).
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
 
@@ -355,10 +364,20 @@ final class ClaudeUsageMonitor {
     // MARK: - Threshold Alerts
 
     private func checkThresholds(_ usage: ClaudeUsageResponse) {
+        // resetId normalized to epoch seconds: the raw ISO string differs
+        // between the legacy API (microseconds) and the daemon path, and a
+        // source flip mid-window must not re-fire already-sent alerts.
+        func resetId(_ bucket: UsageBucket?) -> String? {
+            guard let bucket else { return nil }
+            if let date = bucket.resetDate {
+                return String(Int(date.timeIntervalSince1970))
+            }
+            return bucket.resetsAt
+        }
         UsageAlertHelpers.checkThresholds([
-            .init(bucket: .claudeFiveHour,       utilization: usage.fiveHour?.utilization,       resetId: usage.fiveHour?.resetsAt),
-            .init(bucket: .claudeSevenDay,       utilization: usage.sevenDay?.utilization,       resetId: usage.sevenDay?.resetsAt),
-            .init(bucket: .claudeSevenDaySonnet, utilization: usage.sevenDaySonnet?.utilization, resetId: usage.sevenDaySonnet?.resetsAt),
+            .init(bucket: .claudeFiveHour,       utilization: usage.fiveHour?.utilization,       resetId: resetId(usage.fiveHour)),
+            .init(bucket: .claudeSevenDay,       utilization: usage.sevenDay?.utilization,       resetId: resetId(usage.sevenDay)),
+            .init(bucket: .claudeSevenDaySonnet, utilization: usage.sevenDaySonnet?.utilization, resetId: resetId(usage.sevenDaySonnet)),
         ], providerTitle: L.panel.claudeUsage, settings: settings)
     }
 }
