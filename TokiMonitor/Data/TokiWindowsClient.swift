@@ -106,6 +106,40 @@ enum WindowsFetchResult: Sendable {
 /// Native Unix-domain-socket client for the daemon's WINDOWS command.
 /// Short-lived connection per request (local socket connects are ~µs); a 3s
 /// deadline bounds the worst case even when the daemon is mid-refresh.
+///
+/// Requests are coordinated: the Claude and Codex monitors poll on their own
+/// schedules but consume the same response, so concurrent fetches join a
+/// single in-flight request and a short-lived cache serves back-to-back polls
+/// without a second round-trip. `maxAgeMs: 0` (forced revalidation) always
+/// bypasses both.
+private actor WindowsFetchCoordinator {
+    static let shared = WindowsFetchCoordinator()
+    /// Serve identical requests from cache for this long.
+    private static let cacheWindowMs: Int64 = 5_000
+
+    private var cached: (atMs: Int64, result: WindowsFetchResult)?
+    private var inflight: Task<WindowsFetchResult, Never>?
+
+    func fetch(socketPath: String, maxAgeMs: Int64?) async -> WindowsFetchResult {
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        let forced = (maxAgeMs ?? .max) <= 0
+        if !forced, let cached, nowMs - cached.atMs < Self.cacheWindowMs {
+            return cached.result
+        }
+        if !forced, let inflight {
+            return await inflight.value
+        }
+        let task = Task.detached(priority: .utility) {
+            TokiWindowsClient.fetchBlocking(socketPath: socketPath, maxAgeMs: maxAgeMs)
+        }
+        inflight = task
+        let result = await task.value
+        inflight = nil
+        cached = (Int64(Date().timeIntervalSince1970 * 1000), result)
+        return result
+    }
+}
+
 enum TokiWindowsClient {
 
     /// Resolved once: `toki settings get daemon_sock`, falling back to the
@@ -139,13 +173,10 @@ enum TokiWindowsClient {
     /// live state (bounded server-side at 2s; `refreshing=true` means it served
     /// stale and is refreshing in the background).
     static func fetch(maxAgeMs: Int64?) async -> WindowsFetchResult {
-        let path = socketPath
-        return await Task.detached(priority: .utility) {
-            fetchBlocking(socketPath: path, maxAgeMs: maxAgeMs)
-        }.value
+        await WindowsFetchCoordinator.shared.fetch(socketPath: socketPath, maxAgeMs: maxAgeMs)
     }
 
-    private static func fetchBlocking(socketPath: String, maxAgeMs: Int64?) -> WindowsFetchResult {
+    fileprivate static func fetchBlocking(socketPath: String, maxAgeMs: Int64?) -> WindowsFetchResult {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return .daemonDown }
         defer { close(fd) }

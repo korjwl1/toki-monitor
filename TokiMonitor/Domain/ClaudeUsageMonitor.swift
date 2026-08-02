@@ -30,11 +30,19 @@ struct UsageBucket: Codable {
         case resetsAt = "resets_at"
     }
 
+    /// ISO8601DateFormatter is documented thread-safe; creating one per access
+    /// is the expensive part (this sits on the menu-render path).
+    nonisolated(unsafe) private static let fractionalFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    nonisolated(unsafe) private static let plainFormatter = ISO8601DateFormatter()
+
     var resetDate: Date? {
         guard let resetsAt else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: resetsAt) ?? ISO8601DateFormatter().date(from: resetsAt)
+        return Self.fractionalFormatter.date(from: resetsAt)
+            ?? Self.plainFormatter.date(from: resetsAt)
     }
 
     var timeUntilReset: TimeInterval? {
@@ -302,10 +310,14 @@ final class ClaudeUsageMonitor {
         return true
     }
 
+    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
     private static func isoString(fromMs ms: Int64) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.string(from: Date(timeIntervalSince1970: Double(ms) / 1000))
+        isoFormatter.string(from: Date(timeIntervalSince1970: Double(ms) / 1000))
     }
 
     /// The server rejected a token that looked locally valid (revoked, or an
