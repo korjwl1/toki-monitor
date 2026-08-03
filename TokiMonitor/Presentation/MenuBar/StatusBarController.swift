@@ -563,6 +563,12 @@ final class StatusBarController {
             _ = aggregator.perProviderRates
             _ = aggregator.perProviderHistory
             _ = aggregator.spendAlert
+            // HP bar sources: without these, a usage-monitor poll that lands
+            // while the aggregator is quiet (idle machine) never redraws the
+            // menu-bar HP bar — a window reset stayed invisible until the
+            // next token flowed.
+            _ = usageMonitor.currentUsage
+            _ = codexUsageMonitor.currentUsage
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }

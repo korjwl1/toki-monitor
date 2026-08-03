@@ -60,6 +60,11 @@ final class CharacterAnimationRenderer {
                 self.stopAnimation()
                 self.applyFrame(0, from: self.frames, to: button)
                 self.idleSince = self.idleSince ?? Date()
+                // The watchdog fires precisely when update() stopped being
+                // called — if it doesn't arm the sleep transition itself,
+                // nothing else will, and the character stays awake-idle
+                // forever (observed in the field: idle but never sleeping).
+                self.scheduleSleepCheck(button: button)
             }
         }
 

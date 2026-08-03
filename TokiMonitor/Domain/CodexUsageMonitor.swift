@@ -170,7 +170,10 @@ final class CodexUsageMonitor {
         // files the daemon already watches — zero API calls. The direct
         // wham/usage path below remains for old daemons, daemon-down, and the
         // idle case (no open window rows to display).
-        let daemonResult = await TokiWindowsClient.fetch(maxAgeMs: 120_000)
+        // No freshness request while idle (see ClaudeUsageMonitor) — and
+        // Codex data is passive anyway; rows update when rollout files do.
+        let tokensActive = aggregator.tokensPerMinute > 0
+        let daemonResult = await TokiWindowsClient.fetch(maxAgeMs: tokensActive ? 120_000 : nil)
         guard generation == pollGeneration, !Task.isCancelled else { return }
         switch daemonResult {
         case .success(let resp):

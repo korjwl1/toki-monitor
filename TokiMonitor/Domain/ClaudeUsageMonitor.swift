@@ -159,7 +159,14 @@ final class ClaudeUsageMonitor {
         // poller, single call budget, works while this app is closed). The
         // direct Keychain+HTTP path below survives as the fallback for old
         // daemons and daemon-down, re-detected every tick.
-        let maxAge: Int64 = forceFreshNext ? 0 : 120_000
+        // Freshness is only requested while tokens flow (or on a wake):
+        // passing max_age while idle re-armed the daemon's refresh path every
+        // poll and had it hitting the Claude API ~every 5 minutes on a fully
+        // idle machine — defeating the activity gate ("idle 비용 0"). Idle
+        // reads serve the cached rows; resets still surface via finalize +
+        // the zero-bucket synthesis below.
+        let tokensActive = aggregator.tokensPerMinute > 0
+        let maxAge: Int64? = forceFreshNext ? 0 : (tokensActive ? 120_000 : nil)
         forceFreshNext = false
         let daemonResult = await TokiWindowsClient.fetch(maxAgeMs: maxAge)
         guard generation == pollGeneration, !Task.isCancelled else { return }
@@ -303,9 +310,16 @@ final class ClaudeUsageMonitor {
                 )
             }
         }
+        // No open row for a standard limit + auth ok ⇒ the window genuinely
+        // reset (or was never used): that is 0%, matching the legacy API's
+        // idle shape (utilization 0, resets_at null). Leaving it nil hid the
+        // HP bar and froze the last pre-reset percentage on screen.
+        func bucketOrZero(_ limitId: String) -> UsageBucket {
+            bucket(limitId) ?? UsageBucket(utilization: 0, resetsAt: nil)
+        }
         let usage = ClaudeUsageResponse(
-            fiveHour: bucket("five_hour"),
-            sevenDay: bucket("seven_day"),
+            fiveHour: bucketOrZero("five_hour"),
+            sevenDay: bucketOrZero("seven_day"),
             sevenDaySonnet: bucket("seven_day_sonnet"),
             extraUsage: entry.extraUsageEnabled.map { ExtraUsage(isEnabled: $0) }
         )
