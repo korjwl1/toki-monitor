@@ -57,6 +57,11 @@ final class CharacterAnimationRenderer {
         updateWatchdogTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, !self.isStopped else { return }
+                // Already asleep: the sleep animation is self-sustaining, and
+                // stopping it here would paint the AWAKE frame and wedge
+                // there — scheduleSleepCheck bails while isSleeping, and
+                // update()'s sleep branch only acts when !isSleeping.
+                guard !self.isSleeping else { return }
                 self.stopAnimation()
                 self.applyFrame(0, from: self.frames, to: button)
                 self.idleSince = self.idleSince ?? Date()

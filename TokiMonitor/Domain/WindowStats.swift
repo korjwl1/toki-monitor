@@ -208,17 +208,27 @@ enum WindowStats {
         // the overall one.
         var approxOverall: Double? = nil
         if let windowMinutes = active.first?.windowMinutes, windowMinutes > 0 {
-            let slots = lookbackDays * 24 * 60 / Double(windowMinutes)
+            // Slots span what was actually OBSERVED, not always 28 days: a
+            // fresh install with two consecutive weekly rows covers 14 days,
+            // and dividing by four slots halved its overall mean (a 3-day-old
+            // install's session mean was diluted ~9×).
+            let spanDays = max(min(lookbackDays, observedDays), 0)
+            let slots = max(spanDays * 24 * 60 / Double(windowMinutes), 1)
             let peakSum = active.reduce(0.0) { $0 + $1.peakPct }
             if kind == "session" || Double(active.count) < slots - 0.5 {
-                approxOverall = peakSum / max(slots, 1)
+                approxOverall = peakSum / slots
             }
         }
 
         // Wall clock from the OLDEST WINDOW'S START (not its end): dividing
         // four windows' activity by an end-to-now span overstated duty cycle
         // by up to one window length.
-        let wallMs = min(Int64(lookbackDays * 86_400_000), max(nowMs - (oldest - windowLenMs), 1))
+        // Anchored to the segment's own end, not `now`: an abandoned tier's
+        // duty cycle was diluted by every idle day since the switch.
+        let wallMs = min(
+            Int64(lookbackDays * 86_400_000),
+            max(min(nowMs, newest) - (oldest - windowLenMs), 1)
+        )
         // Double accumulation: Int64 summation of wire-supplied values can
         // trap on overflow, and a single bad row would then crash this view
         // every time it opened.

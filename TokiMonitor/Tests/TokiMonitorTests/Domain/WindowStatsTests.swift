@@ -241,8 +241,13 @@ final class WindowStatsTests: XCTestCase {
         let segs = WindowStats.segments(rows: rows, nowMs: nowMs)
         let session = segs.first { $0.kind == "session" }!
         let weekly = segs.first { $0.kind == "weekly" }!
-        // 15 windows × 67% over ~134 possible 5h slots ≈ 7.5%
-        XCTAssertEqual(session.approxOverallMean ?? 0, 15.0 * 67.0 / (28.0 * 24 * 60 / 300), accuracy: 0.1)
+        // Slots span the OBSERVED period (~14 days here), not always 28:
+        // 15 windows × 67% over the 5h slots those 14 days contain.
+        let observedDays = session.observedDays
+        let slots = observedDays * 24 * 60 / 300
+        XCTAssertEqual(session.approxOverallMean ?? 0, 15.0 * 67.0 / slots, accuracy: 0.1)
+        // And it must exceed the naive 28-day-slot value it used to report.
+        XCTAssertGreaterThan(session.approxOverallMean ?? 0, 15.0 * 67.0 / (28.0 * 24 * 60 / 300))
         // 15 weekly rows ≥ 4 calendar slots → complete, no approximation.
         XCTAssertNil(weekly.approxOverallMean)
         XCTAssertEqual(weekly.meanPeakActive ?? 0, 40, accuracy: 0.1)

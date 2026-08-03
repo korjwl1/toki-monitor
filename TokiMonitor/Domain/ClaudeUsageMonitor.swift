@@ -290,16 +290,20 @@ final class ClaudeUsageMonitor {
             isAuthMissing = false
             lastError = nil
             return true
-        default: // "unreadable" — keep prior state, retry fast (same as legacy)
-            authReadUnreadable = true
-            return true
+        default:
+            // "unreadable" — the daemon could not classify (its own 30s cache
+            // may hold that state). Fall THROUGH to the direct read instead of
+            // pinning the widget: the local read either succeeds (self-heal)
+            // or sets the same state itself.
+            return false
         }
 
         var open = entry.windows.filter { $0.isOpen(nowMs: nowMs) }
         // Ignore rows still open under a previous login: they linger until
-        // their own reset and could otherwise be picked as "live" usage.
-        if let current = entry.currentAccount, !current.isEmpty,
-           open.contains(where: { $0.account == current }) {
+        // their own reset. Filtered UNCONDITIONALLY when the daemon reports an
+        // account — requiring the new account to already have a row disabled
+        // the filter in exactly the switch window it exists for.
+        if let current = entry.currentAccount, !current.isEmpty {
             open = open.filter { $0.account == current }
         }
         // Auth is fine but the daemon has neither polled nor stored anything —
@@ -315,6 +319,13 @@ final class ClaudeUsageMonitor {
                     resetsAt: Self.isoString(fromMs: $0.rawResetsAtMs)
                 )
             }
+        }
+        // Staleness gate (parity with the Codex path): synthesizing 0% from
+        // rows the daemon has not refreshed in a long time would confidently
+        // show a full quota that another machine may have consumed.
+        let lastSuccess = entry.lastSuccessMs ?? 0
+        if nowMs - lastSuccess > 30 * 60_000 {
+            return false
         }
         // No open row for a standard limit + auth ok ⇒ the window genuinely
         // reset (or was never used): that is 0%, matching the legacy API's
@@ -335,7 +346,12 @@ final class ClaudeUsageMonitor {
         currentUsage = usage
         lastError = nil
         consecutiveFailures = 0
-        settings.claudeHasSevenDaySonnet = (usage.sevenDaySonnet != nil)
+        // Set-true-only: an idle machine past a weekly reset has no open
+        // Sonnet row, and clearing the flag would make the bar and its
+        // settings toggles disappear and reappear with usage.
+        if usage.sevenDaySonnet != nil {
+            settings.claudeHasSevenDaySonnet = true
+        }
         checkThresholds(usage)
         return true
     }

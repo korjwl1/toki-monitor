@@ -152,7 +152,9 @@ struct PlanFitView: View {
             )
             .foregroundStyle(row.maxedOut ? Color.red : (row.peakPct > 75 ? Color.orange : Color.accentColor))
         }
-        .chartYScale(domain: 0...100)
+        // Upper bound follows the data: credit-overflow windows exceed 100%
+        // and a fixed domain clipped them to look exactly maxed.
+        .chartYScale(domain: 0...max(100.0, (history.map(\.peakPct).max() ?? 100).rounded(.up)))
         .frame(height: 120)
     }
 
@@ -220,7 +222,11 @@ struct PlanFitView: View {
         for entry in localRows where !serverProviders.contains(entry.provider) {
             fetched.append(entry)
         }
-        usingServerData = !serverRows.isEmpty
+        // Only claim "all devices merged" when EVERY rendered provider came
+        // from the server; per-provider arbitration can mix sources.
+        var localProviders = Set<String>()
+        for entry in localRows { localProviders.insert(entry.provider) }
+        usingServerData = !serverRows.isEmpty && localProviders.isSubset(of: serverProviders)
 
         if fetched.isEmpty {
             segments = []

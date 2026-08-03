@@ -170,10 +170,11 @@ final class CodexUsageMonitor {
         // files the daemon already watches — zero API calls. The direct
         // wham/usage path below remains for old daemons, daemon-down, and the
         // idle case (no open window rows to display).
-        // No freshness request while idle (see ClaudeUsageMonitor) — and
-        // Codex data is passive anyway; rows update when rollout files do.
-        let tokensActive = aggregator.tokensPerMinute > 0
-        let daemonResult = await TokiWindowsClient.fetch(maxAgeMs: tokensActive ? 120_000 : nil)
+        // Always nil: the daemon's max_age join drives the CLAUDE poller only
+        // (Codex rows are passive rollout-file extraction), so asking for
+        // freshness here bought nothing and forced Claude API calls at 120s
+        // even while the Claude widget was hidden.
+        let daemonResult = await TokiWindowsClient.fetch(maxAgeMs: nil)
         guard generation == pollGeneration, !Task.isCancelled else { return }
         switch daemonResult {
         case .success(let resp):
@@ -266,20 +267,23 @@ final class CodexUsageMonitor {
             return true
         case "expired":
             // Mirror the legacy 401 path: surface re-login instead of freezing
-            // stale usage forever (the daemon path must not swallow this).
+            // stale usage forever. currentUsage MUST be cleared — the menu
+            // renders the usage widget whenever it is non-nil, so leaving it
+            // would keep showing stale numbers and never the re-login notice.
             isAvailable = true
             isAuthError = true
+            currentUsage = nil
             lastError = L.tr("Codex 재로그인 필요", "Codex re-login required")
             return true
-        default: // unreadable — keep prior state
-            return true
+        default:
+            // unreadable — fall through to the direct path (see Claude twin).
+            return false
         }
 
         var open = entry.windows.filter { $0.isOpen(nowMs: nowMs) }
-        // Ignore rows still open under a previous login: they linger until
-        // their own reset and could otherwise be picked as "live" usage.
-        if let current = entry.currentAccount, !current.isEmpty,
-           open.contains(where: { $0.account == current }) {
+        // Ignore rows still open under a previous login (see the Claude twin):
+        // filtered unconditionally when the daemon reports an account.
+        if let current = entry.currentAccount, !current.isEmpty {
             open = open.filter { $0.account == current }
         }
         guard !open.isEmpty else { return false }
@@ -304,27 +308,37 @@ final class CodexUsageMonitor {
                 resetAt: resetAt
             )
         }
-        // Session-length window → primary, weekly → secondary; plans with only
-        // a weekly limit (e.g. prolite) surface it as primary. Among multiple
-        // limit ids the main "codex" limit outranks model-specific ones.
+        // Map by KIND, never by presence: promoting the weekly row to primary
+        // when the session window is closed (a very common idle state) fired
+        // the same window's alert under two buckets and made the secondary
+        // settings toggles flip on and off with usage. Among multiple limit
+        // ids the main "codex" limit outranks model-specific ones.
         func pick(_ kind: String) -> WindowRow? {
             let candidates = open.filter { $0.kind == kind }
             return candidates.first { $0.limitId == "codex" } ?? candidates.first
         }
         let session = pick("session")
         let weekly = pick("weekly")
-        let primary = session ?? weekly
-        let secondary = (session != nil) ? weekly : nil
-        guard let primary else { return false }
+        guard session != nil || weekly != nil else { return false }
 
         let reached = open.contains { $0.limitReachedKind > 0 }
+        // A closed session window means 0% used, not "no window" — same
+        // reasoning as the Claude zero-bucket synthesis.
+        let primaryWindow = session.map(window) ?? weekly.map { w in
+            CodexUsageWindow(
+                usedPercent: 0,
+                limitWindowSeconds: 300 * 60,
+                resetAfterSeconds: 0,
+                resetAt: Int(Date().timeIntervalSince1970)
+            )
+        }
         let usage = CodexUsageResponse(
-            planType: primary.plan,
+            planType: (session ?? weekly)?.plan ?? "",
             rateLimit: CodexRateLimit(
                 allowed: !reached,
                 limitReached: reached,
-                primaryWindow: window(primary),
-                secondaryWindow: secondary.map(window)
+                primaryWindow: primaryWindow,
+                secondaryWindow: weekly.map(window)
             ),
             credits: nil
         )
@@ -333,7 +347,11 @@ final class CodexUsageMonitor {
         lastError = nil
         consecutiveFailures = 0
         isAuthError = false
-        settings.codexHasSecondaryWindow = (usage.rateLimit.secondaryWindow != nil)
+        // Set-true-only (see the Claude Sonnet flag): an idle gap must not
+        // make the secondary toggles disappear.
+        if usage.rateLimit.secondaryWindow != nil {
+            settings.codexHasSecondaryWindow = true
+        }
         checkThresholds(usage)
         return true
     }

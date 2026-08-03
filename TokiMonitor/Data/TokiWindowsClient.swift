@@ -201,6 +201,11 @@ enum TokiWindowsClient {
         guard fd >= 0 else { return .daemonDown }
         defer { close(fd) }
 
+        // A daemon restart between connect and write would otherwise raise
+        // SIGPIPE (this is the app's only raw socket write).
+        var nosigpipe: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, socklen_t(MemoryLayout<Int32>.size))
+
         var tv = timeval(tv_sec: 3, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))

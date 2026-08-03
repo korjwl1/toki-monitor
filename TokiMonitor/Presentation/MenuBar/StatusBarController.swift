@@ -563,12 +563,13 @@ final class StatusBarController {
             _ = aggregator.perProviderRates
             _ = aggregator.perProviderHistory
             _ = aggregator.spendAlert
-            // HP bar sources: without these, a usage-monitor poll that lands
-            // while the aggregator is quiet (idle machine) never redraws the
-            // menu-bar HP bar — a window reset stayed invisible until the
-            // next token flowed.
-            _ = usageMonitor.currentUsage
-            _ = codexUsageMonitor.currentUsage
+            // NOTE: deliberately NOT observing the usage monitors here.
+            // emaTick assigns tokensPerMinute every second, and @Observable
+            // fires on assignment, so updateAllDisplays already runs at 1 Hz
+            // while sampling — the HP bar's staleness was the nil-bucket bug,
+            // not a missing observation. Touching the lazy monitors from
+            // init() would also instantiate them before the Codex root is
+            // resolved, freezing CodexUsageMonitor's isAvailable snapshot.
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
