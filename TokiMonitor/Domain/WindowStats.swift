@@ -200,17 +200,30 @@ enum WindowStats {
         // Session windows exist only while used; approximate the overall mean
         // against the calendar slot count. Weekly windows always exist, so the
         // active mean IS the overall mean (approx nil to avoid double-reporting).
+        // Calendar-slot approximation. Sessions only exist while used, so the
+        // slot count comes from the calendar. Weekly rows are usually
+        // complete — but a passive provider (Codex) never records a zero-use
+        // week, so when fewer rows exist than the calendar implies, report the
+        // same approximation instead of an active-only mean masquerading as
+        // the overall one.
         var approxOverall: Double? = nil
-        if kind == "session", let windowMinutes = active.first?.windowMinutes, windowMinutes > 0 {
+        if let windowMinutes = active.first?.windowMinutes, windowMinutes > 0 {
             let slots = lookbackDays * 24 * 60 / Double(windowMinutes)
-            approxOverall = active.map(\.peakPct).reduce(0, +) / max(slots, 1)
+            let peakSum = active.reduce(0.0) { $0 + $1.peakPct }
+            if kind == "session" || Double(active.count) < slots - 0.5 {
+                approxOverall = peakSum / max(slots, 1)
+            }
         }
 
         // Wall clock from the OLDEST WINDOW'S START (not its end): dividing
         // four windows' activity by an end-to-now span overstated duty cycle
         // by up to one window length.
         let wallMs = min(Int64(lookbackDays * 86_400_000), max(nowMs - (oldest - windowLenMs), 1))
-        let dutyCycle = min(1.0, Double(active.map(\.activeMs).reduce(0, +)) / Double(wallMs))
+        // Double accumulation: Int64 summation of wire-supplied values can
+        // trap on overflow, and a single bad row would then crash this view
+        // every time it opened.
+        let totalActiveMs = active.reduce(0.0) { $0 + Double($1.activeMs) }
+        let dutyCycle = min(1.0, totalActiveMs / Double(wallMs))
 
         let medianT100 = percentile(t100s, 0.5)
         let seg = WindowStatsSegment(

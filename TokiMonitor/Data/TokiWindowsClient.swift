@@ -69,6 +69,9 @@ struct WindowsProviderEntry: Codable, Sendable {
     let plan: String?
     let pollingEnabled: Bool?
     let extraUsageEnabled: Bool?
+    /// Account scope the daemon is currently collecting under; rows from a
+    /// superseded login stay open until their own reset.
+    let currentAccount: String?
 
     enum CodingKeys: String, CodingKey {
         case windows
@@ -78,6 +81,7 @@ struct WindowsProviderEntry: Codable, Sendable {
         case plan
         case pollingEnabled = "polling_enabled"
         case extraUsageEnabled = "extra_usage_enabled"
+        case currentAccount = "current_account"
     }
 }
 

@@ -275,7 +275,13 @@ final class CodexUsageMonitor {
             return true
         }
 
-        let open = entry.windows.filter { $0.isOpen(nowMs: nowMs) }
+        var open = entry.windows.filter { $0.isOpen(nowMs: nowMs) }
+        // Ignore rows still open under a previous login: they linger until
+        // their own reset and could otherwise be picked as "live" usage.
+        if let current = entry.currentAccount, !current.isEmpty,
+           open.contains(where: { $0.account == current }) {
+            open = open.filter { $0.account == current }
+        }
         guard !open.isEmpty else { return false }
 
         let newestObservedMs = open.map(\.observedTsMs).max() ?? 0

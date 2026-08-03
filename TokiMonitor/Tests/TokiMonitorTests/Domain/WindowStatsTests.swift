@@ -208,6 +208,30 @@ final class WindowStatsTests: XCTestCase {
         }
     }
 
+    func testWeeklyApproximatesWhenCalendarIncomplete() {
+        // Passive Codex never records a zero-use week: 2 weeks of 20% out of
+        // 4 calendar weeks must NOT read as a 20% overall mean.
+        var rows: [(provider: String, row: WindowRow)] = []
+        for d in [1.0, 22.0] {
+            rows.append(("codex", row(kind: "weekly", endOffsetDays: d, peak: 20, windowMinutes: 10_080)))
+        }
+        let s = WindowStats.segments(rows: rows, nowMs: nowMs)[0]
+        XCTAssertEqual(s.meanPeakActive ?? 0, 20, accuracy: 0.1)
+        // 2 observed rows × 20% over 4 calendar slots = 10%.
+        XCTAssertEqual(s.approxOverallMean ?? 0, 10, accuracy: 0.5)
+    }
+
+    func testHugeActiveMsDoesNotTrap() {
+        // A wire value near Int64.max must degrade (clamped duty cycle), not
+        // crash the summation.
+        var rows: [(provider: String, row: WindowRow)] = []
+        for d in 0..<3 {
+            rows.append(("codex", row(endOffsetDays: Double(d), peak: 30, activeMs: Int64.max / 2)))
+        }
+        let s = WindowStats.segments(rows: rows, nowMs: nowMs)[0]
+        XCTAssertEqual(s.dutyCycle, 1.0, accuracy: 0.001)
+    }
+
     func testOverallCalendarApproximationForSessionOnly() {
         var rows: [(provider: String, row: WindowRow)] = []
         for d in 0..<15 {
@@ -219,6 +243,7 @@ final class WindowStatsTests: XCTestCase {
         let weekly = segs.first { $0.kind == "weekly" }!
         // 15 windows × 67% over ~134 possible 5h slots ≈ 7.5%
         XCTAssertEqual(session.approxOverallMean ?? 0, 15.0 * 67.0 / (28.0 * 24 * 60 / 300), accuracy: 0.1)
+        // 15 weekly rows ≥ 4 calendar slots → complete, no approximation.
         XCTAssertNil(weekly.approxOverallMean)
         XCTAssertEqual(weekly.meanPeakActive ?? 0, 40, accuracy: 0.1)
     }
