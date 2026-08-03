@@ -76,6 +76,8 @@ enum TierAdvice: Equatable, Hashable {
     case keep(reason: String)
     /// Plan string unknown/absent: no tier catalog entry to advise against.
     case evidenceOnly
+    /// A tier/account the user has since left: numbers stand, advice doesn't.
+    case historical
 }
 
 enum WindowStats {
@@ -98,11 +100,16 @@ enum WindowStats {
         // rows too: right after a plan change the newest finalized row still
         // belongs to the old tier (for weekly limits up to 7 days), and advice
         // against an abandoned tier is noise.
-        var currentSegmentKey: [String: (plan: String, account: String, endMs: Int64)] = [:]
+        // Keyed on the last time a row was actually SAMPLED, not on its
+        // anchor: after an account switch both accounts have open rows with
+        // independent anchors, and the abandoned one's anchor can be later —
+        // which would emit advice for the account the user just left.
+        // observedTsMs freezes for the abandoned account, so it discriminates.
+        var currentSegmentKey: [String: (plan: String, account: String, seenMs: Int64)] = [:]
         for (provider, row) in rows where row.windowEndMs >= cutoff {
             let key = [provider, row.kind, row.limitId].joined(separator: "|")
-            if row.windowEndMs > (currentSegmentKey[key]?.endMs ?? 0) {
-                currentSegmentKey[key] = (row.plan, row.account, row.windowEndMs)
+            if row.observedTsMs > (currentSegmentKey[key]?.seenMs ?? 0) {
+                currentSegmentKey[key] = (row.plan, row.account, row.observedTsMs)
             }
         }
 
@@ -134,7 +141,8 @@ enum WindowStats {
             let key = "\(s.provider)|\(s.kind)|\(s.limitId)"
             if let current = currentSegmentKey[key],
                s.plan != current.plan || s.account != current.account {
-                return s.replacingAdvice(.evidenceOnly)
+                // Historical, not unknown — the plan is right there on the card.
+                return s.replacingAdvice(.historical)
             }
             return s
         }

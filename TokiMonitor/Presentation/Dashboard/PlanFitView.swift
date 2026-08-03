@@ -125,16 +125,16 @@ struct PlanFitView: View {
                 )
                 stat(
                     L.tr("사용 중 평균", "Active mean"),
-                    s.meanPeakActive.map { "\(Int($0))%" } ?? "—",
+                    s.meanPeakActive.map { "\(pct($0))%" } ?? "—",
                     detail: s.approxOverallMean.map {
-                        L.tr("전체 평균 ~\(Int($0))% (캘린더 근사)", "overall ~\(Int($0))% (calendar approx.)")
+                        L.tr("전체 평균 ~\(pct($0))% (캘린더 근사)", "overall ~\(pct($0))% (calendar approx.)")
                     }
                 )
                 stat(
                     L.tr("가동률", "Duty cycle"),
                     "\(Int(s.dutyCycle * 100))%",
                     detail: s.impliedDemandP90.map {
-                        L.tr("잠재 수요 p90 ~\(Int($0))%", "implied demand p90 ~\(Int($0))%")
+                        L.tr("잠재 수요 p90 ~\(pct($0))%", "implied demand p90 ~\(pct($0))%")
                     }
                 )
             }
@@ -154,7 +154,8 @@ struct PlanFitView: View {
         }
         // Upper bound follows the data: credit-overflow windows exceed 100%
         // and a fixed domain clipped them to look exactly maxed.
-        .chartYScale(domain: 0...max(100.0, (history.map(\.peakPct).max() ?? 100).rounded(.up)))
+        // Guarded: a NaN upper bound would violate ClosedRange's precondition.
+        .chartYScale(domain: 0...max(100.0, min(history.compactMap { $0.peakPct.isFinite ? $0.peakPct : nil }.max() ?? 100, 9_999).rounded(.up)))
         .frame(height: 120)
     }
 
@@ -187,6 +188,8 @@ struct PlanFitView: View {
                 return (L.tr("적정 — \(reason)", "Right-sized — \(reason)"), .green)
             case .evidenceOnly:
                 return (L.tr("근거만 표시 (플랜 미확인)", "Evidence only (plan unknown)"), .secondary)
+            case .historical:
+                return (L.tr("이전 요금제 · 근거만", "Previous plan · evidence only"), .secondary)
             }
         }()
         return Text(text)
@@ -293,9 +296,15 @@ struct PlanFitView: View {
         }
     }
 
+    /// Wire values are only checked for finiteness daemon-side; a garbage
+    /// magnitude must degrade the display, never trap the Int conversion.
+    private func pct(_ v: Double) -> Int {
+        Int((v.isFinite ? min(max(v, 0), 9_999) : 0).rounded())
+    }
+
     private func percentileText(_ s: WindowStatsSegment) -> String {
         guard let p50 = s.p50Peak, let p95 = s.p95Peak else { return "—" }
-        let p95Str = s.p95IsCensored ? "≥\(Int(p95))%" : "\(Int(p95))%"
+        let p95Str = s.p95IsCensored ? "≥\(Int(p95))%" : "\(pct(p95))%"
         return "p50 \(Int(p50))% · p95 \(p95Str)"
     }
 

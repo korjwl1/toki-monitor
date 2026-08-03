@@ -151,6 +151,8 @@ final class ClaudeUsageMonitor {
 
     /// Next daemon fetch must revalidate (set by wakeForImmediatePoll).
     private var forceFreshNext = false
+    /// Last time a stale-row synthesis routed a direct probe (≤2/hour).
+    private var lastStaleDirectProbe: Date = .distantPast
 
     // MARK: - Polling
 
@@ -303,8 +305,14 @@ final class ClaudeUsageMonitor {
         // their own reset. Filtered UNCONDITIONALLY when the daemon reports an
         // account — requiring the new account to already have a row disabled
         // the filter in exactly the switch window it exists for.
+        let preFilterCount = open.count
         if let current = entry.currentAccount, !current.isEmpty {
             open = open.filter { $0.account == current }
+        }
+        // Everything belonged to a superseded login: that is "we have no data
+        // for the current account", NOT "the windows reset to 0%".
+        if preFilterCount > 0 && open.isEmpty {
+            return false
         }
         // Auth is fine but the daemon has neither polled nor stored anything —
         // a just-started daemon. Let the direct path cover this tick.
@@ -320,11 +328,25 @@ final class ClaudeUsageMonitor {
                 )
             }
         }
-        // Staleness gate (parity with the Codex path): synthesizing 0% from
-        // rows the daemon has not refreshed in a long time would confidently
-        // show a full quota that another machine may have consumed.
+        // Staleness gate — but ONLY where it matters, and throttled.
+        //
+        // last_success_ms is the daemon poller's own last API call, and the
+        // poller is activity-gated: on an idle machine it freezes ~30min after
+        // the last token. An unconditional gate therefore returned false on
+        // EVERY tick forever, sending this app back to the direct Keychain+HTTP
+        // path every 300s — exactly the idle-polling leak this branch removed,
+        // re-introduced one layer up.
+        //
+        // Fresh open rows need no gate at all (they carry their own state).
+        // Only a SYNTHESIZED zero is a claim about data we don't have, so gate
+        // that case, and throttle the resulting direct probe like the Codex
+        // twin does (≤2/hour).
+        let needsSynthesis = !open.contains { $0.limitId == "five_hour" }
+            || !open.contains { $0.limitId == "seven_day" }
         let lastSuccess = entry.lastSuccessMs ?? 0
-        if nowMs - lastSuccess > 30 * 60_000 {
+        if needsSynthesis, nowMs - lastSuccess > 30 * 60_000,
+           Date().timeIntervalSince(lastStaleDirectProbe) > 30 * 60 {
+            lastStaleDirectProbe = Date()
             return false
         }
         // No open row for a standard limit + auth ok ⇒ the window genuinely

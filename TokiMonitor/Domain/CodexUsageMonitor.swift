@@ -42,6 +42,9 @@ struct CodexUsageWindow: Codable {
     }
 
     var resetCountdown: String {
+        // A synthesized window (closed session, real reset unknown) carries
+        // resetAt == 0; rendering "0분" would assert a reset that isn't known.
+        if resetAt == 0 { return L.tr("초기화됨", "reset") }
         let totalHours = resetAfterSeconds / 3600
         let m = (resetAfterSeconds % 3600) / 60
         if totalHours >= 24 {
@@ -259,8 +262,14 @@ final class CodexUsageMonitor {
     private func applyDaemonEntry(_ entry: WindowsProviderEntry, nowMs: Int64) -> Bool {
         switch entry.authStatus {
         case "ok":
-            break
+            // The daemon's classification is a 30s cache; auth.json is a local
+            // file we can stat right now. A logout would otherwise reappear as
+            // "available with stale usage" for up to 30s.
+            guard CodexAuthReader.isAvailable else { return false }
         case "missing":
+            // Same in reverse: after a login the cached "missing" would hide
+            // the freshly-available widget for another cache generation.
+            guard !CodexAuthReader.isAvailable else { return false }
             isAvailable = false
             currentUsage = nil
             lastError = nil
@@ -322,15 +331,35 @@ final class CodexUsageMonitor {
         guard session != nil || weekly != nil else { return false }
 
         let reached = open.contains { $0.limitReachedKind > 0 }
-        // A closed session window means 0% used, not "no window" — same
-        // reasoning as the Claude zero-bucket synthesis.
-        let primaryWindow = session.map(window) ?? weekly.map { w in
-            CodexUsageWindow(
+        // A closed session window means 0% used — but ONLY for plans that
+        // actually have one. Weekly-first plans (e.g. prolite, whose primary
+        // limit is 10080 minutes) would otherwise show a permanent fake
+        // "5시간 · 0% · 0분" row, and the HP bar would read it as full quota.
+        // entry.windows carries 8 days of history, so a session limit having
+        // ever existed is an exact test.
+        let hasSessionLimit = entry.windows.contains { row in
+            row.kind == "session" && (entry.currentAccount.map { row.account == $0 } ?? true)
+        }
+        let primaryWindow: CodexUsageWindow?
+        let secondaryWindow: CodexUsageWindow?
+        if let session {
+            primaryWindow = window(session)
+            secondaryWindow = weekly.map(window)
+        } else if hasSessionLimit, let weekly {
+            // Session window exists for this plan but is currently closed:
+            // 0% used, with the real reset instant left unknown.
+            primaryWindow = CodexUsageWindow(
                 usedPercent: 0,
                 limitWindowSeconds: 300 * 60,
                 resetAfterSeconds: 0,
-                resetAt: Int(Date().timeIntervalSince1970)
+                resetAt: 0
             )
+            secondaryWindow = window(weekly)
+        } else {
+            // Weekly-only plan: the weekly limit IS the primary one (the
+            // provider's own presentation).
+            primaryWindow = weekly.map(window)
+            secondaryWindow = nil
         }
         let usage = CodexUsageResponse(
             planType: (session ?? weekly)?.plan ?? "",
@@ -338,7 +367,7 @@ final class CodexUsageMonitor {
                 allowed: !reached,
                 limitReached: reached,
                 primaryWindow: primaryWindow,
-                secondaryWindow: weekly.map(window)
+                secondaryWindow: secondaryWindow
             ),
             credits: nil
         )

@@ -200,8 +200,9 @@ final class WindowStatsTests: XCTestCase {
         let segs = WindowStats.segments(rows: rows, nowMs: nowMs)
         let old = segs.first { $0.plan == "pro" }!
         let current = segs.first { $0.plan == "max_5x" }!
-        // The abandoned tier must not scream "upgrade" — evidence only.
-        XCTAssertEqual(old.advice, .evidenceOnly)
+        // The abandoned tier must not scream "upgrade" — it is historical
+        // (its plan IS known, so .evidenceOnly would mislabel it).
+        XCTAssertEqual(old.advice, .historical)
         // The current tier has <14 days → collecting.
         guard case .collecting = current.advice else {
             return XCTFail("expected collecting, got \(current.advice)")

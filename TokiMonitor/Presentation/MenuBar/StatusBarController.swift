@@ -762,8 +762,11 @@ final class StatusBarController {
             guard let u = usageMonitor.currentUsage?.sevenDay?.utilization else { return -1 }
             return max(0, 1.0 - u / 100)
         case .codexSevenDay:
-            guard let primary = codexUsageMonitor.currentUsage?.rateLimit.primaryWindow else { return -1 }
-            return max(0, 1.0 - Double(primary.usedPercent) / 100)
+            // The WEEKLY window (matching the label): it is `secondary` when a
+            // session window exists and `primary` on weekly-only plans.
+            let limits = codexUsageMonitor.currentUsage?.rateLimit
+            guard let weekly = limits?.secondaryWindow ?? limits?.primaryWindow else { return -1 }
+            return max(0, 1.0 - Double(weekly.usedPercent) / 100)
         }
     }
 
