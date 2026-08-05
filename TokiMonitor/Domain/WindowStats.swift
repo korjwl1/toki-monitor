@@ -48,6 +48,11 @@ struct WindowStatsSegment: Equatable, Hashable {
     let sawCreditOverflow: Bool
     /// Days between the oldest and newest finalized window in this segment.
     let observedDays: Double
+    /// How many windows actually backed the percentiles. Low-coverage windows
+    /// (asleep at reset) are excluded from `peaks`, so this can be far below
+    /// `activeWindowCount` — and a percentile over two samples is not evidence
+    /// for the one recommendation that costs the user money if wrong.
+    let coveredCount: Int
     /// Anchor of the newest window (current-segment detection).
     let newestWindowEndMs: Int64
 
@@ -63,6 +68,7 @@ struct WindowStatsSegment: Equatable, Hashable {
             meanPeakActive: meanPeakActive, approxOverallMean: approxOverallMean,
             dutyCycle: dutyCycle, impliedDemandP90: impliedDemandP90,
             sawCreditOverflow: sawCreditOverflow, observedDays: observedDays,
+            coveredCount: coveredCount,
             newestWindowEndMs: newestWindowEndMs, advice: advice
         )
     }
@@ -263,6 +269,7 @@ enum WindowStats {
             impliedDemandP90: percentile(implied, 0.9),
             sawCreditOverflow: active.contains { $0.limitReachedKind == 2 },
             observedDays: observedDays,
+            coveredCount: wellCovered.count,
             newestWindowEndMs: newest,
             advice: .evidenceOnly // placeholder, replaced below
         )
@@ -312,9 +319,17 @@ enum WindowStats {
                     "Chronically exhausted before 60% of the window"
                 ))
             } else if s.maxedCount == 0, s.observedDays >= 28 - 1,
+                      s.coveredCount >= 3,
+                      Double(s.coveredCount) >= 0.6 * Double(s.activeWindowCount),
                       let p95 = s.p95Peak, p95 < 40, !s.p95IsCensored {
                 // Downgrade is deliberately stricter than upgrade: it needs the
-                // full 28-day lookback with zero exhaustion (plan §2).
+                // full 28-day lookback with zero exhaustion (plan §2) — and a
+                // representative sample. Windows where the machine slept
+                // through the reset are excluded from `peaks` as lower bounds
+                // of unknown looseness, so without a coverage floor a segment
+                // with 27 observed days and two usable windows could recommend
+                // paying less on the strength of two numbers, while the
+                // excluded windows' true peaks might have been anything.
                 advice = .downgrade(reason: L.tr(
                     "28일간 소진 0회, p95 peak \(Int(p95))%",
                     "0 maxed windows in 28d, p95 peak \(Int(p95))%"

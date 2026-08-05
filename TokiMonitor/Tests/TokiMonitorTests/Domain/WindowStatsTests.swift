@@ -125,6 +125,29 @@ final class WindowStatsTests: XCTestCase {
         }
     }
 
+    /// Downgrade is the one recommendation that costs the user money when
+    /// wrong, so it must not rest on a handful of usable windows. Windows the
+    /// machine slept through are lower bounds of unknown looseness — excluded
+    /// from the percentiles — so a segment whose peaks come from a small
+    /// minority of its windows must fall back to `keep`.
+    func testAdviceDoesNotDowngradeOnSparseCoverage() {
+        var rows: [(provider: String, row: WindowRow)] = []
+        for d in 0..<28 {
+            // Only every 10th window was sampled near its reset; the rest are
+            // low-coverage lower bounds.
+            let covered = d % 10 == 0
+            rows.append(("claude_code", row(
+                endOffsetDays: Double(d), peak: Double(10 + d % 10),
+                gapMs: covered ? 1000 : 3 * 3_600_000
+            )))
+        }
+        let s = WindowStats.segments(rows: rows, nowMs: nowMs)[0]
+        XCTAssertLessThan(s.coveredCount, s.activeWindowCount)
+        if case .downgrade = s.advice {
+            XCTFail("downgraded on \(s.coveredCount)/\(s.activeWindowCount) covered windows")
+        }
+    }
+
     func testAdviceKeepInMiddleGround() {
         var rows: [(provider: String, row: WindowRow)] = []
         for d in 0..<20 {
