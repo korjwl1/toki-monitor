@@ -185,6 +185,10 @@ final class CodexUsageMonitor {
     /// 현재 sleep 중이면 즉시 중단하고 다음 poll을 앞당깁니다.
     func wakeForImmediatePoll() {
         guard pollingTask != nil else { return }
+        // The auth.json watcher fires this on any credential change, so a
+        // re-login gets a real retry instead of being blocked by the sticky
+        // rejection from the previous token.
+        directAuthRejected = false
         sleepTask?.cancel()
     }
 
@@ -298,17 +302,24 @@ final class CodexUsageMonitor {
         // A failed keyspace scan arrives as `windows: []` plus an error. Taking
         // that as "no windows yet" would paint a full quota bar over a broken read.
         if entry.error != nil { return false }
-        // A direct 401/403 is the ONLY detector for a revoked Codex token — the
-        // daemon classifies auth from auth.json presence alone and keeps saying
-        // "ok". Without this the next tick cleared the error and restored stale
-        // rows, so the re-login notice was never visible.
-        if directAuthRejected { return false }
         switch entry.authStatus {
         case "ok":
             // The daemon's classification is a 30s cache; auth.json is a local
             // file we can stat right now. A logout would otherwise reappear as
             // "available with stale usage" for up to 30s.
             guard CodexAuthReader.isAvailable else { return false }
+            // A direct 401/403 is the ONLY detector for a server-revoked token:
+            // the daemon classifies Codex auth from auth.json presence and keeps
+            // saying "ok", so its verdict must not overwrite ours. Answered HERE
+            // rather than by falling through to the direct path — that would
+            // poll a dead token over HTTP every 15s forever.
+            if directAuthRejected {
+                currentUsage = nil
+                consecutiveFailures = 0
+                isAuthError = true
+                lastError = L.tr("Codex 재로그인 필요", "Codex re-login required")
+                return true
+            }
         case "missing":
             // Same in reverse: after a login the cached "missing" would hide
             // the freshly-available widget for another cache generation.
@@ -540,6 +551,10 @@ final class CodexUsageMonitor {
         if consecutiveFailures > 0 {
             return min(30 * pow(2, Double(consecutiveFailures - 1)), 60)
         }
+        // Revoked token: `currentUsage == nil` would otherwise ask for a 15s
+        // retry loop, but nothing changes until the user re-logs in — and the
+        // auth.json watcher wakes us the moment they do.
+        if directAuthRejected { return 60 }
         if currentUsage == nil { return 15 }
         // High utilization or heavy token flow → poll aggressively
         if let usage = currentUsage,

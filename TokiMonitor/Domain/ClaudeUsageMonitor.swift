@@ -144,8 +144,11 @@ final class ClaudeUsageMonitor {
     func wakeForImmediatePoll() {
         guard pollingTask != nil else { return }
         // A token-flow wake implies possible re-login: ask the daemon for a
-        // forced revalidation (max_age=0) on the poll this wake triggers.
+        // forced revalidation (max_age=0) on the poll this wake triggers, and
+        // give a rejected token a real retry (tokens flowing is itself evidence
+        // the credential works).
         forceFreshNext = true
+        directAuthRejected = false
         sleepTask?.cancel()
     }
 
@@ -277,17 +280,24 @@ final class ClaudeUsageMonitor {
         // that as "no windows yet" would synthesize 0%% buckets and paint a full
         // quota bar over a broken read.
         if entry.error != nil { return false }
-        // A direct 401/403 is the ONLY detector for a revoked token — the
-        // daemon classifies auth from file/Keychain presence alone and keeps
-        // reporting "ok". Without this the next daemon tick cleared the error
-        // and restored stale rows, so the re-login notice never survived long
-        // enough to be seen (Codex: never shown at all; Claude: one 20s flash
-        // every 30 minutes).
-        if directAuthRejected { return false }
+
 
         switch entry.authStatus {
         case "ok":
-            break
+            // A direct 401/403 is the ONLY detector for a server-revoked token:
+            // the daemon classifies auth from Keychain presence and keeps
+            // saying "ok", so its verdict must not overwrite ours. Answered
+            // HERE rather than by falling through to the direct path — that
+            // would poll a dead token over HTTP every 20s forever.
+            if directAuthRejected {
+                authReadUnreadable = false
+                isAvailable = true
+                currentUsage = nil
+                consecutiveFailures = 0
+                isAuthMissing = true
+                lastError = L.tr("Claude 재로그인 필요", "Claude re-login required")
+                return true
+            }
         case "expired":
             authReadUnreadable = false
             isAvailable = true
