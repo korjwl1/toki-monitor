@@ -6,7 +6,12 @@ import Foundation
 // right-sizing practice (see the design plan §2/§7):
 // - trailing 28 days (4 weekly cycles), finalized windows only
 // - percentile-of-peaks, never means-of-means
-// - 100% windows are right-censored: counted and extrapolated, not averaged in
+// - 100% windows are right-censored: the recorded 100 is a lower bound on the
+//   demand that would have been used. They are counted, and their implied
+//   demand is extrapolated from time-to-100. They DO enter the means — a mean
+//   that dropped them would understate exactly the heaviest usage — so any
+//   mean over a segment with max-outs is itself a lower bound, and is labelled
+//   as one in the UI. Percentiles carry the same caveat via `p95IsCensored`.
 // - low-coverage windows (big gap between last sample and reset) are lower
 //   bounds — they count toward maxed-out but are excluded from percentiles
 // - statistics are segmented by plan tier and account: a peak percentage is
@@ -34,7 +39,9 @@ struct WindowStatsSegment: Equatable, Hashable {
     let p95Peak: Double?
     /// p95 is a floor, not an exact value (some windows were censored at 100%).
     let p95IsCensored: Bool
-    /// Mean peak over active windows ("사용 중 평균").
+    /// Mean peak over active windows ("사용 중 평균"). A LOWER BOUND whenever
+    /// `maxedCount > 0`: censored windows contribute their capped 100, not the
+    /// demand they actually had.
     let meanPeakActive: Double?
     /// Calendar-slot approximation of the overall mean for session windows
     /// (28d ≈ 134 five-hour slots; idle slots count as 0). nil for weekly

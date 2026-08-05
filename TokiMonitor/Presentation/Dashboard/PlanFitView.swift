@@ -126,9 +126,16 @@ struct PlanFitView: View {
                 stat(
                     L.tr("사용 중 평균", "Active mean"),
                     s.meanPeakActive.map { "\(pct($0))%" } ?? "—",
-                    detail: s.approxOverallMean.map {
-                        L.tr("전체 평균 ~\(pct($0))% (캘린더 근사)", "overall ~\(pct($0))% (calendar approx.)")
-                    }
+                    // Any max-out makes this a lower bound: those windows
+                    // contribute their capped 100, not the demand they had.
+                    detail: [
+                        s.approxOverallMean.map {
+                            L.tr("전체 평균 ~\(pct($0))% (캘린더 근사)", "overall ~\(pct($0))% (calendar approx.)")
+                        },
+                        s.maxedCount > 0
+                            ? L.tr("소진 윈도우 포함 — 실제 평균은 더 높음", "includes maxed windows — true mean is higher")
+                            : nil,
+                    ].compactMap { $0 }.joined(separator: " · ").nilIfEmpty
                 )
                 stat(
                     L.tr("가동률", "Duty cycle"),
@@ -160,6 +167,8 @@ struct PlanFitView: View {
     }
 
     private func stat(_ title: String, _ value: String, detail: String?) -> some View {
+        // (see String.nilIfEmpty below — an empty joined() would render a
+        // blank caption line rather than no line at all)
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.system(size: DS.fontCaption))
@@ -321,4 +330,11 @@ struct PlanFitView: View {
         if hours > 0 { return L.tr("\(hours)시간 \(minutes)분", "\(hours)h \(minutes)m") }
         return L.tr("\(minutes)분", "\(minutes)m")
     }
+}
+
+
+private extension String {
+    /// Joining optional detail fragments yields "" when every fragment is
+    /// absent; `stat` wants nil in that case so no caption row is drawn.
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
