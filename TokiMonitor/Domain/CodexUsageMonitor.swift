@@ -26,6 +26,24 @@ struct CodexRateLimit: Codable {
         case primaryWindow = "primary_window"
         case secondaryWindow = "secondary_window"
     }
+
+    /// `primary`/`secondary` are kind SLOTS in the API, not roles: a
+    /// weekly-first plan (`prolite`) reports the 7-day window as `primary` and
+    /// the 5-hour as `secondary`. Consumers treat primary=session and
+    /// secondary=weekly (which is what the daemon path builds), so the direct
+    /// path normalizes to the same convention — otherwise the HP bar showed the
+    /// 5-hour window under the "Codex 7일" label, and the same window raised
+    /// alerts under two different bucket keys depending on which path served it.
+    func normalizedBySpan() -> CodexRateLimit {
+        guard let p = primaryWindow, let s = secondaryWindow,
+              p.limitWindowSeconds > s.limitWindowSeconds else { return self }
+        return CodexRateLimit(
+            allowed: allowed,
+            limitReached: limitReached,
+            primaryWindow: s,
+            secondaryWindow: p
+        )
+    }
 }
 
 struct CodexUsageWindow: Codable {
@@ -99,6 +117,10 @@ final class CodexUsageMonitor {
     /// true = 일시적 서버 오류로 backoff 중. 인증 오류(401/403)는 포함하지 않음 — 재시도해도 의미 없음.
     var isInTransientBackoff: Bool { consecutiveFailures > 0 && !isAuthError }
     private(set) var isAuthError: Bool = false
+    /// Sticky until a direct fetch succeeds: the daemon classifies Codex auth
+    /// purely from auth.json presence and never sees a 401, so it would clear
+    /// this on its next tick. Cleared only by evidence to the contrary.
+    private var directAuthRejected: Bool = false
     /// true = a daemon answered but predates the WINDOWS command.
     private(set) var daemonUnsupported: Bool = false
 
@@ -211,22 +233,35 @@ final class CodexUsageMonitor {
         do {
             let token = try CodexAuthReader.readAccessToken()
             let accountId = CodexAuthReader.readAccountId()
-            let usage = try await CodexUsageClient.fetchUsage(accessToken: token, accountId: accountId)
+            let raw = try await CodexUsageClient.fetchUsage(accessToken: token, accountId: accountId)
             guard generation == pollGeneration, !Task.isCancelled else { return }
+            // Normalize ONCE, before anything reads the slots — the alert
+            // buckets below key off primary/secondary too.
+            let usage = CodexUsageResponse(
+                planType: raw.planType,
+                rateLimit: raw.rateLimit.normalizedBySpan(),
+                credits: raw.credits
+            )
             currentUsage = usage
             lastError = nil
             consecutiveFailures = 0
             isAuthError = false
+            directAuthRejected = false
             settings.codexHasSecondaryWindow = (usage.rateLimit.secondaryWindow != nil)
             checkThresholds(usage)
         } catch let error as CodexAuthError {
             switch error {
             case .fetchFailed(401), .fetchFailed(403):
+                // Surface immediately, like the Claude twin. The >= 3 counter
+                // could never be reached here: probes are 30 minutes apart and
+                // every daemon tick in between reset it to 0, so a revoked
+                // token showed frozen usage forever instead of a re-login
+                // notice. (KEEP IN SYNC with ClaudeUsageMonitor.)
                 isAuthError = true
-                consecutiveFailures += 1
-                if consecutiveFailures >= 3 {
-                    lastError = L.tr("Codex 재로그인 필요", "Codex re-login required")
-                }
+                directAuthRejected = true
+                currentUsage = nil
+                consecutiveFailures = 0
+                lastError = L.tr("Codex 재로그인 필요", "Codex re-login required")
             case .fetchFailed(429):
                 lastError = nil
                 consecutiveFailures += 1
@@ -260,6 +295,14 @@ final class CodexUsageMonitor {
     /// could mask a dead login for up to 7 days. The occasional direct call
     /// is the only 401 detector.
     private func applyDaemonEntry(_ entry: WindowsProviderEntry, nowMs: Int64) -> Bool {
+        // A failed keyspace scan arrives as `windows: []` plus an error. Taking
+        // that as "no windows yet" would paint a full quota bar over a broken read.
+        if entry.error != nil { return false }
+        // A direct 401/403 is the ONLY detector for a revoked Codex token — the
+        // daemon classifies auth from auth.json presence alone and keeps saying
+        // "ok". Without this the next tick cleared the error and restored stale
+        // rows, so the re-login notice was never visible.
+        if directAuthRejected { return false }
         switch entry.authStatus {
         case "ok":
             // The daemon's classification is a 30s cache; auth.json is a local

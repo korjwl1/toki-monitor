@@ -72,9 +72,14 @@ struct WindowsProviderEntry: Codable, Sendable {
     /// Account scope the daemon is currently collecting under; rows from a
     /// superseded login stay open until their own reset.
     let currentAccount: String?
+    /// Set by the daemon when the window-keyspace scan FAILED, so `windows: []`
+    /// means "storage broken", not "none yet". Without it a Fjall read error
+    /// renders as a full green bar at 0% while the user sits at 95%.
+    let error: String?
 
     enum CodingKeys: String, CodingKey {
         case windows
+        case error
         case authStatus = "auth_status"
         case lastSuccessMs = "last_success_ms"
         case lastPollMs = "last_poll_ms"

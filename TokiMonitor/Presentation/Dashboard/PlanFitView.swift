@@ -210,12 +210,18 @@ struct PlanFitView: View {
         defer { isLoading = false }
         let now = Int(Date().timeIntervalSince1970)
         let start = now - Int(WindowStats.lookbackDays * 86_400)
+        // Both sources bound on the window ANCHOR, which is the reset instant —
+        // in the FUTURE for every open window. Ending at `now` therefore filtered
+        // out exactly the open rows that current-tier detection needs (after a
+        // plan change the newest finalized weekly row still names the old tier,
+        // for up to 7 days). Statistics are unaffected: they require `finalized`.
+        let end = now + 7 * 86_400 + 3_600
         // Both sources fetched in PARALLEL and arbitrated PER PROVIDER: the
         // server (multi-device merge) wins for providers it actually has, but
         // a server that only knows Claude must not discard richer local
         // Codex history — and a broken local CLI must not gate the server.
-        async let localAsync = fetchLocal(start: start, end: now)
-        async let serverAsync = fetchServer(start: start, end: now)
+        async let localAsync = fetchLocal(start: start, end: end)
+        async let serverAsync = fetchServer(start: start, end: end)
         let (localRows, localFailed) = await localAsync
         let (serverRows, serverFailed) = await serverAsync
 

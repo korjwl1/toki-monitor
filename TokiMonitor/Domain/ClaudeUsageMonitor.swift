@@ -238,6 +238,7 @@ final class ClaudeUsageMonitor {
             currentUsage = usage
             lastError = nil
             consecutiveFailures = 0
+            directAuthRejected = false
             settings.claudeHasSevenDaySonnet = (usage.sevenDaySonnet != nil)
             checkThresholds(usage)
         } catch let error as OAuthError {
@@ -272,6 +273,17 @@ final class ClaudeUsageMonitor {
     /// is preserved, just fed from daemon-sourced values.
     private func applyDaemonEntry(_ entry: WindowsProviderEntry, nowMs: Int64) -> Bool {
         guard entry.pollingEnabled == true else { return false }
+        // A failed keyspace scan arrives as `windows: []` plus an error. Taking
+        // that as "no windows yet" would synthesize 0%% buckets and paint a full
+        // quota bar over a broken read.
+        if entry.error != nil { return false }
+        // A direct 401/403 is the ONLY detector for a revoked token — the
+        // daemon classifies auth from file/Keychain presence alone and keeps
+        // reporting "ok". Without this the next daemon tick cleared the error
+        // and restored stale rows, so the re-login notice never survived long
+        // enough to be seen (Codex: never shown at all; Claude: one 20s flash
+        // every 30 minutes).
+        if directAuthRejected { return false }
 
         switch entry.authStatus {
         case "ok":
@@ -397,8 +409,14 @@ final class ClaudeUsageMonitor {
         currentUsage = nil
         isAuthMissing = true
         consecutiveFailures = 0
+        directAuthRejected = true
         lastError = L.tr("Claude 재로그인 필요", "Claude re-login required")
     }
+
+    /// Sticky until a direct fetch succeeds: the daemon cannot see a 401 (it
+    /// classifies auth from Keychain presence), so it would otherwise overwrite
+    /// this on its very next tick. Cleared only by evidence to the contrary.
+    private var directAuthRejected: Bool = false
 
     // MARK: - Adaptive Interval
 
