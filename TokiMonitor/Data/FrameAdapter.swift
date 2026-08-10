@@ -46,7 +46,8 @@ enum FrameAdapter {
         query: String,
         refId: String = "A",
         datasource: String? = nil,
-        time: TimeConfig? = nil
+        time: TimeConfig? = nil,
+        pricingCachePath: URL = ModelPricing.daemonCachePath
     ) -> FrameSet {
         let dimensions = groupByDimensions(in: query)
         var out: [Frame] = []
@@ -87,42 +88,42 @@ enum FrameAdapter {
                     // the fallback exists for. An unpriced name (a project, an
                     // unknown model) yields nil and stays absent.
                     //
-                    // The two sources do NOT use the same prices: the daemon
-                    // values events with its LiteLLM snapshot, whenever that
-                    // was last refreshed, and this fallback with a table
-                    // compiled into the app. Both mean "valued at the prices
-                    // we know", not "what was billed at the time" — nobody
-                    // stores a price history — but they can disagree, so a
-                    // series that mixes them is recorded as mixed below.
+                    // The estimate normally reads the daemon's OWN price
+                    // table, so it agrees with the daemon's numbers. Only when
+                    // that file is unavailable does it fall back to the table
+                    // compiled into this app — and a series priced partly by
+                    // the daemon and partly by that fallback is a total from
+                    // two different price lists, which is recorded below.
                     let cost: Double?
-                    let estimated: Bool
+                    var usedCompiledFallback = false
                     if let reported = summary.costUsd {
                         cost = reported
-                        estimated = false
                     } else {
-                        cost = ModelPricing.estimateCost(
+                        let estimate = ModelPricing.estimate(
                             model: labels["model"] ?? summary.model,
                             inputTokens: summary.inputTokens,
                             outputTokens: summary.outputTokens,
                             cacheCreationInputTokens: summary.cacheCreationInputTokens,
                             cacheReadInputTokens: summary.cacheReadInputTokens,
-                            cachedInputTokens: summary.cachedInputTokens
+                            cachedInputTokens: summary.cachedInputTokens,
+                            cachePath: pricingCachePath
                         )
-                        estimated = cost != nil
+                        cost = estimate?.cost
+                        usedCompiledFallback = estimate?.source == .compiledFallback
                     }
 
                     let key = SeriesKey(labels: labels)
                     series[key, default: SeriesAccumulator(slots: axis.count)]
-                        .add(at: index, summary: summary, cost: cost, costEstimated: estimated)
+                        .add(at: index, summary: summary, cost: cost,
+                             costFromCompiledFallback: usedCompiledFallback)
                 }
             }
 
             for (key, acc) in series.sorted(by: { $0.key.sortKey < $1.key.sortKey }) {
                 // Part of this series was priced by the daemon and part by
-                // this app, from different tables. The total is a blend of two
-                // price lists, which is not something a reader can see in a
-                // number.
-                if acc.sawReportedCost && acc.sawEstimatedCost {
+                // this app's compiled table. The total is a blend of two price
+                // lists, which is not something a reader can see in a number.
+                if acc.sawReportedCost && acc.sawCompiledFallbackCost {
                     notices.append(
                         "cost for \(key.sortKey) mixes daemon-reported and "
                         + "client-estimated prices"
@@ -284,7 +285,7 @@ enum FrameAdapter {
         /// Which side priced this series. Both true means the column is a
         /// blend of two price tables.
         var sawReportedCost = false
-        var sawEstimatedCost = false
+        var sawCompiledFallbackCost = false
 
         init(slots: Int) {
             let empty = [Double?](repeating: nil, count: slots)
@@ -295,7 +296,7 @@ enum FrameAdapter {
         /// Accumulates rather than overwrites: the same bucket can arrive twice
         /// for one series (e.g. one project reported under two model names).
         mutating func add(at i: Int, summary: TokiModelSummary,
-                          cost resolvedCost: Double?, costEstimated: Bool) {
+                          cost resolvedCost: Double?, costFromCompiledFallback: Bool) {
             total[i] = (total[i] ?? 0) + Double(summary.totalTokens)
             input[i] = (input[i] ?? 0) + Double(summary.inputTokens)
             output[i] = (output[i] ?? 0) + Double(summary.outputTokens)
@@ -303,7 +304,11 @@ enum FrameAdapter {
             if let c = resolvedCost {
                 cost[i] = (cost[i] ?? 0) + c
                 sawCost = true
-                if costEstimated { sawEstimatedCost = true } else { sawReportedCost = true }
+                if costFromCompiledFallback {
+                    sawCompiledFallbackCost = true
+                } else {
+                    sawReportedCost = true
+                }
             }
 
             func add(_ column: inout [Double?], _ value: UInt64?, _ seen: inout Bool) {

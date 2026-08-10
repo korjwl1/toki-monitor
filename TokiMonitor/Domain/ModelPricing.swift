@@ -17,8 +17,16 @@ import Foundation
 ///
 /// That is a deliberate choice, not an oversight: billed-at-the-time costs
 /// would need effective-dated prices recorded per event, which nothing in the
-/// pipeline captures. What is NOT acceptable is blending the two silently, so
-/// `FrameAdapter` records a notice when one series is priced by both.
+/// pipeline captures.
+///
+/// # Where the prices come from
+///
+/// The daemon's own LiteLLM cache first (`~/.config/toki/pricing.json`), so
+/// this app and the daemon quote the same number. That file turned out to be
+/// comprehensive and current — it already listed Opus 5, Fable 5 and Sonnet
+/// 5's introductory price — which makes the table below a genuine last resort
+/// for a machine with no daemon cache yet, not the main path it was written
+/// as. When both end up pricing one series, `FrameAdapter` says so.
 enum ModelPricing {
     struct Pricing {
         let inputPerToken: Double
@@ -140,6 +148,89 @@ enum ModelPricing {
         "claude-opus-4-8": 2.0,
     ]
 
+    // MARK: - The daemon's own table
+
+    /// Where the daemon caches the LiteLLM price list
+    /// (`toki/src/pricing.rs::default_cache_path`).
+    static let daemonCachePath = FileManager.default
+        .homeDirectoryForCurrentUser
+        .appendingPathComponent(".config/toki/pricing.json")
+
+    private struct DaemonCacheFile: Decodable {
+        struct Entry: Decodable {
+            let input_cost_per_token: Double
+            let output_cost_per_token: Double
+            let cache_creation_input_token_cost: Double?
+            let cache_read_input_token_cost: Double?
+        }
+        let prices: [String: Entry]
+    }
+
+    private struct LoadedCache {
+        let prices: [String: Pricing]
+        let modified: Date?
+    }
+
+    private static let cacheLock = NSLock()
+    /// Keyed by path so tests can use their own file without disturbing the
+    /// real one — the suite runs in parallel, and a mutable global path would
+    /// have tests overwriting each other's answers.
+    nonisolated(unsafe) private static var loadedCaches: [String: LoadedCache] = [:]
+
+    /// Which table a number came from. The two can disagree, so a caller that
+    /// mixes them in one series needs to be able to say so.
+    enum Source: Equatable, Sendable {
+        /// The daemon's LiteLLM cache — the same prices the daemon itself used.
+        case daemonTable
+        /// The table compiled into this app.
+        case compiledFallback
+    }
+
+    struct Estimate: Equatable, Sendable {
+        let cost: Double
+        let source: Source
+    }
+
+    /// Read the daemon's cache, re-reading when it changes on disk so a
+    /// price refresh reaches a running app without a restart.
+    ///
+    /// This is the same machine and the same product, and the file is always
+    /// fresher than a table compiled months ago — LiteLLM already carried
+    /// Opus 5, Fable 5 and Sonnet 5's introductory price while the compiled
+    /// table had none of them. Keeping a second source of truth here only
+    /// created a way to disagree with the daemon.
+    private static func daemonPricing(for model: String, at path: URL) -> Pricing? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+
+        let key = path.path
+        let modified = (try? FileManager.default
+            .attributesOfItem(atPath: key)[.modificationDate] as? Date) ?? nil
+
+        if let loaded = loadedCaches[key], loaded.modified == modified {
+            return loaded.prices[model]
+        }
+
+        guard let data = try? Data(contentsOf: path),
+              let file = try? JSONDecoder().decode(DaemonCacheFile.self, from: data)
+        else {
+            // Remember the miss too, so a missing file is not re-stat'd and
+            // re-read on every single summary.
+            loadedCaches[key] = LoadedCache(prices: [:], modified: modified)
+            return nil
+        }
+        let prices = file.prices.mapValues {
+            Pricing(inputPerToken: $0.input_cost_per_token,
+                    outputPerToken: $0.output_cost_per_token,
+                    cacheWritePerToken: $0.cache_creation_input_token_cost,
+                    cacheReadPerToken: $0.cache_read_input_token_cost)
+        }
+        loadedCaches[key] = LoadedCache(prices: prices, modified: modified)
+        return prices[model]
+    }
+
+    // MARK: - Estimation
+
     /// Estimate cost from token breakdown. Returns nil if model is unknown.
     static func estimateCost(
         model: String,
@@ -147,8 +238,29 @@ enum ModelPricing {
         outputTokens: UInt64,
         cacheCreationInputTokens: UInt64? = nil,
         cacheReadInputTokens: UInt64? = nil,
-        cachedInputTokens: UInt64? = nil
+        cachedInputTokens: UInt64? = nil,
+        cachePath: URL = daemonCachePath
     ) -> Double? {
+        estimate(model: model, inputTokens: inputTokens, outputTokens: outputTokens,
+                 cacheCreationInputTokens: cacheCreationInputTokens,
+                 cacheReadInputTokens: cacheReadInputTokens,
+                 cachedInputTokens: cachedInputTokens,
+                 cachePath: cachePath)?.cost
+    }
+
+    /// The same estimate, with the table it came from.
+    ///
+    /// `cachePath` exists so a test can supply its own price file; the app
+    /// always uses the default.
+    static func estimate(
+        model: String,
+        inputTokens: UInt64,
+        outputTokens: UInt64,
+        cacheCreationInputTokens: UInt64? = nil,
+        cacheReadInputTokens: UInt64? = nil,
+        cachedInputTokens: UInt64? = nil,
+        cachePath: URL = daemonCachePath
+    ) -> Estimate? {
         let lower = model.lowercased()
 
         // Anthropic Fast mode: upstream toki appends "-fast" to the model name
@@ -165,15 +277,22 @@ enum ModelPricing {
             }
         }
 
-        // Longest prefix, not first: the table lists `claude-opus-4` for the
+        // The daemon's own table first, matched exactly the way the daemon
+        // matches it. Only when it has nothing does the compiled table get a
+        // turn, and then by longest prefix — it lists `claude-opus-4` for the
         // retired model and `claude-opus-4-5` for the current one, and
         // first-match would give every 4.x the retired price.
-        guard let pricing = pricingTable
+        let resolved: (pricing: Pricing, source: Source)
+        if let fromDaemon = daemonPricing(for: lookup, at: cachePath) {
+            resolved = (fromDaemon, .daemonTable)
+        } else if let fromTable = pricingTable
             .filter({ lookup.hasPrefix($0.prefix) })
-            .max(by: { $0.prefix.count < $1.prefix.count })?.pricing
-        else {
+            .max(by: { $0.prefix.count < $1.prefix.count })?.pricing {
+            resolved = (fromTable, .compiledFallback)
+        } else {
             return nil
         }
+        let pricing = resolved.pricing
 
         var cost = 0.0
 
@@ -195,6 +314,6 @@ enum ModelPricing {
         // Output tokens
         cost += Double(outputTokens) * pricing.outputPerToken
 
-        return cost * multiplier
+        return Estimate(cost: cost * multiplier, source: resolved.source)
     }
 }

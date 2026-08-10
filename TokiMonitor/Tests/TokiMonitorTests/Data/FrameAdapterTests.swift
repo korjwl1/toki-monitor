@@ -159,12 +159,15 @@ struct FrameAdapterTests {
         #expect(try #require(cost) > 0)
     }
 
-    /// The daemon prices from its LiteLLM snapshot and this app from a table
-    /// compiled into it. Both mean "at the prices we know", but they can
-    /// disagree, and a total that blends them is not something a reader can
-    /// see in a number.
+    /// The estimate normally reads the daemon's own table, so it agrees with
+    /// the daemon's numbers. When that file is unavailable the compiled table
+    /// answers instead, and a total blending the two is not something a reader
+    /// can see in a number.
     @Test("a series priced by both sources says so")
     func mixedPricingIsReported() {
+        // No daemon cache, so the estimate comes from the compiled table and
+        // the two halves of this series really are priced differently.
+        let noDaemonCache = URL(fileURLWithPath: "/nonexistent/toki/pricing.json")
         let priced = TokiModelSummary(
             model: "claude-opus-4-6", inputTokens: 1_000_000, outputTokens: 1_000_000,
             totalTokens: 2_000_000, events: 1, costUsd: nil,
@@ -177,7 +180,8 @@ struct FrameAdapterTests {
                 entry("2026-08-10T00:00:00", [reported]),
                 entry("2026-08-11T00:00:00", [priced]),
             ]],
-            query: "sum(cost[1d])"
+            query: "sum(cost[1d])",
+            pricingCachePath: noDaemonCache
         )
         #expect(set.notices.contains { $0.contains("mixes") })
     }
