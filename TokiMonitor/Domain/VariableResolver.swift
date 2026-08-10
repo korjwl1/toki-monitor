@@ -111,7 +111,18 @@ enum VariableResolver {
             }
         }
         _ = converged
-        return query
+        return QueryRewriter.applying(adHocFilters(in: variables), to: query)
+    }
+
+    /// Every ad hoc filter on the dashboard, in variable order.
+    ///
+    /// Applied after substitution rather than before, so a filter value that
+    /// happens to contain `$something` is a value and not a template — the
+    /// reader typed it into a filter box, not into a query.
+    static func adHocFilters(in variables: [DashboardVariable]) -> [AdHocFilter] {
+        variables
+            .filter { $0.effectivePluginKind == BuiltinVariablePluginKind.adHoc }
+            .flatMap { $0.adHocFilters ?? [] }
     }
 
     /// Current selection for a variable by name (empty array if not found).

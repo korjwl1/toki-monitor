@@ -38,6 +38,7 @@ final class VariablePluginRegistry {
         register(ConstantVariableLoader())
         register(TextVariableLoader())
         register(GroupByVariableLoader())
+        register(AdHocVariableLoader())
     }
 
     func register(_ loader: any VariablePluginLoader) {
@@ -133,6 +134,46 @@ struct GroupByVariableLoader: VariablePluginLoader {
         )
         let result = try await client.queryPromQL(query: query, time: context.time)
         return FrameReader.labelKeys(result.frames).map { VariableOption(text: $0, value: $0) }
+    }
+}
+
+/// `AdHocFiltersVariable` — the reader's own label matchers.
+///
+/// It has no option list: the reader picks a key and then a value, so what the
+/// editor needs is the label MAP the query returned, not a flat list. The
+/// filters themselves live on the variable rather than in `current`, because
+/// they are not a selection from a list.
+struct AdHocVariableLoader: VariablePluginLoader {
+    var kind: String { BuiltinVariablePluginKind.adHoc }
+
+    func loadOptions(specData: Data, context: VariableLoadContext) async throws -> [VariableOption] {
+        []
+    }
+
+    /// Every label the query returns, mapped to the values it takes. Both
+    /// halves come from the same frames, so a key is only offered when it has
+    /// values and a value is only offered under the key it belongs to.
+    func loadKeyValues(specData: Data,
+                       context: VariableLoadContext) async throws -> [String: [String]] {
+        guard let spec = try? JSONDecoder().decode(AdHocVariableSpec.self, from: specData),
+              !spec.query.isEmpty
+        else { return [:] }
+        let client: (any QueryDataSource)? = await MainActor.run {
+            if let ds = spec.datasource, let plugin = DatasourceRegistry.shared.resolve(ds) {
+                return plugin as any QueryDataSource
+            }
+            return context.queryClient
+        }
+        guard let client else { return [:] }
+        let query = TokiLabelValuesVariableLoader.interpolate(
+            spec.query, with: context.resolvedVariables
+        )
+        let frames = try await client.queryPromQL(query: query, time: context.time).frames
+        var out: [String: [String]] = [:]
+        for key in FrameReader.labelKeys(frames) {
+            out[key] = FrameReader.labelValues(frames, key: key)
+        }
+        return out
     }
 }
 

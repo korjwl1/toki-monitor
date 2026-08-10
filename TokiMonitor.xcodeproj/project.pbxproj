@@ -10,6 +10,7 @@
 		0237DEE9F5EB132AAB4AE384 /* TimeSeriesChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9BDCAC76DC2C743B8CE339 /* TimeSeriesChartView.swift */; };
 		AA34FIELDCFG00000002 /* FieldConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34FIELDCFG00000001 /* FieldConfig.swift */; };
 		AA34PNLSERIES0000002 /* PanelSeries.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34PNLSERIES0000001 /* PanelSeries.swift */; };
+		AA34QRYRW00000002 /* QueryRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34QRYRW00000001 /* QueryRewriter.swift */; };
 		AA32FIELDSEL000000002 /* FieldSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA32FIELDSEL000000001 /* FieldSelection.swift */; };
 		AA30TRANSFORM000000002 /* Transformation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA30TRANSFORM000000001 /* Transformation.swift */; };
 		03C0F28465A00D07ACCB5CC1 /* WindowStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC6A0B44B1C454BB9AA2579 /* WindowStats.swift */; };
@@ -123,6 +124,8 @@
 		AA35VARLOADTEST00002 /* VariableLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35VARLOADTEST00001 /* VariableLoaderTests.swift */; };
 		AA35VARKINDTEST00002 /* VariableKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35VARKINDTEST00001 /* VariableKindTests.swift */; };
 		AA35VARFMTTEST000002 /* VariableFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35VARFMTTEST000001 /* VariableFormatTests.swift */; };
+		AA35QRYRWTEST000002 /* QueryRewriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35QRYRWTEST000001 /* QueryRewriterTests.swift */; };
+		AA35ADHOCTEST000002 /* AdHocVariableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35ADHOCTEST000001 /* AdHocVariableTests.swift */; };
 		AA33FIELDTEST00000002 /* FieldSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA33FIELDTEST00000001 /* FieldSelectionTests.swift */; };
 		AA31TRANSTEST00000002 /* TransformationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA31TRANSTEST00000001 /* TransformationTests.swift */; };
 		CC0857BF78965AF7CCC554E8 /* WindowStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */; };
@@ -254,6 +257,8 @@
 		AA35VARLOADTEST00001 /* VariableLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableLoaderTests.swift; sourceTree = "<group>"; };
 		AA35VARKINDTEST00001 /* VariableKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableKindTests.swift; sourceTree = "<group>"; };
 		AA35VARFMTTEST000001 /* VariableFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableFormatTests.swift; sourceTree = "<group>"; };
+		AA35QRYRWTEST000001 /* QueryRewriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryRewriterTests.swift; sourceTree = "<group>"; };
+		AA35ADHOCTEST000001 /* AdHocVariableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdHocVariableTests.swift; sourceTree = "<group>"; };
 		AA33FIELDTEST00000001 /* FieldSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldSelectionTests.swift; sourceTree = "<group>"; };
 		AA31TRANSTEST00000001 /* TransformationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransformationTests.swift; sourceTree = "<group>"; };
 		931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStatsTests.swift; sourceTree = "<group>"; };
@@ -286,6 +291,7 @@
 		CBE42DEDC857AB657D449C5E /* ClaudeAuthReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAuthReader.swift; sourceTree = "<group>"; };
 		AA34FIELDCFG00000001 /* FieldConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldConfig.swift; sourceTree = "<group>"; };
 		AA34PNLSERIES0000001 /* PanelSeries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelSeries.swift; sourceTree = "<group>"; };
+		AA34QRYRW00000001 /* QueryRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryRewriter.swift; sourceTree = "<group>"; };
 		AA32FIELDSEL000000001 /* FieldSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldSelection.swift; sourceTree = "<group>"; };
 		AA30TRANSFORM000000001 /* Transformation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transformation.swift; sourceTree = "<group>"; };
 		CCC6A0B44B1C454BB9AA2579 /* WindowStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStats.swift; sourceTree = "<group>"; };
@@ -550,6 +556,8 @@
 				AA35PNLSERTEST000001 /* PanelSeriesTests.swift */,
 				AA35VARKINDTEST00001 /* VariableKindTests.swift */,
 				AA35VARFMTTEST000001 /* VariableFormatTests.swift */,
+				AA35QRYRWTEST000001 /* QueryRewriterTests.swift */,
+				AA35ADHOCTEST000001 /* AdHocVariableTests.swift */,
 				AA02PANELNORM00000000001 /* PanelNormalizationTests.swift */,
 			);
 			path = Domain;
@@ -655,6 +663,7 @@
 				AA32FIELDSEL000000001 /* FieldSelection.swift */,
 				AA34FIELDCFG00000001 /* FieldConfig.swift */,
 				AA34PNLSERIES0000001 /* PanelSeries.swift */,
+				AA34QRYRW00000001 /* QueryRewriter.swift */,
 				0E31A2DC812DEED038E06600 /* Migration */,
 			);
 			path = Domain;
@@ -873,6 +882,7 @@
 				AA32FIELDSEL000000002 /* FieldSelection.swift in Sources */,
 				AA34FIELDCFG00000002 /* FieldConfig.swift in Sources */,
 				AA34PNLSERIES0000002 /* PanelSeries.swift in Sources */,
+				AA34QRYRW00000002 /* QueryRewriter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -898,6 +908,8 @@
 				AA35VARLOADTEST00002 /* VariableLoaderTests.swift in Sources */,
 				AA35VARKINDTEST00002 /* VariableKindTests.swift in Sources */,
 				AA35VARFMTTEST000002 /* VariableFormatTests.swift in Sources */,
+				AA35QRYRWTEST000002 /* QueryRewriterTests.swift in Sources */,
+				AA35ADHOCTEST000002 /* AdHocVariableTests.swift in Sources */,
 				AA02PANELNORM00000000002 /* PanelNormalizationTests.swift in Sources */,
 				AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */,
 				AA03SERIESMERGE000000002 /* SeriesMergeTests.swift in Sources */,

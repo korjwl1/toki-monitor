@@ -67,6 +67,12 @@ final class DashboardViewModel {
     /// and nothing to explain it.
     var discoveredLabelKeys: [UUID: [String]] = [:]
 
+    /// For an ad hoc variable: which labels its query returned and which
+    /// values each one takes. The reader picks a key and then a value, so a
+    /// flat list would not do — a value must only be offered under the key it
+    /// actually belongs to.
+    var adHocKeyValues: [UUID: [String: [String]]] = [:]
+
     // MARK: - Annotations
     var annotations: [DashboardAnnotation] = []
 
@@ -279,15 +285,36 @@ final class DashboardViewModel {
         }
     }
 
-    /// Ask a label-values variable which labels its query actually returns.
-    /// Best-effort: on failure the editor keeps whatever it already knew, so a
-    /// transient query error does not empty the picker.
-    func discoverLabelKeys(for variable: DashboardVariable) {
-        guard let ref = variable.plugin,
-              let loader = variablePluginRegistry.loader(for: ref.kind)
-                as? TokiLabelValuesVariableLoader
+    /// Ad hoc filters: replace the whole set and refetch. Every panel narrows,
+    /// including panels written before the filter existed — that is the point
+    /// of the kind, and why it does not go through `$name` substitution.
+    func setAdHocFilters(_ filters: [AdHocFilter], variableID: UUID) {
+        guard let idx = dashboardConfig.templating.list.firstIndex(where: { $0.id == variableID })
         else { return }
-        let context = VariableLoadContext(
+        dashboardConfig.templating.list[idx].adHocFilters = filters.isEmpty ? nil : filters
+        saveDashboard()
+        fetchData()
+    }
+
+    /// Ask an ad hoc variable's query which labels and values it offers.
+    /// Best-effort: a failure leaves the previous answer in place rather than
+    /// emptying the picker mid-edit.
+    func discoverAdHocKeyValues(for variable: DashboardVariable) {
+        guard let ref = variable.plugin,
+              let loader = variablePluginRegistry.loader(for: ref.kind) as? AdHocVariableLoader
+        else { return }
+        let context = variableLoadContext()
+        let id = variable.id
+        Task { [weak self] in
+            guard let map = try? await loader.loadKeyValues(specData: ref.spec, context: context),
+                  !map.isEmpty, let self
+            else { return }
+            self.adHocKeyValues[id] = map
+        }
+    }
+
+    private func variableLoadContext() -> VariableLoadContext {
+        VariableLoadContext(
             time: dashboardConfig.time,
             resolvedVariables: Dictionary(
                 uniqueKeysWithValues: dashboardConfig.templating.list.map {
@@ -296,6 +323,17 @@ final class DashboardViewModel {
             ),
             queryClient: queryClient
         )
+    }
+
+    /// Ask a label-values variable which labels its query actually returns.
+    /// Best-effort: on failure the editor keeps whatever it already knew, so a
+    /// transient query error does not empty the picker.
+    func discoverLabelKeys(for variable: DashboardVariable) {
+        guard let ref = variable.plugin,
+              let loader = variablePluginRegistry.loader(for: ref.kind)
+                as? TokiLabelValuesVariableLoader
+        else { return }
+        let context = variableLoadContext()
         let id = variable.id
         Task { [weak self] in
             guard let keys = try? await loader.loadLabelKeys(specData: ref.spec, context: context),

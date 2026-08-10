@@ -286,6 +286,8 @@ struct DashboardSettingsSheet: View {
                             .tag(BuiltinVariablePluginKind.text)
                         Text(L.tr("그룹 기준", "Group By"))
                             .tag(BuiltinVariablePluginKind.groupBy)
+                        Text(L.tr("애드혹 필터", "Ad Hoc Filters"))
+                            .tag(BuiltinVariablePluginKind.adHoc)
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: 220, alignment: .leading)
@@ -334,6 +336,16 @@ struct DashboardSettingsSheet: View {
             intervalSpecEditor(variable)
         case BuiltinVariablePluginKind.tokiLabelValues:
             labelValuesSpecEditor(variable)
+        case BuiltinVariablePluginKind.adHoc:
+            singleValueSpecEditor(
+                variable,
+                label: L.tr("쿼리", "Query"),
+                help: L.tr("이 쿼리의 라벨과 값이 필터 후보가 됩니다. 모든 패널에 적용됩니다",
+                           "Its labels and values become the choices. Applies to every panel"),
+                read: { (try? JSONDecoder().decode(AdHocVariableSpec.self, from: $0))?.query },
+                write: { (try? JSONEncoder().encode(AdHocVariableSpec(datasource: nil, query: $0))) ?? Data() },
+                kind: BuiltinVariablePluginKind.adHoc
+            )
         case BuiltinVariablePluginKind.groupBy:
             singleValueSpecEditor(
                 variable,
@@ -608,6 +620,11 @@ struct DashboardSettingsSheet: View {
         case BuiltinVariablePluginKind.text:
             let value = v.current.value.first ?? v.options.first?.value ?? v.query
             return (try? encoder.encode(TextVariableSpec(value: value))) ?? Data()
+        case BuiltinVariablePluginKind.adHoc:
+            return (try? encoder.encode(AdHocVariableSpec(
+                datasource: nil,
+                query: "sum(toki_tokens_total[$__interval]) by (model, project)"
+            ))) ?? Data()
         case BuiltinVariablePluginKind.groupBy:
             return (try? encoder.encode(GroupByVariableSpec(
                 datasource: nil,

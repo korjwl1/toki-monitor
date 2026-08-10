@@ -65,6 +65,8 @@ enum BuiltinVariablePluginKind {
     static let text = "TextVariable"
     /// Which dimensions to group by. Its options are label NAMES, not values.
     static let groupBy = "GroupByVariable"
+    /// Reader-added label matchers, injected into every panel's query.
+    static let adHoc = "AdHocFiltersVariable"
 }
 
 /// How a variable's selected values are written into a query.
@@ -141,5 +143,13 @@ struct GroupByVariableSpec: Codable, Equatable, Sendable {
     var datasource: DatasourceSelector?
     /// A query whose result carries the candidate dimensions. Left empty, the
     /// variable offers nothing rather than guessing at a label set.
+    var query: String = ""
+}
+
+/// Spec for `AdHocFiltersVariable` — the query used to discover which labels
+/// and values the reader can filter on. The filters themselves live on the
+/// variable (`adHocFilters`), because they are not a selection from a list.
+struct AdHocVariableSpec: Codable, Equatable, Sendable {
+    var datasource: DatasourceSelector?
     var query: String = ""
 }

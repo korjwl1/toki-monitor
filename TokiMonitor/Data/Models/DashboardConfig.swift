@@ -274,6 +274,12 @@ struct DashboardVariable: Codable, Identifiable, Equatable {
     /// plugin keep their existing options unchanged.
     var plugin: VariablePluginRef?
 
+    /// Filters the reader added to an ad hoc variable. Unlike every other
+    /// kind, these are not substituted at a `$name` the author wrote — they
+    /// are injected into each panel's own matcher block, so they have no
+    /// natural home in `current`, which holds one selection from a list.
+    var adHocFilters: [AdHocFilter]?
+
     enum VariableType: String, Codable, CaseIterable, Equatable {
         case custom
         case interval

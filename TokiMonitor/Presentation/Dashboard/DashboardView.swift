@@ -639,9 +639,12 @@ struct DashboardView: View {
                         .font(.system(size: DS.fontCaption))
                         .foregroundStyle(.secondary)
                 }
-                if variable.effectivePluginKind == BuiltinVariablePluginKind.text {
+                switch variable.effectivePluginKind {
+                case BuiltinVariablePluginKind.text:
                     TextVariableField(variable: variable, viewModel: viewModel)
-                } else {
+                case BuiltinVariablePluginKind.adHoc:
+                    AdHocFilterBar(variable: variable, viewModel: viewModel)
+                default:
                     variableMenu(for: variable)
                 }
             }
@@ -820,5 +823,117 @@ struct TextVariableField: View {
             id: variable.id,
             selection: VariableSelection(text: [value], value: [value])
         )
+    }
+}
+
+// MARK: - Ad hoc filter control
+
+/// The toolbar control for an `AdHocFiltersVariable`.
+///
+/// Each filter is one chip: key, operator, value, remove. The reader picks a
+/// key first and only then a value, because a value only means something under
+/// the key it belongs to — a flat list of every value on the dashboard would
+/// offer `opus` under `project`.
+struct AdHocFilterBar: View {
+    let variable: DashboardVariable
+    @Bindable var viewModel: DashboardViewModel
+
+    private var filters: [AdHocFilter] { variable.adHocFilters ?? [] }
+    private var keyValues: [String: [String]] { viewModel.adHocKeyValues[variable.id] ?? [:] }
+
+    var body: some View {
+        HStack(spacing: DS.xs) {
+            ForEach(filters) { filter in
+                chip(for: filter)
+            }
+            Button {
+                // A new chip starts on the first known key so it is a usable
+                // filter immediately; with nothing discovered yet it stays
+                // blank and the rewriter ignores it until a key is chosen.
+                var next = filters
+                next.append(AdHocFilter(key: keyValues.keys.sorted().first ?? "",
+                                        op: .equals, value: ""))
+                viewModel.setAdHocFilters(next, variableID: variable.id)
+            } label: {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: DS.fontCaption))
+            }
+            .buttonStyle(.plain)
+            .help(L.tr("필터 추가", "Add filter"))
+        }
+        .task(id: variable.plugin?.spec) { viewModel.discoverAdHocKeyValues(for: variable) }
+    }
+
+    private func chip(for filter: AdHocFilter) -> some View {
+        HStack(spacing: 2) {
+            picker(title: filter.key.isEmpty ? L.tr("라벨", "Label") : filter.key,
+                   options: keyValues.keys.sorted(),
+                   current: filter.key) { newKey in
+                // The old value belongs to the old key; keeping it would show
+                // a filter that reads plausibly and matches nothing.
+                update(filter) { $0.key = newKey; $0.value = "" }
+            }
+            Menu {
+                ForEach(AdHocFilter.Op.allCases, id: \.rawValue) { op in
+                    Button(op.rawValue) { update(filter) { $0.op = op } }
+                }
+            } label: {
+                Text(filter.op.rawValue).font(.system(size: DS.fontCaption))
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+
+            picker(title: filter.value.isEmpty ? L.tr("값", "Value") : filter.value,
+                   options: keyValues[filter.key] ?? [],
+                   current: filter.value) { newValue in
+                update(filter) { $0.value = newValue }
+            }
+
+            Button {
+                viewModel.setAdHocFilters(filters.filter { $0.id != filter.id },
+                                          variableID: variable.id)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: DS.fontCaption))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(.quaternary, in: Capsule())
+    }
+
+    private func picker(title: String, options: [String], current: String,
+                        onSelect: @escaping (String) -> Void) -> some View {
+        Menu {
+            if options.isEmpty {
+                Text(L.tr("가져올 값이 없습니다", "Nothing to choose from"))
+            }
+            ForEach(options, id: \.self) { option in
+                Button {
+                    onSelect(option)
+                } label: {
+                    HStack {
+                        Text(option)
+                        if option == current {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text(title).font(.system(size: DS.fontCaption))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    private func update(_ filter: AdHocFilter, _ change: (inout AdHocFilter) -> Void) {
+        var next = filters
+        guard let idx = next.firstIndex(where: { $0.id == filter.id }) else { return }
+        change(&next[idx])
+        viewModel.setAdHocFilters(next, variableID: variable.id)
     }
 }
