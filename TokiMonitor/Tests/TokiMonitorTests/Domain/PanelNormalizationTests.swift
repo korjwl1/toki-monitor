@@ -65,3 +65,41 @@ struct PanelNormalizationTests {
         #expect(datasource(of: panel) == nil)
     }
 }
+
+/// Renderers consume the LEGACY `options`, so a stale `plugin.spec` is not a
+/// display bug — it is an EXPORT bug: the shared JSON describes a panel the
+/// user is not looking at.
+@Suite("Panel plugin spec tracks options")
+@MainActor
+struct PanelPluginSpecTests {
+
+    @Test("editing options that keep the same visualization updates the exported spec")
+    func specFollowsOptions() throws {
+        var panel = PanelConfig(
+            title: "p", panelType: .timeSeries, metric: .tokensByModel,
+            gridPosition: GridPosition(column: 0, row: 0, width: 12, height: 3)
+        )
+        DashboardViewModel.normalizePanel(&panel)
+        let before = try #require(panel.plugin?.spec)
+
+        panel.options.lineWidth = (panel.options.lineWidth == 4) ? 2 : 4
+        DashboardViewModel.normalizePanel(&panel)
+        let after = try #require(panel.plugin?.spec)
+
+        #expect(after != before,
+                "the exported plugin spec must not keep describing the old options")
+        #expect(panel.plugin?.kind == BuiltinPanelPluginKind.kind(for: .timeSeries))
+    }
+
+    @Test("normalizing twice with no edit in between is stable")
+    func normalizationIsIdempotent() throws {
+        var panel = PanelConfig(
+            title: "p", panelType: .stat, metric: .totalTokens,
+            gridPosition: GridPosition(column: 0, row: 0, width: 6, height: 1)
+        )
+        DashboardViewModel.normalizePanel(&panel)
+        let first = try #require(panel.plugin?.spec)
+        DashboardViewModel.normalizePanel(&panel)
+        #expect(panel.plugin?.spec == first, "no edit must produce no churn")
+    }
+}

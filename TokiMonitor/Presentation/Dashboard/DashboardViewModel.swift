@@ -742,15 +742,21 @@ final class DashboardViewModel {
     /// `options`, `targets`). Called on every add/update so the on-disk JSON
     /// stays accurate after edit-mode mutations.
     static func normalizePanel(_ panel: inout PanelConfig) {
-        // Plugin envelope: re-encode spec from current options when the kind
-        // mismatches the panel type, or when no spec has been written yet.
+        // Plugin envelope: re-encode whenever the encoded spec no longer
+        // matches the current options — not merely when it is absent or of the
+        // wrong kind. Renderers read the LEGACY options, so an options edit
+        // that kept the same visualization (say lineWidth 2 -> 4) left the
+        // stored spec at the old value: the screen showed 4 while exported
+        // JSON said 2. For a feature whose point is sharing, the exported
+        // document silently disagreeing with the screen is the worst failure
+        // mode.
         let expectedKind = BuiltinPanelPluginKind.kind(for: panel.panelType)
+        let currentSpec = panel.options.encodedSpec(forPanelPluginKind: expectedKind) ?? Data()
         let needsPluginRebuild = panel.plugin == nil
             || panel.plugin?.kind != expectedKind
-            || (panel.plugin?.spec.isEmpty ?? true)
+            || panel.plugin?.spec != currentSpec
         if needsPluginRebuild {
-            let specData = panel.options.encodedSpec(forPanelPluginKind: expectedKind) ?? Data()
-            panel.plugin = PanelPluginRef(kind: expectedKind, spec: specData)
+            panel.plugin = PanelPluginRef(kind: expectedKind, spec: currentSpec)
         }
 
         // Queries envelope: rebuild when targets shape *or content* drifts

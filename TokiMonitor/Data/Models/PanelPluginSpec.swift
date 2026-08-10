@@ -184,6 +184,11 @@ extension PanelDisplayOptions {
     /// kind has no associated typed spec (e.g. row).
     func encodedSpec(forPanelPluginKind kind: String) -> Data? {
         let encoder = JSONEncoder()
+        // Deterministic bytes: the caller compares this against the stored
+        // spec to decide whether anything changed. With unordered keys the
+        // same options re-encode to different bytes, so every normalize would
+        // look like an edit — churning the document and its version history.
+        encoder.outputFormatting = [.sortedKeys]
         switch kind {
         case BuiltinPanelPluginKind.timeSeriesChart:
             return try? encoder.encode(TimeSeriesChartSpec(
