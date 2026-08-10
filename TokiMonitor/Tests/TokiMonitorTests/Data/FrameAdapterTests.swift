@@ -195,3 +195,56 @@ struct FrameAdapterTests {
         #expect(f.displayName == "opus · toki · codex")
     }
 }
+
+/// A datasource wrapper that forwards only `queryPromQLAsTimeSeries` silently
+/// falls back to the protocol's default `queryPromQL`, which discards the
+/// frames its own backend already built. That is invisible at compile time and
+/// showed up in the app as "no series returned" over a chart full of data.
+@Suite("Datasource wrappers must forward frames")
+struct DatasourceForwardingTests {
+
+    private struct BackendWithFrames: QueryDataSource {
+        func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
+            try await queryPromQL(query: query, time: time).timeSeries
+        }
+        func queryPromQL(query: String, time: TimeConfig) async throws -> QueryResult {
+            QueryResult(
+                timeSeries: TimeSeriesData(points: [], granularity: .daily),
+                frames: FrameSet(frames: [Frame(refId: "A", name: "s")])
+            )
+        }
+    }
+
+    /// Forwards only the legacy method — the hazard, kept here as the contrast.
+    private struct LegacyOnlyWrapper: QueryDataSource {
+        let backend: BackendWithFrames
+        func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
+            try await backend.queryPromQLAsTimeSeries(query: query, time: time)
+        }
+    }
+
+    private struct ForwardingWrapper: QueryDataSource {
+        let backend: BackendWithFrames
+        func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
+            try await backend.queryPromQLAsTimeSeries(query: query, time: time)
+        }
+        func queryPromQL(query: String, time: TimeConfig) async throws -> QueryResult {
+            try await backend.queryPromQL(query: query, time: time)
+        }
+    }
+
+    @Test("a wrapper that forwards both methods keeps the frames")
+    func forwardingWrapperKeepsFrames() async throws {
+        let result = try await ForwardingWrapper(backend: BackendWithFrames())
+            .queryPromQL(query: "q", time: TimeConfig())
+        #expect(result.frames.frames.count == 1)
+    }
+
+    @Test("a wrapper that forwards only the legacy method loses them")
+    func legacyOnlyWrapperLosesFrames() async throws {
+        let result = try await LegacyOnlyWrapper(backend: BackendWithFrames())
+            .queryPromQL(query: "q", time: TimeConfig())
+        #expect(result.frames.frames.isEmpty,
+                "documents the trap: the default extension cannot see the backend's frames")
+    }
+}

@@ -70,7 +70,9 @@ enum FrameAdapter {
                         summaryModel: summary.model,
                         notices: &notices
                     )
-                    labels["provider"] = providerName
+                    // Legacy payloads carry no provider; an empty key would
+                    // render as a blank component in the series name.
+                    if !providerName.isEmpty { labels["provider"] = providerName }
 
                     let key = SeriesKey(labels: labels)
                     series[key, default: SeriesAccumulator()].append(date: date, summary: summary)

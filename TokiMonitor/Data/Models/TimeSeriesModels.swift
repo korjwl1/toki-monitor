@@ -150,15 +150,23 @@ struct TimeSeriesData {
 enum PanelDataState {
     case idle
     case loading(previous: TimeSeriesData?)
-    case loaded(TimeSeriesData)
+    case loaded(TimeSeriesData, frames: FrameSet)
     case error(String)
 
     var timeSeriesData: TimeSeriesData? {
         switch self {
-        case .loaded(let data): return data
+        case .loaded(let data, _): return data
         case .loading(let prev): return prev
         default: return nil
         }
+    }
+
+    /// Frames for this panel. Carried alongside the legacy shape so Inspect
+    /// and, later, transformations can read the labelled data while renderers
+    /// still consume `timeSeriesData`.
+    var frames: FrameSet? {
+        if case let .loaded(_, frames) = self { return frames }
+        return nil
     }
 
     var isLoading: Bool {

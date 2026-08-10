@@ -392,9 +392,9 @@ final class DashboardViewModel {
         if isServer {
             // Server mode: use PromQL query via server proxy
             do {
-                let data = try await queryClient.queryPromQLAsTimeSeries(query: query, time: time)
+                let result = try await queryClient.queryPromQL(query: query, time: time)
                 for panel in panels {
-                    panelData[panel.id] = .loaded(data)
+                    panelData[panel.id] = .loaded(result.timeSeries, frames: result.frames)
                 }
             } catch {
                 for panel in panels {
@@ -458,7 +458,10 @@ final class DashboardViewModel {
             let data = TimeSeriesData(points: [point], granularity: .daily)
 
             for panel in panels {
-                panelData[panel.id] = .loaded(data)
+                // Synthesized locally rather than fetched, so there are no
+                // frames to attach — Inspect reports that honestly instead of
+                // showing an empty frame set as if the query returned nothing.
+                panelData[panel.id] = .loaded(data, frames: FrameSet())
             }
         } catch {
             for panel in panels {

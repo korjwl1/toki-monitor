@@ -52,6 +52,13 @@ final class TokiReportClient: Sendable, QueryDataSource {
     /// Start is floored to bucket boundary so local daemon's epoch-floor bucketing
     /// produces the same step grid as VM's start-aligned steps.
     func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
+        try await queryPromQL(query: query, time: time).timeSeries
+    }
+
+    /// Runs the query once and derives BOTH shapes from the single response.
+    /// Fetching twice would double the CLI cost and could return different
+    /// data across the two calls.
+    func queryPromQL(query: String, time: TimeConfig) async throws -> QueryResult {
         let step = time.bucketSeconds
         let rawStart = Int(time.fromDate.timeIntervalSince1970)
         let startEpoch = (rawStart / step) * step  // floor to bucket boundary
@@ -68,7 +75,13 @@ final class TokiReportClient: Sendable, QueryDataSource {
         points = TimeSeriesGapFiller.fill(points: points, time: time)
         let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
             : time.bucketSeconds < 86400 ? .hourly : .daily
-        return TimeSeriesData(points: points, granularity: granularity)
+        let series = TimeSeriesData(points: points, granularity: granularity)
+        let frames = FrameAdapter.frames(
+            providers: TokiReportParser.providerEntries(data),
+            query: query,
+            datasource: "local"
+        )
+        return QueryResult(timeSeries: series, frames: frames)
     }
 
 }

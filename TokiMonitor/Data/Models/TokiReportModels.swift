@@ -202,6 +202,28 @@ enum TokiReportParser {
         }
     }
 
+    /// Provider-keyed entries, undecorated. The frame adapter needs the
+    /// provider key that `parseReport` merges away, and re-deriving it there
+    /// would mean parsing the payload twice.
+    static func providerEntries(_ data: Data) -> [String: [TokiReportEntry]] {
+        guard let jsonText = extractJson(from: data),
+              let jsonData = jsonText.data(using: .utf8) else { return [:] }
+        let decoder = JSONDecoder()
+        if let report = try? decoder.decode(TokiReportV2.self, from: jsonData) {
+            return report.providers
+        }
+        // Legacy payloads carry no provider at all; attributing them to a name
+        // we invented would be worse than leaving the label off.
+        var legacyEntries: [TokiReportEntry] = []
+        for jsonStr in splitJsonObjects(jsonText) {
+            guard let d = jsonStr.data(using: .utf8),
+                  let report = try? decoder.decode(TokiReportLegacy.self, from: d)
+            else { continue }
+            legacyEntries.append(contentsOf: report.data)
+        }
+        return legacyEntries.isEmpty ? [:] : ["": legacyEntries]
+    }
+
     /// Parse report data (V2 or legacy) into date-keyed dictionary.
     static func parseReport(_ data: Data) -> [Date: [TokiModelSummary]] {
         guard let jsonText = extractJson(from: data) else { return [:] }

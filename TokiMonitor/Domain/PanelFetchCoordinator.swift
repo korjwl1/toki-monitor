@@ -72,10 +72,10 @@ struct PanelFetchCoordinator {
             }
             return defaultClient
         }
-        var queryResults: [(PanelQueryKey, Result<TimeSeriesData, Error>)] = []
+        var queryResults: [(PanelQueryKey, Result<QueryResult, Error>)] = []
         let maxConcurrent = 8
         let pendingKeys = Array(queryGroups.keys)
-        await withTaskGroup(of: (PanelQueryKey, Result<TimeSeriesData, Error>).self) { group in
+        await withTaskGroup(of: (PanelQueryKey, Result<QueryResult, Error>).self) { group in
             var nextIndex = 0
             func enqueueNext() {
                 guard nextIndex < pendingKeys.count else { return }
@@ -84,7 +84,7 @@ struct PanelFetchCoordinator {
                 let client = resolveClient(key)
                 group.addTask {
                     do {
-                        let result = try await client.queryPromQLAsTimeSeries(query: key.query, time: time)
+                        let result = try await client.queryPromQL(query: key.query, time: time)
                         return (key, .success(result))
                     } catch {
                         return (key, .failure(error))
@@ -104,7 +104,9 @@ struct PanelFetchCoordinator {
             let affected = queryGroups[key] ?? []
             switch result {
             case .success(let data):
-                for panel in affected { out[panel.id] = .loaded(data) }
+                for panel in affected {
+                    out[panel.id] = .loaded(data.timeSeries, frames: data.frames)
+                }
             case .failure(let error):
                 for panel in affected { out[panel.id] = .error(error.localizedDescription) }
             }

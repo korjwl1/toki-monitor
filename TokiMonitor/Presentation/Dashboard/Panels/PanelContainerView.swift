@@ -9,6 +9,10 @@ struct PanelContainerView<Content: View>: View {
     var dataState: PanelDataState?
     let onDelete: () -> Void
     let onEdit: () -> Void
+    /// Inspect is available whether or not the dashboard is in edit mode: the
+    /// question it answers ("where did this number come from?") is asked while
+    /// READING a dashboard, not while building one.
+    var onInspect: (() -> Void)?
     @ViewBuilder let content: Content
 
     @State private var isHovered = false
@@ -19,6 +23,7 @@ struct PanelContainerView<Content: View>: View {
         dataState: PanelDataState? = nil,
         onDelete: @escaping () -> Void,
         onEdit: @escaping () -> Void,
+        onInspect: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -26,6 +31,7 @@ struct PanelContainerView<Content: View>: View {
         self.dataState = dataState
         self.onDelete = onDelete
         self.onEdit = onEdit
+        self.onInspect = onInspect
         self.content = content()
     }
 
@@ -44,8 +50,18 @@ struct PanelContainerView<Content: View>: View {
 
                 Spacer()
 
-                // Show edit button on hover (not in edit mode)
+                // Show edit + inspect on hover (not in edit mode)
                 if isHovered && !isEditing {
+                    if let onInspect {
+                        Button(action: onInspect) {
+                            Image(systemName: "magnifyingglass.circle")
+                                .font(.system(size: DS.fontBody))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.opacity)
+                        .help(L.tr("데이터·쿼리 검사", "Inspect data and query"))
+                    }
                     Button(action: onEdit) {
                         Image(systemName: "pencil.circle")
                             .font(.system(size: DS.fontBody))

@@ -6,6 +6,7 @@ import Charts
 struct CustomDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
     var onEditPanel: ((PanelConfig) -> Void)?
+    var onInspectPanel: ((PanelConfig) -> Void)?
 
     @State private var barHoverState = BarHoverState()
     @State private var barModelData: [(model: String, points: [TimeSeriesData.ChartPoint])] = []
@@ -153,7 +154,8 @@ struct CustomDashboardView: View {
             isEditing: viewModel.isEditing,
             dataState: viewModel.dataState(for: panel.id),
             onDelete: { viewModel.removePanel(id: panel.id) },
-            onEdit: { onEditPanel?(panel) }
+            onEdit: { onEditPanel?(panel) },
+            onInspect: onInspectPanel.map { handler in { handler(panel) } }
         ) {
             panelContent(for: panel)
         }

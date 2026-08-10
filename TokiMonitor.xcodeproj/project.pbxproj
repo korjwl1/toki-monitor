@@ -12,6 +12,7 @@
 		062AE52FA18F6C3C5811BC25 /* DashboardConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617E28351290F97E1B3742F0 /* DashboardConfigStore.swift */; };
 		0AD59AAAF77D174E97E09FF8 /* MenuContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B1AC7C10926C1E37F7B0FF /* MenuContentView.swift */; };
 		0C102E5047654E452890DC1C /* frame_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 0C1FFE59530A1D2FC18F1651 /* frame_00.png */; };
+		AA20INSPECT0000000002 /* PanelInspectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA20INSPECT0000000001 /* PanelInspectSheet.swift */; };
 		0CF104220993B0F559EDBC8E /* PlanFitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D478E261DC52C1328878D3 /* PlanFitView.swift */; };
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
 		11722D0924027C0E6C2E6628 /* ClaudeAuthReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48B81232926518156C12BDE /* ClaudeAuthReaderTests.swift */; };
@@ -157,6 +158,7 @@
 /* Begin PBXFileReference section */
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		01FDADF849666205452FCAA1 /* EventsChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsChart.swift; sourceTree = "<group>"; };
+		AA20INSPECT0000000001 /* PanelInspectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelInspectSheet.swift; sourceTree = "<group>"; };
 		02D478E261DC52C1328878D3 /* PlanFitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitView.swift; sourceTree = "<group>"; };
 		03A7FCA1C481A1421555EEF2 /* DatasourceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourceRegistry.swift; sourceTree = "<group>"; };
 		03F503F3516997ED1304E8F7 /* DashboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfig.swift; sourceTree = "<group>"; };
@@ -434,6 +436,7 @@
 				F103561D8BF06FC314BAD0B9 /* DetailHeaderView.swift */,
 				3126EF202F535714BFCD4F20 /* ExploreView.swift */,
 				02D478E261DC52C1328878D3 /* PlanFitView.swift */,
+				AA20INSPECT0000000001 /* PanelInspectSheet.swift */,
 				18AEF7A2555230D2AF60A455 /* TimeRangePickerPopover.swift */,
 				42E478EB5C5691C2D6693F41 /* VersionHistorySheet.swift */,
 				B1296CF4003E042DCC5B6F01 /* Charts */,
@@ -786,6 +789,7 @@
 				D8262FCBDC499382103DEA43 /* PanelPluginSpec.swift in Sources */,
 				FE6D7C67ACAE1D3ACB73C3A6 /* PieChartView.swift in Sources */,
 				0CF104220993B0F559EDBC8E /* PlanFitView.swift in Sources */,
+				AA20INSPECT0000000002 /* PanelInspectSheet.swift in Sources */,
 				43499D46A4DAEA3D71BE7F9C /* ProjectNameResolver.swift in Sources */,
 				3FC14A4CEE21EB76B9B950AA /* PromQLProxyDatasource.swift in Sources */,
 				5A100F7481C256287B782C70 /* PromQLSuggester.swift in Sources */,

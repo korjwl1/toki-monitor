@@ -21,6 +21,12 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
     /// Server returns toki-format JSON (same as `toki query --output-format json`).
     /// No client-side rewriting or special parsing — same parser as local.
     func queryPromQLAsTimeSeries(query: String, time: TimeConfig) async throws -> TimeSeriesData {
+        try await queryPromQL(query: query, time: time).timeSeries
+    }
+
+    /// One request, both shapes — the server returns the same envelope the CLI
+    /// does, so frames come from the same bytes rather than a second round trip.
+    func queryPromQL(query: String, time: TimeConfig) async throws -> QueryResult {
         let creds = try await requireCredentials()
 
         let step = time.bucketSeconds
@@ -39,7 +45,13 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
         let granularity: TimeSeriesGranularity = time.bucketSeconds < 3600 ? .fifteenMinute
             : time.bucketSeconds < 86400 ? .hourly : .daily
 
-        return TimeSeriesData(points: points, granularity: granularity)
+        let series = TimeSeriesData(points: points, granularity: granularity)
+        let frames = FrameAdapter.frames(
+            providers: TokiReportParser.providerEntries(data),
+            query: query,
+            datasource: "server"
+        )
+        return QueryResult(timeSeries: series, frames: frames)
     }
 
     /// Fetch merged multi-device window rows from the server (windows metric,

@@ -8,6 +8,7 @@ struct DashboardView: View {
     @State private var showTimeRangePicker = false
     @State private var showDashboardList = false
     @State private var editingPanel: PanelConfig?
+    @State private var inspectingPanel: PanelConfig?
     @State private var showDashboardSettings = false
     @State private var showVersionHistory = false
     @State private var showAnnotationList = false
@@ -28,6 +29,12 @@ struct DashboardView: View {
 
     var body: some View {
         mainContent
+            .sheet(item: $inspectingPanel) { panel in
+                PanelInspectSheet(
+                    panel: panel,
+                    state: viewModel.dataState(for: panel.id) ?? .idle
+                )
+            }
             .sheet(item: $editingPanel) { panel in
                 PanelEditorView(panel: panel, viewModel: viewModel) { updated in
                     viewModel.updatePanel(updated)
@@ -247,13 +254,17 @@ struct DashboardView: View {
                 if let error = viewModel.errorMessage {
                     errorView(error)
                 } else {
-                    CustomDashboardView(viewModel: viewModel, onEditPanel: { panel in
-                        var transaction = Transaction()
-                        transaction.disablesAnimations = true
-                        withTransaction(transaction) {
-                            editingPanel = panel
-                        }
-                    })
+                    CustomDashboardView(
+                        viewModel: viewModel,
+                        onEditPanel: { panel in
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) {
+                                editingPanel = panel
+                            }
+                        },
+                        onInspectPanel: { panel in inspectingPanel = panel }
+                    )
                 }
             }
         }
