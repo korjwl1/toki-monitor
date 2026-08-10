@@ -313,6 +313,14 @@ struct DashboardVariable: Codable, Identifiable, Equatable {
         effectivePluginKind != BuiltinVariablePluginKind.constant
     }
 
+    /// How this variable's values are written when the template names no
+    /// format. It follows from what the variable MEANS: a groupBy holds
+    /// dimension names and belongs in `by (a, b)`, everything else holds
+    /// values and belongs in a `=~` matcher as `a|b`.
+    var defaultFormat: VariableFormat {
+        effectivePluginKind == BuiltinVariablePluginKind.groupBy ? .csv : .pipe
+    }
+
     /// Options after `sort` is applied — the order the toolbar should render.
     var sortedOptions: [VariableOption] {
         effectiveSort.apply(options)

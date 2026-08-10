@@ -37,6 +37,7 @@ final class VariablePluginRegistry {
         register(TokiLabelValuesVariableLoader())
         register(ConstantVariableLoader())
         register(TextVariableLoader())
+        register(GroupByVariableLoader())
     }
 
     func register(_ loader: any VariablePluginLoader) {
@@ -103,6 +104,35 @@ struct TextVariableLoader: VariablePluginLoader {
             ?? TextVariableSpec()
         guard !spec.value.isEmpty else { return [] }
         return [VariableOption(text: spec.value, value: spec.value)]
+    }
+}
+
+/// `GroupByVariable` — its options are label NAMES, so the reader chooses
+/// which dimensions to break the data down by rather than which values to
+/// keep. Used as `by ($groupby)`, which is why its values join with commas
+/// (see `DashboardVariable.defaultFormat`).
+///
+/// The candidates are whatever the query's own result carries. Offering a
+/// fixed list would mean offering dimensions this data does not have.
+struct GroupByVariableLoader: VariablePluginLoader {
+    var kind: String { BuiltinVariablePluginKind.groupBy }
+
+    func loadOptions(specData: Data, context: VariableLoadContext) async throws -> [VariableOption] {
+        guard let spec = try? JSONDecoder().decode(GroupByVariableSpec.self, from: specData),
+              !spec.query.isEmpty
+        else { return [] }
+        let client: (any QueryDataSource)? = await MainActor.run {
+            if let ds = spec.datasource, let plugin = DatasourceRegistry.shared.resolve(ds) {
+                return plugin as any QueryDataSource
+            }
+            return context.queryClient
+        }
+        guard let client else { return [] }
+        let query = TokiLabelValuesVariableLoader.interpolate(
+            spec.query, with: context.resolvedVariables
+        )
+        let result = try await client.queryPromQL(query: query, time: context.time)
+        return FrameReader.labelKeys(result.frames).map { VariableOption(text: $0, value: $0) }
     }
 }
 

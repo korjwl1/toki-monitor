@@ -63,6 +63,44 @@ enum BuiltinVariablePluginKind {
     static let constant = "ConstantVariable"
     /// Free text the reader types. Grafana calls it a textbox.
     static let text = "TextVariable"
+    /// Which dimensions to group by. Its options are label NAMES, not values.
+    static let groupBy = "GroupByVariable"
+}
+
+/// How a variable's selected values are written into a query.
+///
+/// Without this there is one join for every purpose, and it is wrong for half
+/// of them: `model|project` is right inside a regex matcher and meaningless
+/// inside `by (...)`. Mirrors Grafana's `${var:format}` syntax, limited to the
+/// formats this query language can actually use.
+enum VariableFormat: String, Sendable, Equatable {
+    /// `a,b` — a list of names, which is what `by (...)` takes.
+    case csv
+    /// `a|b` — regex alternation, which is what a `=~` matcher takes.
+    case pipe
+    /// `a|b` with each value regex-escaped, for values containing `.` or `+`.
+    case regex
+    case singlequote
+    case doublequote
+    /// The values joined by nothing but a comma-space, unquoted and unescaped.
+    case raw
+
+    func apply(_ values: [String]) -> String {
+        switch self {
+        case .csv:  return values.joined(separator: ",")
+        case .pipe: return values.joined(separator: "|")
+        case .regex:
+            return values.map { NSRegularExpression.escapedPattern(for: $0) }
+                .joined(separator: "|")
+        case .singlequote:
+            return values.map { "'\($0.replacingOccurrences(of: "'", with: "\\'"))'" }
+                .joined(separator: ",")
+        case .doublequote:
+            return values.map { "\"\($0.replacingOccurrences(of: "\"", with: "\\\""))\"" }
+                .joined(separator: ",")
+        case .raw:  return values.joined(separator: ", ")
+        }
+    }
 }
 
 // MARK: - Plugin spec types
@@ -94,4 +132,14 @@ struct ConstantVariableSpec: Codable, Equatable, Sendable {
 /// overwrite what someone is looking at.
 struct TextVariableSpec: Codable, Equatable, Sendable {
     var value: String = ""
+}
+
+/// Spec for `GroupByVariable` — its options are the label NAMES a query
+/// returns, so the reader picks which dimensions to break the data down by
+/// rather than which values to keep.
+struct GroupByVariableSpec: Codable, Equatable, Sendable {
+    var datasource: DatasourceSelector?
+    /// A query whose result carries the candidate dimensions. Left empty, the
+    /// variable offers nothing rather than guessing at a label set.
+    var query: String = ""
 }

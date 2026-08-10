@@ -58,6 +58,9 @@ enum VariableResolver {
             let variable: DashboardVariable
             let value: String
             let bareForm: NSRegularExpression?
+            /// `${name:format}` — matched before the bare and braced forms so
+            /// the specifier is consumed rather than left dangling as text.
+            let formatted: NSRegularExpression?
         }
         let compiled: [Compiled] = variables
             .filter { $0.name != "provider" }
@@ -67,7 +70,10 @@ enum VariableResolver {
                 return Compiled(
                     variable: v,
                     value: interpolatedValue(for: v),
-                    bareForm: try? NSRegularExpression(pattern: pattern)
+                    bareForm: try? NSRegularExpression(pattern: pattern),
+                    formatted: try? NSRegularExpression(
+                        pattern: "\\$\\{\(escaped):([A-Za-z]+)\\}"
+                    )
                 )
             }
 
@@ -82,6 +88,9 @@ enum VariableResolver {
         for i in 0..<maxIterations {
             let before = query
             for c in compiled {
+                if let regex = c.formatted {
+                    query = replaceFormatted(in: query, regex: regex, variable: c.variable)
+                }
                 query = query.replacingOccurrences(of: "${\(c.variable.name)}", with: c.value)
                 if let regex = c.bareForm {
                     let range = NSRange(query.startIndex..., in: query)
@@ -110,37 +119,70 @@ enum VariableResolver {
         variables.first(where: { $0.name == name })?.current.value ?? []
     }
 
+    /// Rewrite every `${name:format}` occurrence, one at a time because each
+    /// may name a different format.
+    ///
+    /// An unrecognised format falls back to the variable's own default rather
+    /// than being left in the query: `${m:cvs}` should draw the wrong data at
+    /// worst, not produce a syntax error that hides the typo behind a parser
+    /// message about a brace.
+    private static func replaceFormatted(
+        in query: String, regex: NSRegularExpression, variable: DashboardVariable
+    ) -> String {
+        var out = query
+        while true {
+            let range = NSRange(out.startIndex..., in: out)
+            guard let match = regex.firstMatch(in: out, range: range),
+                  let whole = Range(match.range, in: out),
+                  match.numberOfRanges > 1,
+                  let nameRange = Range(match.range(at: 1), in: out)
+            else { return out }
+            let format = VariableFormat(rawValue: String(out[nameRange]).lowercased())
+            out.replaceSubrange(whole, with: interpolatedValue(for: variable, format: format))
+        }
+    }
+
     /// Resolve one variable to the string that replaces `$name` /
-    /// `${name}`. Honors multi-select (joined as PromQL regex
-    /// alternation), the "All" sentinel (→ `customAllValue`), and the
-    /// optional `capturingRegexp` post-filter.
-    static func interpolatedValue(for variable: DashboardVariable) -> String {
+    /// `${name}` / `${name:format}`. Honors multi-select, the "All" sentinel
+    /// (→ `customAllValue`), and the optional `capturingRegexp` post-filter.
+    ///
+    /// `format` nil means "the variable's own default", which follows from
+    /// what it means: a groupBy holds dimension names and joins with commas,
+    /// everything else holds values and joins as regex alternation.
+    ///
+    /// "All" is returned verbatim and no format is applied to it:
+    /// `customAllValue` is already a finished expression (`.*` by default),
+    /// and quoting or comma-joining it would break the query it was written
+    /// for.
+    static func interpolatedValue(for variable: DashboardVariable,
+                                  format: VariableFormat? = nil) -> String {
         let selection = variable.current.value
         if variable.includeAll && (selection.contains("$__all") || selection.isEmpty) {
             return variable.effectiveCustomAllValue
         }
 
-        let filtered = selection.filter { !$0.isEmpty && $0 != "$__all" }
-        if filtered.isEmpty { return "" }
+        var values = selectedValues(for: variable)
+        if values.isEmpty { return "" }
+        // A single-select variable answers with one value even if several are
+        // somehow stored — the same guarantee this made before formats existed.
+        if !variable.multi, let first = values.first { values = [first] }
 
-        let values: [String]
-        if let pattern = variable.capturingRegexp, !pattern.isEmpty,
-           let regex = try? NSRegularExpression(pattern: pattern) {
-            values = filtered.map { raw in
-                let range = NSRange(raw.startIndex..., in: raw)
-                guard let m = regex.firstMatch(in: raw, range: range),
-                      m.numberOfRanges > 1,
-                      let r = Range(m.range(at: 1), in: raw)
-                else { return raw }
-                return String(raw[r])
-            }
-        } else {
-            values = filtered
-        }
+        return (format ?? variable.defaultFormat).apply(values)
+    }
 
-        if variable.multi && values.count > 1 {
-            return values.joined(separator: "|")
+    /// The selection with sentinels dropped and `capturingRegexp` applied.
+    static func selectedValues(for variable: DashboardVariable) -> [String] {
+        let filtered = variable.current.value.filter { !$0.isEmpty && $0 != "$__all" }
+        guard let pattern = variable.capturingRegexp, !pattern.isEmpty,
+              let regex = try? NSRegularExpression(pattern: pattern)
+        else { return filtered }
+        return filtered.map { raw in
+            let range = NSRange(raw.startIndex..., in: raw)
+            guard let m = regex.firstMatch(in: raw, range: range),
+                  m.numberOfRanges > 1,
+                  let r = Range(m.range(at: 1), in: raw)
+            else { return raw }
+            return String(raw[r])
         }
-        return values.first ?? ""
     }
 }

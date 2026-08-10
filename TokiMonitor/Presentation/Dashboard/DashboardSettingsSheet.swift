@@ -284,6 +284,8 @@ struct DashboardSettingsSheet: View {
                             .tag(BuiltinVariablePluginKind.constant)
                         Text(L.tr("텍스트", "Text"))
                             .tag(BuiltinVariablePluginKind.text)
+                        Text(L.tr("그룹 기준", "Group By"))
+                            .tag(BuiltinVariablePluginKind.groupBy)
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: 220, alignment: .leading)
@@ -332,6 +334,16 @@ struct DashboardSettingsSheet: View {
             intervalSpecEditor(variable)
         case BuiltinVariablePluginKind.tokiLabelValues:
             labelValuesSpecEditor(variable)
+        case BuiltinVariablePluginKind.groupBy:
+            singleValueSpecEditor(
+                variable,
+                label: L.tr("쿼리", "Query"),
+                help: L.tr("이 쿼리가 돌려주는 라벨 이름들이 선택지가 됩니다. `by ($이름)`으로 사용",
+                           "Its result's label names become the choices. Use as `by ($name)`"),
+                read: { (try? JSONDecoder().decode(GroupByVariableSpec.self, from: $0))?.query },
+                write: { (try? JSONEncoder().encode(GroupByVariableSpec(datasource: nil, query: $0))) ?? Data() },
+                kind: BuiltinVariablePluginKind.groupBy
+            )
         case BuiltinVariablePluginKind.constant:
             singleValueSpecEditor(
                 variable,
@@ -596,6 +608,11 @@ struct DashboardSettingsSheet: View {
         case BuiltinVariablePluginKind.text:
             let value = v.current.value.first ?? v.options.first?.value ?? v.query
             return (try? encoder.encode(TextVariableSpec(value: value))) ?? Data()
+        case BuiltinVariablePluginKind.groupBy:
+            return (try? encoder.encode(GroupByVariableSpec(
+                datasource: nil,
+                query: "sum(toki_tokens_total[$__interval]) by (model, project)"
+            ))) ?? Data()
         default:
             return Data()
         }
