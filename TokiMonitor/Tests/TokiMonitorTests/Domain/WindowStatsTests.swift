@@ -148,6 +148,30 @@ final class WindowStatsTests: XCTestCase {
         }
     }
 
+
+    /// The badge renders "적정 — <reason>", so a reason that also ends in the
+    /// verdict produced "적정 — ... — 적정" on screen. And a nil p95 is not
+    /// "unknown": it means no window was sampled close enough to its reset to
+    /// bound the peak, which a bare "-" did not convey.
+    func testKeepAdviceDoesNotRestateTheVerdictOrPrintABareDash() {
+        // Every window low-coverage (asleep at reset) -> no percentile sample.
+        var rows: [(provider: String, row: WindowRow)] = []
+        for d in 0..<20 {
+            rows.append(("codex", row(
+                kind: "weekly", endOffsetDays: Double(d), peak: 14,
+                gapMs: 60 * 3_600_000, windowMinutes: 10080
+            )))
+        }
+        let s = WindowStats.segments(rows: rows, nowMs: nowMs)[0]
+        guard case .keep(let reason) = s.advice else {
+            return XCTFail("expected keep, got \(s.advice)")
+        }
+        XCTAssertNil(s.p95Peak, "all rows are low-coverage, so there is no percentile")
+        XCTAssertFalse(reason.contains("적정"), "the badge already says it: \(reason)")
+        XCTAssertFalse(reason.contains("peak -"), "a bare dash explains nothing: \(reason)")
+        XCTAssertTrue(reason.contains("표본 부족"), "should say why there is no peak: \(reason)")
+    }
+
     func testAdviceKeepInMiddleGround() {
         var rows: [(provider: String, row: WindowRow)] = []
         for d in 0..<20 {

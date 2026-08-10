@@ -342,11 +342,24 @@ enum WindowStats {
                     "0 maxed windows in 28d, p95 peak \(Int(p95))%"
                 ))
             } else {
-                let p95Text = s.p95Peak.map { "\(Int($0))%" } ?? "-"
-                advice = .keep(reason: L.tr(
-                    "p95 peak \(p95Text), 소진 \(s.maxedCount)회 — 적정",
-                    "p95 peak \(p95Text), \(s.maxedCount) maxed — right-sized"
-                ))
+                // The badge already states the verdict, so the reason must not
+                // repeat it — "적정 — ... — 적정" was rendering verbatim.
+                //
+                // A nil p95 is not "unknown", it is "no window was sampled
+                // close enough to its reset to bound the peak" (every row was
+                // low-coverage). Printing a bare dash there made the card look
+                // broken rather than under-sampled.
+                if let p95 = s.p95Peak {
+                    advice = .keep(reason: L.tr(
+                        "p95 peak \(Int(p95))%, 소진 \(s.maxedCount)회",
+                        "p95 peak \(Int(p95))%, \(s.maxedCount) maxed"
+                    ))
+                } else {
+                    advice = .keep(reason: L.tr(
+                        "소진 \(s.maxedCount)회 · peak 표본 부족(리셋 직전 관측 없음)",
+                        "\(s.maxedCount) maxed · too few windows sampled near reset for a peak"
+                    ))
+                }
             }
         }
 
