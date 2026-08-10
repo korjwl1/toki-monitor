@@ -6,6 +6,10 @@ struct ClaudeUsageResponse: Codable {
     let fiveHour: UsageBucket?
     let sevenDay: UsageBucket?
     let sevenDaySonnet: UsageBucket?
+    /// Which model the scoped weekly limit belongs to ("Fable", "Sonnet", ...).
+    /// Not on the wire — derived from the limit id, so it is decoded as nil
+    /// and filled in by the daemon path.
+    var scopedWeeklyLabel: String? = nil
     let extraUsage: ExtraUsage?
 
     enum CodingKeys: String, CodingKey {
@@ -74,6 +78,42 @@ struct ExtraUsage: Codable {
 
 /// Adaptive polling monitor for Claude usage/rate-limit data.
 /// Reads authentication from Claude Code's Keychain entry.
+
+/// Labels for a model-scoped weekly limit. Free functions rather than members
+/// of the @MainActor monitor: they are pure string formatting with no monitor
+/// state, and hanging them off an actor-isolated type made them unusable from
+/// tests (and needlessly actor-hopped at the call site).
+enum ScopedWeeklyLabel {
+    /// "weekly_fable" + 10080 -> "Fable 7일". The daemon lowercases the model's
+    /// display name into the limit id (that is what makes the id stable as a
+    /// storage key), so the UI title-cases it back and appends the span the row
+    /// actually carries — a hardcoded "7일" would silently lie if the endpoint
+    /// ever scoped a limit to a different window length.
+    static func make(model limitId: String, windowMinutes: Int) -> String {
+        let raw = limitId == "seven_day_sonnet"
+            ? "sonnet"
+            : (limitId.hasPrefix("weekly_")
+                ? String(limitId.dropFirst("weekly_".count))
+                : limitId)
+        let name = raw.split(separator: "_")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
+        return "\(name) \(span(minutes: windowMinutes))"
+    }
+
+    static func span(minutes: Int) -> String {
+        if minutes % 1440 == 0 && minutes >= 1440 {
+            let d = minutes / 1440
+            return L.tr("\(d)일", "\(d)d")
+        }
+        if minutes % 60 == 0 {
+            let h = minutes / 60
+            return L.tr("\(h)시간", "\(h)h")
+        }
+        return L.tr("\(minutes)분", "\(minutes)m")
+    }
+}
+
 @MainActor
 @Observable
 final class ClaudeUsageMonitor {
@@ -378,10 +418,25 @@ final class ClaudeUsageMonitor {
         func bucketOrZero(_ limitId: String) -> UsageBucket {
             bucket(limitId) ?? UsageBucket(utilization: 0, resetsAt: nil)
         }
+        // The scoped-weekly slot takes ANY model-scoped weekly limit, not
+        // just Sonnet. The endpoint moved these into its `limits[]` array
+        // keyed by model, so the daemon records them as `weekly_<model>` —
+        // `seven_day_sonnet` returns null on accounts whose scoped limit is a
+        // different model, and matching that literal key alone made a limit
+        // the user is actively consuming invisible.
+        let scopedWeekly = open.first { row in
+            row.limitId == "seven_day_sonnet" || row.limitId.hasPrefix("weekly_")
+        }
         let usage = ClaudeUsageResponse(
             fiveHour: bucketOrZero("five_hour"),
             sevenDay: bucketOrZero("seven_day"),
-            sevenDaySonnet: bucket("seven_day_sonnet"),
+            sevenDaySonnet: scopedWeekly.map {
+                UsageBucket(utilization: $0.livePct,
+                            resetsAt: Self.isoString(fromMs: $0.rawResetsAtMs))
+            },
+            scopedWeeklyLabel: scopedWeekly.map {
+                ScopedWeeklyLabel.make(model: $0.limitId, windowMinutes: $0.windowMinutes)
+            },
             extraUsage: entry.extraUsageEnabled.map { ExtraUsage(isEnabled: $0) }
         )
         authReadUnreadable = false
@@ -391,10 +446,13 @@ final class ClaudeUsageMonitor {
         lastError = nil
         consecutiveFailures = 0
         // Set-true-only: an idle machine past a weekly reset has no open
-        // Sonnet row, and clearing the flag would make the bar and its
+        // scoped row, and clearing the flag would make the bar and its
         // settings toggles disappear and reappear with usage.
         if usage.sevenDaySonnet != nil {
             settings.claudeHasSevenDaySonnet = true
+            if let label = usage.scopedWeeklyLabel {
+                settings.claudeScopedWeeklyLabel = label
+            }
         }
         checkThresholds(usage)
         return true

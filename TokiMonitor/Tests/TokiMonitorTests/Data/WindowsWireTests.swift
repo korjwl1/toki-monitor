@@ -191,3 +191,41 @@ struct CodexSlotNormalizationTests {
         #expect(n.secondaryWindow?.usedPercent == 22)
     }
 }
+
+/// The scoped weekly limit is per model and its span comes from the data, so
+/// the label is built rather than constant. A hardcoded "Sonnet" mislabels
+/// every account whose scoped limit is a different model, and a hardcoded
+/// "7일" would lie if the endpoint ever scopes a limit to another span.
+/// @MainActor because these labels go through `L.tr`, whose `L.code` uses
+/// `MainActor.assumeIsolated` — calling it from Swift Testing's default
+/// off-main context traps at runtime rather than failing an expectation.
+@Suite("Scoped weekly label")
+@MainActor
+struct ScopedWeeklyLabelTests {
+
+    @Test("model name and span are both taken from the data")
+    func labelsFromData() {
+        #expect(ScopedWeeklyLabel.make(model: "weekly_fable", windowMinutes: 10080) == "Fable 7일"
+             || ScopedWeeklyLabel.make(model: "weekly_fable", windowMinutes: 10080) == "Fable 7d")
+        // A multi-word model id keeps its words.
+        let two = ScopedWeeklyLabel.make(model: "weekly_claude_next", windowMinutes: 10080)
+        #expect(two.hasPrefix("Claude Next"))
+    }
+
+    /// The legacy key must still read as Sonnet rather than "Seven Day Sonnet".
+    @Test("the legacy seven_day_sonnet key keeps its name")
+    func legacyKeyIsHandled() {
+        let label = ScopedWeeklyLabel.make(model: "seven_day_sonnet", windowMinutes: 10080)
+        #expect(label.hasPrefix("Sonnet"))
+    }
+
+    @Test("spans other than a week are rendered honestly")
+    func spanVaries() {
+        #expect(ScopedWeeklyLabel.span(minutes: 10080) == "7일"
+             || ScopedWeeklyLabel.span(minutes: 10080) == "7d")
+        #expect(ScopedWeeklyLabel.span(minutes: 300) == "5시간"
+             || ScopedWeeklyLabel.span(minutes: 300) == "5h")
+        #expect(ScopedWeeklyLabel.span(minutes: 90) == "90분"
+             || ScopedWeeklyLabel.span(minutes: 90) == "90m")
+    }
+}

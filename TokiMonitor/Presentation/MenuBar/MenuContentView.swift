@@ -233,8 +233,15 @@ struct MenuContentView: View {
         var rows: [(String, UsageBucket)] = []
         if showFiveHour, let fh = usage.fiveHour { rows.append((L.panel.fiveHour, fh)) }
         if showSevenDay, let sd = usage.sevenDay { rows.append((L.panel.sevenDay, sd)) }
-        if showSevenDaySonnet, let sonnet = usage.sevenDaySonnet {
-            rows.append((L.notification.claudeSevenDaySonnet, sonnet))
+        if showSevenDaySonnet, let scoped = usage.sevenDaySonnet {
+            // Labelled from live data: the scoped weekly limit is per model
+            // (Fable on this account today), so a constant "Sonnet" would be
+            // wrong for everyone else.
+            rows.append((
+                ClaudeUsageBucketOption.sevenDaySonnet
+                    .displayName(scopedWeeklyLabel: settings.claudeScopedWeeklyLabel),
+                scoped
+            ))
         }
 
         return HStack(spacing: DS.md) {

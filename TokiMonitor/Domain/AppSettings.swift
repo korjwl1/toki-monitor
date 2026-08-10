@@ -197,6 +197,17 @@ enum ClaudeUsageBucketOption: String, CaseIterable, Codable {
         case .sevenDaySonnet: L.notification.claudeSevenDaySonnet
         }
     }
+
+    /// The scoped weekly bucket names its model and span directly ("Fable
+    /// 7일") rather than wrapping them in a sentence: it sits in a list beside
+    /// "5시간" and "7일", where the extra "Claude 7일 (...)" framing was both
+    /// redundant and ambiguous about which window it meant.
+    func displayName(scopedWeeklyLabel: String?) -> String {
+        guard case .sevenDaySonnet = self, let label = scopedWeeklyLabel else {
+            return displayName
+        }
+        return label
+    }
 }
 
 enum CodexUsageWindowOption: String, CaseIterable, Codable {
@@ -331,6 +342,11 @@ final class AppSettings {
 
     // Availability flags for optional usage buckets/windows (not persisted)
     var claudeHasSevenDaySonnet: Bool?
+    /// Which model the scoped weekly limit covers ("Fable", "Sonnet", ...).
+    /// The endpoint reports scoped weekly limits per model, so the label
+    /// cannot be a constant — hardcoding "Sonnet" mislabels every other
+    /// account. Not persisted: it is re-derived from live data.
+    var claudeScopedWeeklyLabel: String?
     var codexHasSecondaryWindow: Bool?
 
     // Anomaly detection
