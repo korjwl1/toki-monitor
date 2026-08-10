@@ -159,6 +159,41 @@ struct FrameAdapterTests {
         #expect(try #require(cost) > 0)
     }
 
+    /// The daemon prices from its LiteLLM snapshot and this app from a table
+    /// compiled into it. Both mean "at the prices we know", but they can
+    /// disagree, and a total that blends them is not something a reader can
+    /// see in a number.
+    @Test("a series priced by both sources says so")
+    func mixedPricingIsReported() {
+        let priced = TokiModelSummary(
+            model: "claude-opus-4-6", inputTokens: 1_000_000, outputTokens: 1_000_000,
+            totalTokens: 2_000_000, events: 1, costUsd: nil,
+            cacheCreationInputTokens: nil, cacheReadInputTokens: nil,
+            cachedInputTokens: nil, reasoningOutputTokens: nil
+        )
+        let reported = summary("claude-opus-4-6", total: 10, cost: 1.0)
+        let set = FrameAdapter.frames(
+            providers: ["claude_code": [
+                entry("2026-08-10T00:00:00", [reported]),
+                entry("2026-08-11T00:00:00", [priced]),
+            ]],
+            query: "sum(cost[1d])"
+        )
+        #expect(set.notices.contains { $0.contains("mixes") })
+    }
+
+    @Test("a consistently priced series says nothing")
+    func consistentPricingIsSilent() {
+        let set = FrameAdapter.frames(
+            providers: ["claude_code": [
+                entry("2026-08-10T00:00:00", [summary("m", total: 1, cost: 1.0)]),
+                entry("2026-08-11T00:00:00", [summary("m", total: 2, cost: 2.0)]),
+            ]],
+            query: "sum(cost[1d])"
+        )
+        #expect(!set.notices.contains { $0.contains("mixes") })
+    }
+
     /// A project name is not a model, so it cannot be priced. Inventing a
     /// number for it would be worse than leaving the column off.
     @Test("an unpriceable series gets no invented cost")

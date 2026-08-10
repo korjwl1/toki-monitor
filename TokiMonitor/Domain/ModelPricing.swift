@@ -5,6 +5,20 @@ import Foundation
 ///
 /// Prices are per-token (not per-million-tokens) for direct multiplication.
 /// Source: Official API pricing pages as of 2025-Q4. Updated periodically.
+///
+/// # What a cost number means here
+///
+/// "Valued at the prices we currently know" — NOT "what was billed at the
+/// time". Neither side stores a price history: the daemon values events with
+/// whatever LiteLLM snapshot it last downloaded (`toki/src/pricing.rs`), and
+/// this table is compiled into the app. So a chart of last month's cost
+/// changes when either table changes, and the same event can be valued
+/// differently by the two of them.
+///
+/// That is a deliberate choice, not an oversight: billed-at-the-time costs
+/// would need effective-dated prices recorded per event, which nothing in the
+/// pipeline captures. What is NOT acceptable is blending the two silently, so
+/// `FrameAdapter` records a notice when one series is priced by both.
 enum ModelPricing {
     struct Pricing {
         let inputPerToken: Double

@@ -86,22 +86,48 @@ enum FrameAdapter {
                     // must too or it would read "-" against exactly the daemons
                     // the fallback exists for. An unpriced name (a project, an
                     // unknown model) yields nil and stays absent.
-                    let cost = summary.costUsd ?? ModelPricing.estimateCost(
-                        model: labels["model"] ?? summary.model,
-                        inputTokens: summary.inputTokens,
-                        outputTokens: summary.outputTokens,
-                        cacheCreationInputTokens: summary.cacheCreationInputTokens,
-                        cacheReadInputTokens: summary.cacheReadInputTokens,
-                        cachedInputTokens: summary.cachedInputTokens
-                    )
+                    //
+                    // The two sources do NOT use the same prices: the daemon
+                    // values events with its LiteLLM snapshot, whenever that
+                    // was last refreshed, and this fallback with a table
+                    // compiled into the app. Both mean "valued at the prices
+                    // we know", not "what was billed at the time" — nobody
+                    // stores a price history — but they can disagree, so a
+                    // series that mixes them is recorded as mixed below.
+                    let cost: Double?
+                    let estimated: Bool
+                    if let reported = summary.costUsd {
+                        cost = reported
+                        estimated = false
+                    } else {
+                        cost = ModelPricing.estimateCost(
+                            model: labels["model"] ?? summary.model,
+                            inputTokens: summary.inputTokens,
+                            outputTokens: summary.outputTokens,
+                            cacheCreationInputTokens: summary.cacheCreationInputTokens,
+                            cacheReadInputTokens: summary.cacheReadInputTokens,
+                            cachedInputTokens: summary.cachedInputTokens
+                        )
+                        estimated = cost != nil
+                    }
 
                     let key = SeriesKey(labels: labels)
                     series[key, default: SeriesAccumulator(slots: axis.count)]
-                        .add(at: index, summary: summary, cost: cost)
+                        .add(at: index, summary: summary, cost: cost, costEstimated: estimated)
                 }
             }
 
             for (key, acc) in series.sorted(by: { $0.key.sortKey < $1.key.sortKey }) {
+                // Part of this series was priced by the daemon and part by
+                // this app, from different tables. The total is a blend of two
+                // price lists, which is not something a reader can see in a
+                // number.
+                if acc.sawReportedCost && acc.sawEstimatedCost {
+                    notices.append(
+                        "cost for \(key.sortKey) mixes daemon-reported and "
+                        + "client-estimated prices"
+                    )
+                }
                 out.append(acc.frame(refId: refId, times: axis, labels: key.labels,
                                      query: query, datasource: datasource))
             }
@@ -255,6 +281,10 @@ enum FrameAdapter {
         var sawCachedInput = false
         var sawReasoning = false
         var sawCost = false
+        /// Which side priced this series. Both true means the column is a
+        /// blend of two price tables.
+        var sawReportedCost = false
+        var sawEstimatedCost = false
 
         init(slots: Int) {
             let empty = [Double?](repeating: nil, count: slots)
@@ -264,12 +294,17 @@ enum FrameAdapter {
 
         /// Accumulates rather than overwrites: the same bucket can arrive twice
         /// for one series (e.g. one project reported under two model names).
-        mutating func add(at i: Int, summary: TokiModelSummary, cost resolvedCost: Double?) {
+        mutating func add(at i: Int, summary: TokiModelSummary,
+                          cost resolvedCost: Double?, costEstimated: Bool) {
             total[i] = (total[i] ?? 0) + Double(summary.totalTokens)
             input[i] = (input[i] ?? 0) + Double(summary.inputTokens)
             output[i] = (output[i] ?? 0) + Double(summary.outputTokens)
             events[i] = (events[i] ?? 0) + Double(summary.events)
-            if let c = resolvedCost { cost[i] = (cost[i] ?? 0) + c; sawCost = true }
+            if let c = resolvedCost {
+                cost[i] = (cost[i] ?? 0) + c
+                sawCost = true
+                if costEstimated { sawEstimatedCost = true } else { sawReportedCost = true }
+            }
 
             func add(_ column: inout [Double?], _ value: UInt64?, _ seen: inout Bool) {
                 guard let value else { return }
