@@ -59,6 +59,10 @@ enum BuiltinVariablePluginKind {
     /// Dynamic options pulled from a PromQL result's labels (model, project).
     /// toki-monitor equivalent of Perses' PrometheusLabelValuesVariable.
     static let tokiLabelValues = "TokiLabelValuesVariable"
+    /// One fixed value the dashboard author sets and the reader cannot change.
+    static let constant = "ConstantVariable"
+    /// Free text the reader types. Grafana calls it a textbox.
+    static let text = "TextVariable"
 }
 
 // MARK: - Plugin spec types
@@ -71,4 +75,23 @@ struct StaticListVariableSpec: Codable, Equatable, Sendable {
 /// Spec for `IntervalVariable` — a fixed list of duration strings.
 struct IntervalVariableSpec: Codable, Equatable, Sendable {
     var values: [String] = ["1m", "5m", "15m", "30m", "1h", "6h", "24h"]
+}
+
+/// Spec for `ConstantVariable` — one value fixed by the dashboard author.
+///
+/// Its purpose is to name a repeated literal once: a metric prefix, an
+/// account id, a threshold that appears in six panels. The reader is not
+/// offered a choice, so it renders hidden by default; a "menu" with exactly
+/// one item that cannot be changed is noise in the toolbar.
+struct ConstantVariableSpec: Codable, Equatable, Sendable {
+    var value: String = ""
+}
+
+/// Spec for `TextVariable` — free text the reader types.
+///
+/// The stored `value` is the author's default. What the reader types lives in
+/// the variable's `current`, so editing the default later does not silently
+/// overwrite what someone is looking at.
+struct TextVariableSpec: Codable, Equatable, Sendable {
+    var value: String = ""
 }

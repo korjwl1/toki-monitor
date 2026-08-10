@@ -296,6 +296,23 @@ struct DashboardVariable: Codable, Identifiable, Equatable {
     var effectiveCustomAllValue: String { customAllValue ?? ".*" }
     var effectiveSort: VariableSort { sort ?? .none }
 
+    /// Which plugin drives this variable. Pre-v4 dashboards carry no `plugin`
+    /// ref, so the legacy `type` enum maps onto one.
+    var effectivePluginKind: String {
+        if let kind = plugin?.kind { return kind }
+        switch type {
+        case .interval: return BuiltinVariablePluginKind.interval
+        case .custom:   return BuiltinVariablePluginKind.staticList
+        }
+    }
+
+    /// A constant is the author's, not the reader's: it exists to name a
+    /// repeated literal once, and a toolbar control offering one unchangeable
+    /// item is noise. Grafana hides it for the same reason.
+    var isReaderControllable: Bool {
+        effectivePluginKind != BuiltinVariablePluginKind.constant
+    }
+
     /// Options after `sort` is applied — the order the toolbar should render.
     var sortedOptions: [VariableOption] {
         effectiveSort.apply(options)

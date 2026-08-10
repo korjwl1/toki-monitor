@@ -263,6 +263,16 @@ final class DashboardViewModel {
             for (varID, options) in results {
                 if let idx = self.dashboardConfig.templating.list.firstIndex(where: { $0.id == varID }) {
                     self.dashboardConfig.templating.list[idx].options = options
+                    // A variable that has never been selected interpolates to
+                    // an empty string, which silently produces a different
+                    // query rather than a visible error. `includeAll` already
+                    // answers for itself, so only the rest are seeded — and a
+                    // constant or a textbox default arrives this way.
+                    var v = self.dashboardConfig.templating.list[idx]
+                    if v.current.value.isEmpty, !v.includeAll, let first = v.sortedOptions.first {
+                        v.current = VariableSelection(text: [first.text], value: [first.value])
+                        self.dashboardConfig.templating.list[idx] = v
+                    }
                 }
             }
             self.saveDashboard()

@@ -35,6 +35,8 @@ final class VariablePluginRegistry {
         register(StaticListVariableLoader())
         register(IntervalVariableLoader())
         register(TokiLabelValuesVariableLoader())
+        register(ConstantVariableLoader())
+        register(TextVariableLoader())
     }
 
     func register(_ loader: any VariablePluginLoader) {
@@ -68,6 +70,39 @@ struct IntervalVariableLoader: VariablePluginLoader {
         let spec = (try? JSONDecoder().decode(IntervalVariableSpec.self, from: specData))
             ?? IntervalVariableSpec()
         return spec.values.map { VariableOption(text: $0, value: $0) }
+    }
+}
+
+/// `ConstantVariable` — one value the author fixes.
+///
+/// It still produces an option so that everything downstream (selection,
+/// interpolation, export) treats it like any other variable; what makes it
+/// constant is that the option list has exactly one entry and the toolbar
+/// offers no control.
+struct ConstantVariableLoader: VariablePluginLoader {
+    var kind: String { BuiltinVariablePluginKind.constant }
+
+    func loadOptions(specData: Data, context: VariableLoadContext) async throws -> [VariableOption] {
+        let spec = (try? JSONDecoder().decode(ConstantVariableSpec.self, from: specData))
+            ?? ConstantVariableSpec()
+        guard !spec.value.isEmpty else { return [] }
+        return [VariableOption(text: spec.value, value: spec.value)]
+    }
+}
+
+/// `TextVariable` — free text, with the author's default as the only option.
+///
+/// The option exists so a dashboard that has never been touched still
+/// interpolates to something; once the reader types, `current` carries their
+/// text and this list is not consulted.
+struct TextVariableLoader: VariablePluginLoader {
+    var kind: String { BuiltinVariablePluginKind.text }
+
+    func loadOptions(specData: Data, context: VariableLoadContext) async throws -> [VariableOption] {
+        let spec = (try? JSONDecoder().decode(TextVariableSpec.self, from: specData))
+            ?? TextVariableSpec()
+        guard !spec.value.isEmpty else { return [] }
+        return [VariableOption(text: spec.value, value: spec.value)]
     }
 }
 

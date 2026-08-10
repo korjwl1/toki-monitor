@@ -629,13 +629,28 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func variableControl(for variable: DashboardVariable) -> some View {
-        HStack(spacing: DS.xs) {
-            if variable.hide != .hideLabel {
-                Text(localizedVariableLabel(variable))
-                    .font(.system(size: DS.fontCaption))
-                    .foregroundStyle(.secondary)
+        if !variable.isReaderControllable {
+            // A constant has no control by design — see `isReaderControllable`.
+            EmptyView()
+        } else {
+            HStack(spacing: DS.xs) {
+                if variable.hide != .hideLabel {
+                    Text(localizedVariableLabel(variable))
+                        .font(.system(size: DS.fontCaption))
+                        .foregroundStyle(.secondary)
+                }
+                if variable.effectivePluginKind == BuiltinVariablePluginKind.text {
+                    TextVariableField(variable: variable, viewModel: viewModel)
+                } else {
+                    variableMenu(for: variable)
+                }
             }
+        }
+    }
 
+    @ViewBuilder
+    private func variableMenu(for variable: DashboardVariable) -> some View {
+        Group {
             Menu {
                 if variable.includeAll {
                     Button {
@@ -759,5 +774,51 @@ private struct ToolbarPillModifier: ViewModifier {
                     in: RoundedRectangle(cornerRadius: DS.btnRadius, style: .continuous)
                 )
         }
+    }
+}
+
+// MARK: - Text variable control
+
+/// The toolbar control for a `TextVariable`.
+///
+/// Holds its own draft and commits on Return rather than on every keystroke:
+/// a commit refetches every panel on the dashboard, so committing per
+/// character would make typing a filter unusable — and would fire a query for
+/// each meaningless prefix along the way.
+struct TextVariableField: View {
+    let variable: DashboardVariable
+    @Bindable var viewModel: DashboardViewModel
+
+    @State private var draft: String = ""
+    @FocusState private var focused: Bool
+
+    private var committed: String { variable.current.value.first ?? "" }
+
+    var body: some View {
+        TextField(variable.label ?? variable.name, text: $draft)
+            .textFieldStyle(.roundedBorder)
+            .font(.system(size: DS.fontCaption))
+            .frame(width: 120)
+            .focused($focused)
+            .onSubmit { commit() }
+            .onAppear { draft = committed }
+            // An external change — a dashboard switch, an import, another
+            // control resetting it — must reach the field, but not while the
+            // reader is mid-word in it.
+            .onChange(of: committed) { _, new in
+                if !focused { draft = new }
+            }
+            .onChange(of: focused) { _, isFocused in
+                if !isFocused { commit() }
+            }
+    }
+
+    private func commit() {
+        let value = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value != committed else { return }
+        viewModel.updateVariable(
+            id: variable.id,
+            selection: VariableSelection(text: [value], value: [value])
+        )
     }
 }

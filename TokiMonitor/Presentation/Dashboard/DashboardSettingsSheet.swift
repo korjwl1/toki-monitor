@@ -280,6 +280,10 @@ struct DashboardSettingsSheet: View {
                             .tag(BuiltinVariablePluginKind.interval)
                         Text(L.tr("PromQL 라벨", "PromQL Label Values"))
                             .tag(BuiltinVariablePluginKind.tokiLabelValues)
+                        Text(L.tr("상수", "Constant"))
+                            .tag(BuiltinVariablePluginKind.constant)
+                        Text(L.tr("텍스트", "Text"))
+                            .tag(BuiltinVariablePluginKind.text)
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: 220, alignment: .leading)
@@ -328,8 +332,60 @@ struct DashboardSettingsSheet: View {
             intervalSpecEditor(variable)
         case BuiltinVariablePluginKind.tokiLabelValues:
             labelValuesSpecEditor(variable)
+        case BuiltinVariablePluginKind.constant:
+            singleValueSpecEditor(
+                variable,
+                label: L.tr("값", "Value"),
+                help: L.tr("모든 패널에서 같은 값으로 치환됩니다", "Substituted everywhere; readers cannot change it"),
+                read: { (try? JSONDecoder().decode(ConstantVariableSpec.self, from: $0))?.value },
+                write: { (try? JSONEncoder().encode(ConstantVariableSpec(value: $0))) ?? Data() },
+                kind: BuiltinVariablePluginKind.constant
+            )
+        case BuiltinVariablePluginKind.text:
+            singleValueSpecEditor(
+                variable,
+                label: L.tr("기본값", "Default"),
+                help: L.tr("읽는 사람이 입력한 값은 따로 보관됩니다", "What a reader types is kept separately"),
+                read: { (try? JSONDecoder().decode(TextVariableSpec.self, from: $0))?.value },
+                write: { (try? JSONEncoder().encode(TextVariableSpec(value: $0))) ?? Data() },
+                kind: BuiltinVariablePluginKind.text
+            )
         default:
             EmptyView()
+        }
+    }
+
+    /// One text field writing one string into a plugin spec. Constant and
+    /// text differ only in what the value means, so they share the control.
+    private func singleValueSpecEditor(
+        _ variable: DashboardVariable,
+        label: String,
+        help: String,
+        read: @escaping (Data) -> String?,
+        write: @escaping (String) -> Data,
+        kind: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .top) {
+                Text(label)
+                    .font(.caption)
+                    .frame(width: 60, alignment: .leading)
+                TextField("", text: Binding(
+                    get: { variable.plugin.flatMap { read($0.spec) } ?? "" },
+                    set: { newValue in
+                        mutateVariable(variable.id) { v in
+                            v.plugin = VariablePluginRef(kind: kind, spec: write(newValue))
+                        }
+                        viewModel.refreshVariables()
+                    }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.caption, design: .monospaced))
+            }
+            Text(help)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 60)
         }
     }
 
@@ -503,10 +559,7 @@ struct DashboardSettingsSheet: View {
     /// Fall back from the legacy `type` enum to a plugin kind when a
     /// variable has no `plugin` ref yet (pre-v4 imports, etc.).
     private func legacyPluginKind(_ variable: DashboardVariable) -> String {
-        switch variable.type {
-        case .interval: return BuiltinVariablePluginKind.interval
-        case .custom:   return BuiltinVariablePluginKind.staticList
-        }
+        variable.effectivePluginKind
     }
 
     /// Produce a sensible default plugin spec when the user switches plugin
@@ -534,6 +587,15 @@ struct DashboardSettingsSheet: View {
                 query: "sum by (model) (increase(usage[$__interval]))",
                 labelName: "model"
             ))) ?? Data()
+        // Switching kinds keeps the current value when there is one, so a
+        // static list of one entry becomes a constant with that entry rather
+        // than an empty box.
+        case BuiltinVariablePluginKind.constant:
+            let value = v.current.value.first ?? v.options.first?.value ?? v.query
+            return (try? encoder.encode(ConstantVariableSpec(value: value))) ?? Data()
+        case BuiltinVariablePluginKind.text:
+            let value = v.current.value.first ?? v.options.first?.value ?? v.query
+            return (try? encoder.encode(TextVariableSpec(value: value))) ?? Data()
         default:
             return Data()
         }
