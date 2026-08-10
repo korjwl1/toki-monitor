@@ -181,6 +181,96 @@ struct FrameAdapterTests {
         #expect(f.meta.datasource == "local")
     }
 
+    // MARK: - The shared time axis
+
+    /// The daemon emits only buckets that contain events. The point path has
+    /// always gap-filled to the requested window (`TimeSeriesGapFiller`); frames
+    /// did not, so a "last 24 hours" chart drew only the three hours that had
+    /// traffic, and each series covered only its own buckets — one model with
+    /// one busy bucket rendered as a single unconnected dot.
+    @Test("every frame spans the requested window, not just its own buckets")
+    func framesSpanTheRequestedWindow() throws {
+        // 15 hours in 1-hour buckets (bucketSeconds is duration ÷ 15).
+        let time = TimeConfig(from: "2026-08-10T00:00:00Z", to: "2026-08-10T15:00:00Z")
+        let set = FrameAdapter.frames(
+            providers: [
+                "claude_code": [entry("2026-08-10T03:00:00", [summary("opus", total: 100)])],
+                "codex": [entry("2026-08-10T09:00:00", [summary("gpt", total: 5)])],
+            ],
+            query: "sum(toki_tokens_total[1h])",
+            time: time
+        )
+        #expect(set.frames.count == 2)
+        let widths = Set(set.frames.map(\.rowCount))
+        #expect(widths.count == 1, "both series must sit on one axis or they cannot be compared")
+        let opus = try #require(set.frames.first { $0.commonLabels["model"] == "opus" })
+        #expect(opus.rowCount > 2, "the window has more buckets than the series reported")
+        #expect(opus.isRectangular)
+    }
+
+    /// A bucket the series never reported is unknown, not measured zero. The
+    /// counter charts render it as zero themselves; the data must not decide
+    /// that for every reader.
+    @Test("a bucket this series never reported stays nil")
+    func unreportedBucketsAreNil() throws {
+        let time = TimeConfig(from: "2026-08-10T00:00:00Z", to: "2026-08-10T15:00:00Z")
+        let set = FrameAdapter.frames(
+            providers: ["codex": [entry("2026-08-10T03:00:00", [summary("gpt", total: 5)])]],
+            query: "sum(toki_tokens_total[1h])",
+            time: time
+        )
+        let values = try #require(set.frames.first?.field(named: "total_tokens")?.values.numbers)
+        #expect(values.contains(5))
+        #expect(values.contains(where: { $0 == nil }), "gaps are absent, not zero")
+        #expect(!values.contains(where: { $0 == 0 }))
+    }
+
+    /// A reported bucket and the generated slot it falls in are the same bucket;
+    /// emitting both would double the axis and draw each series twice.
+    @Test("a reported bucket is not duplicated by the generated slot")
+    func reportedBucketsAreNotDuplicated() throws {
+        let time = TimeConfig(from: "2026-08-10T00:00:00Z", to: "2026-08-10T15:00:00Z")
+        let set = FrameAdapter.frames(
+            providers: ["codex": [entry("2026-08-10T03:00:00", [summary("gpt", total: 5)])]],
+            query: "sum(toki_tokens_total[1h])",
+            time: time
+        )
+        let f = try #require(set.frames.first)
+        guard case let .time(dates) = try #require(f.timeField).values else {
+            Issue.record("time field is not a time column"); return
+        }
+        #expect(Set(dates).count == dates.count)
+        #expect(dates == dates.sorted())
+    }
+
+    /// An instant query's period is a group key, not a date. Inventing a window
+    /// of empty buckets for it would turn one row into a phantom series.
+    @Test("a result with no parsable timestamp is not given a window")
+    func noTimestampsMeansNoWindow() {
+        let time = TimeConfig(from: "2026-08-10T00:00:00Z", to: "2026-08-10T15:00:00Z")
+        let set = FrameAdapter.frames(
+            providers: ["codex": [entry("opus-5", [summary("opus-5", total: 5)])]],
+            query: "sum(toki_tokens_total) by (model)",
+            time: time
+        )
+        #expect(set.frames.allSatisfy { $0.rowCount <= 1 })
+        #expect(set.notices.contains { $0.contains("unparsable period") })
+    }
+
+    /// Without a window the axis is exactly what the response reported — which
+    /// is what every caller that has no time range gets.
+    @Test("no window means the response's own buckets")
+    func noWindowKeepsResponseBuckets() throws {
+        let set = FrameAdapter.frames(
+            providers: ["codex": [
+                entry("2026-08-10T00:00:00", [summary("gpt", total: 1)]),
+                entry("2026-08-11T00:00:00", [summary("gpt", total: 2)]),
+            ]],
+            query: "sum(toki_tokens_total[1d])"
+        )
+        #expect(try #require(set.frames.first).rowCount == 2)
+    }
+
     @Test("display name is stable and derived from labels")
     func displayNameIsStable() throws {
         let set = FrameAdapter.frames(

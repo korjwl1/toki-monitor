@@ -37,17 +37,26 @@ enum FrameAdapter {
     ///     recorded on each frame for Inspect.
     ///   - refId: which query in the panel produced this.
     ///   - datasource: for provenance.
+    ///   - time: the requested window. Supplied, every frame spans the whole of
+    ///     it; the daemon only emits buckets that contain events, so without it
+    ///     a "last 24 hours" chart shows only the hours that had traffic, and
+    ///     each series covers only its own buckets rather than a shared axis.
     static func frames(
         providers: [String: [TokiReportEntry]],
         query: String,
         refId: String = "A",
-        datasource: String? = nil
+        datasource: String? = nil,
+        time: TimeConfig? = nil
     ) -> FrameSet {
         let dimensions = groupByDimensions(in: query)
         var out: [Frame] = []
         var notices: [String] = []
 
-        // series identity -> (times, measures)
+        let axis = timeAxis(providers: providers, time: time, notices: &notices)
+        var slot: [Date: Int] = [:]
+        for (i, date) in axis.enumerated() { slot[date] = i }
+
+        // series identity -> measures, one column per axis slot
         // Built per provider so provider is never merged away, which the old
         // parser did unconditionally (`for (_, entries) in report.providers`).
         for providerName in providers.keys.sorted() {
@@ -58,10 +67,8 @@ enum FrameAdapter {
                 guard let periodStr = entry.period,
                       let models = entry.usagePerModels else { continue }
                 let (dateString, tail) = splitPeriod(periodStr)
-                guard let date = TokiReportParser.parseDate(dateString) else {
-                    notices.append("unparsable period: \(periodStr)")
-                    continue
-                }
+                guard let date = TokiReportParser.parseDate(dateString),
+                      let index = slot[date] else { continue }
 
                 for summary in models {
                     var labels = labelsFor(
@@ -75,12 +82,13 @@ enum FrameAdapter {
                     if !providerName.isEmpty { labels["provider"] = providerName }
 
                     let key = SeriesKey(labels: labels)
-                    series[key, default: SeriesAccumulator()].append(date: date, summary: summary)
+                    series[key, default: SeriesAccumulator(slots: axis.count)]
+                        .add(at: index, summary: summary)
                 }
             }
 
             for (key, acc) in series.sorted(by: { $0.key.sortKey < $1.key.sortKey }) {
-                out.append(acc.frame(refId: refId, labels: key.labels,
+                out.append(acc.frame(refId: refId, times: axis, labels: key.labels,
                                      query: query, datasource: datasource))
             }
         }
@@ -98,6 +106,52 @@ enum FrameAdapter {
             }
         }
         return FrameSet(frames: out)
+    }
+
+    // MARK: - Time axis
+
+    /// The shared time axis: every bucket the response reported, plus every
+    /// bucket the requested window contains.
+    ///
+    /// Only the response's own timestamps are used when `time` is absent, and
+    /// the window is ignored entirely when the response carried no parsable
+    /// timestamp at all — an instant query's period is a group key rather than
+    /// a date, and inventing 15 empty buckets for it would turn one row into a
+    /// phantom series.
+    private static func timeAxis(
+        providers: [String: [TokiReportEntry]],
+        time: TimeConfig?,
+        notices: inout [String]
+    ) -> [Date] {
+        var dates = Set<Date>()
+        var unparsable = Set<String>()
+        for entries in providers.values {
+            for entry in entries {
+                guard let periodStr = entry.period, entry.usagePerModels != nil else { continue }
+                let (dateString, _) = splitPeriod(periodStr)
+                if let date = TokiReportParser.parseDate(dateString) {
+                    dates.insert(date)
+                } else {
+                    unparsable.insert(periodStr)
+                }
+            }
+        }
+        for period in unparsable.sorted() {
+            notices.append("unparsable period: \(period)")
+        }
+        guard !dates.isEmpty else { return [] }
+
+        if let time {
+            let step = TimeInterval(time.bucketSeconds)
+            // Match the point path's dedup rule: a reported bucket wins over the
+            // generated slot it falls in, so the two never draw at offset times.
+            let reported = Set(dates.map { floor($0.timeIntervalSince1970 / step) * step })
+            for slot in TimeSeriesGapFiller.bucketStarts(time: time)
+            where !reported.contains(slot.timeIntervalSince1970) {
+                dates.insert(slot)
+            }
+        }
+        return dates.sorted()
     }
 
     // MARK: - Dimension recovery
@@ -166,17 +220,20 @@ enum FrameAdapter {
         }
     }
 
+    /// One series' measures, held as columns already aligned to the shared time
+    /// axis. Every series therefore spans the same window, which is what lets a
+    /// chart draw them together and a table put them in one row per bucket.
+    /// A bucket this series never reported stays nil — absent, not zero.
     private struct SeriesAccumulator {
-        var dates: [Date] = []
-        var input: [Double?] = []
-        var output: [Double?] = []
-        var total: [Double?] = []
-        var events: [Double?] = []
-        var cost: [Double?] = []
-        var cacheCreation: [Double?] = []
-        var cacheRead: [Double?] = []
-        var cachedInput: [Double?] = []
-        var reasoning: [Double?] = []
+        var input: [Double?]
+        var output: [Double?]
+        var total: [Double?]
+        var events: [Double?]
+        var cost: [Double?]
+        var cacheCreation: [Double?]
+        var cacheRead: [Double?]
+        var cachedInput: [Double?]
+        var reasoning: [Double?]
         /// Whether any row carried this optional column. A column nobody
         /// reported must not appear as a wall of zeroes.
         var sawCacheCreation = false
@@ -185,78 +242,59 @@ enum FrameAdapter {
         var sawReasoning = false
         var sawCost = false
 
-        mutating func append(date: Date, summary: TokiModelSummary) {
-            // Same bucket twice for one series: sum rather than keep the last.
-            if let i = dates.lastIndex(of: date) {
-                total[i] = (total[i] ?? 0) + Double(summary.totalTokens)
-                input[i] = (input[i] ?? 0) + Double(summary.inputTokens)
-                output[i] = (output[i] ?? 0) + Double(summary.outputTokens)
-                events[i] = (events[i] ?? 0) + Double(summary.events)
-                if let c = summary.costUsd { cost[i] = (cost[i] ?? 0) + c; sawCost = true }
-                accumulateOptionals(at: i, summary)
-                return
-            }
-            dates.append(date)
-            input.append(Double(summary.inputTokens))
-            output.append(Double(summary.outputTokens))
-            total.append(Double(summary.totalTokens))
-            events.append(Double(summary.events))
-            cost.append(summary.costUsd)
-            if summary.costUsd != nil { sawCost = true }
-            cacheCreation.append(summary.cacheCreationInputTokens.map(Double.init))
-            cacheRead.append(summary.cacheReadInputTokens.map(Double.init))
-            cachedInput.append(summary.cachedInputTokens.map(Double.init))
-            reasoning.append(summary.reasoningOutputTokens.map(Double.init))
-            if summary.cacheCreationInputTokens != nil { sawCacheCreation = true }
-            if summary.cacheReadInputTokens != nil { sawCacheRead = true }
-            if summary.cachedInputTokens != nil { sawCachedInput = true }
-            if summary.reasoningOutputTokens != nil { sawReasoning = true }
+        init(slots: Int) {
+            let empty = [Double?](repeating: nil, count: slots)
+            input = empty; output = empty; total = empty; events = empty; cost = empty
+            cacheCreation = empty; cacheRead = empty; cachedInput = empty; reasoning = empty
         }
 
-        private mutating func accumulateOptionals(at i: Int, _ s: TokiModelSummary) {
+        /// Accumulates rather than overwrites: the same bucket can arrive twice
+        /// for one series (e.g. one project reported under two model names).
+        mutating func add(at i: Int, summary: TokiModelSummary) {
+            total[i] = (total[i] ?? 0) + Double(summary.totalTokens)
+            input[i] = (input[i] ?? 0) + Double(summary.inputTokens)
+            output[i] = (output[i] ?? 0) + Double(summary.outputTokens)
+            events[i] = (events[i] ?? 0) + Double(summary.events)
+            if let c = summary.costUsd { cost[i] = (cost[i] ?? 0) + c; sawCost = true }
+
             func add(_ column: inout [Double?], _ value: UInt64?, _ seen: inout Bool) {
                 guard let value else { return }
                 column[i] = (column[i] ?? 0) + Double(value)
                 seen = true
             }
-            add(&cacheCreation, s.cacheCreationInputTokens, &sawCacheCreation)
-            add(&cacheRead, s.cacheReadInputTokens, &sawCacheRead)
-            add(&cachedInput, s.cachedInputTokens, &sawCachedInput)
-            add(&reasoning, s.reasoningOutputTokens, &sawReasoning)
+            add(&cacheCreation, summary.cacheCreationInputTokens, &sawCacheCreation)
+            add(&cacheRead, summary.cacheReadInputTokens, &sawCacheRead)
+            add(&cachedInput, summary.cachedInputTokens, &sawCachedInput)
+            add(&reasoning, summary.reasoningOutputTokens, &sawReasoning)
         }
 
-        func frame(refId: String, labels: [String: String],
+        func frame(refId: String, times: [Date], labels: [String: String],
                    query: String, datasource: String?) -> Frame {
-            // Sort by time: a chart that plots rows in arrival order draws a
-            // scribble when the wire happens to emit buckets out of order.
-            let order = dates.indices.sorted { dates[$0] < dates[$1] }
-            func reorder(_ c: [Double?]) -> [Double?] { order.map { c[$0] } }
-
             var fields: [Field] = [
-                Field(name: "time", labels: labels, values: .time(order.map { dates[$0] })),
-                Field(name: "total_tokens", labels: labels, values: .number(reorder(total))),
-                Field(name: "input_tokens", labels: labels, values: .number(reorder(input))),
-                Field(name: "output_tokens", labels: labels, values: .number(reorder(output))),
-                Field(name: "events", labels: labels, values: .number(reorder(events))),
+                Field(name: "time", labels: labels, values: .time(times)),
+                Field(name: "total_tokens", labels: labels, values: .number(total)),
+                Field(name: "input_tokens", labels: labels, values: .number(input)),
+                Field(name: "output_tokens", labels: labels, values: .number(output)),
+                Field(name: "events", labels: labels, values: .number(events)),
             ]
             if sawCost {
-                fields.append(Field(name: "cost_usd", labels: labels, values: .number(reorder(cost))))
+                fields.append(Field(name: "cost_usd", labels: labels, values: .number(cost)))
             }
             if sawCacheCreation {
                 fields.append(Field(name: "cache_creation_input_tokens", labels: labels,
-                                    values: .number(reorder(cacheCreation))))
+                                    values: .number(cacheCreation)))
             }
             if sawCacheRead {
                 fields.append(Field(name: "cache_read_input_tokens", labels: labels,
-                                    values: .number(reorder(cacheRead))))
+                                    values: .number(cacheRead)))
             }
             if sawCachedInput {
                 fields.append(Field(name: "cached_input_tokens", labels: labels,
-                                    values: .number(reorder(cachedInput))))
+                                    values: .number(cachedInput)))
             }
             if sawReasoning {
                 fields.append(Field(name: "reasoning_output_tokens", labels: labels,
-                                    values: .number(reorder(reasoning))))
+                                    values: .number(reasoning)))
             }
             return Frame(
                 refId: refId,

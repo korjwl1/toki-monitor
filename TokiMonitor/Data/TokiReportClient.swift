@@ -79,7 +79,8 @@ final class TokiReportClient: Sendable, QueryDataSource {
         let frames = FrameAdapter.frames(
             providers: TokiReportParser.providerEntries(data),
             query: query,
-            datasource: "local"
+            datasource: "local",
+            time: time
         )
         return QueryResult(timeSeries: series, frames: frames)
     }

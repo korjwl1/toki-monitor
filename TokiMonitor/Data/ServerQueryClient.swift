@@ -49,7 +49,8 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
         let frames = FrameAdapter.frames(
             providers: TokiReportParser.providerEntries(data),
             query: query,
-            datasource: "server"
+            datasource: "server",
+            time: time
         )
         return QueryResult(timeSeries: series, frames: frames)
     }

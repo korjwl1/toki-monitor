@@ -180,6 +180,8 @@ struct CustomDashboardView: View {
                 TimeSeriesChartView(
                     metric: panel.effectiveMetric,
                     data: data,
+                    frames: viewModel.dataState(for: panel.id).frames,
+                    panel: panel,
                     viewModel: viewModel,
                     dateFormat: chartDateFormat
                 )
