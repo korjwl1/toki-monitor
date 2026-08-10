@@ -37,9 +37,9 @@ final class DashboardConfigStore {
         // dashboard list from a newer build. Reading the list as the
         // source of truth here avoids the "active dashboard suddenly
         // becomes Default" drift where the two keys disagreed.
-        if let data = UserDefaults.standard.data(forKey: Self.dashboardListKey),
-           let list = try? JSONDecoder().decode([DashboardConfig].self, from: data),
-           !list.isEmpty {
+        if let data = UserDefaults.standard.data(forKey: Self.dashboardListKey) {
+            let list = Self.decodeList(data).list
+            guard !list.isEmpty else { return Self.defaultConfig }
             let activeUID = UserDefaults.standard.string(forKey: Self.activeDashboardKey)
             let chosen = list.first(where: { $0.uid == activeUID }) ?? list[0]
             return migrateAndPersist(chosen)
@@ -84,27 +84,100 @@ final class DashboardConfigStore {
     // MARK: - Dashboard List (multiple dashboards)
 
     func loadDashboardList() -> [DashboardConfig] {
-        guard let data = UserDefaults.standard.data(forKey: Self.dashboardListKey),
-              let raw = try? JSONDecoder().decode([DashboardConfig].self, from: data)
-        else {
+        guard let data = UserDefaults.standard.data(forKey: Self.dashboardListKey) else {
             return [load()]
         }
+        let (list, decodedAll) = Self.decodeList(data)
+        guard !list.isEmpty else { return [load()] }
+
         // Apply migrations to each entry so the in-memory list always
         // carries the latest schema, even for entries written before this
         // version. Persist back only if anything changed.
         var anyMigrated = false
-        let list = raw.map { entry -> DashboardConfig in
-            let migrated = DashboardMigrator.migrate(entry)
-            if migrated.schemaVersion != entry.schemaVersion { anyMigrated = true }
-            return migrated
+        let migrated = list.map { entry -> DashboardConfig in
+            let m = DashboardMigrator.migrate(entry)
+            if m.schemaVersion != entry.schemaVersion { anyMigrated = true }
+            return m
         }
-        if anyMigrated { saveDashboardList(list) }
-        return list
+        // Only write back when every entry was understood. Saving a partial
+        // list would make a transient read failure permanent — the entries
+        // this build could not decode would be erased from disk on the next
+        // save, and a downgrade or a future field would cost the user
+        // dashboards it merely failed to READ.
+        if anyMigrated && decodedAll { saveDashboardList(migrated) }
+        return migrated
+    }
+
+    /// Decode the list entry by entry.
+    ///
+    /// Decoding `[DashboardConfig]` in one call is all-or-nothing: a single
+    /// entry this build cannot read — one written by a newer version, one
+    /// naming a panel type that did not exist yet — fails the whole array, and
+    /// the caller then falls back to a single default and overwrites
+    /// everything. One unreadable dashboard must cost the user that dashboard,
+    /// not all of them.
+    ///
+    /// Returns the entries that decoded, and whether all of them did.
+    static func decodeList(_ data: Data) -> (list: [DashboardConfig], decodedAll: Bool) {
+        let decoder = JSONDecoder()
+        if let list = try? decoder.decode([DashboardConfig].self, from: data) {
+            return (list, true)
+        }
+        // Split the array at the JSON level so each element can be attempted
+        // on its own, without a Codable type that has to model every shape a
+        // dashboard might have.
+        guard let elements = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else {
+            return ([], false)
+        }
+        var out: [DashboardConfig] = []
+        for element in elements {
+            guard let elementData = try? JSONSerialization.data(
+                    withJSONObject: element, options: [.fragmentsAllowed]),
+                  let config = try? decoder.decode(DashboardConfig.self, from: elementData)
+            else { continue }
+            out.append(config)
+        }
+        return (out, out.count == elements.count)
     }
 
     func saveDashboardList(_ list: [DashboardConfig]) {
-        guard let data = try? JSONEncoder().encode(list) else { return }
+        guard let encoded = try? JSONEncoder().encode(list),
+              var elements = (try? JSONSerialization.jsonObject(with: encoded)) as? [Any]
+        else { return }
+
+        // Carry forward any stored entry this build could not decode.
+        //
+        // Without this, `loadDashboardList()` returning a partial list and the
+        // caller then adding or deleting a dashboard would erase the entries
+        // that merely failed to READ — a downgrade would silently delete every
+        // dashboard the newer build had written, on the first edit. The user
+        // cannot see them, so they cannot have meant to remove them.
+        let known = Set(list.map(\.uid))
+        elements.append(contentsOf: Self.unreadableEntries(excludingUIDs: known))
+
+        guard let data = try? JSONSerialization.data(withJSONObject: elements) else { return }
         UserDefaults.standard.set(data, forKey: Self.dashboardListKey)
+    }
+
+    /// Stored list elements that do not decode into a `DashboardConfig`, minus
+    /// any whose `uid` is already accounted for. `uid` is a plain string field,
+    /// so it is readable even when the entry as a whole is not.
+    private static func unreadableEntries(excludingUIDs known: Set<String>) -> [Any] {
+        guard let data = UserDefaults.standard.data(forKey: dashboardListKey),
+              let elements = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
+        else { return [] }
+
+        let decoder = JSONDecoder()
+        return elements.filter { element in
+            guard let elementData = try? JSONSerialization.data(
+                    withJSONObject: element, options: [.fragmentsAllowed])
+            else { return false }
+            if (try? decoder.decode(DashboardConfig.self, from: elementData)) != nil {
+                return false
+            }
+            let uid = (element as? [String: Any])?["uid"] as? String
+            return uid.map { !known.contains($0) } ?? true
+        }
     }
 
     var activeDashboardUID: String? {
