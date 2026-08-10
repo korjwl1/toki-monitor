@@ -214,7 +214,7 @@ struct CustomDashboardView: View {
     private func statContent(for panel: PanelConfig, data: TimeSeriesData?,
                              frames: FrameSet?) -> some View {
         let metric = panel.effectiveMetric
-        let stat = Self.statValue(metric: metric, data: data, frames: frames)
+        let stat = Self.statValue(panel: panel, data: data, frames: frames)
         return VStack(alignment: .leading, spacing: 4) {
             Text(stat.value)
                 .font(.system(size: 20, weight: .semibold, design: .monospaced))
@@ -233,8 +233,9 @@ struct CustomDashboardView: View {
 
     /// Resolve a stat card's number. Frames first; the legacy extractor only
     /// when a datasource has not been migrated.
-    static func statValue(metric: PanelMetric, data: TimeSeriesData?,
+    static func statValue(panel: PanelConfig, data: TimeSeriesData?,
                           frames: FrameSet?) -> PanelDataExtractor.StatValue {
+        let metric = panel.effectiveMetric
         guard let frames, !frames.frames.isEmpty else {
             return PanelDataExtractor.statValue(for: metric, data: data)
         }
@@ -248,11 +249,23 @@ struct CustomDashboardView: View {
         let prepared = TransformationPipeline.apply(
             PanelPreset.transformations(for: metric), to: frames
         )
-        guard let value = FrameReader.singleValue(
-            prepared, selection: PanelPreset.selection(for: metric)
-        ) else {
+        // The panel's own selection wins; the preset is the starting point a
+        // panel keeps until someone changes it.
+        let selection = panel.fieldSelection ?? PanelPreset.selection(for: metric)
+        guard let value = FrameReader.singleValue(prepared, selection: selection) else {
             // Absent stays "-", never 0 — see FrameReader.singleValue.
             return PanelDataExtractor.StatValue(value: "-", subtitle: nil)
+        }
+        // Formatting comes from the field's resolved config when the panel has
+        // one, so a card can read "$" while its neighbour reads tokens.
+        if let config = panel.fieldConfig,
+           let field = prepared.frames.compactMap({ selection.resolve(in: $0) }).first {
+            let resolved = config.resolve(for: field)
+            if !resolved.isEmpty {
+                return PanelDataExtractor.StatValue(
+                    value: FieldFormatter.format(value, config: resolved), subtitle: nil
+                )
+            }
         }
         return PanelDataExtractor.StatValue(
             value: Self.format(value, metric: metric), subtitle: nil

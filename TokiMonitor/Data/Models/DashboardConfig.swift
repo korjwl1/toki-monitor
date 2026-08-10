@@ -345,6 +345,16 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     /// `targets` during data fetching.
     var queries: [Query]?
 
+    /// Per-field display configuration: defaults plus matcher-based overrides.
+    /// Optional so existing dashboards decode unchanged and keep rendering
+    /// from `options`; a panel that has never been edited has no rules and
+    /// resolves to exactly what it showed before.
+    var fieldConfig: FieldConfigSource?
+
+    /// Which field a visualization reads, and how it collapses it. Nil means
+    /// "use the preset for `metric`", which is what every existing panel does.
+    var fieldSelection: FieldSelection?
+
     /// Decoded `TokiPromQLQuerySpec` from this panel's first query envelope,
     /// or nil. Returned fresh on every access — Swift structs can't cache
     /// computed values without a separate class wrapper, and panel fetch
