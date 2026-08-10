@@ -169,7 +169,8 @@ struct CustomDashboardView: View {
         let isEmpty = data?.allModelNames.isEmpty ?? true
         switch panel.panelType {
         case .stat:
-            statContent(for: panel.effectiveMetric, data: data)
+            statContent(for: panel, data: data,
+                        frames: viewModel.dataState(for: panel.id).frames)
         case .timeSeries:
             if isEmpty {
                 Spacer()
@@ -204,8 +205,16 @@ struct CustomDashboardView: View {
 
     // MARK: - Pure Panel Renderers (data passed in, no global state reads)
 
-    private func statContent(for metric: PanelMetric, data: TimeSeriesData?) -> some View {
-        let stat = PanelDataExtractor.statValue(for: metric, data: data)
+    /// Field-driven when frames are available, with the legacy extractor as a
+    /// fallback for sources that do not produce them yet.
+    ///
+    /// The value no longer comes from a switch on the metric: the preset says
+    /// which FIELD to read and how to reduce it, so a panel pointed at a column
+    /// no enum case knows about renders through this same path.
+    private func statContent(for panel: PanelConfig, data: TimeSeriesData?,
+                             frames: FrameSet?) -> some View {
+        let metric = panel.effectiveMetric
+        let stat = Self.statValue(metric: metric, data: data, frames: frames)
         return VStack(alignment: .leading, spacing: 4) {
             Text(stat.value)
                 .font(.system(size: 20, weight: .semibold, design: .monospaced))
@@ -220,6 +229,47 @@ struct CustomDashboardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Resolve a stat card's number. Frames first; the legacy extractor only
+    /// when a datasource has not been migrated.
+    static func statValue(metric: PanelMetric, data: TimeSeriesData?,
+                          frames: FrameSet?) -> PanelDataExtractor.StatValue {
+        guard let frames, !frames.frames.isEmpty else {
+            return PanelDataExtractor.statValue(for: metric, data: data)
+        }
+        // `topModel` names a series rather than reducing a column.
+        if metric == .topModel {
+            let name = FrameReader.topSeries(
+                frames, selection: PanelPreset.selection(for: metric), labelKey: "model"
+            )
+            return PanelDataExtractor.StatValue(value: name ?? "-", subtitle: nil)
+        }
+        let prepared = TransformationPipeline.apply(
+            PanelPreset.transformations(for: metric), to: frames
+        )
+        guard let value = FrameReader.singleValue(
+            prepared, selection: PanelPreset.selection(for: metric)
+        ) else {
+            // Absent stays "-", never 0 — see FrameReader.singleValue.
+            return PanelDataExtractor.StatValue(value: "-", subtitle: nil)
+        }
+        return PanelDataExtractor.StatValue(
+            value: Self.format(value, metric: metric), subtitle: nil
+        )
+    }
+
+    static func format(_ value: Double, metric: PanelMetric) -> String {
+        switch metric {
+        case .totalCost, .costByModel:
+            return TokenFormatter.formatCost(value)
+        case .apiCalls, .eventsByModel:
+            return String(Int(value))
+        case .cacheHitRate:
+            return String(format: "%.1f%%", value * 100)
+        default:
+            return TokenFormatter.formatTokens(UInt64(max(0, value)))
+        }
     }
 
     @ViewBuilder
