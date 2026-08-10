@@ -973,7 +973,16 @@ final class DashboardViewModel {
     }
 
     func importDashboard() {
-        guard var imported = configStore.importFromFile() else { return }
+        guard var imported = configStore.importFromFile() else {
+            // Distinguish a failed import from a cancelled one: the store sets
+            // a reason only for the former. Swallowing it made a malformed
+            // file look exactly like pressing Cancel.
+            if let reason = configStore.lastImportError {
+                errorMessage = reason
+            }
+            return
+        }
+        errorMessage = nil
         // Migrate imported config and normalize each panel so plugin /
         // queries envelopes are accurate (imports might originate from
         // older exports or be hand-edited).

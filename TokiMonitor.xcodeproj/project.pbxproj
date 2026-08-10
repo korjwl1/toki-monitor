@@ -62,6 +62,7 @@
 		5A100F7481C256287B782C70 /* PromQLSuggester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10785CF25F5378B78803A23B /* PromQLSuggester.swift */; };
 		5A9B8A4604691516E084F28B /* GaugePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24D5C9A7319840C3B1F3CC6 /* GaugePanelView.swift */; };
 		5C5E8E33DBFD060EB0916AD9 /* SemVer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C95A0813C9EB083B73F3EBAB /* SemVer.swift */; };
+		AA03SERIESMERGE000000002 /* SeriesMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */; };
 		AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01WINWIRE0000000000001 /* WindowsWireTests.swift */; };
 		5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */; };
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
@@ -212,6 +213,7 @@
 		6EB3ECA48F693919010308AC /* ChartPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartPanel.swift; sourceTree = "<group>"; };
 		7368908C5687B4CB8281CE2C /* ModelPricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPricing.swift; sourceTree = "<group>"; };
 		74A27A6A118A446539806BB7 /* TokiReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportModels.swift; sourceTree = "<group>"; };
+		AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesMergeTests.swift; sourceTree = "<group>"; };
 		AA01WINWIRE0000000000001 /* WindowsWireTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsWireTests.swift; sourceTree = "<group>"; };
 		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
@@ -339,6 +341,7 @@
 				755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */,
 				750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */,
 				AA01WINWIRE0000000000001 /* WindowsWireTests.swift */,
+				AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -838,6 +841,7 @@
 				CC0857BF78965AF7CCC554E8 /* WindowStatsTests.swift in Sources */,
 				AA02PANELNORM00000000002 /* PanelNormalizationTests.swift in Sources */,
 				AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */,
+				AA03SERIESMERGE000000002 /* SeriesMergeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

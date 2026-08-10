@@ -103,3 +103,39 @@ struct PanelPluginSpecTests {
         #expect(panel.plugin?.spec == first, "no edit must produce no churn")
     }
 }
+
+/// A dashboard's identity is its UID. Matching on title as well meant an edit
+/// could overwrite a DIFFERENT dashboard that happened to share a name — which
+/// a rename or an import can produce, since neither enforces uniqueness after
+/// creation.
+@Suite("Dashboard identity is the UID")
+@MainActor
+struct DashboardIdentityTests {
+
+    @Test("import surfaces a reason instead of looking like a cancel")
+    func importErrorIsDescribed() throws {
+        // Valid JSON, wrong shape for a dashboard.
+        let data = try #require(#"{"title": 42}"#.data(using: .utf8))
+        #expect(throws: (any Error).self) {
+            _ = try DashboardConfig.importJSON(data)
+        }
+    }
+
+    @Test("a well-formed export round-trips and takes a fresh identity")
+    func exportRoundTrips() throws {
+        var original = DashboardConfig(title: "Shared")
+        original.panels = [PanelConfig(
+            title: "p", panelType: .stat, metric: .totalTokens,
+            gridPosition: GridPosition(column: 0, row: 0, width: 6, height: 1)
+        )]
+        let json = try original.exportJSONString()
+        let imported = try DashboardConfig.importJSONString(json)
+
+        #expect(imported.title == original.title)
+        #expect(imported.panels.count == 1)
+        // Import must not adopt the source's identity, or updating one would
+        // silently rewrite the other.
+        #expect(imported.uid != original.uid)
+        #expect(imported.id != original.id)
+    }
+}

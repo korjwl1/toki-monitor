@@ -141,8 +141,12 @@ final class DashboardConfigStore {
 
     func updateDashboardInList(_ config: DashboardConfig) {
         var list = loadDashboardList()
-        // Match by title (unique key) or uid
-        if let idx = list.firstIndex(where: { $0.title == config.title || $0.uid == config.uid }) {
+        // Identity is the UID, and ONLY the UID. Matching on title first meant
+        // that two dashboards sharing a title — which a rename or an import
+        // can produce, since neither enforces uniqueness after creation —
+        // caused an edit to overwrite whichever one happened to come first in
+        // the list. Silent loss of the wrong document.
+        if let idx = list.firstIndex(where: { $0.uid == config.uid }) {
             list[idx] = config
         }
         // Don't append if not found — prevents duplication
@@ -199,8 +203,45 @@ final class DashboardConfigStore {
             let data = try Data(contentsOf: url)
             return try DashboardConfig.importJSON(data)
         } catch {
+            // A malformed file must not look like "user pressed Cancel". The
+            // caller cannot tell those apart from a bare nil, so the reason
+            // surfaces here.
+            lastImportError = Self.describeImportFailure(error, url: url)
             return nil
         }
+    }
+
+    /// Set when `importFromFile` fails; nil after a success or a cancel.
+    private(set) var lastImportError: String?
+
+    private static func describeImportFailure(_ error: Error, url: URL) -> String {
+        let name = url.lastPathComponent
+        if let decoding = error as? DecodingError {
+            switch decoding {
+            case let .keyNotFound(key, ctx):
+                return L.tr("\(name): 필수 항목 '\(key.stringValue)'이 없습니다 (\(Self.path(ctx)))",
+                            "\(name): missing required field '\(key.stringValue)' at \(Self.path(ctx))")
+            case let .typeMismatch(_, ctx):
+                return L.tr("\(name): 형식이 맞지 않습니다 (\(Self.path(ctx)))",
+                            "\(name): type mismatch at \(Self.path(ctx))")
+            case let .valueNotFound(_, ctx):
+                return L.tr("\(name): 값이 비어 있습니다 (\(Self.path(ctx)))",
+                            "\(name): null where a value is required at \(Self.path(ctx))")
+            case .dataCorrupted:
+                return L.tr("\(name): JSON을 읽을 수 없습니다", "\(name): not valid JSON")
+            @unknown default:
+                return L.tr("\(name): 불러오기 실패", "\(name): import failed")
+            }
+        }
+        return L.tr("\(name): \(error.localizedDescription)", "\(name): \(error.localizedDescription)")
+    }
+
+    /// "panels[2].targets[0].metric" — a path the user can act on, rather than
+    /// Swift's default coding-key dump.
+    private static func path(_ ctx: DecodingError.Context) -> String {
+        ctx.codingPath.map { $0.intValue.map { "[\($0)]" } ?? ".\($0.stringValue)" }
+            .joined()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
     }
 
     // MARK: - Default Layout (24-column grid)

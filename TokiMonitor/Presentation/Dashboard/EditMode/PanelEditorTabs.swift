@@ -56,6 +56,22 @@ struct PanelEditorQueryTab: View {
     private func targetEditor(index: Int, target: PanelTarget) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
+                // Only query A is executed today: the fetch path resolves a
+                // single target and a panel receives one result, with no
+                // refId-keyed set for a second one to land in. The editor used
+                // to accept B..Z silently, so a user could write a query,
+                // save it, export it — and never see it run. Say so until the
+                // frame/FrameSet work makes multiple results possible.
+                if index > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(L.tr("아직 실행되지 않습니다 — 현재는 쿼리 A만 조회됩니다",
+                                  "Not executed yet — only query A is run today"))
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption2)
+                }
                 HStack {
                     Text(L.tr("지표", "Metric"))
                         .font(.caption)

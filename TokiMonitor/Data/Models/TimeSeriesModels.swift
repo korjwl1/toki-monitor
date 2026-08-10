@@ -48,7 +48,13 @@ struct TimeSeriesPoint: Identifiable {
     init(date: Date, models: [TokiModelSummary]) {
         self.date = date
         self.models = models
-        self.modelIndex = Dictionary(models.map { ($0.model, $0) }, uniquingKeysWith: { _, new in new })
+        // Sum on collision rather than keeping the last. `totalTokens` below
+        // reduces over `models` and therefore counted BOTH entries, while the
+        // index kept one — so a stat card and its chart disagreed whenever a
+        // series name arrived twice in one bucket (e.g. one project reported
+        // by two providers).
+        self.modelIndex = Dictionary(models.map { ($0.model, $0) },
+                                     uniquingKeysWith: { $0.merged(with: $1) })
     }
 
     var totalTokens: UInt64 {

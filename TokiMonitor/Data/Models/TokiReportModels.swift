@@ -18,6 +18,32 @@ struct TokiModelSummary: Codable, Identifiable {
     let cachedInputTokens: UInt64?
     let reasoningOutputTokens: UInt64?
 
+    /// Combine two summaries that share a series name. This happens when one
+    /// logical series arrives split across providers — most plausibly a
+    /// `by (project)` query, since a project is not provider-specific. The
+    /// index used to keep only the last of them while the panel totals summed
+    /// both, so a stat card and its chart disagreed. Summing is the only
+    /// answer that keeps them consistent, and every field here is additive.
+    func merged(with other: TokiModelSummary) -> TokiModelSummary {
+        func add(_ a: UInt64?, _ b: UInt64?) -> UInt64? {
+            guard a != nil || b != nil else { return nil }
+            return (a ?? 0) + (b ?? 0)
+        }
+        return TokiModelSummary(
+            model: model,
+            inputTokens: inputTokens + other.inputTokens,
+            outputTokens: outputTokens + other.outputTokens,
+            totalTokens: totalTokens + other.totalTokens,
+            events: events + other.events,
+            costUsd: (costUsd == nil && other.costUsd == nil)
+                ? nil : (costUsd ?? 0) + (other.costUsd ?? 0),
+            cacheCreationInputTokens: add(cacheCreationInputTokens, other.cacheCreationInputTokens),
+            cacheReadInputTokens: add(cacheReadInputTokens, other.cacheReadInputTokens),
+            cachedInputTokens: add(cachedInputTokens, other.cachedInputTokens),
+            reasoningOutputTokens: add(reasoningOutputTokens, other.reasoningOutputTokens)
+        )
+    }
+
     enum CodingKeys: String, CodingKey {
         case model, events
         case inputTokens = "input_tokens"
