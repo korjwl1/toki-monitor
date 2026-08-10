@@ -512,11 +512,15 @@ enum PanelType: String, Codable, CaseIterable {
     case pieChart
     case table
     case gauge
+    /// Spans on a row per series: what state something was in, and for how
+    /// long. The other types all answer "how much, over time" and can only
+    /// show a state change as a step to be read off an axis.
+    case stateTimeline
     case rowPanel
 
     /// Panel types available for user creation (excludes rowPanel from general picker)
     static var creatableTypes: [PanelType] {
-        [.stat, .timeSeries, .barChart, .pieChart, .table, .gauge]
+        [.stat, .timeSeries, .barChart, .pieChart, .table, .gauge, .stateTimeline]
     }
 
     /// Minimum grid width (columns). Stat cards default to width=6 in the
@@ -530,6 +534,8 @@ enum PanelType: String, Codable, CaseIterable {
         case .pieChart: 6
         case .table: 8
         case .gauge: 4
+        // Spans are read by their extent, so a narrow one is unreadable.
+        case .stateTimeline: 8
         case .rowPanel: 24
         }
     }
@@ -548,6 +554,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .pieChart: 1
         case .table: 1
         case .gauge: 1
+        case .stateTimeline: 1
         case .rowPanel: 1
         }
     }
@@ -581,6 +588,10 @@ enum PanelMetric: String, Codable, CaseIterable {
     case reasoningTokens
     case modelBreakdown
     case tokensByProject
+    /// Rate-limit windows. Not a series — each row is an interval with an
+    /// outcome, which is why it belongs to the state timeline and to nothing
+    /// that plots a value against time.
+    case rateLimitWindows
 
     var compatiblePanelTypes: [PanelType] {
         switch self {
@@ -598,6 +609,8 @@ enum PanelMetric: String, Codable, CaseIterable {
             return [.table, .barChart]
         case .tokensByProject:
             return [.pieChart, .barChart, .table]
+        case .rateLimitWindows:
+            return [.stateTimeline, .table]
         }
     }
 
@@ -621,6 +634,8 @@ enum PanelMetric: String, Codable, CaseIterable {
             "sum by (model) (increase(usage{$provider}[$__interval]))"
         case .tokensByProject:
             "sum by (project) (increase(usage{$provider}[$__interval]))"
+        case .rateLimitWindows:
+            "windows"
         }
     }
 }

@@ -48,6 +48,30 @@ final class TokiReportClient: Sendable, QueryDataSource {
         return providers.flatMap { name, rows in rows.map { (name, $0) } }
     }
 
+    /// Window rows for a panel, as interval frames.
+    ///
+    /// The legacy `timeSeries` half stays empty on purpose: there is no honest
+    /// series to derive from a set of spans, and filling it with something
+    /// plausible is how a panel ends up drawing a shape the data never had.
+    private func queryWindowFrames(query: String, time: TimeConfig) async throws -> QueryResult {
+        let rows = try await queryWindows(
+            startEpoch: Int(time.fromDate.timeIntervalSince1970),
+            endEpoch: Int(time.toDate.timeIntervalSince1970)
+        )
+        var byProvider: [String: [WindowRow]] = [:]
+        for (provider, row) in rows { byProvider[provider, default: []].append(row) }
+        let frames = WindowFrameAdapter.frames(
+            rowsByProvider: byProvider,
+            nowMs: Int64(Date().timeIntervalSince1970 * 1000),
+            query: query,
+            datasource: "local"
+        )
+        return QueryResult(
+            timeSeries: TimeSeriesData(points: [], granularity: .hourly),
+            frames: frames
+        )
+    }
+
     /// Run a range query via `toki query --start/--end/--step` (Prometheus/VM query_range compatible).
     /// Start is floored to bucket boundary so local daemon's epoch-floor bucketing
     /// produces the same step grid as VM's start-aligned steps.
@@ -59,6 +83,12 @@ final class TokiReportClient: Sendable, QueryDataSource {
     /// Fetching twice would double the CLI cost and could return different
     /// data across the two calls.
     func queryPromQL(query: String, time: TimeConfig) async throws -> QueryResult {
+        // Windows are intervals, not samples. Routing them through the bucket
+        // pipeline would mean inventing a series out of spans; instead they
+        // reach panels as interval frames, which the state timeline draws.
+        if QueryRewriter.metricName(in: query) == "windows" {
+            return try await queryWindowFrames(query: query, time: time)
+        }
         let step = time.bucketSeconds
         let rawStart = Int(time.fromDate.timeIntervalSince1970)
         let startEpoch = (rawStart / step) * step  // floor to bucket boundary

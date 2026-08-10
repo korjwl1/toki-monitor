@@ -78,6 +78,20 @@ enum QueryRewriter {
 
     // MARK: - Locating the metric selector
 
+    /// Which metric a query asks for, or nil when it names none this parser
+    /// knows. One place understands the grammar; callers that need to route on
+    /// the metric ask here rather than matching on the text themselves.
+    static func metricName(in query: String) -> String? {
+        guard let selector = findSelector(in: query) else { return nil }
+        var start = selector.nameEnd
+        while start > query.startIndex {
+            let prev = query.index(before: start)
+            guard isIdentifierBody(query[prev]) else { break }
+            start = prev
+        }
+        return String(query[start..<selector.nameEnd])
+    }
+
     struct Selector {
         /// Index just past the metric name — where a `{` would go.
         let nameEnd: String.Index

@@ -202,6 +202,13 @@ struct CustomDashboardView: View {
             if isEmpty { Spacer() } else { tableContent(data: data, frames: frames) }
         case .gauge:
             gaugeContent(for: panel, data: data, frames: frames)
+        case .stateTimeline:
+            if isEmpty {
+                Spacer()
+            } else {
+                StateTimelinePanelView(panel: panel, frames: frames,
+                                       dateFormat: chartDateFormat)
+            }
         case .rowPanel:
             EmptyView()
         }

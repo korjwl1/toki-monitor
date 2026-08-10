@@ -107,6 +107,21 @@ struct QueryRewriterTests {
                 "a half-typed filter with no key is not yet a filter")
     }
 
+    // MARK: - Naming the metric
+
+    /// One place understands the grammar. Routing on the metric — windows are
+    /// intervals and take a different path — asks here rather than matching on
+    /// the query text, which would find `usage` inside a filter value.
+    @Test("the metric a query asks for is readable without re-parsing it")
+    func metricNameIsReadable() {
+        #expect(QueryRewriter.metricName(in: "sum(toki_tokens_total[1h]) by (model)")
+                == "toki_tokens_total")
+        #expect(QueryRewriter.metricName(in: "windows") == "windows")
+        #expect(QueryRewriter.metricName(in: "sum(cost{project=\"usage\"}[1h])") == "cost")
+        #expect(QueryRewriter.metricName(in: "usage_total[1h]") == nil)
+        #expect(QueryRewriter.metricName(in: "") == nil)
+    }
+
     // MARK: - Encoding
 
     /// A value containing a quote must not close the string early and turn the

@@ -23,6 +23,7 @@ enum BuiltinPanelPluginKind {
     static let pieChart        = "PieChart"
     static let tableChart      = "TableChart"
     static let gaugeChart      = "GaugeChart"
+    static let stateTimelineChart = "StateTimelineChart"
     static let row             = "Row"
 
     /// Reverse mapping back to the legacy `PanelType` enum so existing
@@ -35,6 +36,7 @@ enum BuiltinPanelPluginKind {
         case pieChart:        return .pieChart
         case tableChart:      return .table
         case gaugeChart:      return .gauge
+        case stateTimelineChart: return .stateTimeline
         case row:             return .rowPanel
         default:              return nil
         }
@@ -48,6 +50,7 @@ enum BuiltinPanelPluginKind {
         case .pieChart:   return pieChart
         case .table:      return tableChart
         case .gauge:      return gaugeChart
+        case .stateTimeline: return stateTimelineChart
         case .rowPanel:   return row
         }
     }

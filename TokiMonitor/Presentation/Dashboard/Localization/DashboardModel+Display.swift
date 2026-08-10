@@ -90,6 +90,7 @@ extension PanelType {
         case .pieChart: L.tr("파이 차트", "Pie Chart")
         case .table: L.dash.tablePanel
         case .gauge: L.dash.gaugePanel
+        case .stateTimeline: L.tr("상태 타임라인", "State Timeline")
         case .rowPanel: L.tr("행", "Row")
         }
     }
@@ -102,6 +103,7 @@ extension PanelType {
         case .pieChart: "chart.pie"
         case .table: "tablecells"
         case .gauge: "gauge.open.with.lines.needle.33percent"
+        case .stateTimeline: "chart.bar.doc.horizontal"
         case .rowPanel: "rectangle.split.1x2"
         }
     }
@@ -122,6 +124,7 @@ extension PanelMetric {
         case .reasoningTokens: L.dash.metricReasoningTokens
         case .modelBreakdown: L.dash.metricModelBreakdown
         case .tokensByProject: L.tr("프로젝트별 토큰", "Tokens by Project")
+        case .rateLimitWindows: L.tr("한도 윈도우", "Rate-limit Windows")
         }
     }
 
@@ -139,6 +142,7 @@ extension PanelMetric {
         case .reasoningTokens: "brain"
         case .modelBreakdown: "tablecells"
         case .tokensByProject: "chart.pie"
+        case .rateLimitWindows: "chart.bar.doc.horizontal"
         }
     }
 }

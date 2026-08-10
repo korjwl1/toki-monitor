@@ -143,6 +143,10 @@ struct PanelPreset: Equatable, Sendable {
             return FieldSelection(field: "cache_hit_rate", reducer: .lastNotNull)
         case .topModel, .modelBreakdown, .tokensByProject:
             return FieldSelection(field: "total_tokens", reducer: .sum)
+        case .rateLimitWindows:
+            // The peak is what a window is judged by; the last value only
+            // says where it happened to be when it was last observed.
+            return FieldSelection(field: "peak_pct", reducer: .max)
         }
     }
 

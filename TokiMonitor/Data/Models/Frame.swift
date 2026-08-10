@@ -63,6 +63,11 @@ enum FieldValues: Equatable, Sendable {
         if case let .number(v) = self { return v }
         return nil
     }
+
+    var strings: [String?]? {
+        if case let .string(v) = self { return v }
+        return nil
+    }
 }
 
 /// One column of a frame.

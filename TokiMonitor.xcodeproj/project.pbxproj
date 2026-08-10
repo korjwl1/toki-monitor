@@ -8,9 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		0237DEE9F5EB132AAB4AE384 /* TimeSeriesChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9BDCAC76DC2C743B8CE339 /* TimeSeriesChartView.swift */; };
+		AA34STPANEL00000002 /* StateTimelinePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34STPANEL00000001 /* StateTimelinePanelView.swift */; };
 		AA34FIELDCFG00000002 /* FieldConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34FIELDCFG00000001 /* FieldConfig.swift */; };
 		AA34PNLSERIES0000002 /* PanelSeries.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34PNLSERIES0000001 /* PanelSeries.swift */; };
 		AA34QRYRW00000002 /* QueryRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34QRYRW00000001 /* QueryRewriter.swift */; };
+		AA34STATETL00000002 /* StateTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34STATETL00000001 /* StateTimeline.swift */; };
+		AA34WINFRAME0000002 /* WindowFrameAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34WINFRAME0000001 /* WindowFrameAdapter.swift */; };
 		AA32FIELDSEL000000002 /* FieldSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA32FIELDSEL000000001 /* FieldSelection.swift */; };
 		AA30TRANSFORM000000002 /* Transformation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA30TRANSFORM000000001 /* Transformation.swift */; };
 		03C0F28465A00D07ACCB5CC1 /* WindowStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC6A0B44B1C454BB9AA2579 /* WindowStats.swift */; };
@@ -126,6 +129,7 @@
 		AA35VARFMTTEST000002 /* VariableFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35VARFMTTEST000001 /* VariableFormatTests.swift */; };
 		AA35QRYRWTEST000002 /* QueryRewriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35QRYRWTEST000001 /* QueryRewriterTests.swift */; };
 		AA35ADHOCTEST000002 /* AdHocVariableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35ADHOCTEST000001 /* AdHocVariableTests.swift */; };
+		AA35STTLTEST0000002 /* StateTimelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35STTLTEST0000001 /* StateTimelineTests.swift */; };
 		AA33FIELDTEST00000002 /* FieldSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA33FIELDTEST00000001 /* FieldSelectionTests.swift */; };
 		AA31TRANSTEST00000002 /* TransformationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA31TRANSTEST00000001 /* TransformationTests.swift */; };
 		CC0857BF78965AF7CCC554E8 /* WindowStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */; };
@@ -259,6 +263,7 @@
 		AA35VARFMTTEST000001 /* VariableFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableFormatTests.swift; sourceTree = "<group>"; };
 		AA35QRYRWTEST000001 /* QueryRewriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryRewriterTests.swift; sourceTree = "<group>"; };
 		AA35ADHOCTEST000001 /* AdHocVariableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdHocVariableTests.swift; sourceTree = "<group>"; };
+		AA35STTLTEST0000001 /* StateTimelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateTimelineTests.swift; sourceTree = "<group>"; };
 		AA33FIELDTEST00000001 /* FieldSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldSelectionTests.swift; sourceTree = "<group>"; };
 		AA31TRANSTEST00000001 /* TransformationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransformationTests.swift; sourceTree = "<group>"; };
 		931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStatsTests.swift; sourceTree = "<group>"; };
@@ -292,6 +297,8 @@
 		AA34FIELDCFG00000001 /* FieldConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldConfig.swift; sourceTree = "<group>"; };
 		AA34PNLSERIES0000001 /* PanelSeries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelSeries.swift; sourceTree = "<group>"; };
 		AA34QRYRW00000001 /* QueryRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryRewriter.swift; sourceTree = "<group>"; };
+		AA34STATETL00000001 /* StateTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateTimeline.swift; sourceTree = "<group>"; };
+		AA34WINFRAME0000001 /* WindowFrameAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowFrameAdapter.swift; sourceTree = "<group>"; };
 		AA32FIELDSEL000000001 /* FieldSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldSelection.swift; sourceTree = "<group>"; };
 		AA30TRANSFORM000000001 /* Transformation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transformation.swift; sourceTree = "<group>"; };
 		CCC6A0B44B1C454BB9AA2579 /* WindowStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStats.swift; sourceTree = "<group>"; };
@@ -308,6 +315,7 @@
 		DB2BF0000196F3EA0107C726 /* TokiConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiConnection.swift; sourceTree = "<group>"; };
 		DB89E56D927ABD7289F04084 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DB9BDCAC76DC2C743B8CE339 /* TimeSeriesChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesChartView.swift; sourceTree = "<group>"; };
+		AA34STPANEL00000001 /* StateTimelinePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateTimelinePanelView.swift; sourceTree = "<group>"; };
 		DC937E6C266ED917AE6D11A2 /* StatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCard.swift; sourceTree = "<group>"; };
 		DD104D8D23446C055623FC7D /* DashboardVersionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardVersionStore.swift; sourceTree = "<group>"; };
 		DFDF640C227D467E72826C64 /* DashboardMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMigrator.swift; sourceTree = "<group>"; };
@@ -336,6 +344,7 @@
 				DB2BF0000196F3EA0107C726 /* TokiConnection.swift */,
 				D7A07540C3665358D10E114C /* TokiEventStream.swift */,
 				AA11FRAMEADAPT00000001 /* FrameAdapter.swift */,
+				AA34WINFRAME0000001 /* WindowFrameAdapter.swift */,
 				B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */,
 				1DC4403CA1CEB595A2E79560 /* TokiWindowsClient.swift */,
 				8D4AD16E434B8960AFD5B678 /* Datasource */,
@@ -395,6 +404,7 @@
 				096E04F1C2D87A5D5F1C0251 /* StatPanelView.swift */,
 				9CA03537C2F0CAF1D37B5252 /* TablePanelView.swift */,
 				DB9BDCAC76DC2C743B8CE339 /* TimeSeriesChartView.swift */,
+				AA34STPANEL00000001 /* StateTimelinePanelView.swift */,
 				3EED40448CCAA9BDD9E5EE7E /* TimeSeriesPanelView.swift */,
 			);
 			path = Panels;
@@ -558,6 +568,7 @@
 				AA35VARFMTTEST000001 /* VariableFormatTests.swift */,
 				AA35QRYRWTEST000001 /* QueryRewriterTests.swift */,
 				AA35ADHOCTEST000001 /* AdHocVariableTests.swift */,
+				AA35STTLTEST0000001 /* StateTimelineTests.swift */,
 				AA02PANELNORM00000000001 /* PanelNormalizationTests.swift */,
 			);
 			path = Domain;
@@ -664,6 +675,7 @@
 				AA34FIELDCFG00000001 /* FieldConfig.swift */,
 				AA34PNLSERIES0000001 /* PanelSeries.swift */,
 				AA34QRYRW00000001 /* QueryRewriter.swift */,
+				AA34STATETL00000001 /* StateTimeline.swift */,
 				0E31A2DC812DEED038E06600 /* Migration */,
 			);
 			path = Domain;
@@ -855,6 +867,7 @@
 				2C3F97F7C70F8029872F46B7 /* TablePanelView.swift in Sources */,
 				B40444463A7E8FAB10625282 /* TimeRangePickerPopover.swift in Sources */,
 				0237DEE9F5EB132AAB4AE384 /* TimeSeriesChartView.swift in Sources */,
+				AA34STPANEL00000002 /* StateTimelinePanelView.swift in Sources */,
 				4F0393586E478CF6F96F5B8D /* TimeSeriesGapFiller.swift in Sources */,
 				65AA1C3426510B47ECEC2529 /* TimeSeriesModels.swift in Sources */,
 				98F08FDD937168036919376A /* TimeSeriesPanelView.swift in Sources */,
@@ -883,6 +896,8 @@
 				AA34FIELDCFG00000002 /* FieldConfig.swift in Sources */,
 				AA34PNLSERIES0000002 /* PanelSeries.swift in Sources */,
 				AA34QRYRW00000002 /* QueryRewriter.swift in Sources */,
+				AA34STATETL00000002 /* StateTimeline.swift in Sources */,
+				AA34WINFRAME0000002 /* WindowFrameAdapter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -910,6 +925,7 @@
 				AA35VARFMTTEST000002 /* VariableFormatTests.swift in Sources */,
 				AA35QRYRWTEST000002 /* QueryRewriterTests.swift in Sources */,
 				AA35ADHOCTEST000002 /* AdHocVariableTests.swift in Sources */,
+				AA35STTLTEST0000002 /* StateTimelineTests.swift in Sources */,
 				AA02PANELNORM00000000002 /* PanelNormalizationTests.swift in Sources */,
 				AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */,
 				AA03SERIESMERGE000000002 /* SeriesMergeTests.swift in Sources */,

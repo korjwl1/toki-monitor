@@ -186,6 +186,7 @@ struct PanelEditorVisualizationTab: View {
             case .barChart:   barChartOptions
             case .table:      tableOptions
             case .gauge:      gaugeOptions
+            case .stateTimeline: stateTimelineOptions
             case .pieChart, .rowPanel: EmptyView()
             }
         }
@@ -265,6 +266,25 @@ struct PanelEditorVisualizationTab: View {
 
     private var gaugeOptions: some View {
         Toggle(L.tr("임계값 표시", "Show thresholds"), isOn: $panel.options.showThresholdMarkers)
+    }
+
+    /// A continuous measure has a different value in every sample, so merging
+    /// spans by exact value would draw one span per sample. Thresholds are
+    /// what turn it into a handful of states — which is why the panel says so
+    /// here rather than silently drawing stripes.
+    private var stateTimelineOptions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L.tr("연속된 같은 상태끼리 하나의 구간으로 합쳐집니다.",
+                      "Consecutive samples in the same state merge into one span."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if panel.options.thresholds.isEmpty {
+                Text(L.tr("임계값이 없으면 값이 그대로 상태가 됩니다 — 연속적인 수치라면 옵션 탭에서 임계값을 지정하세요.",
+                          "With no thresholds each distinct value is its own state — set thresholds in the Options tab for a continuous measure."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 
