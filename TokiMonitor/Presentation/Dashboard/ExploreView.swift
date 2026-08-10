@@ -31,10 +31,10 @@ struct ExploreView: View {
                         viewModel.runExploreQuery()
                     }
                     .onChange(of: viewModel.exploreQuery) { _, newValue in
-                        cachedSuggestions = PromQLSuggester.suggestions(for: newValue)
+                        cachedSuggestions = PromQLSuggester.suggestions(for: newValue, dialect: viewModel.suggestionDialect)
                     }
                     .onAppear {
-                        cachedSuggestions = PromQLSuggester.suggestions(for: viewModel.exploreQuery)
+                        cachedSuggestions = PromQLSuggester.suggestions(for: viewModel.exploreQuery, dialect: viewModel.suggestionDialect)
                     }
 
                 Button {

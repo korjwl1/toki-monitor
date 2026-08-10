@@ -123,6 +123,14 @@ final class DashboardViewModel {
         }
     }
 
+    /// Which query dialect Explore should suggest for. The two backends do
+    /// not accept the same subset, and completing someone into syntax their
+    /// backend ignores yields a plausible number from a different expression
+    /// than the one on screen.
+    var suggestionDialect: PromQLSuggester.Dialect {
+        activeDatasource.kind == BuiltinDatasourceKind.promQLProxy ? .server : .local
+    }
+
     /// Legacy enum-style accessor. Bridges the old `dataSource` API used by the
     /// toolbar picker to the new selector model so view code stays unchanged.
     var dataSource: DashboardDataSource {

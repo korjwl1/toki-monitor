@@ -34,20 +34,45 @@ struct PromQLSuggestion: Identifiable, Hashable, Sendable {
 
 /// Static suggestion engine for the toki-monitor explore view.
 ///
-/// Not a real PromQL parser — toki-sync's `/api/v1/toki/query` endpoint
-/// accepts only a tiny subset (the virtual metrics `usage` / `cost` /
-/// `events` and a handful of `by (...)` labels). The suggester reflects
-/// exactly that subset so users don't get auto-completed into syntax the
-/// server will silently ignore.
+/// Not a real PromQL parser. Neither backend is one either, and they do not
+/// accept the same subset:
+///
+/// - the local daemon parses `sum`/`avg`/`count`, an optional `increase(...)`
+///   wrapper, `by (...)` and `offset` over the metrics it knows
+///   (toki/src/query_parser.rs `parse`);
+/// - the sync server does less still — it looks for `cost{`/`events{` and a
+///   `by (...)` clause and ignores everything else
+///   (toki_sync `parse_toki_virtual_query`).
+///
+/// So the vocabulary is per datasource. Suggesting `rate` or `max` was worse
+/// than suggesting nothing: neither backend implements them and neither
+/// reports that, so the query returns a plausible number computed from a
+/// different expression than the one on screen. Same for `$__rate_interval`,
+/// which nothing expands.
 enum PromQLSuggester {
+
+    /// Which backend the suggestions must be valid for.
+    enum Dialect: Sendable {
+        case local
+        case server
+    }
 
     // MARK: - Vocabulary
 
-    /// Virtual metric names accepted by toki / toki-sync.
+    /// Metric names both backends accept.
     static let metrics: [PromQLSuggestion] = [
         .init(text: "usage",  kind: .metric, hint: "token usage"),
         .init(text: "cost",   kind: .metric, hint: "USD cost"),
         .init(text: "events", kind: .metric, hint: "API call count"),
+    ]
+
+    /// Metrics only the local daemon knows. The server has no parser branch
+    /// for them, so offering them against a server datasource would produce a
+    /// silent fall-through to `usage`.
+    static let localOnlyMetrics: [PromQLSuggestion] = [
+        .init(text: "windows",  kind: .metric, hint: "rate-limit windows (intervals)"),
+        .init(text: "sessions", kind: .metric, hint: "session ids"),
+        .init(text: "projects", kind: .metric, hint: "project names"),
     ]
 
     /// Labels that `aggregate_events_to_toki_json` actually groups on.
@@ -59,21 +84,23 @@ enum PromQLSuggester {
         .init(text: "device_id", kind: .label, hint: "per-device split"),
     ]
 
+    /// Functions both backends honour.
     static let functions: [PromQLSuggestion] = [
         .init(text: "sum",      kind: .function, hint: "sum series"),
         .init(text: "increase", kind: .function, hint: "delta over range"),
-        .init(text: "rate",     kind: .function, hint: "per-second rate"),
         .init(text: "by",       kind: .function, hint: "group by (label)"),
-        .init(text: "avg",      kind: .function, hint: "average"),
-        .init(text: "max",      kind: .function, hint: "max"),
-        .init(text: "min",      kind: .function, hint: "min"),
-        .init(text: "count",    kind: .function, hint: "count series"),
+    ]
+
+    /// Aggregations and modifiers only the local parser implements.
+    static let localOnlyFunctions: [PromQLSuggestion] = [
+        .init(text: "avg",    kind: .function, hint: "average per event"),
+        .init(text: "count",  kind: .function, hint: "count events"),
+        .init(text: "offset", kind: .function, hint: "shift the window back"),
     ]
 
     static let variables: [PromQLSuggestion] = [
         .init(text: "$provider",         kind: .variable, hint: "active provider filter"),
         .init(text: "$__interval",       kind: .variable, hint: "auto bucket width"),
-        .init(text: "$__rate_interval",  kind: .variable, hint: "rate-safe interval"),
     ]
 
     static let rangeVectors: [PromQLSuggestion] = [
@@ -84,10 +111,15 @@ enum PromQLSuggester {
         .init(text: "[$__interval]", kind: .rangeVector, hint: nil),
     ]
 
-    /// Full vocabulary, in display order. Categories that match the current
-    /// prefix surface to the top.
-    static var all: [PromQLSuggestion] {
-        metrics + functions + labels + variables + rangeVectors
+    /// Full vocabulary for a dialect, in display order.
+    static func all(_ dialect: Dialect) -> [PromQLSuggestion] {
+        switch dialect {
+        case .local:
+            return metrics + localOnlyMetrics + functions + localOnlyFunctions
+                + labels + variables + rangeVectors
+        case .server:
+            return metrics + functions + labels + variables + rangeVectors
+        }
     }
 
     // MARK: - Suggestion
@@ -97,19 +129,21 @@ enum PromQLSuggester {
     /// from the most recent whitespace / `(` / `,` / `{` / `[` boundary up
     /// to the end of the string. This is the part the suggester is allowed
     /// to replace when the user accepts a suggestion.
-    static func suggestions(for query: String) -> (token: String, items: [PromQLSuggestion]) {
+    static func suggestions(for query: String,
+                            dialect: Dialect = .local) -> (token: String, items: [PromQLSuggestion]) {
         let token = currentToken(in: query)
+        let vocabulary = all(dialect)
         if token.isEmpty {
             // Empty input or just-typed boundary → show a useful starter set.
-            return (token, metrics + functions)
+            return (token, vocabulary.filter { $0.kind == .metric || $0.kind == .function })
         }
 
         let lower = token.lowercased()
         // Case-insensitive prefix match *and* case-insensitive identity
-        // check — typing "MAX" should still surface the lowercase
-        // `max` suggestion (the original code compared `$0.text != token`
+        // check — typing "SUM" should still surface the lowercase
+        // `sum` suggestion (the original code compared `$0.text != token`
         // case-sensitively, leaking duplicates).
-        let matches = all.filter {
+        let matches = vocabulary.filter {
             $0.text.lowercased().hasPrefix(lower) && $0.text.lowercased() != lower
         }
         return (token, matches)
