@@ -62,7 +62,10 @@
 		5A100F7481C256287B782C70 /* PromQLSuggester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10785CF25F5378B78803A23B /* PromQLSuggester.swift */; };
 		5A9B8A4604691516E084F28B /* GaugePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24D5C9A7319840C3B1F3CC6 /* GaugePanelView.swift */; };
 		5C5E8E33DBFD060EB0916AD9 /* SemVer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C95A0813C9EB083B73F3EBAB /* SemVer.swift */; };
+		AA12FRAMETEST000000002 /* FrameAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA12FRAMETEST000000001 /* FrameAdapterTests.swift */; };
 		AA03SERIESMERGE000000002 /* SeriesMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */; };
+		AA10FRAME00000000000002 /* Frame.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10FRAME00000000000001 /* Frame.swift */; };
+		AA11FRAMEADAPT00000002 /* FrameAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11FRAMEADAPT00000001 /* FrameAdapter.swift */; };
 		AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01WINWIRE0000000000001 /* WindowsWireTests.swift */; };
 		5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */; };
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
@@ -213,7 +216,10 @@
 		6EB3ECA48F693919010308AC /* ChartPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartPanel.swift; sourceTree = "<group>"; };
 		7368908C5687B4CB8281CE2C /* ModelPricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPricing.swift; sourceTree = "<group>"; };
 		74A27A6A118A446539806BB7 /* TokiReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportModels.swift; sourceTree = "<group>"; };
+		AA12FRAMETEST000000001 /* FrameAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameAdapterTests.swift; sourceTree = "<group>"; };
 		AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesMergeTests.swift; sourceTree = "<group>"; };
+		AA10FRAME00000000000001 /* Frame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Frame.swift; sourceTree = "<group>"; };
+		AA11FRAMEADAPT00000001 /* FrameAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameAdapter.swift; sourceTree = "<group>"; };
 		AA01WINWIRE0000000000001 /* WindowsWireTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsWireTests.swift; sourceTree = "<group>"; };
 		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
@@ -299,6 +305,7 @@
 				B785BB7AAB222C1088257256 /* TimeSeriesGapFiller.swift */,
 				DB2BF0000196F3EA0107C726 /* TokiConnection.swift */,
 				D7A07540C3665358D10E114C /* TokiEventStream.swift */,
+				AA11FRAMEADAPT00000001 /* FrameAdapter.swift */,
 				B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */,
 				1DC4403CA1CEB595A2E79560 /* TokiWindowsClient.swift */,
 				8D4AD16E434B8960AFD5B678 /* Datasource */,
@@ -342,6 +349,7 @@
 				750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */,
 				AA01WINWIRE0000000000001 /* WindowsWireTests.swift */,
 				AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */,
+				AA12FRAMETEST000000001 /* FrameAdapterTests.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -472,6 +480,7 @@
 				A285CEF82274757C8A327142 /* TimeSeriesModels.swift */,
 				8B4247163632AC4A7FF3582B /* TokiEvent.swift */,
 				74A27A6A118A446539806BB7 /* TokiReportModels.swift */,
+				AA10FRAME00000000000001 /* Frame.swift */,
 				7CD76DA115AED88DEAB5DEA6 /* Variable.swift */,
 			);
 			path = Models;
@@ -813,6 +822,8 @@
 				3C67B974F8F903F27F8D9F62 /* TokiMonitorApp.swift in Sources */,
 				F7B06F96F0152C66001A51CB /* TokiReportClient.swift in Sources */,
 				909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */,
+				AA10FRAME00000000000002 /* Frame.swift in Sources */,
+				AA11FRAMEADAPT00000002 /* FrameAdapter.swift in Sources */,
 				42DEEA70E38D36BB98D1F4F2 /* TokiWindowsClient.swift in Sources */,
 				64CFC0046724FA45053F0D8B /* UpdateChecker.swift in Sources */,
 				67735C617E16379A7BE552E2 /* Variable.swift in Sources */,
@@ -842,6 +853,7 @@
 				AA02PANELNORM00000000002 /* PanelNormalizationTests.swift in Sources */,
 				AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */,
 				AA03SERIESMERGE000000002 /* SeriesMergeTests.swift in Sources */,
+				AA12FRAMETEST000000002 /* FrameAdapterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
