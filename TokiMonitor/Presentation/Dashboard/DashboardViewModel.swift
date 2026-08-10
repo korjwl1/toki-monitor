@@ -763,9 +763,22 @@ final class DashboardViewModel {
             ? [PanelTarget(refId: "A", metric: panel.metric)]
             : panel.targets
         if !queriesMatch(panel.queries, targets: sourceTargets) {
-            panel.queries = sourceTargets.map { target in
+            // Carry the existing per-query datasource forward. `PanelTarget`
+            // has no datasource field, so rebuilding from targets alone wrote
+            // `nil` and silently erased a query-level override every time an
+            // unrelated field (metric, PromQL text) was edited.
+            let decoder = JSONDecoder()
+            let existingDatasources: [DatasourceSelector?] = (panel.queries ?? []).map { q in
+                guard let spec = try? decoder.decode(TokiPromQLQuerySpec.self, from: q.spec.plugin.spec)
+                else { return nil }
+                return spec.datasource
+            }
+            panel.queries = sourceTargets.enumerated().map { index, target in
                 let spec = TokiPromQLQuerySpec(
-                    datasource: nil, metric: target.metric, query: target.query
+                    datasource: existingDatasources.indices.contains(index)
+                        ? existingDatasources[index] : nil,
+                    metric: target.metric,
+                    query: target.query
                 )
                 let specData = (try? JSONEncoder().encode(spec)) ?? Data()
                 return Query(
@@ -796,6 +809,10 @@ final class DashboardViewModel {
             if q.spec.name != target.refId { return false }
             if spec.metric != target.metric { return false }
             if spec.query != target.query { return false }
+            // Datasource is deliberately NOT compared: it lives only on the
+            // query envelope (PanelTarget has no such field), so a difference
+            // here is not drift from the targets — treating it as drift would
+            // rebuild and destroy the very value being preserved above.
         }
         return true
     }

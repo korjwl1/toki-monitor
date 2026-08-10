@@ -5,6 +5,12 @@ import Charts
 /// Each instance has its own @State hoveredDate so charts don't interfere.
 struct TimeSeriesChartView: View {
     let metric: PanelMetric
+    /// THIS panel's result. Previously the view read `viewModel.timeSeriesData`
+    /// — a global holding whichever regular panel happened to load first — so
+    /// two time-series panels with different queries rendered identical data.
+    /// Every other panel type already received its own `data`; only this one
+    /// did not.
+    let data: TimeSeriesData?
     @Bindable var viewModel: DashboardViewModel
     let dateFormat: Date.FormatStyle
 
@@ -93,7 +99,7 @@ struct TimeSeriesChartView: View {
                 modelData = PanelDataExtractor.allModelChartPoints(
                     for: metric,
                     enabledModels: viewModel.enabledModels,
-                    data: viewModel.timeSeriesData
+                    data: data
                 )
             }
         }
@@ -108,7 +114,7 @@ struct TimeSeriesChartView: View {
         let real = PanelDataExtractor.allModelChartPoints(
             for: metric,
             enabledModels: viewModel.enabledModels,
-            data: viewModel.timeSeriesData
+            data: data
         )
         // Start from zero
         modelData = real.map { entry in

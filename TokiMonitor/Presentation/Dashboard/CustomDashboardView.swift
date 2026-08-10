@@ -176,6 +176,7 @@ struct CustomDashboardView: View {
             } else {
                 TimeSeriesChartView(
                     metric: panel.effectiveMetric,
+                    data: data,
                     viewModel: viewModel,
                     dateFormat: chartDateFormat
                 )
