@@ -120,6 +120,7 @@
 		AA02PANELNORM00000000002 /* PanelNormalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02PANELNORM00000000001 /* PanelNormalizationTests.swift */; };
 		AA35FIELDCFGTEST00002 /* FieldConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35FIELDCFGTEST00001 /* FieldConfigTests.swift */; };
 		AA35PNLSERTEST000002 /* PanelSeriesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35PNLSERTEST000001 /* PanelSeriesTests.swift */; };
+		AA35VARLOADTEST00002 /* VariableLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35VARLOADTEST00001 /* VariableLoaderTests.swift */; };
 		AA33FIELDTEST00000002 /* FieldSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA33FIELDTEST00000001 /* FieldSelectionTests.swift */; };
 		AA31TRANSTEST00000002 /* TransformationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA31TRANSTEST00000001 /* TransformationTests.swift */; };
 		CC0857BF78965AF7CCC554E8 /* WindowStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */; };
@@ -248,6 +249,7 @@
 		AA02PANELNORM00000000001 /* PanelNormalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelNormalizationTests.swift; sourceTree = "<group>"; };
 		AA35FIELDCFGTEST00001 /* FieldConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldConfigTests.swift; sourceTree = "<group>"; };
 		AA35PNLSERTEST000001 /* PanelSeriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelSeriesTests.swift; sourceTree = "<group>"; };
+		AA35VARLOADTEST00001 /* VariableLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableLoaderTests.swift; sourceTree = "<group>"; };
 		AA33FIELDTEST00000001 /* FieldSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldSelectionTests.swift; sourceTree = "<group>"; };
 		AA31TRANSTEST00000001 /* TransformationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransformationTests.swift; sourceTree = "<group>"; };
 		931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStatsTests.swift; sourceTree = "<group>"; };
@@ -368,6 +370,7 @@
 				AA01WINWIRE0000000000001 /* WindowsWireTests.swift */,
 				AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */,
 				AA12FRAMETEST000000001 /* FrameAdapterTests.swift */,
+				AA35VARLOADTEST00001 /* VariableLoaderTests.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -886,6 +889,7 @@
 				AA33FIELDTEST00000002 /* FieldSelectionTests.swift in Sources */,
 				AA35FIELDCFGTEST00002 /* FieldConfigTests.swift in Sources */,
 				AA35PNLSERTEST000002 /* PanelSeriesTests.swift in Sources */,
+				AA35VARLOADTEST00002 /* VariableLoaderTests.swift in Sources */,
 				AA02PANELNORM00000000002 /* PanelNormalizationTests.swift in Sources */,
 				AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */,
 				AA03SERIESMERGE000000002 /* SeriesMergeTests.swift in Sources */,

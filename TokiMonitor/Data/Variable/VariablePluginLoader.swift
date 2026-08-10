@@ -72,13 +72,18 @@ struct IntervalVariableLoader: VariablePluginLoader {
 }
 
 /// `TokiLabelValuesVariable` — dynamic options sourced from the labels of a
-/// PromQL query result. Parallels Perses' `PrometheusLabelValuesVariable`,
-/// but scoped to the labels toki actually emits (`model`, `project`).
+/// PromQL query result. Parallels Perses' `PrometheusLabelValuesVariable`.
+///
+/// Reads the label off the frames the query produced, so `labelName` means
+/// what it says. It could not before: the legacy result had one series-name
+/// slot, so the loader had to take whatever the query happened to put there
+/// and trust the user to have targeted the right dimension — and any label
+/// beyond an allowlist of two returned nothing at all.
 ///
 /// Spec:
 ///   - `datasource`: optional override; nil → use context's active client.
 ///   - `query`: PromQL whose result series carry the label of interest.
-///   - `labelName`: which label to extract (currently `model` or `project`).
+///   - `labelName`: which label to extract.
 struct TokiLabelValuesVariableSpec: Codable, Equatable, Sendable {
     var datasource: DatasourceSelector?
     var query: String
@@ -88,15 +93,10 @@ struct TokiLabelValuesVariableSpec: Codable, Equatable, Sendable {
 struct TokiLabelValuesVariableLoader: VariablePluginLoader {
     var kind: String { BuiltinVariablePluginKind.tokiLabelValues }
 
-    /// Labels this loader understands. Anything else is rejected at the
-    /// spec level so a typo (e.g. "Model") surfaces as an empty option
-    /// list immediately, rather than after a misleading query roundtrip.
-    private static let supportedLabels: Set<String> = ["model", "project"]
-
     func loadOptions(specData: Data, context: VariableLoadContext) async throws -> [VariableOption] {
-        guard let spec = try? JSONDecoder().decode(TokiLabelValuesVariableSpec.self, from: specData)
+        guard let spec = try? JSONDecoder().decode(TokiLabelValuesVariableSpec.self, from: specData),
+              !spec.labelName.isEmpty
         else { return [] }
-        guard Self.supportedLabels.contains(spec.labelName) else { return [] }
 
         // Resolve the client: per-spec datasource wins, else context default.
         let client: (any QueryDataSource)? = await MainActor.run {
@@ -108,30 +108,52 @@ struct TokiLabelValuesVariableLoader: VariablePluginLoader {
         }
         guard let client else { return [] }
 
-        // Cascading interpolation — both `${name}` and bare `$name` forms.
-        // The value is escaped as a regex *template* before substitution
-        // so that values like `claude|gpt` (multi-select alternation) or
-        // `.*` (customAllValue) aren't reinterpreted as regex template
-        // metacharacters — they were producing garbage interpolations
-        // before this.
-        var query = spec.query
-        for (name, value) in context.resolvedVariables {
+        let query = Self.interpolate(spec.query, with: context.resolvedVariables)
+        let result = try await client.queryPromQL(query: query, time: context.time)
+        if !result.frames.frames.isEmpty {
+            return FrameReader.labelValues(result.frames, key: spec.labelName)
+                .map { VariableOption(text: $0, value: $0) }
+        }
+        // A datasource that serves no frames yet. `allModelNames` holds
+        // whatever dimension the query grouped by — the loader cannot tell
+        // which — so this reproduces the old behaviour and no more.
+        return result.timeSeries.allModelNames.map { VariableOption(text: $0, value: $0) }
+    }
+
+    /// Labels the query's own result carries, for an editor that would
+    /// otherwise offer a hard-coded list the query may never return.
+    func loadLabelKeys(specData: Data, context: VariableLoadContext) async throws -> [String] {
+        guard let spec = try? JSONDecoder().decode(TokiLabelValuesVariableSpec.self, from: specData)
+        else { return [] }
+        let client: (any QueryDataSource)? = await MainActor.run {
+            if let ds = spec.datasource, let plugin = DatasourceRegistry.shared.resolve(ds) {
+                return plugin as any QueryDataSource
+            }
+            return context.queryClient
+        }
+        guard let client else { return [] }
+        let result = try await client.queryPromQL(
+            query: Self.interpolate(spec.query, with: context.resolvedVariables),
+            time: context.time
+        )
+        return FrameReader.labelKeys(result.frames)
+    }
+
+    /// Cascading interpolation — both `${name}` and bare `$name` forms.
+    /// The value is escaped as a regex *template* before substitution so that
+    /// values like `claude|gpt` (multi-select alternation) or `.*`
+    /// (customAllValue) aren't reinterpreted as regex template metacharacters
+    /// — they were producing garbage interpolations before this.
+    static func interpolate(_ template: String, with values: [String: String]) -> String {
+        var query = template
+        for (name, value) in values {
             query = query.replacingOccurrences(of: "${\(name)}", with: value)
             let pattern = "\\$\(NSRegularExpression.escapedPattern(for: name))(?![A-Za-z0-9_])"
             guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
-            let template = NSRegularExpression.escapedTemplate(for: value)
+            let replacement = NSRegularExpression.escapedTemplate(for: value)
             let range = NSRange(query.startIndex..., in: query)
-            query = regex.stringByReplacingMatches(in: query, range: range, withTemplate: template)
+            query = regex.stringByReplacingMatches(in: query, range: range, withTemplate: replacement)
         }
-
-        let data = try await client.queryPromQLAsTimeSeries(query: query, time: context.time)
-        // toki's TimeSeriesData stores both model and project label values
-        // in `allModelNames` — the project fetch path stashes project
-        // names in the model slot (see DashboardViewModel.fetchProjectPanels),
-        // so the loader's role is to validate the requested label and
-        // expose whatever the query produced. The user's PromQL is
-        // expected to target the correct label dimension (e.g. a
-        // `tokens_by_project_*` metric for `labelName: "project"`).
-        return data.allModelNames.map { VariableOption(text: $0, value: $0) }
+        return query
     }
 }

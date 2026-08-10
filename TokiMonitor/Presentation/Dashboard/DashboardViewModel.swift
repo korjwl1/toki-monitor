@@ -61,6 +61,12 @@ final class DashboardViewModel {
     var enabledModels: Set<String> = []
     var panelData: [UUID: PanelDataState] = [:]
 
+    /// Labels a variable's own query returned, keyed by variable id. The
+    /// editor offers these instead of a hard-coded list, which could name a
+    /// label the query never produces — the user then gets an empty dropdown
+    /// and nothing to explain it.
+    var discoveredLabelKeys: [UUID: [String]] = [:]
+
     // MARK: - Annotations
     var annotations: [DashboardAnnotation] = []
 
@@ -260,6 +266,32 @@ final class DashboardViewModel {
                 }
             }
             self.saveDashboard()
+        }
+    }
+
+    /// Ask a label-values variable which labels its query actually returns.
+    /// Best-effort: on failure the editor keeps whatever it already knew, so a
+    /// transient query error does not empty the picker.
+    func discoverLabelKeys(for variable: DashboardVariable) {
+        guard let ref = variable.plugin,
+              let loader = variablePluginRegistry.loader(for: ref.kind)
+                as? TokiLabelValuesVariableLoader
+        else { return }
+        let context = VariableLoadContext(
+            time: dashboardConfig.time,
+            resolvedVariables: Dictionary(
+                uniqueKeysWithValues: dashboardConfig.templating.list.map {
+                    ($0.name, $0.current.value.joined(separator: "|"))
+                }
+            ),
+            queryClient: queryClient
+        )
+        let id = variable.id
+        Task { [weak self] in
+            guard let keys = try? await loader.loadLabelKeys(specData: ref.spec, context: context),
+                  !keys.isEmpty, let self
+            else { return }
+            self.discoveredLabelKeys[id] = keys
         }
     }
 

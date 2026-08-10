@@ -101,6 +101,13 @@ enum FrameReader {
     static func labelValues(_ set: FrameSet, key: String) -> [String] {
         Array(Set(set.frames.compactMap { $0.commonLabels[key] })).sorted()
     }
+
+    /// Which labels the data actually carries. A variable editor that offers a
+    /// hard-coded list can offer one the query never returns, and the user gets
+    /// an empty dropdown with nothing to explain it.
+    static func labelKeys(_ set: FrameSet) -> [String] {
+        Array(Set(set.frames.flatMap { $0.commonLabels.keys })).sorted()
+    }
 }
 
 // MARK: - Presets

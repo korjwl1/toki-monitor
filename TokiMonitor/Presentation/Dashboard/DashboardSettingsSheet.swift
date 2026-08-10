@@ -435,6 +435,15 @@ struct DashboardSettingsSheet: View {
                 Text(L.tr("라벨", "Label"))
                     .font(.caption)
                     .frame(width: 60, alignment: .leading)
+                // Offered labels come from what the query actually returned.
+                // A fixed list could name a label the query never produces —
+                // `device_id` was offered here and always resolved to nothing.
+                // The current value is always included so an existing variable
+                // never appears unset while the discovery query is in flight.
+                let discovered = viewModel.discoveredLabelKeys[variable.id] ?? []
+                let choices = discovered.contains(currentSpec.labelName)
+                    ? discovered
+                    : discovered + [currentSpec.labelName]
                 Picker("", selection: Binding(
                     get: { currentSpec.labelName },
                     set: { newLabel in
@@ -443,12 +452,11 @@ struct DashboardSettingsSheet: View {
                         writeLabelValuesSpec(s, variableID: variable.id)
                     }
                 )) {
-                    Text("model").tag("model")
-                    Text("project").tag("project")
-                    Text("device_id").tag("device_id")
+                    ForEach(choices, id: \.self) { Text($0).tag($0) }
                 }
                 .pickerStyle(.menu)
                 .frame(maxWidth: 200, alignment: .leading)
+                .task(id: currentSpec.query) { viewModel.discoverLabelKeys(for: variable) }
                 Spacer()
             }
         }
