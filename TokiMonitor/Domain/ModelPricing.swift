@@ -27,53 +27,45 @@ enum ModelPricing {
         let cacheReadPerToken: Double?
     }
 
-    // Per-million-token prices converted to per-token
+    /// Per-million-token prices converted to per-token, from Anthropic's
+    /// published table. `reviewedOn` below says when they were last checked.
+    ///
+    /// Deliberately NO family catch-all. The daemon matches model names
+    /// exactly and omits `cost_usd` when it has no entry
+    /// (`toki/src/pricing.rs`: "Exact model name match only — no fuzzy
+    /// matching to avoid mismatched pricing"). This table used to end in a
+    /// `claude-` entry that caught everything else at Sonnet prices, which
+    /// made the fallback confidently wrong in exactly the window it exists
+    /// for: a model so new that LiteLLM has no price for it yet. An unknown
+    /// model now yields nil, and the cost column stays absent.
     private static let pricingTable: [(prefix: String, pricing: Pricing)] = [
-        // Anthropic Claude
-        ("claude-opus-4", Pricing(
-            inputPerToken: 15.0 / 1_000_000,
-            outputPerToken: 75.0 / 1_000_000,
-            cacheWritePerToken: 18.75 / 1_000_000,
-            cacheReadPerToken: 1.50 / 1_000_000
-        )),
-        ("claude-sonnet-4", Pricing(
-            inputPerToken: 3.0 / 1_000_000,
-            outputPerToken: 15.0 / 1_000_000,
-            cacheWritePerToken: 3.75 / 1_000_000,
-            cacheReadPerToken: 0.30 / 1_000_000
-        )),
-        ("claude-3-7-sonnet", Pricing(
-            inputPerToken: 3.0 / 1_000_000,
-            outputPerToken: 15.0 / 1_000_000,
-            cacheWritePerToken: 3.75 / 1_000_000,
-            cacheReadPerToken: 0.30 / 1_000_000
-        )),
-        ("claude-3-5-sonnet", Pricing(
-            inputPerToken: 3.0 / 1_000_000,
-            outputPerToken: 15.0 / 1_000_000,
-            cacheWritePerToken: 3.75 / 1_000_000,
-            cacheReadPerToken: 0.30 / 1_000_000
-        )),
-        ("claude-3-5-haiku", Pricing(
-            inputPerToken: 0.80 / 1_000_000,
-            outputPerToken: 4.0 / 1_000_000,
-            cacheWritePerToken: 1.0 / 1_000_000,
-            cacheReadPerToken: 0.08 / 1_000_000
-        )),
-        ("claude-3-haiku", Pricing(
-            inputPerToken: 0.25 / 1_000_000,
-            outputPerToken: 1.25 / 1_000_000,
-            cacheWritePerToken: 0.30 / 1_000_000,
-            cacheReadPerToken: 0.03 / 1_000_000
-        )),
-        // Fallback Claude
-        ("claude-", Pricing(
-            inputPerToken: 3.0 / 1_000_000,
-            outputPerToken: 15.0 / 1_000_000,
-            cacheWritePerToken: 3.75 / 1_000_000,
-            cacheReadPerToken: 0.30 / 1_000_000
-        )),
-        // OpenAI
+        // Anthropic — longest prefix wins, so `claude-opus-4-5` is not
+        // swallowed by `claude-opus-4` (that bug priced Opus 4.5 through 4.8
+        // at the retired 4.1 rate, three times over).
+        ("claude-fable-5",   anthropic(input: 10, output: 50)),
+        ("claude-mythos-5",  anthropic(input: 10, output: 50)),
+        ("claude-opus-5",    anthropic(input: 5, output: 25)),
+        ("claude-opus-4-8",  anthropic(input: 5, output: 25)),
+        ("claude-opus-4-7",  anthropic(input: 5, output: 25)),
+        ("claude-opus-4-6",  anthropic(input: 5, output: 25)),
+        ("claude-opus-4-5",  anthropic(input: 5, output: 25)),
+        // Retired, but old events still carry the name and were billed at it.
+        ("claude-opus-4-1",  anthropic(input: 15, output: 75)),
+        ("claude-opus-4",    anthropic(input: 15, output: 75)),
+        // Introductory pricing through 2026-08-31; $3/$15 from 2026-09-01.
+        // `sonnetFiveIntroductoryPricingEnds` below is asserted by a test so
+        // this cannot be forgotten.
+        ("claude-sonnet-5",  anthropic(input: 2, output: 10)),
+        ("claude-sonnet-4-6", anthropic(input: 3, output: 15)),
+        ("claude-sonnet-4-5", anthropic(input: 3, output: 15)),
+        ("claude-sonnet-4",  anthropic(input: 3, output: 15)),
+        ("claude-3-7-sonnet", anthropic(input: 3, output: 15)),
+        ("claude-3-5-sonnet", anthropic(input: 3, output: 15)),
+        ("claude-haiku-4-5", anthropic(input: 1, output: 5)),
+        ("claude-3-5-haiku", anthropic(input: 0.80, output: 4)),
+        ("claude-3-haiku",   anthropic(input: 0.25, output: 1.25)),
+        // OpenAI / Google — no cache-tier pricing modelled, and no catch-all:
+        // a model absent here costs nothing rather than something invented.
         ("gpt-4o", Pricing(
             inputPerToken: 2.50 / 1_000_000,
             outputPerToken: 10.0 / 1_000_000,
@@ -87,10 +79,10 @@ enum ModelPricing {
             cacheReadPerToken: nil
         )),
         ("o3", Pricing(
-            inputPerToken: 10.0 / 1_000_000,
-            outputPerToken: 40.0 / 1_000_000,
+            inputPerToken: 2.0 / 1_000_000,
+            outputPerToken: 8.0 / 1_000_000,
             cacheWritePerToken: nil,
-            cacheReadPerToken: 2.50 / 1_000_000
+            cacheReadPerToken: 0.50 / 1_000_000
         )),
         ("o1", Pricing(
             inputPerToken: 15.0 / 1_000_000,
@@ -98,7 +90,6 @@ enum ModelPricing {
             cacheWritePerToken: nil,
             cacheReadPerToken: 7.50 / 1_000_000
         )),
-        // Google Gemini
         ("gemini-2.0-flash", Pricing(
             inputPerToken: 0.10 / 1_000_000,
             outputPerToken: 0.40 / 1_000_000,
@@ -113,13 +104,40 @@ enum ModelPricing {
         )),
     ]
 
+    /// Anthropic's cache tiers are fixed multiples of the base input price
+    /// (5-minute write 1.25x, cache hit 0.1x), so spelling them out per model
+    /// would be four chances to mistype the same two ratios.
+    private static func anthropic(input: Double, output: Double) -> Pricing {
+        Pricing(
+            inputPerToken: input / 1_000_000,
+            outputPerToken: output / 1_000_000,
+            cacheWritePerToken: input * 1.25 / 1_000_000,
+            cacheReadPerToken: input * 0.1 / 1_000_000
+        )
+    }
+
+    /// When these prices were last checked against the published table.
+    /// A hand-maintained table with no freshness marker is one nobody can
+    /// tell is stale.
+    static let reviewedOn = "2026-08-10"
+
+    /// Sonnet 5 runs on introductory pricing ($2/$10) until this date, then
+    /// moves to $3/$15. Encoded because "current prices" is the semantic this
+    /// table promises, and a scheduled change is not a surprise.
+    static let sonnetFiveIntroductoryPricingEnds = "2026-09-01"
+
     /// Fallback multipliers for Anthropic Fast mode. Mirrors toki's
     /// `providers/claude_code::FAST_MULTIPLIER` so client-side and
     /// server-side cost estimates agree when the CLI omits `cost_usd`.
-    /// Source: Anthropic Claude Code fast-mode pricing ($30/$150 vs $5/$25 = 6x).
+    ///
+    /// Fast mode is $10/$50 against a $5/$25 base — a flat 2x, and because
+    /// the cache tiers are multiples of the base input price the same 2x
+    /// carries them correctly. It is offered on Opus 5 and Opus 4.8 only:
+    /// 4.7 rejects the request and 4.6 runs at standard speed and standard
+    /// rates, so neither takes a multiplier.
     private static let fastMultiplier: [String: Double] = [
-        "claude-opus-4-6": 6.0,
-        "claude-opus-4-7": 6.0,
+        "claude-opus-5": 2.0,
+        "claude-opus-4-8": 2.0,
     ]
 
     /// Estimate cost from token breakdown. Returns nil if model is unknown.
@@ -147,7 +165,13 @@ enum ModelPricing {
             }
         }
 
-        guard let pricing = pricingTable.first(where: { lookup.hasPrefix($0.prefix) })?.pricing else {
+        // Longest prefix, not first: the table lists `claude-opus-4` for the
+        // retired model and `claude-opus-4-5` for the current one, and
+        // first-match would give every 4.x the retired price.
+        guard let pricing = pricingTable
+            .filter({ lookup.hasPrefix($0.prefix) })
+            .max(by: { $0.prefix.count < $1.prefix.count })?.pricing
+        else {
             return nil
         }
 

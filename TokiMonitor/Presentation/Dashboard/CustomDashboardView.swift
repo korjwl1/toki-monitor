@@ -278,8 +278,23 @@ struct CustomDashboardView: View {
             }
         }
         return PanelDataExtractor.StatValue(
-            value: Self.format(value, metric: metric), subtitle: nil
+            value: Self.format(value, metric: metric),
+            subtitle: Self.costSubtitle(for: metric)
         )
+    }
+
+    /// A cost figure here is "valued at the prices we currently know", not
+    /// "what was billed at the time" — nothing in the pipeline stores a price
+    /// history, so a chart of last month's spend moves when a price does.
+    /// That is the useful reading on a flat-rate plan ("what would this cost
+    /// me on the API today?"), but only if it says so.
+    static func costSubtitle(for metric: PanelMetric) -> String? {
+        switch metric {
+        case .totalCost, .costByModel:
+            return L.tr("현재 가격 기준", "at current prices")
+        default:
+            return nil
+        }
     }
 
     static func format(_ value: Double, metric: PanelMetric) -> String {

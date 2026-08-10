@@ -178,6 +178,16 @@ struct PanelConfigBackCompatTests {
         #expect(stat.value.contains("7"))
     }
 
+    /// A cost figure is valued at prices that can change under it, so the
+    /// card has to say which prices it used. Token counts do not move.
+    @Test("a cost card says which prices it used, and a token card does not")
+    func costCardIsLabelled() {
+        #expect(CustomDashboardView.costSubtitle(for: .totalCost) != nil)
+        #expect(CustomDashboardView.costSubtitle(for: .costByModel) != nil)
+        #expect(CustomDashboardView.costSubtitle(for: .totalTokens) == nil)
+        #expect(CustomDashboardView.costSubtitle(for: .apiCalls) == nil)
+    }
+
     /// Encoding must stay stable for dashboards that predate these fields, or
     /// every export would churn.
     @Test("absent config round-trips as absent")
