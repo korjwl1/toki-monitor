@@ -165,12 +165,14 @@ struct CustomDashboardView: View {
     /// Chart panels show "데이터 없음" for empty data. Stat/gauge show "-" or "0" naturally.
     @ViewBuilder
     private func panelContent(for panel: PanelConfig) -> some View {
-        let data = viewModel.dataState(for: panel.id).timeSeriesData
-        let isEmpty = data?.allModelNames.isEmpty ?? true
+        let state = viewModel.dataState(for: panel.id)
+        let data = state.timeSeriesData
+        let frames = state.frames
+        // A datasource that serves frames and no legacy points is not empty.
+        let isEmpty = (data?.allModelNames.isEmpty ?? true) && (frames?.frames.isEmpty ?? true)
         switch panel.panelType {
         case .stat:
-            statContent(for: panel, data: data,
-                        frames: viewModel.dataState(for: panel.id).frames)
+            statContent(for: panel, data: data, frames: frames)
         case .timeSeries:
             if isEmpty {
                 Spacer()
@@ -180,7 +182,7 @@ struct CustomDashboardView: View {
                 TimeSeriesChartView(
                     metric: panel.effectiveMetric,
                     data: data,
-                    frames: viewModel.dataState(for: panel.id).frames,
+                    frames: frames,
                     panel: panel,
                     viewModel: viewModel,
                     dateFormat: chartDateFormat
@@ -192,14 +194,14 @@ struct CustomDashboardView: View {
             } else if viewModel.filteredModelNames.isEmpty {
                 noModelSelected
             } else {
-                barChartContent(for: panel.effectiveMetric, data: data)
+                barChartContent(for: panel, data: data, frames: frames)
             }
         case .pieChart:
-            if isEmpty { Spacer() } else { pieChartContent(for: panel.effectiveMetric, data: data) }
+            if isEmpty { Spacer() } else { pieChartContent(for: panel, data: data, frames: frames) }
         case .table:
-            if isEmpty { Spacer() } else { tableContent(data: data) }
+            if isEmpty { Spacer() } else { tableContent(data: data, frames: frames) }
         case .gauge:
-            gaugeContent(for: panel.effectiveMetric, data: data)
+            gaugeContent(for: panel, data: data, frames: frames)
         case .rowPanel:
             EmptyView()
         }
@@ -215,7 +217,6 @@ struct CustomDashboardView: View {
     /// no enum case knows about renders through this same path.
     private func statContent(for panel: PanelConfig, data: TimeSeriesData?,
                              frames: FrameSet?) -> some View {
-        let metric = panel.effectiveMetric
         let stat = Self.statValue(panel: panel, data: data, frames: frames)
         return VStack(alignment: .leading, spacing: 4) {
             Text(stat.value)
@@ -288,7 +289,8 @@ struct CustomDashboardView: View {
     }
 
     @ViewBuilder
-    private func barChartContent(for metric: PanelMetric, data: TimeSeriesData?) -> some View {
+    private func barChartContent(for panel: PanelConfig, data: TimeSeriesData?,
+                                 frames: FrameSet?) -> some View {
         let bucketSecs = viewModel.dashboardConfig.time.bucketSeconds
         return Chart {
             ForEach(barModelData, id: \.model) { entry in
@@ -347,18 +349,19 @@ struct CustomDashboardView: View {
                 formatDate: { formatBarDate($0) }
             )
         }
-        .onAppear { barAnimateIn(metric: metric, data: data) }
-        .onChange(of: viewModel.dataVersion) { _, _ in barAnimateIn(metric: metric, data: data) }
+        .onAppear { barAnimateIn(panel: panel, data: data, frames: frames) }
+        .onChange(of: viewModel.dataVersion) { _, _ in
+            barAnimateIn(panel: panel, data: data, frames: frames)
+        }
         .onChange(of: viewModel.isLoading) { _, loading in
             if loading { barCollapseToZero() }
         }
     }
 
-    private func barAnimateIn(metric: PanelMetric, data: TimeSeriesData?) {
-        let real = PanelDataExtractor.allModelChartPoints(
-            for: metric,
-            enabledModels: viewModel.enabledModels,
-            data: data
+    private func barAnimateIn(panel: PanelConfig, data: TimeSeriesData?, frames: FrameSet?) {
+        let real = PanelSeries.chartPoints(
+            metric: panel.effectiveMetric, panel: panel, frames: frames,
+            data: data, enabled: viewModel.enabledModels
         )
         barModelData = real.map { entry in
             (model: entry.model, points: entry.points.map {
@@ -413,8 +416,8 @@ struct CustomDashboardView: View {
     }
 
     @ViewBuilder
-    private func tableContent(data: TimeSeriesData?) -> some View {
-        let rows = PanelDataExtractor.tableRows(from: data)
+    private func tableContent(data: TimeSeriesData?, frames: FrameSet?) -> some View {
+        let rows = PanelSeries.rows(frames: frames, data: data)
         if rows.isEmpty {
             Text("-")
                 .foregroundStyle(.secondary)
@@ -435,32 +438,28 @@ struct CustomDashboardView: View {
     }
 
     @ViewBuilder
-    private func pieChartContent(for metric: PanelMetric, data: TimeSeriesData?) -> some View {
-        if metric == .tokensByProject {
-            let projects = PanelDataExtractor.projectBreakdown(from: data)
-            if projects.isEmpty {
-                Text("-").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                PieChartView(
-                    entries: projects.map { .init(label: $0.project, value: Double($0.tokens)) },
-                    colors: nil
-                )
-            }
+    private func pieChartContent(for panel: PanelConfig, data: TimeSeriesData?,
+                                 frames: FrameSet?) -> some View {
+        let metric = panel.effectiveMetric
+        let slices = PanelSeries.breakdown(metric: metric, panel: panel,
+                                           frames: frames, data: data)
+        if slices.isEmpty {
+            Text("-").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            let rows = PanelDataExtractor.tableRows(from: data)
-            if rows.isEmpty {
-                Text("-").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                PieChartView(
-                    entries: rows.map { .init(label: $0.model, value: Double($0.tokens)) },
-                    colors: rows.map { viewModel.colorForModel($0.model) }
-                )
-            }
+            PieChartView(
+                entries: slices.map { .init(label: $0.label, value: $0.value) },
+                // Projects have no colour of their own; models do, and keeping
+                // it means a model is the same colour in every panel.
+                colors: metric == .tokensByProject
+                    ? nil
+                    : slices.map { viewModel.colorForModel($0.label) }
+            )
         }
     }
 
-    private func gaugeContent(for metric: PanelMetric, data: TimeSeriesData?) -> some View {
-        let stat = PanelDataExtractor.statValue(for: metric, data: data)
+    private func gaugeContent(for panel: PanelConfig, data: TimeSeriesData?,
+                              frames: FrameSet?) -> some View {
+        let stat = Self.statValue(panel: panel, data: data, frames: frames)
         return VStack {
             Text(stat.value)
                 .font(.system(size: 24, weight: .bold, design: .monospaced))

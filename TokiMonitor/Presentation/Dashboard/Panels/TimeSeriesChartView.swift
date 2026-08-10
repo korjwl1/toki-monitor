@@ -101,8 +101,8 @@ struct TimeSeriesChartView: View {
         .onChange(of: viewModel.dataVersion) { _, _ in animateIn() }
         .onChange(of: viewModel.enabledModels) { _, _ in
             withAnimation(.easeOut(duration: 0.3)) {
-                modelData = Self.points(metric: metric, panel: panel, frames: frames,
-                                        data: data, enabled: viewModel.enabledModels)
+                modelData = PanelSeries.chartPoints(metric: metric, panel: panel, frames: frames,
+                                                    data: data, enabled: viewModel.enabledModels)
             }
         }
         .onChange(of: viewModel.isLoading) { _, loading in
@@ -112,37 +112,9 @@ struct TimeSeriesChartView: View {
 
     // MARK: - Data
 
-    /// Frames when the datasource produced them, the legacy extractor
-    /// otherwise. Series names come from labels, so two grouping dimensions
-    /// stay two dimensions in the legend.
-    static func points(metric: PanelMetric, panel: PanelConfig?, frames: FrameSet?,
-                       data: TimeSeriesData?, enabled: Set<String>)
-        -> [(model: String, points: [TimeSeriesData.ChartPoint])] {
-        guard let frames, !frames.frames.isEmpty else {
-            return PanelDataExtractor.allModelChartPoints(
-                for: metric, enabledModels: enabled, data: data
-            )
-        }
-        let prepared = TransformationPipeline.apply(
-            PanelPreset.transformations(for: metric), to: frames
-        )
-        let selection = panel?.fieldSelection ?? PanelPreset.selection(for: metric)
-        return FrameReader.series(prepared, selection: selection).compactMap { entry in
-            // The model toggle list is keyed by the legacy series name; a frame
-            // whose display name carries extra dimensions must still match the
-            // model the user toggled, so fall back to including it.
-            let modelPart = entry.name.components(separatedBy: " · ").first ?? entry.name
-            guard enabled.isEmpty || enabled.contains(modelPart) || enabled.contains(entry.name)
-            else { return nil }
-            return (entry.name, entry.points.map {
-                TimeSeriesData.ChartPoint(date: $0.date, value: $0.value ?? 0)
-            })
-        }
-    }
-
     private func animateIn() {
-        let real = Self.points(metric: metric, panel: panel, frames: frames,
-                               data: data, enabled: viewModel.enabledModels)
+        let real = PanelSeries.chartPoints(metric: metric, panel: panel, frames: frames,
+                                           data: data, enabled: viewModel.enabledModels)
         // Start from zero
         modelData = real.map { entry in
             (model: entry.model, points: entry.points.map {

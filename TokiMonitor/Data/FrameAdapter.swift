@@ -81,9 +81,23 @@ enum FrameAdapter {
                     // render as a blank component in the series name.
                     if !providerName.isEmpty { labels["provider"] = providerName }
 
+                    // An older daemon reports no cost. The point path has always
+                    // estimated it client-side, so a frame-driven cost panel
+                    // must too or it would read "-" against exactly the daemons
+                    // the fallback exists for. An unpriced name (a project, an
+                    // unknown model) yields nil and stays absent.
+                    let cost = summary.costUsd ?? ModelPricing.estimateCost(
+                        model: labels["model"] ?? summary.model,
+                        inputTokens: summary.inputTokens,
+                        outputTokens: summary.outputTokens,
+                        cacheCreationInputTokens: summary.cacheCreationInputTokens,
+                        cacheReadInputTokens: summary.cacheReadInputTokens,
+                        cachedInputTokens: summary.cachedInputTokens
+                    )
+
                     let key = SeriesKey(labels: labels)
                     series[key, default: SeriesAccumulator(slots: axis.count)]
-                        .add(at: index, summary: summary)
+                        .add(at: index, summary: summary, cost: cost)
                 }
             }
 
@@ -250,12 +264,12 @@ enum FrameAdapter {
 
         /// Accumulates rather than overwrites: the same bucket can arrive twice
         /// for one series (e.g. one project reported under two model names).
-        mutating func add(at i: Int, summary: TokiModelSummary) {
+        mutating func add(at i: Int, summary: TokiModelSummary, cost resolvedCost: Double?) {
             total[i] = (total[i] ?? 0) + Double(summary.totalTokens)
             input[i] = (input[i] ?? 0) + Double(summary.inputTokens)
             output[i] = (output[i] ?? 0) + Double(summary.outputTokens)
             events[i] = (events[i] ?? 0) + Double(summary.events)
-            if let c = summary.costUsd { cost[i] = (cost[i] ?? 0) + c; sawCost = true }
+            if let c = resolvedCost { cost[i] = (cost[i] ?? 0) + c; sawCost = true }
 
             func add(_ column: inout [Double?], _ value: UInt64?, _ seen: inout Bool) {
                 guard let value else { return }

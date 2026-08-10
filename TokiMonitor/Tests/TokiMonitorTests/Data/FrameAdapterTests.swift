@@ -126,7 +126,8 @@ struct FrameAdapterTests {
     }
 
     /// A column nobody reported must be absent, not a wall of zeroes that
-    /// looks like real measured data.
+    /// looks like real measured data. `gpt` is not in the pricing table, so no
+    /// cost can be estimated for it either.
     @Test("optional measures appear only when reported")
     func optionalColumnsAreOmitted() throws {
         let set = FrameAdapter.frames(
@@ -137,6 +138,38 @@ struct FrameAdapterTests {
         #expect(f.field(named: "cache_read_input_tokens") == nil)
         #expect(f.field(named: "cost_usd") == nil)
         #expect(f.field(named: "total_tokens") != nil)
+    }
+
+    /// An older daemon reports no cost. The point path has always estimated it
+    /// client-side; a frame-driven cost panel that did not would read "-"
+    /// against exactly the daemons the fallback exists for.
+    @Test("cost is estimated client-side when the daemon reports none")
+    func costFallsBackToTheEstimate() throws {
+        let priced = TokiModelSummary(
+            model: "claude-opus-4-6", inputTokens: 1_000_000, outputTokens: 1_000_000,
+            totalTokens: 2_000_000, events: 1, costUsd: nil,
+            cacheCreationInputTokens: nil, cacheReadInputTokens: nil,
+            cachedInputTokens: nil, reasoningOutputTokens: nil
+        )
+        let set = FrameAdapter.frames(
+            providers: ["claude_code": [entry("2026-08-10T00:00:00", [priced])]],
+            query: "sum(toki_tokens_total[1d])"
+        )
+        let cost = try #require(set.frames.first?.field(named: "cost_usd")?.values.numbers?.first)
+        #expect(try #require(cost) > 0)
+    }
+
+    /// A project name is not a model, so it cannot be priced. Inventing a
+    /// number for it would be worse than leaving the column off.
+    @Test("an unpriceable series gets no invented cost")
+    func unpriceableSeriesHasNoCost() throws {
+        let set = FrameAdapter.frames(
+            providers: ["claude_code": [
+                entry("2026-08-10T00:00:00|toki", [summary("toki", total: 5)])
+            ]],
+            query: "sum(toki_tokens_total[1d]) by (project)"
+        )
+        #expect(set.frames.first?.field(named: "cost_usd") == nil)
     }
 
     @Test("rows are ordered by time regardless of arrival order")
