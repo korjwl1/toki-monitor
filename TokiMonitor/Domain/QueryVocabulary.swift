@@ -81,6 +81,9 @@ struct QueryVocabulary: Sendable {
     /// Metrics that are a list, not a series: no bucket, no group-by, no
     /// aggregation.
     let listMetrics: Set<String>
+    /// Metrics the backend answers only as the whole query, with no matcher,
+    /// range, offset, aggregation or grouping around them.
+    let bareOnlyMetrics: Set<String>
     /// Whether a bare number is a duration (`[3600]`). The daemon requires a
     /// unit; the server's duration parser takes plain seconds.
     let allowsUnitlessDuration: Bool
@@ -160,6 +163,7 @@ struct QueryVocabulary: Sendable {
         supportsOffset: true,
         maxGroupLabels: Int.max,
         listMetrics: ["windows", "sessions", "projects"],
+        bareOnlyMetrics: [],
         allowsUnitlessDuration: false,
         allowsEmptyGroupList: true,
         allowsEscapesInValues: true,
@@ -173,6 +177,13 @@ struct QueryVocabulary: Sendable {
             Term("usage", "token usage"),
             Term("cost", "USD cost"),
             Term("events", "API call count"),
+            // The sync server answers the bare query `windows` from its own
+            // branch, before the PromQL parser sees it — so refusing it here
+            // would be a false rejection of a query it executes. It is not
+            // OFFERED for the server because this client's PromQL path decodes
+            // a toki report, not the window envelope, so completing someone
+            // into it would fill a panel with nothing.
+            Term("windows", "rate-limit windows", suggested: false),
             Term("toki_tokens_total", "old spelling of usage",
                  suggested: false),
         ],
@@ -191,6 +202,7 @@ struct QueryVocabulary: Sendable {
         supportsOffset: false,
         maxGroupLabels: 1,
         listMetrics: [],
+        bareOnlyMetrics: ["windows"],
         allowsUnitlessDuration: true,
         allowsEmptyGroupList: false,
         allowsEscapesInValues: false,

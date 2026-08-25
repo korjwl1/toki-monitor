@@ -233,7 +233,9 @@ private struct QueryGrammarCheck {
 
         // ── Label matchers ──
         var seenKeys: [String: String] = [:]
+        var hasMatchers = false
         if eat("{") {
+            hasMatchers = true
             while true {
                 if eat("}") { break }
                 guard let key = ident() else {
@@ -398,6 +400,20 @@ private struct QueryGrammarCheck {
                 L.tr("\(backendName)는 라벨 \(vocabulary.maxGroupLabels)개로만 그룹할 수 있습니다. 요청: \(dimensions.joined(separator: ", "))",
                      "\(backendName) can group by only \(vocabulary.maxGroupLabels) label, got \(dimensions.joined(separator: ", "))"),
                 span: groupLabels.last?.span
+            )
+        }
+
+        // ── Metrics answered only as the whole query ──
+        //
+        // The sync server reads a bare `windows` in a branch of its own, ahead
+        // of the PromQL parser; anything wrapped around it reaches the parser,
+        // which refuses it.
+        if vocabulary.bareOnlyMetrics.contains(metric.name),
+           hasMatchers || hasBucket || openParens > 0 || !groupLabels.isEmpty {
+            return .invalid(
+                L.tr("`\(metric.name)`는 \(backendName)에서 다른 절 없이 `\(metric.name)` 한 낱말로만 조회할 수 있습니다.",
+                     "`\(metric.name)` is only available from \(backendName) as the bare query `\(metric.name)`."),
+                span: metricToken.span
             )
         }
 

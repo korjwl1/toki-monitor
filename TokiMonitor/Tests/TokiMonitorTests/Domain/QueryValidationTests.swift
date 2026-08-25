@@ -82,12 +82,41 @@ struct QueryValidationTests {
     }
 
     @Test("metrics the sync backend does not serve are named as local-only",
-          arguments: ["sessions", "projects", "windows"])
+          arguments: ["sessions", "projects"])
     func serverRefusesLocalOnlyMetrics(_ metric: String) {
         let v = check(metric, .server)
         #expect(!v.isValid)
         #expect(v.reason?.contains(metric) == true)
         #expect(check(metric, .local).isValid)
+    }
+
+    /// `windows` is the one metric the sync server answers outside its PromQL
+    /// parser — `toki_query` matches the bare string before parsing. Refusing
+    /// it would be a false rejection of a query the backend executes; accepting
+    /// `windows{...}` would be a promise the parser breaks.
+    @Test("the bare `windows` query is accepted by both, and only bare on the server")
+    func bareWindows() {
+        #expect(check("windows", .server).isValid)
+        #expect(check("windows", .local).isValid)
+        for wrapped in ["windows{}", "windows{provider=\"codex\"}", "windows[1d]",
+                        "sum(windows)", "windows by (model)"] {
+            let v = check(wrapped, .server)
+            #expect(!v.isValid, "\(wrapped) should be refused")
+            #expect(v.reason?.contains("windows") == true)
+        }
+        #expect(check("windows{provider=\"codex\"}", .local).isValid,
+                "the daemon does filter windows")
+    }
+
+    /// Autocomplete may offer LESS than the validator accepts — `windows` runs
+    /// against the sync server but this client cannot render its response — so
+    /// the drift tests run one way only, and this pins the exception rather
+    /// than leaving it to be rediscovered as a bug.
+    @Test("a query the backend executes but the app cannot render is not offered")
+    func acceptedButNotOffered() {
+        #expect(check("windows", .server).isValid)
+        #expect(!PromQLSuggester.metrics(.server).map(\.text).contains("windows"))
+        #expect(PromQLSuggester.metrics(.local).map(\.text).contains("windows"))
     }
 
     @Test("the sync backend groups by one label only")
