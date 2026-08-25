@@ -286,6 +286,8 @@ struct PlanFitControlSurfaceTests {
                                                   quietLimitsNote: model.quietLimitsNote)),
             ("ProviderComparisonSection", ProviderComparisonSection(model: model.comparison)),
             ("ModelPatternSection", ModelPatternSection(model: model.modelPattern)),
+            ("EmptyStateSection", EmptyStateSection(model: model.readiness)),
+            ("MoneyFootnote", MoneyFootnote(model: model.money)),
         ]
         for (name, section) in sections {
             for child in Mirror(reflecting: section).children {
@@ -1027,13 +1029,15 @@ struct PlanFitMoneyTests {
             unit: full.unit, lede: full.lede, otherVerdicts: full.otherVerdicts,
             trend: full.trend, limitGroups: full.limitGroups, activeUse: full.activeUse,
             comparison: full.comparison, modelPattern: full.modelPattern,
-            money: .empty, quietLimitsNote: full.quietLimitsNote, sourceNote: full.sourceNote
+            money: .empty, readiness: full.readiness,
+            quietLimitsNote: full.quietLimitsNote, sourceNote: full.sourceNote
         )
         let withoutLimits = PlanFitModel(
             unit: full.unit, lede: full.lede, otherVerdicts: full.otherVerdicts,
             trend: full.trend, limitGroups: [], activeUse: [],
             comparison: full.comparison, modelPattern: full.modelPattern,
-            money: full.money, quietLimitsNote: full.quietLimitsNote, sourceNote: full.sourceNote
+            money: full.money, readiness: full.readiness,
+            quietLimitsNote: full.quietLimitsNote, sourceNote: full.sourceNote
         )
 
         let fullRaster = try #require(raster(full))
@@ -1068,5 +1072,204 @@ struct PlanFitMoneyTests {
         ))
         #expect(raster.pagePeakContrast >= 4.5)
         #expect(raster.edgeInk(margin: 8) == 0)
+    }
+}
+
+// MARK: - Empty and insufficient (T060…T065)
+
+@Suite("Plan-fit day one")
+@MainActor
+struct PlanFitReadinessTests {
+
+    private func model(
+        _ rows: [(provider: String, row: WindowRow)],
+        unit: PeriodUnit = .weekly,
+        availability: AccountShapeAvailability = .absent(.accountShapeNotSent),
+        usage: ModelUsageInput = .notFetched
+    ) -> PlanFitModel {
+        PlanFitModelBuilder.build(
+            rows: rows, unit: unit, nowMs: WindowFixtures.nowMs,
+            modelUsage: usage, windowsAvailability: availability
+        )
+    }
+
+    /// T060. Zero windows is guidance, not an error and not a chart of zeroes —
+    /// and the conditions are enumerated so a reader can find which one is
+    /// missing instead of parsing a paragraph.
+    @Test("the zero-window screen names what has to be true")
+    func zeroWindowsIsGuidance() {
+        let readiness = model([]).readiness
+        #expect(readiness.collectionNotStarted)
+        #expect(readiness.headline?.isEmpty == false)
+        #expect(readiness.requirements.count >= 3,
+                "day one gets \(readiness.requirements.count) conditions — not enough to act on")
+        #expect(readiness.gap == nil, "an empty account is being reported as a daemon fault")
+        // The two providers fill in differently, and the screen says so.
+        #expect(readiness.requirements.contains { $0.contains("Codex") })
+    }
+
+    /// T061. A few days of history shows every observed fact and withholds the
+    /// interpretation — the verdict, and reading a direction into the bars.
+    @Test("a few days shows the facts and withholds the reading")
+    func fewDaysShowsFactsOnly() {
+        let rows = PlanFitSnapshotMatrix.rows(
+            for: PlanFitSnapshotCase(sufficiency: .fewDays, segments: .one, theme: .light)
+        )
+        let built = model(rows)
+        // The facts are on the page.
+        #expect(built.hasSegments)
+        #expect(!built.trend.isEmpty, "the observed bars were dropped along with the reading")
+        // The readings are not.
+        let verdict = built.readiness.metrics.first { $0.id == "metric|verdict" }
+        #expect(verdict?.status == .withheld)
+        #expect(verdict?.reason.isEmpty == false)
+        let trend = built.readiness.metrics.first { $0.id == "metric|trend" }
+        #expect(trend?.status != .ready,
+                "three days of history is being read as a trend")
+        #expect(trend?.reason.isEmpty == false)
+    }
+
+    /// T062. A period still running is named, and compared on its daily average
+    /// rather than on a total that is only part of a month.
+    @Test("an unfinished period is named rather than compared away")
+    func unfinishedPeriodIsNamed() {
+        let rows = PlanFitSnapshotMatrix.rows(
+            for: PlanFitSnapshotCase(sufficiency: .sufficient, segments: .one, theme: .light)
+        )
+        let built = model(rows, unit: .monthly)
+        guard let last = built.trend.bars.last, !last.isComplete else { return }
+        #expect(built.readiness.incompletePeriodNote?.isEmpty == false,
+                "the period still running is not named anywhere")
+    }
+
+    /// **T063, the point of the whole block.** Sufficiency is judged per
+    /// metric: a thin verdict must not take the limit statistics down with it.
+    @Test("one thin metric does not blank the others")
+    func sufficiencyIsPerMetric() {
+        let rows = PlanFitSnapshotMatrix.rows(
+            for: PlanFitSnapshotCase(sufficiency: .fewDays, segments: .four, theme: .light)
+        )
+        let built = model(rows)
+        let byId = Dictionary(uniqueKeysWithValues: built.readiness.metrics.map { ($0.id, $0) })
+        #expect(byId["metric|verdict"]?.status == .withheld)
+        #expect(byId["metric|limits"]?.status == .ready,
+                "the limit statistics went withheld because the verdict did")
+        // And the sections themselves are still populated.
+        #expect(!built.limitGroups.isEmpty)
+        #expect(built.readiness.metrics.count >= 6, "not every metric is being judged")
+        #expect(Set(built.readiness.metrics.map(\.id)).count == built.readiness.metrics.count)
+        // Only the unready ones are drawn — the rest are on the page as
+        // themselves, and repeating them would make this a checklist.
+        #expect(built.readiness.unreadyMetrics.allSatisfy { !$0.isReady })
+    }
+
+    /// Every withheld metric says when it stops being withheld, where that is
+    /// knowable at all (contract V1).
+    @Test("a withheld metric says what is missing")
+    func withheldMetricsExplainThemselves() {
+        for sufficiency in PlanFitDataSufficiency.allCases {
+            let rows = PlanFitSnapshotMatrix.rows(
+                for: PlanFitSnapshotCase(sufficiency: sufficiency, segments: .four, theme: .light)
+            )
+            for metric in model(rows).readiness.unreadyMetrics {
+                #expect(!metric.reason.isEmpty,
+                        "\(sufficiency.rawValue): \(metric.metric) is withheld with no reason")
+            }
+        }
+    }
+
+    /// **T064.** A daemon that cannot serve windows is a capability gap, not an
+    /// error — and `AccountShapeAbsence`'s four causes stay four causes.
+    @Test("the four reasons a daemon serves no windows stay four reasons")
+    func capabilityGapsAreNotCollapsed() {
+        let absences: [AccountShapeAbsence] = [
+            .windowsMetricUnsupported, .accountShapeNotSent,
+            .windowStateUnavailable, .daemonUnreachable,
+        ]
+        var seen: Set<String> = []
+        for absence in absences {
+            let gap = model([], availability: .absent(absence)).readiness.gap
+            switch absence {
+            case .accountShapeNotSent:
+                // The account object is a Claude profile field and Codex has no
+                // equivalent; its absence says nothing about window support.
+                #expect(gap == nil, "a missing account object is being reported as a broken feature")
+            default:
+                guard let gap else {
+                    Issue.record("\(absence) produced no capability gap")
+                    continue
+                }
+                #expect(!gap.headline.isEmpty, "\(absence) has no headline")
+                #expect(!gap.explanation.isEmpty)
+                #expect(gap.remedy?.isEmpty == false, "\(absence) says nothing the reader can do")
+                seen.insert(gap.headline)
+            }
+        }
+        #expect(seen.count == 3, "the three window-serving failures share wording: \(seen)")
+
+        // Only one of them is a fault. The rest are states a working system
+        // reaches, and drawing them as errors is what contract W4 forbids.
+        #expect(model([], availability: .absent(.daemonUnreachable)).readiness.gap?.isFailure == true)
+        #expect(model([], availability: .absent(.windowsMetricUnsupported)).readiness.gap?.isFailure == false)
+        #expect(model([], availability: .absent(.windowsMetricUnsupported)).readiness.gap?.isCapabilityGap == true)
+        #expect(model([], availability: .absent(.windowStateUnavailable)).readiness.gap?.isFailure == false)
+    }
+
+    /// A page with everything says nothing here.
+    @Test("a page that can read every metric shows no readiness block")
+    func fullPageHasNoReadinessBlock() {
+        let built = PlanFitModelBuilder.build(
+            rows: WindowFixtures.accountB(), unit: .weekly, nowMs: WindowFixtures.nowMs
+        )
+        #expect(built.readiness.collectionNotStarted == false)
+        #expect(built.readiness.gap == nil)
+    }
+
+    // MARK: T065 — the screens, in pixels
+
+    /// The screens a reader on day one, day three and day eighteen actually
+    /// meets, plus the capability gap and the dead daemon. These are the ones
+    /// most users will spend the most time on, so they are rendered rather than
+    /// asserted about.
+    @Test("every insufficient screen renders as a full page",
+          arguments: PlanFitSnapshotTheme.allCases)
+    func insufficientScreensRender(theme: PlanFitSnapshotTheme) throws {
+        let screens: [(String, PlanFitModel)] = [
+            ("day one", model([])),
+            ("old daemon", model([], availability: .absent(.windowsMetricUnsupported))),
+            ("tracking off", model([], availability: .absent(.windowStateUnavailable))),
+            ("daemon down", model([], availability: .absent(.daemonUnreachable))),
+            ("a few days", model(PlanFitSnapshotMatrix.rows(
+                for: PlanFitSnapshotCase(sufficiency: .fewDays, segments: .four, theme: theme)))),
+            ("under the gate", model(PlanFitSnapshotMatrix.rows(
+                for: PlanFitSnapshotCase(sufficiency: .underLookback, segments: .eight, theme: theme)))),
+        ]
+        for (name, built) in screens {
+            let raster = try #require(PlanFitSnapshotRenderer.raster(
+                PlanFitContent(model: built, unit: .constant(.weekly)),
+                theme: theme,
+                size: CGSize(width: PlanFitSnapshotRenderer.width, height: 1600)
+            ), "\(name) did not render")
+            #expect(raster.pageInkCoverage > 0.03,
+                    "\(name) (\(theme.rawValue)) is nearly empty: \(raster.pageInkCoverage)")
+            #expect(raster.pagePeakContrast >= 4.5, "\(name) (\(theme.rawValue)) has no readable text")
+            #expect(raster.edgeInk(margin: 8) == 0, "\(name) (\(theme.rawValue)) overflows 800pt")
+        }
+    }
+
+    /// The day-one screen is not a thinner version of the populated one — it
+    /// carries a comparable amount of text, because what it has to say is a
+    /// comparable amount of information.
+    @Test("day one is not a stub beside a populated page")
+    func dayOneIsNotAStub() throws {
+        let empty = try #require(PlanFitSnapshotRenderer.raster(
+            PlanFitContent(model: model([]), unit: .constant(.weekly)),
+            theme: .light,
+            size: CGSize(width: PlanFitSnapshotRenderer.width, height: 900)
+        ))
+        #expect(empty.pageInkCoverage > 0.05,
+                "the screen every existing user opens first draws \(empty.pageInkCoverage)")
+        #expect(empty.pagePixelsAbove(contrast: 4.5) > 400,
+                "day one is drawn but barely readable")
     }
 }

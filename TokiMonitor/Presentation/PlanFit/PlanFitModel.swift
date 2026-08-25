@@ -577,6 +577,88 @@ struct MoneySummaryModel: Equatable, Sendable {
     var isPresentable: Bool { !notes.isEmpty }
 }
 
+// MARK: - Readiness (T060…T064 / contract W3, W4, FR-051…FR-054)
+
+/// What one metric on this page needs before it means anything.
+///
+/// **Sufficiency is judged per metric (T063).** A plan verdict needs four
+/// times the longest limit cycle behind it; a limit's exhaustion count needs
+/// one finished window; a trend needs two finished periods. Gating the page on
+/// the strictest of them would blank everything a day-one account can honestly
+/// show, which is most of it — and with 21 window rows in the real database,
+/// day one is what nearly every existing user opens.
+struct MetricReadiness: Equatable, Sendable, Identifiable {
+
+    enum Status: Equatable, Sendable {
+        /// Enough to show and to read.
+        case ready
+        /// Shown as observed facts, but not interpreted (T061).
+        case observedOnly
+        /// Not shown yet.
+        case withheld
+    }
+
+    let id: String
+    /// The metric, by the name it has on screen.
+    let metric: String
+    let status: Status
+    /// What is missing. Empty when ready.
+    let reason: String
+    /// When it changes, where that is knowable (contract V1).
+    let availability: String?
+
+    var isReady: Bool { status == .ready }
+}
+
+/// The daemon cannot serve windows — and only one of the reasons is a failure.
+///
+/// `AccountShapeAbsence` already models the four distinct causes, so they are
+/// carried rather than collapsed: an old daemon, a daemon that sent no account
+/// object, window tracking switched off and a daemon that is not answering
+/// want four different screens, and three of them are not errors (contract W4).
+struct CapabilityGapModel: Equatable, Sendable {
+    let absence: AccountShapeAbsence
+    let headline: String
+    let explanation: String
+    /// What the reader can do. nil when there is nothing to do but wait.
+    let remedy: String?
+    /// Only a daemon that is not answering. The rest are normal states.
+    var isFailure: Bool { absence.isFailure }
+    /// The feature is not there yet rather than broken.
+    var isCapabilityGap: Bool { absence.isCapabilityGap }
+}
+
+/// Everything the page says about what it cannot yet say.
+struct DataReadinessModel: Equatable, Sendable {
+    /// Present when the daemon cannot serve windows at all (T064).
+    let gap: CapabilityGapModel?
+    /// Present when there is not one window row (T060).
+    let collectionNotStarted: Bool
+    /// The headline for the day-one screen, and what fills it in.
+    let headline: String?
+    /// The concrete things that have to be true. Not one paragraph — a reader
+    /// with an empty page needs to know which of them is missing.
+    let requirements: [String]
+    /// One row per metric (T063).
+    let metrics: [MetricReadiness]
+    /// The period still running, named rather than compared (T062).
+    let incompletePeriodNote: String?
+
+    static let ready = DataReadinessModel(
+        gap: nil, collectionNotStarted: false, headline: nil,
+        requirements: [], metrics: [], incompletePeriodNote: nil
+    )
+
+    /// Metrics that cannot be read yet — the only ones the section draws. The
+    /// ready ones are already visible as their own sections; repeating them
+    /// here would turn the honesty block into a checklist.
+    var unreadyMetrics: [MetricReadiness] { metrics.filter { !$0.isReady } }
+
+    var isPresentable: Bool {
+        gap != nil || collectionNotStarted || !unreadyMetrics.isEmpty || incompletePeriodNote != nil
+    }
+}
+
 // MARK: - The page
 
 /// Everything the page draws.
@@ -594,6 +676,8 @@ struct PlanFitModel: Equatable, Sendable {
     let modelPattern: ModelPatternModel
     /// Money, in the supporting position it is required to keep (T058).
     let money: MoneySummaryModel
+    /// What the page cannot yet say, and when it will be able to (T060…T064).
+    let readiness: DataReadinessModel
     /// Limits with neither an exhaustion nor a worked window, named in one
     /// line instead of getting a card each (T050).
     let quietLimitsNote: String?
@@ -623,6 +707,7 @@ enum PlanFitModelBuilder {
         unit: PeriodUnit,
         nowMs: Int64,
         modelUsage: ModelUsageInput = .notFetched,
+        windowsAvailability: AccountShapeAvailability = .absent(.accountShapeNotSent),
         usingServerData: Bool = false,
         loadFailed: Bool = false,
         isLoading: Bool = false
@@ -642,18 +727,34 @@ enum PlanFitModelBuilder {
             lede = verdictLede(paired)
         }
 
+        // Built before the readiness block so that block can judge each metric
+        // against what was actually produced, rather than re-deriving the
+        // conditions and drifting from them.
+        let trendModel = trend(rows: rows, unit: unit, nowMs: nowMs)
+        let comparisonModel = comparison(rows: rows, nowMs: nowMs)
+        let patternModel = modelPattern(
+            segments: segments, usage: modelUsage, unit: unit, nowMs: nowMs
+        )
+
         return PlanFitModel(
             unit: unit,
             lede: lede,
             otherVerdicts: otherVerdicts(paired),
-            trend: trend(rows: rows, unit: unit, nowMs: nowMs),
+            trend: trendModel,
             limitGroups: limitGroups(paired, rows: rows, nowMs: nowMs),
             activeUse: activeUse(paired),
-            comparison: comparison(rows: rows, nowMs: nowMs),
-            modelPattern: modelPattern(
-                segments: segments, usage: modelUsage, unit: unit, nowMs: nowMs
-            ),
+            comparison: comparisonModel,
+            modelPattern: patternModel,
             money: money(usage: modelUsage),
+            readiness: readiness(
+                paired: paired,
+                trend: trendModel,
+                comparison: comparisonModel,
+                pattern: patternModel,
+                windowsAvailability: windowsAvailability,
+                isLoading: isLoading,
+                loadFailed: loadFailed
+            ),
             quietLimitsNote: quietLimitsNote(paired),
             sourceNote: usingServerData
                 ? L.tr("동기화 서버 데이터 · 전체 디바이스 병합", "Sync-server data · all devices merged")
@@ -1741,6 +1842,284 @@ extension PlanFitModelBuilder {
                 "정액 구독에서는 청구액이 아니라 참고 수치입니다. 이 페이지가 답하려는 것은 한도와 여유이고, 금액은 그 아래에 둡니다.",
                 "On a flat-rate subscription this is a reference figure, not a bill. What this page is for is limits and headroom; money sits below them."
             )
+        )
+    }
+}
+
+// MARK: - Readiness (T060…T064)
+
+extension PlanFitModelBuilder {
+
+    /// A trend needs two finished periods before it is a trend. One finished
+    /// period and a running one is a pair of numbers.
+    static let minimumCompletePeriodsForTrend = 2
+
+    /// What the page cannot yet say, and when it will be able to.
+    ///
+    /// The whole point is that this is judged **per metric** (T063). A verdict
+    /// needs 28 days; a limit's exhaustion count needs one finished window.
+    /// Gating the page on the strictest of those would blank the observed facts
+    /// too — and the observed facts are what a day-one reader came for.
+    static func readiness(
+        paired: [(WindowStatsSegment, PlanFitVerdict)],
+        trend: PeriodTrendModel,
+        comparison: ProviderComparisonModel,
+        pattern: ModelPatternModel,
+        windowsAvailability: AccountShapeAvailability,
+        isLoading: Bool,
+        loadFailed: Bool
+    ) -> DataReadinessModel {
+        // T064 — the daemon cannot serve windows. Four distinct causes, and
+        // only one of them is a failure.
+        let gap = capabilityGap(windowsAvailability)
+
+        // T060 — not one row. Day one, and the normal state of every existing
+        // account on this branch.
+        let empty = paired.isEmpty && !isLoading && !loadFailed
+
+        let complete = trend.bars.filter(\.isComplete).count
+        let running = trend.bars.last.flatMap { $0.isComplete ? nil : $0 }
+
+        var metrics: [MetricReadiness] = []
+        metrics.append(limitStatusReadiness(paired))
+        metrics.append(activeUseReadiness(paired))
+        metrics.append(trendReadiness(trend: trend, completePeriods: complete))
+        metrics.append(verdictReadiness(paired))
+        metrics.append(comparisonReadiness(comparison))
+        metrics.append(patternReadiness(pattern))
+
+        return DataReadinessModel(
+            gap: gap,
+            collectionNotStarted: empty,
+            headline: empty
+                ? L.tr(
+                    "아직 기록된 윈도우가 없습니다",
+                    "No windows have been recorded yet"
+                )
+                : nil,
+            requirements: empty ? collectionRequirements() : [],
+            metrics: metrics,
+            // T062 — named, never compared away. An unfinished period held
+            // against a finished one on absolute totals reports a collapse
+            // that is only the calendar.
+            incompletePeriodNote: running.flatMap { bar in
+                bar.incompleteNote.map { note in
+                    L.tr(
+                        "\(bar.label)은 아직 진행 중입니다 (\(note)). 완결된 기간과 나란히 두되 총량으로 비교하지 않고 일평균으로 비교합니다.",
+                        "\(bar.label) is still running (\(note)). It sits beside the finished periods but is compared on its daily average, never on its total."
+                    )
+                }
+            }
+        )
+    }
+
+    /// Contract W4 / T064. A daemon that does not serve windows is a missing
+    /// feature; a daemon that does not answer is a fault. Rendering the first
+    /// as the second is what the contract forbids, and `AccountShapeAbsence`
+    /// already separates the four cases — they are carried, not collapsed.
+    static func capabilityGap(_ availability: AccountShapeAvailability) -> CapabilityGapModel? {
+        guard case .absent(let absence) = availability else { return nil }
+        switch absence {
+        case .accountShapeNotSent:
+            // Says nothing about window support: the account object is a Claude
+            // profile field, and Codex has no equivalent at all. Not a gap.
+            return nil
+        case .windowsMetricUnsupported:
+            return CapabilityGapModel(
+                absence: absence,
+                headline: L.tr(
+                    "설치된 toki 데몬에는 아직 이 기능이 없습니다",
+                    "The installed toki daemon does not have this feature yet"
+                ),
+                explanation: absence.explanation,
+                remedy: L.tr(
+                    "toki를 v2.3 이상으로 올리면 그때부터 윈도우가 쌓이기 시작합니다. 지금까지의 기간은 소급되지 않습니다.",
+                    "Update toki to v2.3 or later and windows start accumulating from then. The time before that cannot be backfilled."
+                )
+            )
+        case .windowStateUnavailable:
+            return CapabilityGapModel(
+                absence: absence,
+                headline: L.tr(
+                    "데몬이 윈도우 상태를 제공하지 못했습니다",
+                    "The daemon could not serve window state"
+                ),
+                explanation: absence.explanation,
+                remedy: L.tr(
+                    "윈도우 추적이 꺼져 있는지 확인하세요. 꺼져 있는 것도 정상 설정이라 오류로 표시하지 않습니다.",
+                    "Check whether window tracking is switched off. Off is a valid setting, which is why this is not shown as an error."
+                )
+            )
+        case .daemonUnreachable:
+            return CapabilityGapModel(
+                absence: absence,
+                headline: L.tr("toki 데몬에 연결할 수 없습니다", "Cannot reach the toki daemon"),
+                explanation: absence.explanation,
+                remedy: L.tr(
+                    "데몬이 실행 중인지 확인하세요. 데이터가 없는 것과는 다른 상태라 빈 화면 대신 이렇게 알립니다.",
+                    "Check that the daemon is running. This is a different state from having no data, which is why it is not an empty screen."
+                )
+            )
+        }
+    }
+
+    /// T060. Concrete conditions, one per line. A reader looking at an empty
+    /// page needs to know WHICH of them is missing, and one paragraph does not
+    /// let them find out.
+    static func collectionRequirements() -> [String] {
+        [
+            L.tr(
+                "toki 데몬 v2.3 이상이 실행 중이어야 합니다 — 윈도우 기록은 이 버전부터 생겼습니다.",
+                "The toki daemon must be v2.3 or later — window recording starts at that version."
+            ),
+            L.tr(
+                "윈도우 폴링이 켜져 있고 공급자에 로그인되어 있어야 합니다. 로그아웃 상태에서는 한도가 조회되지 않습니다.",
+                "Window polling must be on and the provider logged in. A logged-out account reports no limits."
+            ),
+            L.tr(
+                "Codex는 rollout 로그에서 과거가 즉시 복원됩니다. Claude는 폴링을 시작한 시점부터만 쌓이므로 판정 근거가 서기까지 약 4주가 걸립니다.",
+                "Codex history is restored from rollout logs immediately. Claude accrues only from when polling starts, so it takes about four weeks before a verdict has anything to stand on."
+            ),
+        ]
+    }
+
+    // MARK: One metric at a time
+
+    static func limitStatusReadiness(
+        _ paired: [(WindowStatsSegment, PlanFitVerdict)]
+    ) -> MetricReadiness {
+        let windows = paired.reduce(0) { $0 + $1.0.activeWindowCount }
+        return MetricReadiness(
+            id: "metric|limits",
+            metric: L.tr("한도별 소진 현황", "How each limit is running"),
+            status: windows > 0 ? .ready : .withheld,
+            reason: windows > 0
+                ? ""
+                : L.tr("완료된 창이 아직 없습니다.", "No window has finished yet."),
+            availability: windows > 0
+                ? nil
+                : L.tr(
+                    "창 하나가 리셋을 지나면 바로 표시됩니다 — 5시간 한도라면 다섯 시간 안입니다.",
+                    "It appears as soon as one window passes its reset — within five hours on the five-hour limit."
+                )
+        )
+    }
+
+    static func activeUseReadiness(
+        _ paired: [(WindowStatsSegment, PlanFitVerdict)]
+    ) -> MetricReadiness {
+        let active = paired.reduce(0) { $0 + $1.0.activeUse.activeCount }
+        let undecidable = paired.reduce(0) { $0 + $1.0.activeUse.cannotTellCount }
+        if active > 0 {
+            return MetricReadiness(
+                id: "metric|activeUse", metric: L.tr("실사용 분리", "The worked/idle split"),
+                status: .ready, reason: "", availability: nil
+            )
+        }
+        return MetricReadiness(
+            id: "metric|activeUse",
+            metric: L.tr("실사용 분리", "The worked/idle split"),
+            status: undecidable > 0 ? .observedOnly : .withheld,
+            reason: undecidable > 0
+                ? L.tr(
+                    "실사용이 확인된 창이 아직 없습니다. 창 \(undecidable)개는 판단 불가로 두었습니다 — 기록된 실사용 시간은 하한이라 작다고 '사용 없음'으로 단정하지 않습니다.",
+                    "No window is confirmed as worked in yet. \(undecidable) are left undecided — recorded work time is a floor, so a small figure is not called 'unused'."
+                )
+                : L.tr("실사용이 확인된 창이 아직 없습니다.", "No window is confirmed as worked in yet."),
+            availability: L.tr(
+                "실사용이 기록된 창이 생기면 표시됩니다 — 날짜가 아니라 사용량에 달려 있습니다.",
+                "It appears once a window records work — that depends on usage, not on the calendar."
+            )
+        )
+    }
+
+    static func trendReadiness(trend: PeriodTrendModel, completePeriods: Int) -> MetricReadiness {
+        let metric = L.tr("기간 추이", "The period trend")
+        if trend.isEmpty {
+            return MetricReadiness(
+                id: "metric|trend", metric: metric, status: .withheld,
+                reason: L.tr("추이를 그릴 기간이 없습니다.", "There is no period to trend yet."),
+                availability: nil
+            )
+        }
+        // T061. The bars are drawn — they are observed facts. What is withheld
+        // is reading a direction into them.
+        if completePeriods < minimumCompletePeriodsForTrend {
+            return MetricReadiness(
+                id: "metric|trend", metric: metric, status: .observedOnly,
+                reason: L.tr(
+                    "완결된 기간이 \(completePeriods)개뿐이라 값은 표시하되 추세로 읽지 않습니다. 방향은 완결된 기간 \(minimumCompletePeriodsForTrend)개부터 의미가 생깁니다.",
+                    "Only \(completePeriods) period has finished, so the values are shown but not read as a direction. A direction needs \(minimumCompletePeriodsForTrend) finished periods."
+                ),
+                availability: L.tr(
+                    "다음 기간이 끝나면 방향을 읽을 수 있습니다.",
+                    "A direction becomes readable once the next period closes."
+                )
+            )
+        }
+        return MetricReadiness(id: "metric|trend", metric: metric, status: .ready,
+                               reason: "", availability: nil)
+    }
+
+    /// The verdict's own withholding conditions already live in the domain, so
+    /// this reads them rather than restating them — a second copy of contract
+    /// V2 here is a second copy free to drift.
+    static func verdictReadiness(
+        _ paired: [(WindowStatsSegment, PlanFitVerdict)]
+    ) -> MetricReadiness {
+        let metric = L.tr("요금제 판정", "The plan verdict")
+        let spoken = paired.filter { !$0.1.isWithheld }
+        if !spoken.isEmpty {
+            return MetricReadiness(id: "metric|verdict", metric: metric, status: .ready,
+                                   reason: "", availability: nil)
+        }
+        guard let (_, verdict) = primary(paired) else {
+            return MetricReadiness(
+                id: "metric|verdict", metric: metric, status: .withheld,
+                reason: L.tr("판정할 근거가 아직 없습니다.", "There is nothing to judge from yet."),
+                availability: nil
+            )
+        }
+        let statement = verdict.statement()
+        return MetricReadiness(
+            id: "metric|verdict", metric: metric, status: .withheld,
+            reason: statement.headline, availability: statement.availability
+        )
+    }
+
+    static func comparisonReadiness(_ comparison: ProviderComparisonModel) -> MetricReadiness {
+        let metric = L.tr("공급자 비교", "The provider comparison")
+        switch comparison.state {
+        case .comparable:
+            return MetricReadiness(id: "metric|comparison", metric: metric, status: .ready,
+                                   reason: "", availability: nil)
+        case .singleProvider, .noOverlap:
+            return MetricReadiness(
+                id: "metric|comparison", metric: metric, status: .withheld,
+                reason: comparison.unavailableNote ?? "",
+                availability: nil
+            )
+        case .none:
+            return MetricReadiness(
+                id: "metric|comparison", metric: metric, status: .withheld,
+                reason: L.tr("비교할 기록이 없습니다.", "There is no history to compare."),
+                availability: nil
+            )
+        }
+    }
+
+    static func patternReadiness(_ pattern: ModelPatternModel) -> MetricReadiness {
+        let metric = L.tr("모델별 분해", "The per-model breakdown")
+        let hasRows = pattern.blocks.contains { !$0.limitRows.isEmpty || !$0.usageRows.isEmpty }
+        if hasRows {
+            return MetricReadiness(id: "metric|pattern", metric: metric, status: .ready,
+                                   reason: "", availability: nil)
+        }
+        return MetricReadiness(
+            id: "metric|pattern", metric: metric, status: .withheld,
+            reason: pattern.unavailableNote
+                ?? L.tr("이 기간에 모델별 기록이 없습니다.", "No per-model record in this period."),
+            availability: nil
         )
     }
 }

@@ -36,6 +36,10 @@ struct PlanFitPage: View {
     /// Token events per provider per model. The only source of a per-model
     /// breakdown for Codex, which has no model-scoped windows at all.
     @State private var modelUsage: ModelUsageInput = .notFetched
+    /// Whether the daemon can serve windows at all. A daemon that cannot is a
+    /// capability gap, not an error, and the four causes want four screens
+    /// (contract W4).
+    @State private var windowsAvailability: AccountShapeAvailability = .absent(.accountShapeNotSent)
     @State private var isLoading = false
     @State private var loadFailed = false
     /// true = rows came from the sync server (multi-device merged statistics).
@@ -50,6 +54,7 @@ struct PlanFitPage: View {
                 unit: periodUnit,
                 nowMs: Int64(Date().timeIntervalSince1970 * 1000),
                 modelUsage: modelUsage,
+                windowsAvailability: windowsAvailability,
                 usingServerData: usingServerData,
                 loadFailed: loadFailed,
                 isLoading: isLoading
@@ -83,9 +88,14 @@ struct PlanFitPage: View {
         async let localAsync = fetchLocal(start: start, end: end)
         async let serverAsync = fetchServer(start: start, end: end)
         async let usageAsync = fetchModelUsage(start: start, end: now)
+        // Cheap: the coordinator serves back-to-back requests from a 5s cache,
+        // and this is the only thing that can tell an old daemon apart from an
+        // account that simply has no windows yet.
+        async let capabilityAsync = TokiWindowsClient.fetch(maxAgeMs: nil)
         let (localRows, localFailed) = await localAsync
         let (serverRows, serverFailed) = await serverAsync
         modelUsage = await usageAsync
+        windowsAvailability = AccountShapeAvailability.from(await capabilityAsync)
 
         var serverProviders = Set<String>()
         for entry in serverRows { serverProviders.insert(entry.provider) }
@@ -172,6 +182,11 @@ struct PlanFitContent: View {
             VStack(alignment: .leading, spacing: DS.lg) {
                 header
                 VerdictSection(lede: model.lede, others: model.otherVerdicts)
+                // Directly under the conclusion: what the page cannot yet say
+                // is part of the conclusion, not a footnote to it.
+                if model.readiness.isPresentable {
+                    EmptyStateSection(model: model.readiness)
+                }
                 PeriodTrendSection(model: model.trend)
                 if model.hasSegments {
                     LimitStatusSection(groups: model.limitGroups)

@@ -184,6 +184,7 @@
 		AA03PFTREND0B001 /* PeriodTrendSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFTREND0F001 /* PeriodTrendSection.swift */; };
 		AA03PFLIMIT0B001 /* LimitStatusSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFLIMIT0F001 /* LimitStatusSection.swift */; };
 		AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFACTIV0F001 /* ActiveUseSection.swift */; };
+		AA03PFEMPT0B001 /* EmptyStateSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFEMPT0F001 /* EmptyStateSection.swift */; };
 		AA03PFMONE0B001 /* MoneyFootnote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFMONE0F001 /* MoneyFootnote.swift */; };
 		AA03PFMODP0B001 /* ModelPatternSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFMODP0F001 /* ModelPatternSection.swift */; };
 		AA03PFCOMP0B001 /* ProviderComparisonSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFCOMP0F001 /* ProviderComparisonSection.swift */; };
@@ -382,6 +383,7 @@
 		AA03PFTREND0F001 /* PeriodTrendSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodTrendSection.swift; sourceTree = "<group>"; };
 		AA03PFLIMIT0F001 /* LimitStatusSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LimitStatusSection.swift; sourceTree = "<group>"; };
 		AA03PFACTIV0F001 /* ActiveUseSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveUseSection.swift; sourceTree = "<group>"; };
+		AA03PFEMPT0F001 /* EmptyStateSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateSection.swift; sourceTree = "<group>"; };
 		AA03PFMONE0F001 /* MoneyFootnote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyFootnote.swift; sourceTree = "<group>"; };
 		AA03PFMODP0F001 /* ModelPatternSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPatternSection.swift; sourceTree = "<group>"; };
 		AA03PFCOMP0F001 /* ProviderComparisonSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderComparisonSection.swift; sourceTree = "<group>"; };
@@ -720,6 +722,7 @@
 			isa = PBXGroup;
 			children = (
 				AA03PFACTIV0F001 /* ActiveUseSection.swift */,
+				AA03PFEMPT0F001 /* EmptyStateSection.swift */,
 				AA03PFMONE0F001 /* MoneyFootnote.swift */,
 				AA03PFMODP0F001 /* ModelPatternSection.swift */,
 				AA03PFCOMP0F001 /* ProviderComparisonSection.swift */,
@@ -889,6 +892,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */,
+				AA03PFEMPT0B001 /* EmptyStateSection.swift in Sources */,
 				AA03PFMONE0B001 /* MoneyFootnote.swift in Sources */,
 				AA03PFMODP0B001 /* ModelPatternSection.swift in Sources */,
 				AA03PFCOMP0B001 /* ProviderComparisonSection.swift in Sources */,
