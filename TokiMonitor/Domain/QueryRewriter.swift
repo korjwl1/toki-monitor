@@ -49,12 +49,53 @@ enum QueryRewriter {
         "windows", "sessions", "projects",
     ]
 
+    /// The rewrite, and whether it happened.
+    ///
+    /// `QueryRewriter` has always returned the query unchanged when it could
+    /// not find the selector — the right call, since a guessed edit yields a
+    /// query that still parses and answers a different question. What was
+    /// missing is the second half: the reader saw `project = toki` in the
+    /// toolbar and a panel showing every project, with nothing anywhere saying
+    /// the filter had not been applied (contract Q4). So the rewrite reports.
+    struct Rewrite: Equatable {
+        var query: String
+        var appliedFilters: AppliedFilters
+    }
+
+    /// Add `filters` to `query`'s label matchers, and say what landed.
+    static func rewrite(_ filters: [AdHocFilter], in query: String) -> Rewrite {
+        // A filter with no key is one the reader has started and not finished.
+        // It was never asked for, so it is neither applied nor missing.
+        let usable = filters.filter { !$0.key.isEmpty }
+        guard !usable.isEmpty else {
+            return Rewrite(query: query, appliedFilters: .none)
+        }
+        let keys = usable.map(\.key)
+        guard findSelector(in: query) != nil else {
+            return Rewrite(
+                query: query,
+                appliedFilters: AppliedFilters(
+                    applied: [], unapplied: keys,
+                    reason: L.tr(
+                        "질의에서 지표 선택자를 찾지 못해 필터를 적용하지 못했습니다. 질의가 아는 지표(\(metricNames.sorted().joined(separator: ", "))) 중 하나로 시작해야 필터가 걸립니다.",
+                        "The filter was not applied: no metric selector was found in the query. A filter can only be placed on a query naming one of \(metricNames.sorted().joined(separator: ", "))."
+                    )
+                )
+            )
+        }
+        return Rewrite(
+            query: applying(usable, to: query),
+            appliedFilters: AppliedFilters(applied: keys, unapplied: [], reason: nil)
+        )
+    }
+
     /// Add `filters` to `query`'s label matchers.
     ///
     /// Returns the query unchanged when it cannot find the metric selector.
     /// A filter that silently does not apply is bad; a query mangled into
     /// something that still parses is worse, so an unrecognised shape is left
-    /// alone rather than guessed at.
+    /// alone rather than guessed at. Callers that must disclose the difference
+    /// use `rewrite(_:in:)`, which reports it.
     static func applying(_ filters: [AdHocFilter], to query: String) -> String {
         let usable = filters.filter { !$0.key.isEmpty }
         guard !usable.isEmpty else { return query }

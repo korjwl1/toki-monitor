@@ -76,6 +76,8 @@
 		555FD7C25C250BCAB0806025 /* NotificationsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3EB4A17B1B322A3259A1454 /* NotificationsSettingsPane.swift */; };
 		5638D116E13B29E6DC83754C /* LocalCLIDatasource.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31CF6A450F00B8FE22A493C /* LocalCLIDatasource.swift */; };
 		5A100F7481C256287B782C70 /* PromQLSuggester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10785CF25F5378B78803A23B /* PromQLSuggester.swift */; };
+		AA41QVALID0001B /* QueryValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41QVALID0001F /* QueryValidation.swift */; };
+		AA41QVOCAB0001B /* QueryVocabulary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41QVOCAB0001F /* QueryVocabulary.swift */; };
 		5A9B8A4604691516E084F28B /* GaugePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24D5C9A7319840C3B1F3CC6 /* GaugePanelView.swift */; };
 		5C5E8E33DBFD060EB0916AD9 /* SemVer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C95A0813C9EB083B73F3EBAB /* SemVer.swift */; };
 		AA12FRAMETEST000000002 /* FrameAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA12FRAMETEST000000001 /* FrameAdapterTests.swift */; };
@@ -83,6 +85,7 @@
 		AA10FRAME00000000000002 /* Frame.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10FRAME00000000000001 /* Frame.swift */; };
 		AA11FRAMEADAPT00000002 /* FrameAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11FRAMEADAPT00000001 /* FrameAdapter.swift */; };
 		AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01WINWIRE0000000000001 /* WindowsWireTests.swift */; };
+		AA41QREFTEST001B /* QueryRefusalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41QREFTEST001F /* QueryRefusalTests.swift */; };
 		5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */; };
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
 		64CFC0046724FA45053F0D8B /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2419FCCD7EDF135528C44ACD /* UpdateChecker.swift */; };
@@ -132,6 +135,7 @@
 		AA35VARKINDTEST00002 /* VariableKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35VARKINDTEST00001 /* VariableKindTests.swift */; };
 		AA35VARFMTTEST000002 /* VariableFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35VARFMTTEST000001 /* VariableFormatTests.swift */; };
 		AA35QRYRWTEST000002 /* QueryRewriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35QRYRWTEST000001 /* QueryRewriterTests.swift */; };
+		AA41QVTEST0001B /* QueryValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41QVTEST0001F /* QueryValidationTests.swift */; };
 		AA35ADHOCTEST000002 /* AdHocVariableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35ADHOCTEST000001 /* AdHocVariableTests.swift */; };
 		AA35STTLTEST0000002 /* StateTimelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35STTLTEST0000001 /* StateTimelineTests.swift */; };
 		AA35SUGGTEST0000002 /* PromQLSuggesterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35SUGGTEST0000001 /* PromQLSuggesterTests.swift */; };
@@ -203,6 +207,8 @@
 		096E04F1C2D87A5D5F1C0251 /* StatPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatPanelView.swift; sourceTree = "<group>"; };
 		0C1FFE59530A1D2FC18F1651 /* frame_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00.png; sourceTree = "<group>"; };
 		10785CF25F5378B78803A23B /* PromQLSuggester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromQLSuggester.swift; sourceTree = "<group>"; };
+		AA41QVALID0001F /* QueryValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryValidation.swift; sourceTree = "<group>"; };
+		AA41QVOCAB0001F /* QueryVocabulary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryVocabulary.swift; sourceTree = "<group>"; };
 		10835A353F20C9BFA10795A1 /* GlassWorkaround.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWorkaround.swift; sourceTree = "<group>"; };
 		11EDBA80BF147096558E5D33 /* ProjectNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectNameResolver.swift; sourceTree = "<group>"; };
 		1246B6D3F3ED7B1F2A2BB791 /* DatasourcePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourcePlugin.swift; sourceTree = "<group>"; };
@@ -255,6 +261,7 @@
 		AA10FRAME00000000000001 /* Frame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Frame.swift; sourceTree = "<group>"; };
 		AA11FRAMEADAPT00000001 /* FrameAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameAdapter.swift; sourceTree = "<group>"; };
 		AA01WINWIRE0000000000001 /* WindowsWireTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsWireTests.swift; sourceTree = "<group>"; };
+		AA41QREFTEST001F /* QueryRefusalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryRefusalTests.swift; sourceTree = "<group>"; };
 		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
 		77B9855FE6D408AAA8CF6F61 /* DashboardGridLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardGridLayout.swift; sourceTree = "<group>"; };
@@ -276,6 +283,7 @@
 		AA35VARKINDTEST00001 /* VariableKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableKindTests.swift; sourceTree = "<group>"; };
 		AA35VARFMTTEST000001 /* VariableFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableFormatTests.swift; sourceTree = "<group>"; };
 		AA35QRYRWTEST000001 /* QueryRewriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryRewriterTests.swift; sourceTree = "<group>"; };
+		AA41QVTEST0001F /* QueryValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryValidationTests.swift; sourceTree = "<group>"; };
 		AA35ADHOCTEST000001 /* AdHocVariableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdHocVariableTests.swift; sourceTree = "<group>"; };
 		AA35STTLTEST0000001 /* StateTimelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateTimelineTests.swift; sourceTree = "<group>"; };
 		AA35SUGGTEST0000001 /* PromQLSuggesterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromQLSuggesterTests.swift; sourceTree = "<group>"; };
@@ -413,6 +421,7 @@
 				755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */,
 				750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */,
 				AA01WINWIRE0000000000001 /* WindowsWireTests.swift */,
+				AA41QREFTEST001F /* QueryRefusalTests.swift */,
 				AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */,
 				AA12FRAMETEST000000001 /* FrameAdapterTests.swift */,
 				AA35VARLOADTEST00001 /* VariableLoaderTests.swift */,
@@ -617,6 +626,7 @@
 				AA35VARKINDTEST00001 /* VariableKindTests.swift */,
 				AA35VARFMTTEST000001 /* VariableFormatTests.swift */,
 				AA35QRYRWTEST000001 /* QueryRewriterTests.swift */,
+				AA41QVTEST0001F /* QueryValidationTests.swift */,
 				AA35ADHOCTEST000001 /* AdHocVariableTests.swift */,
 				AA35STTLTEST0000001 /* StateTimelineTests.swift */,
 				AA35SUGGTEST0000001 /* PromQLSuggesterTests.swift */,
@@ -700,6 +710,8 @@
 				8CC4A7E29F84136565F5CED9 /* PanelFetchCoordinator.swift */,
 				11EDBA80BF147096558E5D33 /* ProjectNameResolver.swift */,
 				10785CF25F5378B78803A23B /* PromQLSuggester.swift */,
+				AA41QVALID0001F /* QueryValidation.swift */,
+				AA41QVOCAB0001F /* QueryVocabulary.swift */,
 				CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */,
 				37F55200D88B2D7260541C5D /* ProviderSummary.swift */,
 				C95A0813C9EB083B73F3EBAB /* SemVer.swift */,
@@ -890,6 +902,8 @@
 				43499D46A4DAEA3D71BE7F9C /* ProjectNameResolver.swift in Sources */,
 				3FC14A4CEE21EB76B9B950AA /* PromQLProxyDatasource.swift in Sources */,
 				5A100F7481C256287B782C70 /* PromQLSuggester.swift in Sources */,
+				AA41QVALID0001B /* QueryValidation.swift in Sources */,
+				AA41QVOCAB0001B /* QueryVocabulary.swift in Sources */,
 				27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */,
 				2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */,
 				46DF834236EAC2C92B2F93AE /* ProviderSummary.swift in Sources */,
@@ -978,12 +992,14 @@
 				AA35VARKINDTEST00002 /* VariableKindTests.swift in Sources */,
 				AA35VARFMTTEST000002 /* VariableFormatTests.swift in Sources */,
 				AA35QRYRWTEST000002 /* QueryRewriterTests.swift in Sources */,
+				AA41QVTEST0001B /* QueryValidationTests.swift in Sources */,
 				AA35ADHOCTEST000002 /* AdHocVariableTests.swift in Sources */,
 				AA35STTLTEST0000002 /* StateTimelineTests.swift in Sources */,
 				AA35SUGGTEST0000002 /* PromQLSuggesterTests.swift in Sources */,
 				AA35STORETEST000002 /* DashboardConfigStoreTests.swift in Sources */,
 				AA02PANELNORM00000000002 /* PanelNormalizationTests.swift in Sources */,
 				AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */,
+				AA41QREFTEST001B /* QueryRefusalTests.swift in Sources */,
 				AA03SERIESMERGE000000002 /* SeriesMergeTests.swift in Sources */,
 				AA12FRAMETEST000000002 /* FrameAdapterTests.swift in Sources */,
 			);

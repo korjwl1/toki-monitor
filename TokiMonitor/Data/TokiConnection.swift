@@ -134,12 +134,20 @@ final class TokiTraceListener {
 // MARK: - Shared CLI Process Runner
 
 enum CLIRunnerError: Error, LocalizedError {
-    case exitCode(Int)
+    /// The CLI failed. `message` is whatever it wrote to stderr — for a query
+    /// that is the daemon's own refusal ("unexpected trailing input: '…'"),
+    /// which is the only part of the failure that names what to fix. It used
+    /// to be routed to `/dev/null`, so a rejected query reached the panel as
+    /// "toki exited with code 1" — the local twin of the HTTP 400 that
+    /// contract Q2 is about.
+    case exitCode(Int, message: String?)
     case timeout
     var errorDescription: String? {
         switch self {
-        case .exitCode(let code): "toki exited with code \(code)"
-        case .timeout: "toki CLI timed out"
+        case let .exitCode(code, message):
+            guard let message, !message.isEmpty else { return "toki exited with code \(code)" }
+            return message
+        case .timeout: return "toki CLI timed out"
         }
     }
 }
@@ -156,8 +164,19 @@ enum CLIProcessRunner {
                 process.arguments = arguments
 
                 let pipe = Pipe()
+                let errPipe = Pipe()
                 process.standardOutput = pipe
-                process.standardError = FileHandle.nullDevice
+                process.standardError = errPipe
+
+                // stderr is drained on its own queue, concurrently with stdout.
+                // Reading them in sequence deadlocks whenever the child fills
+                // the pipe we are not reading yet.
+                let stderrBox = LockedData()
+                let stderrDone = DispatchSemaphore(value: 0)
+                DispatchQueue.global(qos: .utility).async {
+                    stderrBox.set(errPipe.fileHandleForReading.readDataToEndOfFile())
+                    stderrDone.signal()
+                }
 
                 // Track whether continuation has been resumed
                 let resumed = LockedFlag()
@@ -182,12 +201,16 @@ enum CLIProcessRunner {
                     let data = pipe.fileHandleForReading.readDataToEndOfFile()
                     process.waitUntilExit()
                     timeoutItem.cancel()
+                    _ = stderrDone.wait(timeout: .now() + 1)
 
                     if resumed.setIfUnset() {
                         if process.terminationStatus == 0 {
                             continuation.resume(returning: data)
                         } else {
-                            continuation.resume(throwing: CLIRunnerError.exitCode(Int(process.terminationStatus)))
+                            continuation.resume(throwing: CLIRunnerError.exitCode(
+                                Int(process.terminationStatus),
+                                message: CLIProcessRunner.stderrMessage(stderrBox.get())
+                            ))
                         }
                     }
                 } catch {
@@ -197,6 +220,35 @@ enum CLIProcessRunner {
                 }
             }
         }
+    }
+
+    /// The last non-empty line of stderr, trimmed. The daemon prints its
+    /// refusal there; anything longer than a sentence is a backtrace or a log
+    /// dump and is not worth putting on a panel.
+    static func stderrMessage(_ data: Data) -> String? {
+        guard let text = String(data: data, encoding: .utf8) else { return nil }
+        let line = text
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .last { !$0.isEmpty }
+        guard let line, !line.isEmpty, line.count <= 300 else { return nil }
+        return line
+    }
+}
+
+/// Thread-safe box for data handed between the stdout and stderr readers.
+private final class LockedData: @unchecked Sendable {
+    private var _value = Data()
+    private let lock = NSLock()
+
+    func set(_ value: Data) {
+        lock.lock(); defer { lock.unlock() }
+        _value = value
+    }
+
+    func get() -> Data {
+        lock.lock(); defer { lock.unlock() }
+        return _value
     }
 }
 

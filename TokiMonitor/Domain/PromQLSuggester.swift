@@ -35,68 +35,56 @@ struct PromQLSuggestion: Identifiable, Hashable, Sendable {
 /// Static suggestion engine for the toki-monitor explore view.
 ///
 /// Not a real PromQL parser. Neither backend is one either, and they do not
-/// accept the same subset:
+/// accept the same subset, so the vocabulary is per backend and comes from
+/// `QueryVocabulary` — the same table `QueryValidation` enforces.
 ///
-/// - the local daemon parses `sum`/`avg`/`count`, an optional `increase(...)`
-///   wrapper, `by (...)` and `offset` over the metrics it knows
-///   (toki/src/query_parser.rs `parse`);
-/// - the sync server does less still — it looks for `cost{`/`events{` and a
-///   `by (...)` clause and ignores everything else
-///   (toki_sync `parse_toki_virtual_query`).
+/// That sharing is the point. Suggesting `rate` or `max` was worse than
+/// suggesting nothing: neither backend implements them and neither reported
+/// that, so the query returned a plausible number computed from a different
+/// expression than the one on screen. A completion the validator would reject,
+/// or a term the validator accepts and autocomplete never offers, is the same
+/// defect in a different direction — so neither side keeps its own list.
 ///
-/// So the vocabulary is per datasource. Suggesting `rate` or `max` was worse
-/// than suggesting nothing: neither backend implements them and neither
-/// reports that, so the query returns a plausible number computed from a
-/// different expression than the one on screen. Same for `$__rate_interval`,
-/// which nothing expands.
+/// What stays here is what the EDITOR adds rather than what a backend parses:
+/// dashboard variables and range-vector shortcuts.
 enum PromQLSuggester {
 
     /// Which backend the suggestions must be valid for.
-    enum Dialect: Sendable {
-        case local
-        case server
-    }
+    typealias Dialect = QueryBackend
 
     // MARK: - Vocabulary
 
-    /// Metric names both backends accept.
-    static let metrics: [PromQLSuggestion] = [
-        .init(text: "usage",  kind: .metric, hint: "token usage"),
-        .init(text: "cost",   kind: .metric, hint: "USD cost"),
-        .init(text: "events", kind: .metric, hint: "API call count"),
-    ]
+    static func metrics(_ dialect: Dialect) -> [PromQLSuggestion] {
+        suggestions(dialect.vocabulary.metrics, kind: .metric)
+    }
 
-    /// Metrics only the local daemon knows. The server has no parser branch
-    /// for them, so offering them against a server datasource would produce a
-    /// silent fall-through to `usage`.
-    static let localOnlyMetrics: [PromQLSuggestion] = [
-        .init(text: "windows",  kind: .metric, hint: "rate-limit windows (intervals)"),
-        .init(text: "sessions", kind: .metric, hint: "session ids"),
-        .init(text: "projects", kind: .metric, hint: "project names"),
-    ]
+    /// Aggregations and range functions — everything that may wrap a selector.
+    static func functions(_ dialect: Dialect) -> [PromQLSuggestion] {
+        suggestions(dialect.vocabulary.aggregations, kind: .function)
+            + suggestions(dialect.vocabulary.rangeFunctions, kind: .function)
+            + [byTerm]
+            + (dialect.vocabulary.supportsOffset ? [offsetTerm] : [])
+    }
 
-    /// Labels that `aggregate_events_to_toki_json` actually groups on.
-    /// `device_id` requires the toki-sync PR `feature/device-id-groupby`.
-    static let labels: [PromQLSuggestion] = [
-        .init(text: "model",     kind: .label, hint: "model name"),
-        .init(text: "project",   kind: .label, hint: "project path"),
-        .init(text: "provider",  kind: .label, hint: "claude_code | codex"),
-        .init(text: "device_id", kind: .label, hint: "per-device split"),
-    ]
+    /// Filter and group keys together: at the moment a label is being typed,
+    /// the suggester cannot yet know which of the two positions it will land in.
+    static func labels(_ dialect: Dialect) -> [PromQLSuggestion] {
+        suggestions(dialect.vocabulary.labelKeys, kind: .label)
+    }
 
-    /// Functions both backends honour.
-    static let functions: [PromQLSuggestion] = [
-        .init(text: "sum",      kind: .function, hint: "sum series"),
-        .init(text: "increase", kind: .function, hint: "delta over range"),
-        .init(text: "by",       kind: .function, hint: "group by (label)"),
-    ]
+    /// `by` and `offset` are grammar, not functions, and so are not in the
+    /// vocabulary's function lists; the editor still completes them.
+    private static let byTerm = PromQLSuggestion(
+        text: "by", kind: .function, hint: "group by (label)"
+    )
+    private static let offsetTerm = PromQLSuggestion(
+        text: "offset", kind: .function, hint: "shift the window back"
+    )
 
-    /// Aggregations and modifiers only the local parser implements.
-    static let localOnlyFunctions: [PromQLSuggestion] = [
-        .init(text: "avg",    kind: .function, hint: "average per event"),
-        .init(text: "count",  kind: .function, hint: "count events"),
-        .init(text: "offset", kind: .function, hint: "shift the window back"),
-    ]
+    private static func suggestions(_ terms: [QueryVocabulary.Term],
+                                    kind: PromQLSuggestionKind) -> [PromQLSuggestion] {
+        terms.filter(\.suggested).map { .init(text: $0.name, kind: kind, hint: $0.hint) }
+    }
 
     static let variables: [PromQLSuggestion] = [
         .init(text: "$provider",         kind: .variable, hint: "active provider filter"),
@@ -113,13 +101,7 @@ enum PromQLSuggester {
 
     /// Full vocabulary for a dialect, in display order.
     static func all(_ dialect: Dialect) -> [PromQLSuggestion] {
-        switch dialect {
-        case .local:
-            return metrics + localOnlyMetrics + functions + localOnlyFunctions
-                + labels + variables + rangeVectors
-        case .server:
-            return metrics + functions + labels + variables + rangeVectors
-        }
+        metrics(dialect) + functions(dialect) + labels(dialect) + variables + rangeVectors
     }
 
     // MARK: - Suggestion

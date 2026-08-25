@@ -137,7 +137,9 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
                 throw ServerQueryError.httpError(http.statusCode)
             }
         }
-        guard http.statusCode == 200 else { throw ServerQueryError.httpError(http.statusCode) }
+        guard http.statusCode == 200 else {
+            throw ServerQueryError.from(status: http.statusCode, body: data)
+        }
         return data
     }
 
@@ -190,7 +192,9 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
                 throw ServerQueryError.httpError(http.statusCode)
             }
         }
-        guard http.statusCode == 200 else { throw ServerQueryError.httpError(http.statusCode) }
+        guard http.statusCode == 200 else {
+            throw ServerQueryError.from(status: http.statusCode, body: data)
+        }
         return data
     }
 
@@ -203,11 +207,14 @@ final class ServerQueryClient: @unchecked Sendable, QueryDataSource {
     }
 }
 
-enum ServerQueryError: LocalizedError {
+enum ServerQueryError: LocalizedError, Equatable {
     case notConfigured
     case invalidURL
     case invalidResponse
     case httpError(Int)
+    /// The server refused the request and said why. The reason is the server's
+    /// own sentence, kept intact.
+    case rejected(status: Int, reason: String)
     case tokenExpired
     case networkError(String)
 
@@ -217,8 +224,55 @@ enum ServerQueryError: LocalizedError {
         case .invalidURL:           return L.tr("잘못된 URL", "Invalid URL")
         case .invalidResponse:      return L.tr("잘못된 응답", "Invalid response")
         case .httpError(let c):     return "HTTP \(c)"
+        // Verbatim, with no wrapper of ours: contract Q2 exists because the
+        // reason is the only thing that tells the reader which token to fix,
+        // and "HTTP 400" tells them nothing at all.
+        case .rejected(_, let r):   return r
         case .tokenExpired:         return L.sync.tokenExpired
         case .networkError(let m):  return m
         }
+    }
+}
+
+// MARK: - Reading a refusal
+//
+// The server answers a query it cannot execute with 400 and
+// `{"error": "unsupported query: <reason>"}` (toki_sync `AppError`). Until this
+// existed the client threw away the body and threw `HTTP 400`, so the one piece
+// of information that names the unsupported token — the whole point of the
+// server-side fix — never reached the screen.
+//
+// Split out as a pure function so it is testable without a URLSession: what
+// must not regress is the READING of the body, not the transport.
+
+extension ServerQueryError {
+
+    /// Map a non-2xx response onto an error that keeps whatever the server
+    /// said. Falls back to the bare status only when the body says nothing
+    /// usable — never to an empty result.
+    static func from(status: Int, body: Data) -> ServerQueryError {
+        guard let reason = refusalReason(in: body) else { return .httpError(status) }
+        return .rejected(status: status, reason: reason)
+    }
+
+    /// The server's sentence, or nil when the body carries none.
+    static func refusalReason(in body: Data) -> String? {
+        if let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
+            for key in ["error", "message", "detail"] {
+                if let text = object[key] as? String,
+                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return text.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+            return nil
+        }
+        // A plain-text body is worth showing too, but only when it reads like a
+        // sentence. An HTML error page from something in front of the server is
+        // noise, and a long body is a payload rather than an explanation.
+        guard let text = String(data: body, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty, !text.hasPrefix("<"), text.count <= 300
+        else { return nil }
+        return text
     }
 }

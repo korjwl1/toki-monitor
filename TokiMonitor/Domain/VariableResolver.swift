@@ -26,6 +26,21 @@ enum VariableResolver {
         time: TimeConfig,
         variables: [DashboardVariable]
     ) -> String {
+        interpolateReporting(template: template, time: time, variables: variables).query
+    }
+
+    /// The same interpolation, plus whether the reader's ad hoc filters
+    /// actually reached the query.
+    ///
+    /// The filter rewrite can fail to find a place to put itself, and when it
+    /// does the query it returns is the unfiltered one. Callers that show the
+    /// result to someone need to be able to say so (contract Q4), which the
+    /// String-returning form cannot express.
+    static func interpolateReporting(
+        template: String,
+        time: TimeConfig,
+        variables: [DashboardVariable]
+    ) -> (query: String, appliedFilters: AppliedFilters) {
         var query = template
         query = query.replacingOccurrences(of: "$__interval", with: time.bucketString)
 
@@ -111,7 +126,8 @@ enum VariableResolver {
             }
         }
         _ = converged
-        return QueryRewriter.applying(adHocFilters(in: variables), to: query)
+        let rewrite = QueryRewriter.rewrite(adHocFilters(in: variables), in: query)
+        return (rewrite.query, rewrite.appliedFilters)
     }
 
     /// Every ad hoc filter on the dashboard, in variable order.
