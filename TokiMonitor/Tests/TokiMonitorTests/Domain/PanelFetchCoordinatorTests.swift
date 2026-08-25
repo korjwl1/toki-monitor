@@ -360,6 +360,42 @@ struct PanelFetchCoordinatorTests {
         #expect(plans.allSatisfy { $0.panelID == p.id })
     }
 
+    // MARK: - Ad hoc filters (contract Q4)
+
+    private func adHoc(_ filters: [AdHocFilter]) -> DashboardVariable {
+        var v = DashboardVariable(name: "filters", type: .custom)
+        v.plugin = VariablePluginRef(kind: BuiltinVariablePluginKind.adHoc, spec: Data())
+        v.adHocFilters = filters
+        return v
+    }
+
+    @Test("a filter that reached the query is not reported as missing")
+    func filterApplied() async {
+        let client = RecordingDatasource()
+        let p = panel("filtered", targets: [target("A", "usage[1h]")])
+        let states = await fetch([p], client: client,
+                                 variables: [adHoc([AdHocFilter(key: "project", op: .equals,
+                                                                value: "toki")])])
+        #expect(client.executed == ["usage{project=\"toki\"}[1h]"])
+        #expect(states[p.id]?.frames?.notices.isEmpty == true)
+    }
+
+    /// The filter is set, the rewriter cannot place it, the query runs
+    /// unfiltered — and the result says so instead of looking correct.
+    @Test("a filter the query could not take is carried on the result")
+    func filterNotApplied() async {
+        let client = RecordingDatasource()
+        let p = panel("unfilterable", targets: [target("A", "unknown_metric[1h]")])
+        let states = await fetch([p], client: client,
+                                 variables: [adHoc([AdHocFilter(key: "project", op: .equals,
+                                                                value: "toki")])])
+        #expect(client.executed == ["unknown_metric[1h]"], "the query is left alone")
+        let notices = states[p.id]?.frames?.notices ?? []
+        #expect(notices.count == 1)
+        #expect(notices.first?.contains("project") == true
+                || notices.first?.isEmpty == false)
+    }
+
     @Test("a query envelope wins over the legacy target it was built from")
     func envelopeWinsOverTarget() {
         var p = panel("both", targets: [target("A", "legacy[1h]")])

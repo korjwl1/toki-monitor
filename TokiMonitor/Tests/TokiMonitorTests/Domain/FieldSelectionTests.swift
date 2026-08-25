@@ -147,6 +147,47 @@ struct FieldSelectionTests {
         ])
         #expect(FrameReader.labelValues(set, key: "project") == ["toki", "wireguard"])
     }
+
+    // MARK: - Reading a result with no panel to interpret it
+    //
+    // Explore runs an arbitrary query, so nothing tells it which column to
+    // read. It used to hold a `TimeSeriesData` instead, which has fixed measure
+    // columns — a query returning anything else arrived empty.
+
+    @Test("every measure of every frame becomes a series")
+    func allSeriesCoversEveryColumn() {
+        let set = FrameSet(frames: [
+            frame("opus", ["total_tokens": [1, 2], "cost_usd": [0.5, 0.5]]),
+            frame("sonnet", ["total_tokens": [3, 4], "cost_usd": [0.1, 0.1]]),
+        ])
+        let names = FrameReader.allSeries(set).map(\.name).sorted()
+        #expect(names == ["opus · cost_usd", "opus · total_tokens",
+                          "sonnet · cost_usd", "sonnet · total_tokens"])
+    }
+
+    @Test("a column no PanelMetric names is still shown")
+    func unknownColumnIsStillRead() {
+        let set = FrameSet(frames: [frame("opus", ["something_new": [7, 8]])])
+        let series = FrameReader.allSeries(set)
+        #expect(series.map(\.name) == ["opus"], "one measure needs no suffix")
+        #expect(series.first?.points.map(\.value) == [7, 8])
+    }
+
+    @Test("an absent bucket stays absent")
+    func absenceSurvives() {
+        let set = FrameSet(frames: [frame("opus", ["total_tokens": [1, nil, 3]])])
+        #expect(FrameReader.allSeries(set).first?.points.map(\.value) == [1, nil, 3])
+    }
+
+    @Test("a frame with no time column contributes nothing rather than a fake axis")
+    func framesWithoutTime() {
+        let set = FrameSet(frames: [
+            Frame(refId: "A", name: "totals", fields: [
+                Field(name: "total_tokens", values: .number([5]))
+            ])
+        ])
+        #expect(FrameReader.allSeries(set).isEmpty)
+    }
 }
 
 /// A card headed "top model" must answer with a model. The full display name

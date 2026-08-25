@@ -37,6 +37,12 @@ struct PanelFetchCoordinator {
         let datasource: DatasourceSelector?
         /// Executed either way; excluded from what the panel renders.
         let hidden: Bool
+        /// Whether the reader's ad hoc filters reached this query text
+        /// (contract Q4). `QueryRewriter` returns the query untouched when it
+        /// cannot find a selector to edit, so a panel can be showing unfiltered
+        /// data while the toolbar shows a filter. Carried here so the result
+        /// can say so.
+        let appliedFilters: AppliedFilters
 
         var key: PanelQueryKey { PanelQueryKey(query: query, datasource: datasource) }
     }
@@ -55,14 +61,16 @@ struct PanelFetchCoordinator {
         let sources = querySources(of: panel)
         return sources.enumerated().map { index, source in
             let template = source.query ?? source.metric.defaultQuery
+            let resolved = VariableResolver.interpolateReporting(
+                template: template, time: time, variables: variables
+            )
             return PlannedQuery(
                 panelID: panel.id,
                 refId: source.refId ?? Self.refId(at: index),
-                query: VariableResolver.interpolate(
-                    template: template, time: time, variables: variables
-                ),
+                query: resolved.query,
                 datasource: source.datasource ?? panel.effectiveDatasource,
-                hidden: source.hidden
+                hidden: source.hidden,
+                appliedFilters: resolved.appliedFilters
             )
         }
     }
@@ -235,6 +243,15 @@ struct PanelFetchCoordinator {
                 frames += result.frames.frames.map { frame in
                     var tagged = frame
                     tagged.refId = planned.refId
+                    // A filter the reader set and this query did not honour is
+                    // a non-fatal problem with the result, which is what a
+                    // notice is for — Inspect shows them, and the panel face
+                    // will. Silence here is how a panel shows every project
+                    // under a `project` filter and looks correct.
+                    if let reason = planned.appliedFilters.reason,
+                       planned.appliedFilters.hasUnapplied {
+                        tagged.meta.notices.append(reason)
+                    }
                     return tagged
                 }
                 for (_, message) in result.frames.errors { errors[planned.refId] = message }

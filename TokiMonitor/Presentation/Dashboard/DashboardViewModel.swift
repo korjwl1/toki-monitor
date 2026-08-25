@@ -81,7 +81,31 @@ final class DashboardViewModel {
 
 // MARK: - Explore
     var exploreQuery = ""
-    var exploreResults: TimeSeriesData?
+    /// The result as frames. Explore used to hold a `TimeSeriesData`, which
+    /// carries one series name and fixed measure columns — so a query grouped
+    /// by two dimensions arrived flattened and a query returning a column the
+    /// legacy shape has no slot for arrived empty. Frames are what every panel
+    /// reads; Explore reads the same thing (contract Q5 / data-model Frame).
+    var exploreFrames: FrameSet?
+    /// The query actually sent, after interpolation — what a promoted panel
+    /// should carry, and what Inspect would show.
+    var exploreExecutedQuery: String?
+    /// Why the last run produced nothing. Explore used to set the result to
+    /// `nil` on failure, which draws the same "enter a query" screen as never
+    /// having run one: a rejected query looked like an idle Explore
+    /// (contract Q2).
+    var exploreError: String?
+    /// Whether that error was the backend refusing the query rather than the
+    /// transport failing. A refusal is fixed by editing; retrying it unchanged
+    /// fails identically.
+    var exploreErrorIsRefusal = false
+    /// What the selected backend is expected to make of the query, before it
+    /// is sent (contract Q3).
+    var exploreValidation: QueryValidation?
+    /// Explore's OWN time range. Sharing the dashboard's meant trying a query
+    /// over a wider window silently moved every panel behind it, and narrowing
+    /// the dashboard silently re-scoped the experiment.
+    var exploreTime = TimeConfig(from: "now-6h", to: "now")
     var exploreQueryHistory: [ExploreQueryEntry] = []
     var isExploreLoading = false
 
@@ -1264,6 +1288,8 @@ final class DashboardViewModel {
     func runExploreQuery() {
         guard !exploreQuery.isEmpty else { return }
         isExploreLoading = true
+        exploreError = nil
+        exploreErrorIsRefusal = false
 
         // Save to history
         let entry = ExploreQueryEntry(query: exploreQuery)
@@ -1274,8 +1300,14 @@ final class DashboardViewModel {
         saveExploreHistory()
 
         let client = queryClient
-        let time = dashboardConfig.time
-        let interpolated = interpolateQuery(exploreQuery, time: time)
+        let time = exploreTime
+        let checked = QueryValidation.check(
+            template: exploreQuery, time: time,
+            variables: dashboardConfig.templating.list, backend: suggestionDialect
+        )
+        exploreValidation = checked.validation
+        let interpolated = checked.query
+        exploreExecutedQuery = interpolated
 
         // Cancel any in-flight explore query first — otherwise a slower
         // previous response can race in and overwrite the result of a
@@ -1283,18 +1315,55 @@ final class DashboardViewModel {
         exploreTask?.cancel()
         exploreTask = Task { [weak self] in
             do {
-                let data = try await client.queryPromQLAsTimeSeries(query: interpolated, time: time)
+                let result = try await client.queryPromQL(query: interpolated, time: time)
                 if Task.isCancelled { return }
                 guard let self else { return }
                 self.isExploreLoading = false
-                self.exploreResults = data
+                self.exploreFrames = result.frames
+                self.exploreError = nil
             } catch {
                 if Task.isCancelled { return }
                 guard let self else { return }
                 self.isExploreLoading = false
-                self.exploreResults = nil
+                // The previous result is dropped along with the failure: a
+                // chart left on screen under an error message is read as the
+                // answer to the query that just failed.
+                self.exploreFrames = nil
+                self.exploreError = error.localizedDescription
+                self.exploreErrorIsRefusal = DatasourceRefusal.isRefusal(error)
             }
         }
+    }
+
+    /// Put the explored query on the dashboard as a panel (contract Q5 /
+    /// User Story 1). Explore exists to try a query; if the only way to keep
+    /// one is to retype it into the editor, the trying and the keeping are two
+    /// unrelated activities and the reader does the second one by hand.
+    @discardableResult
+    func promoteExploreToPanel(title: String, panelType: PanelType = .timeSeries) -> PanelConfig? {
+        let template = exploreQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !template.isEmpty else { return nil }
+        let metric: PanelMetric = .tokensByModel
+        // The query is stored as the TEMPLATE the reader typed, not as the
+        // interpolated string that was sent: a panel with `$__interval` baked
+        // into it would keep Explore's bucket width forever.
+        let panel = PanelConfig(
+            title: title.isEmpty ? template : title,
+            panelType: panelType,
+            metric: metric,
+            gridPosition: GridPosition(column: 0, row: nextFreeRow, width: 12, height: 4),
+            targets: [PanelTarget(refId: "A", metric: metric, query: template)]
+        )
+        addPanel(panel)
+        fetchData()
+        return panel
+    }
+
+    /// The first row below everything already placed.
+    private var nextFreeRow: Int {
+        dashboardConfig.panels
+            .map { $0.gridPosition.row + $0.gridPosition.height }
+            .max() ?? 0
     }
 
     private func loadExploreHistory() {

@@ -76,6 +76,32 @@ enum FrameReader {
         }
     }
 
+    /// Every numeric column of every frame, as named series.
+    ///
+    /// For readers with no panel to tell them which field to read: Explore runs
+    /// an arbitrary query and has to show whatever came back, including columns
+    /// no `PanelMetric` names. A frame carrying several measures contributes one
+    /// series per measure, named for it, so `usage` does not silently show only
+    /// its first column.
+    static func allSeries(
+        _ set: FrameSet
+    ) -> [(name: String, points: [(date: Date, value: Double?)])] {
+        var out: [(name: String, points: [(date: Date, value: Double?)])] = []
+        for frame in set.frames {
+            guard let times = frame.timeField, case let .time(dates) = times.values else { continue }
+            let measures = frame.numberFields
+            for field in measures {
+                guard let values = field.values.numbers else { continue }
+                let n = min(dates.count, values.count)
+                let name = measures.count > 1
+                    ? "\(frame.displayName) · \(field.name)"
+                    : frame.displayName
+                out.append((name, (0..<n).map { (dates[$0], values[$0]) }))
+            }
+        }
+        return out
+    }
+
     /// The series with the largest reduced value — "top model" without an enum
     /// case for it.
     ///
