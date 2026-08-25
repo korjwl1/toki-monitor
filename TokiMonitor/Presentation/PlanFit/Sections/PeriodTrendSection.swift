@@ -85,6 +85,19 @@ struct PeriodTrendSection: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
+            // FR-007. Months are 28 to 31 days long, so an absolute total is
+            // not comparable with the one beside it — every monthly bucket
+            // carries its own daily rate, not just the latest one.
+            if model.unit == .monthly {
+                Text(bar.dailyAverageHours.map {
+                    L.tr("일 \(PlanFitFormat.hours($0))", "\(PlanFitFormat.hours($0))/day")
+                } ?? L.tr("하루 미만", "under a day"))
+                .font(.system(size: PlanFitType.tiny))
+                .foregroundStyle(PlanFitInk.support)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            }
+
             ZStack(alignment: .bottom) {
                 RoundedRectangle(cornerRadius: 3)
                     .fill(Color.primary.opacity(0.05))

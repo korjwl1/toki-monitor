@@ -454,6 +454,25 @@ struct PlanFitHonestyTests {
                 "the in-progress marker and the flag disagree")
     }
 
+    /// FR-007 / T046. Every monthly bucket carries its own daily rate, not
+    /// just the one the readout spells out — months are 28 to 31 days long, so
+    /// two absolute totals side by side are not a comparison.
+    @Test("monthly mode gives every period a daily average")
+    func monthlyPeriodsCarryTheirDailyAverage() {
+        let snapshotCase = PlanFitSnapshotCase(sufficiency: .sufficient, segments: .one, theme: .light)
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase, unit: .monthly)
+        #expect(!model.trend.bars.isEmpty)
+        for bar in model.trend.bars {
+            // nil is allowed only under one observed day, where a daily rate
+            // would be one morning's work multiplied up.
+            if bar.dailyAverageHours == nil {
+                #expect(!bar.isComplete, "a finished month with no daily average: \(bar.label)")
+            }
+        }
+        let complete = model.trend.bars.filter(\.isComplete)
+        #expect(complete.allSatisfy { $0.dailyAverageHours != nil })
+    }
+
     /// FR-050 / invariant 6. No cohort, no peer ranking, anywhere on the page.
     @Test("nothing on the page compares the user with anyone else",
           arguments: PlanFitSnapshotMatrix.all)
