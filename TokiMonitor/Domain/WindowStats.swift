@@ -17,6 +17,131 @@ import Foundation
 // - statistics are segmented by plan tier and account: a peak percentage is
 //   relative to the tier's limit, so mixing tiers corrupts every number
 
+// MARK: - Active use and exhaustion timing
+//
+// Two axes decide whether a plan actually fits, and neither of them is the
+// overall average a naive reading reaches for first.
+//
+// 1. Was the window WORKED IN? LLM work does not run until the limit is
+//    exhausted — people sleep. Most windows are barely used, so an average
+//    over every window reports "plenty of headroom" to someone who is blocked
+//    every single time they actually sit down to work.
+// 2. WHEN did it exhaust? Being cut off with three hours left is not the same
+//    event as topping out ten minutes before the reset. Only the first one
+//    interrupted anything.
+
+/// Whether a window contained real work.
+///
+/// `activeMs` is a LOWER BOUND — the daemon accumulates it in memory and the
+/// accumulation restarts with the daemon — so a small value does not prove the
+/// window was unused. That is why *absence of work* is a separate state from
+/// *inability to tell*: collapsing the two would let a daemon restart
+/// masquerade as a night's sleep, and idle windows are exactly what must not
+/// dilute the distribution a plan recommendation rests on.
+enum ActiveUseClass: String, Equatable, Hashable, Sendable, CaseIterable {
+    /// `activeMs` alone clears the floor. Since it only ever understates, this
+    /// is proof rather than inference.
+    case active
+    /// The provider reported zero utilisation across a well-covered window.
+    /// `peakPct` is a provider-reported value persisted on the row, so unlike
+    /// `activeMs` it survives a daemon restart: a covered zero really is a
+    /// window in which nothing was consumed.
+    case noActiveUse
+    /// Everything else — including a small-but-nonzero `activeMs`. Not "no
+    /// use": unknown.
+    case cannotTell
+}
+
+/// One window that reached 100%, with how much of the cycle was left when it
+/// happened.
+struct ExhaustionEvent: Equatable, Hashable, Sendable {
+    let windowEndMs: Int64
+    let windowLengthMs: Int64
+    /// `windowMinutes × 60000 − timeToOneHundredMs`, clamped to the window.
+    /// nil when the row is maxed but carries no timestamped first-100% sample
+    /// (`timeTo100Ms == -1`) — that is unknown timing, NOT zero time left.
+    let timeLeftMs: Int64?
+    let activeUse: ActiveUseClass
+    let hitCredits: Bool
+
+    /// Share of the cycle still to run when the limit was hit, 0…1.
+    var fractionLeft: Double? {
+        guard let timeLeftMs, windowLengthMs > 0 else { return nil }
+        return Double(timeLeftMs) / Double(windowLengthMs)
+    }
+
+    /// Contract V5: how much this exhaustion counts as real interruption.
+    var interruptionWeight: Double { WindowStats.interruptionWeight(fractionLeft: fractionLeft) }
+}
+
+/// Peak-utilisation percentiles over one set of windows.
+///
+/// Kept as a value so the same shape can describe the active set, the
+/// idle set, and the undecidable set side by side — the sets that are not
+/// used for headroom are *separated*, never dropped.
+struct UtilisationDistribution: Equatable, Hashable, Sendable {
+    /// Windows in this set.
+    let count: Int
+    /// Of those, how many backed the percentiles. Low-coverage windows (the
+    /// machine slept through the reset) are lower bounds of unknown looseness
+    /// and stay out, but every maxed window is exact at ">=100" regardless.
+    let sampledCount: Int
+    let p50: Double?
+    let p90: Double?
+    let p95: Double?
+    /// Mean peak over the whole set. A lower bound whenever `isCensored`.
+    let mean: Double?
+    /// Some samples were clipped at 100%, so the percentiles are floors.
+    let isCensored: Bool
+
+    var excludedForCoverage: Int { count - sampledCount }
+
+    static let empty = UtilisationDistribution(
+        count: 0, sampledCount: 0, p50: nil, p90: nil, p95: nil,
+        mean: nil, isCensored: false
+    )
+}
+
+/// The active-use split of one segment, plus its exhaustion timing.
+struct ActiveUseBreakdown: Equatable, Hashable, Sendable {
+    /// Peaks of windows that were actually worked in. **This is the
+    /// distribution a plan verdict may use for headroom** (contract V4).
+    let active: UtilisationDistribution
+    /// Windows positively known to be unused. Separated, not discarded — they
+    /// are the honest answer to "how much of the plan goes unused".
+    let noActiveUse: UtilisationDistribution
+    /// Windows whose `activeMs` was too small to confirm work and whose peak
+    /// was not a covered zero. Neither set gets to claim them.
+    let cannotTell: UtilisationDistribution
+
+    /// Every exhaustion in the segment, newest last.
+    let exhaustions: [ExhaustionEvent]
+    /// Σ interruption weight over `exhaustions` (contract V5).
+    let interruptionScore: Double
+    /// `interruptionScore` per observed week — the rate a verdict compares
+    /// against a threshold.
+    let interruptionsPerWeek: Double
+    /// Exhaustions that weigh at all (weight > 0).
+    let interruptingExhaustionCount: Int
+    /// Exhaustions inside the last tenth of their cycle — reset was imminent.
+    let harmlessExhaustionCount: Int
+    /// Maxed windows with no timestamped 100% sample.
+    let unknownTimingExhaustionCount: Int
+    /// Median time left at exhaustion, ms. nil when no timing is known.
+    let medianTimeLeftMs: Int64?
+
+    var activeCount: Int { active.count }
+    var noActiveUseCount: Int { noActiveUse.count }
+    var cannotTellCount: Int { cannotTell.count }
+
+    static let empty = ActiveUseBreakdown(
+        active: .empty, noActiveUse: .empty, cannotTell: .empty,
+        exhaustions: [], interruptionScore: 0, interruptionsPerWeek: 0,
+        interruptingExhaustionCount: 0, harmlessExhaustionCount: 0,
+        unknownTimingExhaustionCount: 0, medianTimeLeftMs: nil
+    )
+}
+
 /// One statistics segment: same provider, window kind, tier, and account.
 struct WindowStatsSegment: Equatable, Hashable {
     let provider: String
@@ -63,6 +188,13 @@ struct WindowStatsSegment: Equatable, Hashable {
     /// Anchor of the newest window (current-segment detection).
     let newestWindowEndMs: Int64
 
+    /// The two axes a plan verdict actually stands on: which windows were
+    /// worked in, and how much of the cycle was left when one ran out.
+    /// `activeWindowCount` above is a row-survival count, not this — it means
+    /// "rows that were not dropped as noise", and includes windows nobody
+    /// touched.
+    let activeUse: ActiveUseBreakdown
+
     let advice: TierAdvice
 
     func replacingAdvice(_ advice: TierAdvice) -> WindowStatsSegment {
@@ -76,7 +208,7 @@ struct WindowStatsSegment: Equatable, Hashable {
             dutyCycle: dutyCycle, impliedDemandP90: impliedDemandP90,
             sawCreditOverflow: sawCreditOverflow, observedDays: observedDays,
             coveredCount: coveredCount,
-            newestWindowEndMs: newestWindowEndMs, advice: advice
+            newestWindowEndMs: newestWindowEndMs, activeUse: activeUse, advice: advice
         )
     }
 }
@@ -99,6 +231,157 @@ enum WindowStats {
     /// A last-sample gap beyond this means the recorded peak is a lower bound
     /// (machine asleep at reset) — excluded from percentiles.
     static let coverageGapLimitMs: Int64 = 30 * 60_000
+
+    /// Recorded active time at or above which a window counts as worked in.
+    ///
+    /// The daemon accumulates active time under a 30-minute gap rule, so a
+    /// genuine work session registers in minutes, not seconds — and because
+    /// `activeMs` only ever understates, clearing this floor is proof. Below
+    /// it we cannot separate "one stray background request" from "a long
+    /// session the daemon forgot when it restarted", which is exactly what
+    /// `.cannotTell` is for.
+    ///
+    /// The error this floor makes is deliberate. Wrongly admitting an idle
+    /// window drags the active distribution down and reports headroom that
+    /// isn't there — the failure this whole split exists to prevent. Wrongly
+    /// excluding a worked window leaves a smaller sample of worked windows,
+    /// which is still a sample of worked windows.
+    static let activeUseFloorMs: Int64 = 5 * 60_000
+
+    /// At or below this share of the cycle remaining, an exhaustion carries no
+    /// interruption weight: the reset was about to happen anyway.
+    static let harmlessExhaustionFractionLeft: Double = 0.10
+    /// At or above this share remaining, it counts in full — the rest of the
+    /// cycle was spent blocked.
+    static let fullInterruptionFractionLeft: Double = 0.50
+
+    // MARK: Active use (contract W1, V4)
+
+    /// Whether one window contained real work.
+    ///
+    /// Note what is NOT here: no inference from `peakPct` upward. A high peak
+    /// with a tiny `activeMs` stays `.cannotTell` rather than being promoted
+    /// to `.active`, because the thing we would be inferring — that a human
+    /// was working — is the thing `activeMs` exists to report.
+    static func activeUse(_ row: WindowRow) -> ActiveUseClass {
+        if row.activeMs >= activeUseFloorMs { return .active }
+        // A covered zero peak is provider-reported and row-persisted: it
+        // outlives the daemon restart that would have zeroed `activeMs`, so
+        // it is the one thing that can positively establish absence of work.
+        if row.peakPct == 0, row.nSamples > 0, row.lastSampleGapMs <= coverageGapLimitMs {
+            return .noActiveUse
+        }
+        return .cannotTell
+    }
+
+    // MARK: Time left at exhaustion (contract V5)
+
+    /// Milliseconds between the first 100% sample and the reset.
+    ///
+    /// nil when the window never maxed out, and also when it maxed out with
+    /// `timeTo100Ms == -1` — no timestamped 100% sample exists, and that is
+    /// unknown timing, not zero time left.
+    static func timeLeftAtExhaustionMs(_ row: WindowRow) -> Int64? {
+        guard row.maxedOut, row.timeTo100Ms >= 0 else { return nil }
+        let windowMs = Int64(row.windowMinutes) * 60_000
+        guard windowMs > 0 else { return nil }
+        return max(0, min(windowMs, windowMs - row.timeTo100Ms))
+    }
+
+    static func exhaustionEvent(_ row: WindowRow) -> ExhaustionEvent? {
+        guard row.maxedOut else { return nil }
+        return ExhaustionEvent(
+            windowEndMs: row.windowEndMs,
+            windowLengthMs: Int64(row.windowMinutes) * 60_000,
+            timeLeftMs: timeLeftAtExhaustionMs(row),
+            activeUse: activeUse(row),
+            hitCredits: row.limitReachedKind == 2
+        )
+    }
+
+    /// Contract V5. Linear ramp between the two fractions above.
+    static func interruptionWeight(fractionLeft: Double?) -> Double {
+        // Unknown timing is a confirmed exhaustion with no evidence that it
+        // was harmless. A row goes maxed-without-timing when the first sample
+        // we ever took already read 100%, which if anything points at an early
+        // exhaustion — so it counts in full rather than being written off.
+        guard let fractionLeft else { return 1 }
+        let span = fullInterruptionFractionLeft - harmlessExhaustionFractionLeft
+        guard span > 0 else { return fractionLeft > harmlessExhaustionFractionLeft ? 1 : 0 }
+        return min(1, max(0, (fractionLeft - harmlessExhaustionFractionLeft) / span))
+    }
+
+    // MARK: Distributions
+
+    /// Peak percentiles over one set of windows.
+    ///
+    /// Sampling rule matches the segment-wide one: well-covered windows plus
+    /// every maxed window (a maxed row is exact at ">=100" no matter how large
+    /// its sample gap).
+    static func distribution(_ rows: [WindowRow]) -> UtilisationDistribution {
+        guard !rows.isEmpty else { return .empty }
+        let sampled = rows.filter { $0.lastSampleGapMs <= coverageGapLimitMs || $0.maxedOut }
+        let peaks = sampled.map(\.peakPct).sorted()
+        let maxedCount = rows.filter(\.maxedOut).count
+        return UtilisationDistribution(
+            count: rows.count,
+            sampledCount: sampled.count,
+            p50: percentile(peaks, 0.5),
+            p90: percentile(peaks, 0.9),
+            p95: percentile(peaks, 0.95),
+            mean: rows.map(\.peakPct).reduce(0, +) / Double(rows.count),
+            isCensored: Double(maxedCount) / Double(rows.count) > 0.05
+        )
+    }
+
+    /// Split one segment's windows by active use and score its exhaustions.
+    ///
+    /// The three sets partition the input: nothing is dropped. The verdict
+    /// layer reads `active` for headroom (V4); the other two exist so the page
+    /// can say how much of the plan went unused and how much we could not
+    /// account for, which is a different question from the same rows.
+    static func activeUseBreakdown(rows: [WindowRow], observedDays: Double) -> ActiveUseBreakdown {
+        guard !rows.isEmpty else { return .empty }
+
+        var active: [WindowRow] = []
+        var idle: [WindowRow] = []
+        var unclear: [WindowRow] = []
+        for row in rows {
+            switch activeUse(row) {
+            case .active: active.append(row)
+            case .noActiveUse: idle.append(row)
+            case .cannotTell: unclear.append(row)
+            }
+        }
+
+        // Exhaustion is scored over EVERY maxed window, not only the active
+        // ones. Reaching 100% of a rate limit is provider-reported consumption
+        // — it is itself evidence that work happened — so filtering exhaustions
+        // by the lower-bound `activeMs` would discard real interruptions on the
+        // strength of a number we already know understates. (A maxed window can
+        // never classify as `.noActiveUse` anyway: that requires a zero peak.)
+        let exhaustions = rows
+            .sorted { $0.windowEndMs < $1.windowEndMs }
+            .compactMap(exhaustionEvent)
+
+        let score = exhaustions.reduce(0.0) { $0 + $1.interruptionWeight }
+        let weeks = max(observedDays / 7, 1)
+        let timesLeft = exhaustions.compactMap(\.timeLeftMs).sorted()
+        let medianLeft = percentile(timesLeft.map(Double.init), 0.5).map { Int64($0) }
+
+        return ActiveUseBreakdown(
+            active: distribution(active),
+            noActiveUse: distribution(idle),
+            cannotTell: distribution(unclear),
+            exhaustions: exhaustions,
+            interruptionScore: score,
+            interruptionsPerWeek: score / weeks,
+            interruptingExhaustionCount: exhaustions.filter { $0.interruptionWeight > 0 }.count,
+            harmlessExhaustionCount: exhaustions.filter { $0.interruptionWeight == 0 }.count,
+            unknownTimingExhaustionCount: exhaustions.filter { $0.timeLeftMs == nil }.count,
+            medianTimeLeftMs: medianLeft
+        )
+    }
 
     /// Compute all segments from raw rows (any providers/kinds mixed).
     /// `nowMs` is injectable for tests.
@@ -257,6 +540,7 @@ enum WindowStats {
         let dutyCycle = min(1.0, totalActiveMs / Double(wallMs))
 
         let medianT100 = percentile(t100s, 0.5)
+        let breakdown = activeUseBreakdown(rows: active, observedDays: observedDays)
         let seg = WindowStatsSegment(
             provider: provider,
             kind: kind,
@@ -278,6 +562,7 @@ enum WindowStats {
             observedDays: observedDays,
             coveredCount: wellCovered.count,
             newestWindowEndMs: newest,
+            activeUse: breakdown,
             advice: .evidenceOnly // placeholder, replaced below
         )
         return withAdvice(seg)
@@ -293,12 +578,16 @@ enum WindowStats {
         } else if s.observedDays < 14 {
             advice = .collecting(days: Int(s.observedDays.rounded(.down)))
         } else {
-            let weeks = max(s.observedDays / 7, 1)
-            let maxedPerWeek = Double(s.maxedCount) / weeks
+            // Interruptions, not max-outs. A window that tops out ten
+            // minutes before its reset blocked nothing, and counting it the
+            // same as one that died with three hours left is what makes a
+            // "hitting the limit constantly" reading out of a plan that fits.
+            // Contract V5 weights each exhaustion by the time it cost.
+            let interruptionsPerWeek = s.activeUse.interruptionsPerWeek
             let windowMinutes: Double = s.kind == "session" ? 300 : 10_080
             // "Chronic" requires recurrence: with one max-out the median IS
             // that single sample, and this branch bypassed the 2-per-week gate.
-            let chronicEarlyExhaustion = s.maxedCount >= 2
+            let chronicEarlyExhaustion = s.activeUse.interruptingExhaustionCount >= 2
                 && (s.medianTimeTo100Sec ?? .infinity) < windowMinutes * 60 * 0.6
 
             if s.sawCreditOverflow {
@@ -306,10 +595,10 @@ enum WindowStats {
                     "이미 한도 초과분을 크레딧으로 지불 중 — 초과 지출이 티어 차액보다 크면 업그레이드가 저렴합니다",
                     "Already paying overflow via credits — upgrading is cheaper if overflow spend exceeds the tier gap"
                 ))
-            } else if maxedPerWeek >= 2 {
+            } else if interruptionsPerWeek >= 2 {
                 advice = .upgrade(reason: L.tr(
-                    "주당 \(String(format: "%.1f", maxedPerWeek))회 한도 소진",
-                    "Hitting the limit \(String(format: "%.1f", maxedPerWeek))×/week"
+                    "주당 \(String(format: "%.1f", interruptionsPerWeek))회 작업 중단 (리셋까지 시간이 남은 소진)",
+                    "Work cut short \(String(format: "%.1f", interruptionsPerWeek))×/week, with the cycle still to run"
                 ))
             } else if let demand = s.impliedDemandP90, demand > 120, s.maxedCount >= 2 {
                 // Margin + min-sample: implied demand is >=100 by construction
@@ -328,7 +617,17 @@ enum WindowStats {
             } else if s.maxedCount == 0, s.observedDays >= 28 - 1,
                       s.coveredCount >= 3,
                       Double(s.coveredCount) >= 0.6 * Double(s.activeWindowCount),
-                      let p95 = s.p95Peak, p95 < 40, !s.p95IsCensored {
+                      let p95 = s.p95Peak, p95 < 40, !s.p95IsCensored,
+                      // Contract V4: headroom is read off the windows the user
+                      // actually worked in. The all-window p95 above can be low
+                      // purely because most windows were slept through, and
+                      // telling that user to pay less is the one recommendation
+                      // that costs them when it is wrong.
+                      // A nil active p95 is not a pass: it means no window
+                      // the user worked in was sampled near its reset, so
+                      // there is nothing to read headroom off at all.
+                      let activeP95 = s.activeUse.active.p95, activeP95 < 40,
+                      !s.activeUse.active.isCensored {
                 // Downgrade is deliberately stricter than upgrade: it needs the
                 // full 28-day lookback with zero exhaustion (plan §2) — and a
                 // representative sample. Windows where the machine slept
