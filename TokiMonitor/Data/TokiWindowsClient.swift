@@ -61,6 +61,46 @@ struct WindowRow: Codable, Sendable, Equatable, Hashable {
     var livePct: Double { lastPct ?? peakPct }
 }
 
+/// The provider's own account vocabulary, response-only (daemon `699c388`).
+///
+/// **Every field is optional because the daemon OMITS what the provider did
+/// not send**, rather than defaulting it — and here absent and `false` are
+/// different claims. `has_claude_max: false` is the provider saying there is
+/// no Max subscription; a missing `has_claude_max` is the provider saying
+/// nothing, which is the normal case for an account whose profile could not be
+/// read at all. Defaulting either one to `false` would manufacture a negative
+/// fact out of silence, so the optionality is load-bearing: it is what lets
+/// `AccountType` confirm only from what is present.
+///
+/// Values are the provider's strings verbatim. Classification lives in
+/// `AccountShape.swift` (Domain) — the daemon deliberately does not classify,
+/// because the provider owns this vocabulary and keeps extending it.
+struct AccountShape: Codable, Sendable, Equatable, Hashable {
+    /// e.g. "claude_max".
+    let organizationType: String?
+    /// e.g. "stripe_subscription". Positive evidence of a subscription; its
+    /// absence is NOT evidence of an API account.
+    let billingType: String?
+    /// Non-null on seat-based (team/enterprise) organizations.
+    let seatTier: String?
+    /// e.g. "active".
+    let subscriptionStatus: String?
+    let hasClaudeMax: Bool?
+    let hasClaudePro: Bool?
+    /// From the usage endpoint rather than the profile: a team/org signal.
+    let memberDashboardAvailable: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case organizationType = "organization_type"
+        case billingType = "billing_type"
+        case seatTier = "seat_tier"
+        case subscriptionStatus = "subscription_status"
+        case hasClaudeMax = "has_claude_max"
+        case hasClaudePro = "has_claude_pro"
+        case memberDashboardAvailable = "member_dashboard_available"
+    }
+}
+
 struct WindowsProviderEntry: Codable, Sendable {
     let windows: [WindowRow]
     let authStatus: String        // "ok" | "missing" | "expired" | "unreadable"
@@ -76,10 +116,14 @@ struct WindowsProviderEntry: Codable, Sendable {
     /// means "storage broken", not "none yet". Without it a Fjall read error
     /// renders as a full green bar at 0% while the user sits at 95%.
     let error: String?
+    /// Claude only, and only on daemons that read the profile fields. Absent
+    /// is the normal case — see `AccountShape` above and contract W4.
+    let accountShape: AccountShape?
 
     enum CodingKeys: String, CodingKey {
         case windows
         case error
+        case accountShape = "account_shape"
         case authStatus = "auth_status"
         case lastSuccessMs = "last_success_ms"
         case lastPollMs = "last_poll_ms"
