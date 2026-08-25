@@ -147,7 +147,10 @@ struct CustomDashboardView: View {
         PanelContainerView(
             title: panel.title,
             isEditing: viewModel.isEditing,
-            state: panelState(for: panel),
+            // A panel this build cannot draw has no query state worth showing:
+            // whatever the fetch did, the answer on screen is "unknown type".
+            // `nil` hands the whole box to the content (contract R5).
+            state: panel.panelType == .unknown ? nil : panelState(for: panel),
             onDelete: { viewModel.removePanel(id: panel.id) },
             onEdit: { onEditPanel?(panel) },
             onRetry: { viewModel.fetchData() },

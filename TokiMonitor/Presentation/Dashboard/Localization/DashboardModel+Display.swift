@@ -92,6 +92,7 @@ extension PanelType {
         case .gauge: L.dash.gaugePanel
         case .stateTimeline: L.tr("상태 타임라인", "State Timeline")
         case .rowPanel: L.tr("행", "Row")
+        case .unknown: L.tr("알 수 없는 종류", "Unknown type")
         }
     }
 
@@ -105,6 +106,7 @@ extension PanelType {
         case .gauge: "gauge.open.with.lines.needle.33percent"
         case .stateTimeline: "chart.bar.doc.horizontal"
         case .rowPanel: "rectangle.split.1x2"
+        case .unknown: "questionmark.square.dashed"
         }
     }
 }

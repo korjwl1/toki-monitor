@@ -231,7 +231,7 @@ struct PanelEditorVisualizationTab: View {
             case .table:      tableOptions
             case .gauge:      gaugeOptions
             case .stateTimeline: stateTimelineOptions
-            case .pieChart, .rowPanel: EmptyView()
+            case .pieChart, .rowPanel, .unknown: EmptyView()
             }
         }
     }

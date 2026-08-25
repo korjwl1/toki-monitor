@@ -39,6 +39,8 @@ struct PanelContentView: View {
             StateTimelinePanelView(panel: panel, frames: frames, dateFormat: dateFormat)
         case .rowPanel:
             EmptyView()
+        case .unknown:
+            UnknownPanelView(panel: panel)
         }
     }
 

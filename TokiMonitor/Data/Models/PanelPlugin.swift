@@ -25,6 +25,8 @@ enum BuiltinPanelPluginKind {
     static let gaugeChart      = "GaugeChart"
     static let stateTimelineChart = "StateTimelineChart"
     static let row             = "Row"
+    /// Placeholder kind for a panel type this build has no renderer for.
+    static let unknownChart    = "UnknownChart"
 
     /// Reverse mapping back to the legacy `PanelType` enum so existing
     /// renderers (which still switch on `PanelType`) keep working.
@@ -52,6 +54,9 @@ enum BuiltinPanelPluginKind {
         case .gauge:      return gaugeChart
         case .stateTimeline: return stateTimelineChart
         case .rowPanel:   return row
+        // A panel this build cannot draw has no plugin of ours. Keeping the
+        // raw name means a normalization pass does not overwrite it.
+        case .unknown:    return unknownChart
         }
     }
 }

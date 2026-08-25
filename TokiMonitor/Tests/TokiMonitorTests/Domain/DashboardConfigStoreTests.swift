@@ -167,3 +167,190 @@ struct DashboardConfigStoreTests {
         #expect(DashboardMigrator.migrate(future) == future)
     }
 }
+
+// MARK: - Round trip (계약 C1)
+
+/// `save(load(D)) ≡ D`, modulo normalisation of the parts this build
+/// understands.
+///
+/// The path these guard is ordinary and silent: a newer build writes a field, an
+/// older build opens the dashboard once and saves, and the field is gone. The
+/// user pressed save. Nothing told them anything was dropped, and unlike event
+/// data there is no provider log to rebuild a dashboard from.
+@Suite("A dashboard survives a build that does not understand all of it")
+@MainActor
+struct DashboardRoundTripTests {
+
+    private var base: DashboardConfig { DashboardConfigStore.defaultConfig }
+
+    private func objectify(_ config: DashboardConfig) throws -> [String: Any] {
+        let data = try JSONEncoder().encode(config)
+        return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func decode(_ object: [String: Any]) throws -> DashboardConfig {
+        let data = try JSONSerialization.data(withJSONObject: object)
+        return try JSONDecoder().decode(DashboardConfig.self, from: data)
+    }
+
+    /// load → save, expressed as JSON on both ends so the assertion is about
+    /// the bytes a downgrade would leave on disk, not about in-memory fields.
+    private func roundTrip(_ object: [String: Any]) throws -> [String: Any] {
+        try objectify(try decode(object))
+    }
+
+    // MARK: Level 1 — the dashboard
+
+    @Test("an unknown key on the dashboard comes back with its value intact")
+    func dashboardLevelKeySurvives() throws {
+        var doc = try objectify(base)
+        doc["crossPanelLinking"] = ["mode": "shared", "maxHops": 3, "enabled": true]
+
+        let out = try roundTrip(doc)
+        let carried = try #require(out["crossPanelLinking"] as? [String: Any])
+        #expect(carried["mode"] as? String == "shared")
+        #expect(carried["maxHops"] as? Int == 3)
+        #expect(carried["enabled"] as? Bool == true)
+    }
+
+    // MARK: Level 2 — a panel
+
+    @Test("an unknown key on a panel comes back with its value intact")
+    func panelLevelKeySurvives() throws {
+        var doc = try objectify(base)
+        var panels = try #require(doc["panels"] as? [[String: Any]])
+        panels[0]["annotationOverlay"] = ["source": "deploys", "opacity": 0.35]
+        doc["panels"] = panels
+
+        let out = try roundTrip(doc)
+        let outPanels = try #require(out["panels"] as? [[String: Any]])
+        let carried = try #require(outPanels[0]["annotationOverlay"] as? [String: Any])
+        #expect(carried["source"] as? String == "deploys")
+        #expect(carried["opacity"] as? Double == 0.35)
+    }
+
+    // MARK: Level 3 — a variable
+
+    @Test("an unknown key on a variable comes back with its value intact")
+    func variableLevelKeySurvives() throws {
+        var doc = try objectify(base)
+        var templating = try #require(doc["templating"] as? [String: Any])
+        var list = try #require(templating["list"] as? [[String: Any]])
+        list[0]["dependsOn"] = ["cluster", "namespace"]
+        templating["list"] = list
+        doc["templating"] = templating
+
+        let out = try roundTrip(doc)
+        let outTemplating = try #require(out["templating"] as? [String: Any])
+        let outList = try #require(outTemplating["list"] as? [[String: Any]])
+        #expect(outList[0]["dependsOn"] as? [String] == ["cluster", "namespace"])
+    }
+
+    // MARK: All three at once
+
+    @Test("all three levels survive the same round trip")
+    func allThreeLevelsSurviveTogether() throws {
+        var doc = try objectify(base)
+        doc["futureDashboardKey"] = "d"
+        var panels = try #require(doc["panels"] as? [[String: Any]])
+        panels[0]["futurePanelKey"] = "p"
+        doc["panels"] = panels
+        var templating = try #require(doc["templating"] as? [String: Any])
+        var list = try #require(templating["list"] as? [[String: Any]])
+        list[0]["futureVariableKey"] = "v"
+        templating["list"] = list
+        doc["templating"] = templating
+
+        let out = try roundTrip(doc)
+        #expect(out["futureDashboardKey"] as? String == "d")
+        #expect((out["panels"] as? [[String: Any]])?[0]["futurePanelKey"] as? String == "p")
+        let outList = (out["templating"] as? [String: Any])?["list"] as? [[String: Any]]
+        #expect(outList?[0]["futureVariableKey"] as? String == "v")
+    }
+
+    @Test("a second round trip does not accumulate or drop anything")
+    func roundTripIsStable() throws {
+        var doc = try objectify(base)
+        doc["futureDashboardKey"] = ["a": 1]
+
+        let once = try roundTrip(doc)
+        let twice = try roundTrip(once)
+        #expect(NSDictionary(dictionary: once) == NSDictionary(dictionary: twice))
+    }
+
+    @Test("a document with only known keys round-trips to itself")
+    func knownOnlyDocumentIsUnchanged() throws {
+        let doc = try objectify(base)
+        let out = try roundTrip(doc)
+        #expect(NSDictionary(dictionary: out) == NSDictionary(dictionary: doc))
+    }
+
+    /// A key this build DOES understand must come from the live field, not
+    /// from a preserved copy — otherwise an edit would be shadowed by the
+    /// value that was on disk when the dashboard was opened.
+    @Test("an edit to a known field is not shadowed by preserved data")
+    func knownFieldWinsOverPreserved() throws {
+        var doc = try objectify(base)
+        doc["futureDashboardKey"] = "x"
+        var loaded = try decode(doc)
+        loaded.title = "Renamed"
+        let out = try objectify(loaded)
+        #expect(out["title"] as? String == "Renamed")
+        #expect(out["futureDashboardKey"] as? String == "x")
+    }
+
+    // MARK: - Unknown panel type (계약 R5)
+
+    @Test("a panel type this build cannot draw keeps the panel")
+    func unknownPanelTypeKeepsThePanel() throws {
+        var doc = try objectify(base)
+        var panels = try #require(doc["panels"] as? [[String: Any]])
+        let panelCount = panels.count
+        panels[0]["panelType"] = "sankeyDiagram"
+        doc["panels"] = panels
+
+        let loaded = try decode(doc)
+        #expect(loaded.panels.count == panelCount, "the panel must not be deleted")
+        #expect(loaded.panels[0].panelType == .unknown)
+        #expect(loaded.panels[0].unknownPanelTypeRaw == "sankeyDiagram")
+        #expect(loaded.panels[0].panelTypeLabel == "sankeyDiagram")
+    }
+
+    @Test("an unknown panel type is written back as the name it came in as")
+    func unknownPanelTypeRoundTrips() throws {
+        var doc = try objectify(base)
+        var panels = try #require(doc["panels"] as? [[String: Any]])
+        panels[0]["panelType"] = "sankeyDiagram"
+        doc["panels"] = panels
+
+        let out = try roundTrip(doc)
+        let outPanels = try #require(out["panels"] as? [[String: Any]])
+        #expect(outPanels[0]["panelType"] as? String == "sankeyDiagram")
+    }
+
+    @Test("changing an unknown panel to a type this build has drops the placeholder")
+    func editingAwayFromUnknownWritesTheNewType() throws {
+        var doc = try objectify(base)
+        var panels = try #require(doc["panels"] as? [[String: Any]])
+        panels[0]["panelType"] = "sankeyDiagram"
+        doc["panels"] = panels
+
+        var loaded = try decode(doc)
+        loaded.panels[0].panelType = .table
+        let out = try objectify(loaded)
+        #expect((out["panels"] as? [[String: Any]])?[0]["panelType"] as? String == "table")
+    }
+
+    @Test("the whole rest of the dashboard still loads around an undrawable panel")
+    func unknownPanelDoesNotCostTheDashboard() throws {
+        var doc = try objectify(base)
+        var panels = try #require(doc["panels"] as? [[String: Any]])
+        panels[1]["panelType"] = "somethingFromLater"
+        doc["panels"] = panels
+
+        let loaded = try decode(doc)
+        #expect(loaded.title == base.title)
+        #expect(loaded.panels.count == base.panels.count)
+        #expect(loaded.panels.filter { $0.panelType == .unknown }.count == 1)
+    }
+}

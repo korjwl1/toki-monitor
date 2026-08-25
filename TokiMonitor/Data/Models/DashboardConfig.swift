@@ -44,6 +44,25 @@ struct DashboardConfig: Codable, Equatable {
     // Settings
     var editable: Bool = true
 
+    /// Dashboard-level keys written by a build newer than this one, kept
+    /// verbatim so a load→save here does not erase them (계약 C1).
+    var unknownFields: [String: JSONValue] = [:]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id, uid, title, description, tags, schemaVersion, version
+        case time, refresh, panels, templating, datasources, activeDatasource
+        case layouts, annotations, editable
+    }
+
+    static let knownKeys: Set<String> = Set(CodingKeys.allCases.map(\.stringValue))
+
+    /// True when the document was written against a schema this build does not
+    /// understand. Such a document opens read-only and is written back as the
+    /// original bytes rather than re-encoded (계약 C2).
+    var isReadOnlyForThisBuild: Bool {
+        schemaVersion > DashboardMigrator.currentVersion
+    }
+
     // MARK: - Perses-style layout helpers
     //
     // The in-memory renderer still reads from `panels[].gridPosition`, but
@@ -92,6 +111,56 @@ struct DashboardConfig: Codable, Equatable {
     static func generateUID() -> String {
         let chars = "abcdefghijklmnopqrstuvwxyz0123456789"
         return String((0..<8).map { _ in chars.randomElement()! })
+    }
+}
+
+// MARK: - DashboardConfig Codable (unknown-key preserving)
+//
+// Written by hand rather than synthesized so that keys this build has no field
+// for survive the round trip. The implementations live in an extension so the
+// memberwise initializer is still synthesized for the callers that use it.
+
+extension DashboardConfig {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        uid = try c.decode(String.self, forKey: .uid)
+        title = try c.decode(String.self, forKey: .title)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        tags = try c.decode([String].self, forKey: .tags)
+        schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+        version = try c.decode(Int.self, forKey: .version)
+        time = try c.decode(TimeConfig.self, forKey: .time)
+        refresh = try c.decode(RefreshInterval.self, forKey: .refresh)
+        panels = try c.decode([PanelConfig].self, forKey: .panels)
+        templating = try c.decode(TemplatingConfig.self, forKey: .templating)
+        datasources = try c.decode([String: DatasourceInstance].self, forKey: .datasources)
+        activeDatasource = try c.decodeIfPresent(DatasourceSelector.self, forKey: .activeDatasource)
+        layouts = try c.decodeIfPresent([DashboardLayout].self, forKey: .layouts)
+        annotations = try c.decode([DashboardAnnotation].self, forKey: .annotations)
+        editable = try c.decode(Bool.self, forKey: .editable)
+        unknownFields = decoder.unknownFields(besides: Self.knownKeys)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(uid, forKey: .uid)
+        try c.encode(title, forKey: .title)
+        try c.encodeIfPresent(description, forKey: .description)
+        try c.encode(tags, forKey: .tags)
+        try c.encode(schemaVersion, forKey: .schemaVersion)
+        try c.encode(version, forKey: .version)
+        try c.encode(time, forKey: .time)
+        try c.encode(refresh, forKey: .refresh)
+        try c.encode(panels, forKey: .panels)
+        try c.encode(templating, forKey: .templating)
+        try c.encode(datasources, forKey: .datasources)
+        try c.encodeIfPresent(activeDatasource, forKey: .activeDatasource)
+        try c.encodeIfPresent(layouts, forKey: .layouts)
+        try c.encode(annotations, forKey: .annotations)
+        try c.encode(editable, forKey: .editable)
+        try encoder.encodeUnknownFields(unknownFields, besides: Self.knownKeys)
     }
 }
 
@@ -280,6 +349,18 @@ struct DashboardVariable: Codable, Identifiable, Equatable {
     /// natural home in `current`, which holds one selection from a list.
     var adHocFilters: [AdHocFilter]?
 
+    /// Variable-level keys written by a build newer than this one, kept
+    /// verbatim through load→save (계약 C1).
+    var unknownFields: [String: JSONValue] = [:]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id, name, label, type, query, current, options, multi, includeAll
+        case hide, refresh, customAllValue, capturingRegexp, sort, plugin
+        case adHocFilters
+    }
+
+    static let knownKeys: Set<String> = Set(CodingKeys.allCases.map(\.stringValue))
+
     enum VariableType: String, Codable, CaseIterable, Equatable {
         case custom
         case interval
@@ -330,6 +411,52 @@ struct DashboardVariable: Codable, Identifiable, Equatable {
     /// Options after `sort` is applied — the order the toolbar should render.
     var sortedOptions: [VariableOption] {
         effectiveSort.apply(options)
+    }
+}
+
+// MARK: - DashboardVariable Codable (unknown-key preserving)
+
+extension DashboardVariable {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        label = try c.decodeIfPresent(String.self, forKey: .label)
+        type = try c.decode(VariableType.self, forKey: .type)
+        query = try c.decode(String.self, forKey: .query)
+        current = try c.decode(VariableSelection.self, forKey: .current)
+        options = try c.decode([VariableOption].self, forKey: .options)
+        multi = try c.decode(Bool.self, forKey: .multi)
+        includeAll = try c.decode(Bool.self, forKey: .includeAll)
+        hide = try c.decode(VariableHide.self, forKey: .hide)
+        refresh = try c.decode(VariableRefresh.self, forKey: .refresh)
+        customAllValue = try c.decodeIfPresent(String.self, forKey: .customAllValue)
+        capturingRegexp = try c.decodeIfPresent(String.self, forKey: .capturingRegexp)
+        sort = try c.decodeIfPresent(VariableSort.self, forKey: .sort)
+        plugin = try c.decodeIfPresent(VariablePluginRef.self, forKey: .plugin)
+        adHocFilters = try c.decodeIfPresent([AdHocFilter].self, forKey: .adHocFilters)
+        unknownFields = decoder.unknownFields(besides: Self.knownKeys)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encodeIfPresent(label, forKey: .label)
+        try c.encode(type, forKey: .type)
+        try c.encode(query, forKey: .query)
+        try c.encode(current, forKey: .current)
+        try c.encode(options, forKey: .options)
+        try c.encode(multi, forKey: .multi)
+        try c.encode(includeAll, forKey: .includeAll)
+        try c.encode(hide, forKey: .hide)
+        try c.encode(refresh, forKey: .refresh)
+        try c.encodeIfPresent(customAllValue, forKey: .customAllValue)
+        try c.encodeIfPresent(capturingRegexp, forKey: .capturingRegexp)
+        try c.encodeIfPresent(sort, forKey: .sort)
+        try c.encodeIfPresent(plugin, forKey: .plugin)
+        try c.encodeIfPresent(adHocFilters, forKey: .adHocFilters)
+        try encoder.encodeUnknownFields(unknownFields, besides: Self.knownKeys)
     }
 }
 
@@ -386,6 +513,31 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     /// "use the preset for `metric`", which is what every existing panel does.
     var fieldSelection: FieldSelection?
 
+    /// Panel-level keys written by a build newer than this one, kept verbatim
+    /// through load→save (계약 C1).
+    var unknownFields: [String: JSONValue] = [:]
+
+    /// The `panelType` string exactly as it was written, when this build has no
+    /// case for it. Re-encoded in place of `panelType` so that opening a
+    /// dashboard from a newer build and saving it does not rewrite a panel it
+    /// merely could not draw (계약 R5).
+    var unknownPanelTypeRaw: String?
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id, title, description, panelType, metric, gridPosition, targets
+        case options, dataLinks, collapsed, plugin, queries, fieldConfig
+        case fieldSelection
+    }
+
+    static let knownKeys: Set<String> = Set(CodingKeys.allCases.map(\.stringValue))
+
+    /// The type name to show the reader — the real one when this build knows
+    /// it, the raw string off disk when it does not.
+    var panelTypeLabel: String {
+        panelType == .unknown ? (unknownPanelTypeRaw ?? PanelType.unknown.rawValue)
+                              : panelType.rawValue
+    }
+
     /// Decoded `TokiPromQLQuerySpec` from this panel's first query envelope,
     /// or nil. Returned fresh on every access — Swift structs can't cache
     /// computed values without a separate class wrapper, and panel fetch
@@ -424,6 +576,60 @@ struct PanelConfig: Codable, Identifiable, Equatable {
             return ds
         }
         return nil
+    }
+}
+
+// MARK: - PanelConfig Codable (unknown-key preserving)
+
+extension PanelConfig {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+
+        // An unrecognised panel type must NOT fail the panel. Failing here
+        // fails the dashboard, and the dashboard is the thing that cannot be
+        // rebuilt. Keep the string, render a placeholder, write it back.
+        let rawType = try c.decode(String.self, forKey: .panelType)
+        if let known = PanelType(rawValue: rawType), known != .unknown {
+            panelType = known
+            unknownPanelTypeRaw = nil
+        } else {
+            panelType = .unknown
+            unknownPanelTypeRaw = rawType
+        }
+
+        metric = try c.decode(PanelMetric.self, forKey: .metric)
+        gridPosition = try c.decode(GridPosition.self, forKey: .gridPosition)
+        targets = try c.decode([PanelTarget].self, forKey: .targets)
+        options = try c.decode(PanelDisplayOptions.self, forKey: .options)
+        dataLinks = try c.decode([DataLink].self, forKey: .dataLinks)
+        collapsed = try c.decode(Bool.self, forKey: .collapsed)
+        plugin = try c.decodeIfPresent(PanelPluginRef.self, forKey: .plugin)
+        queries = try c.decodeIfPresent([Query].self, forKey: .queries)
+        fieldConfig = try c.decodeIfPresent(FieldConfigSource.self, forKey: .fieldConfig)
+        fieldSelection = try c.decodeIfPresent(FieldSelection.self, forKey: .fieldSelection)
+        unknownFields = decoder.unknownFields(besides: Self.knownKeys)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encodeIfPresent(description, forKey: .description)
+        try c.encode(panelTypeLabel, forKey: .panelType)
+        try c.encode(metric, forKey: .metric)
+        try c.encode(gridPosition, forKey: .gridPosition)
+        try c.encode(targets, forKey: .targets)
+        try c.encode(options, forKey: .options)
+        try c.encode(dataLinks, forKey: .dataLinks)
+        try c.encode(collapsed, forKey: .collapsed)
+        try c.encodeIfPresent(plugin, forKey: .plugin)
+        try c.encodeIfPresent(queries, forKey: .queries)
+        try c.encodeIfPresent(fieldConfig, forKey: .fieldConfig)
+        try c.encodeIfPresent(fieldSelection, forKey: .fieldSelection)
+        try encoder.encodeUnknownFields(unknownFields, besides: Self.knownKeys)
     }
 }
 
@@ -552,6 +758,13 @@ enum PanelType: String, Codable, CaseIterable {
     case stateTimeline
     case rowPanel
 
+    /// A type this build has no renderer for — a panel written by a newer
+    /// build. It is never created here and never offered in a picker; it
+    /// exists so that decoding such a panel keeps the panel instead of
+    /// failing the whole dashboard (계약 R5). The string actually on disk is
+    /// kept in `PanelConfig.unknownPanelTypeRaw`.
+    case unknown = "__unknown__"
+
     /// Panel types available for user creation (excludes rowPanel from general picker)
     static var creatableTypes: [PanelType] {
         [.stat, .timeSeries, .barChart, .pieChart, .table, .gauge, .stateTimeline]
@@ -571,6 +784,7 @@ enum PanelType: String, Codable, CaseIterable {
         // Spans are read by their extent, so a narrow one is unreadable.
         case .stateTimeline: 8
         case .rowPanel: 24
+        case .unknown: 4
         }
     }
 
@@ -590,6 +804,7 @@ enum PanelType: String, Codable, CaseIterable {
         case .gauge: 1
         case .stateTimeline: 1
         case .rowPanel: 1
+        case .unknown: 1
         }
     }
 

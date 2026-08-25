@@ -13,6 +13,8 @@
 		AA40PSTATETEST0002 /* PanelStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSTATETEST0001 /* PanelStateTests.swift */; };
 		AA41PFCTEST0001B /* PanelFetchCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41PFCTEST0001F /* PanelFetchCoordinatorTests.swift */; };
 		AA40PANELSTATUS002 /* PanelStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PANELSTATUS001 /* PanelStatusView.swift */; };
+		AA80JSONVALUE0000002 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80JSONVALUE0000001 /* JSONValue.swift */; };
+		AA80UNKNOWNPANEL0002 /* UnknownPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80UNKNOWNPANEL0001 /* UnknownPanelView.swift */; };
 		AA40PANELSTATE0002 /* PanelState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PANELSTATE0001 /* PanelState.swift */; };
 		0237DEE9F5EB132AAB4AE384 /* TimeSeriesChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9BDCAC76DC2C743B8CE339 /* TimeSeriesChartView.swift */; };
 		AA34STPANEL00000002 /* StateTimelinePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34STPANEL00000001 /* StateTimelinePanelView.swift */; };
@@ -209,6 +211,8 @@
 		AA40PSTATETEST0001 /* PanelStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateTests.swift; sourceTree = "<group>"; };
 		AA41PFCTEST0001F /* PanelFetchCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelFetchCoordinatorTests.swift; sourceTree = "<group>"; };
 		AA40PANELSTATUS001 /* PanelStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStatusView.swift; sourceTree = "<group>"; };
+		AA80JSONVALUE0000001 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
+		AA80UNKNOWNPANEL0001 /* UnknownPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnknownPanelView.swift; sourceTree = "<group>"; };
 		AA40PANELSTATE0001 /* PanelState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelState.swift; sourceTree = "<group>"; };
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		AA20INSPECT0000000001 /* PanelInspectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelInspectSheet.swift; sourceTree = "<group>"; };
@@ -458,6 +462,7 @@
 		2A3062764644CB53A2DA4066 /* Panels */ = {
 			isa = PBXGroup;
 			children = (
+				AA80UNKNOWNPANEL0001 /* UnknownPanelView.swift */,
 				AA40PANELSTATUS001 /* PanelStatusView.swift */,
 				4AB11444FDF44AA3CB147AA1 /* BarChartPanelView.swift */,
 				F24D5C9A7319840C3B1F3CC6 /* GaugePanelView.swift */,
@@ -584,6 +589,7 @@
 				8B4247163632AC4A7FF3582B /* TokiEvent.swift */,
 				74A27A6A118A446539806BB7 /* TokiReportModels.swift */,
 				AA10FRAME00000000000001 /* Frame.swift */,
+				AA80JSONVALUE0000001 /* JSONValue.swift */,
 				7CD76DA115AED88DEAB5DEA6 /* Variable.swift */,
 			);
 			path = Models;
@@ -902,6 +908,8 @@
 				AA03PFMODEL0B001 /* PlanFitModel.swift in Sources */,
 				AA03PFSTYLE00B001 /* PlanFitStyle.swift in Sources */,
 				AA40PANELSTATUS002 /* PanelStatusView.swift in Sources */,
+				AA80JSONVALUE0000002 /* JSONValue.swift in Sources */,
+				AA80UNKNOWNPANEL0002 /* UnknownPanelView.swift in Sources */,
 				AA40PANELSTATE0002 /* PanelState.swift in Sources */,
 				DCECAC1B3A4EEA97415FC579 /* AboutPane.swift in Sources */,
 				DDE1EB2EC7A1FBCF494362FC /* AddPanelPopover.swift in Sources */,

@@ -211,6 +211,8 @@ enum PanelSnapshotRenderer {
             StateTimelinePanelView(panel: PanelSnapshotFixtures.panel(type),
                                    frames: PanelSnapshotFixtures.frames,
                                    dateFormat: .dateTime.hour().minute())
+        case .unknown:
+            UnknownPanelView(panel: PanelSnapshotFixtures.panel(.stat))
         case .timeSeries, .barChart, .rowPanel:
             // See the note at the top of the file: constructing these needs a
             // `DashboardViewModel`, and constructing one of those writes to the
