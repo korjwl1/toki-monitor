@@ -1,5 +1,7 @@
 import Testing
 import Foundation
+import SwiftUI
+import AppKit
 @testable import TokiMonitor
 
 // MARK: - Plan-fit snapshot matrix
@@ -14,9 +16,10 @@ import Foundation
 // to. A matrix carrying only the `.sufficient` column would leave the most
 // common screen in the product unverified.
 //
-// Rendering is deliberately not here yet: the page is redesigned in a later
-// phase, and a harness that pinned today's `PlanFitView` would pin the layout
-// this feature exists to replace.
+// The renderer lives at the foot of the file. It draws `PlanFitContent`, which
+// is a pure function of a `PlanFitModel` and the one binding — no daemon, no
+// network, no clock — at exactly the 800pt window minimum, because rendering
+// wider would hide the overflow the layout claims are about.
 
 /// How much finalized history the account has.
 enum PlanFitDataSufficiency: String, CaseIterable, Sendable {
@@ -153,5 +156,161 @@ struct PlanFitSnapshotHarnessTests {
                 }
             }
         }
+    }
+}
+
+// MARK: - Rendering
+
+extension PlanFitSnapshotTheme {
+    var colorScheme: ColorScheme { self == .dark ? .dark : .light }
+    var appearance: NSAppearance? {
+        NSAppearance(named: self == .dark ? .darkAqua : .aqua)
+    }
+    /// The window ground under the page. A page whose own surfaces are
+    /// translucent has no measurable contrast without one.
+    var ground: Color { self == .dark ? Color(white: 0.11) : Color(white: 0.96) }
+}
+
+@MainActor
+enum PlanFitSnapshotRenderer {
+
+    /// The window minimum (`DashboardWindow.swift`), less the sidebar the page
+    /// sits beside. Rendering wider would hide exactly the overflow FR-056 is
+    /// about, so this is the width every layout claim is made at.
+    static let width: CGFloat = 800
+    /// Tall enough to hold the lede and the first sections in view. The page
+    /// scrolls; the assertions are about what a reader meets on arrival.
+    static let height: CGFloat = 1200
+
+    static func model(for snapshotCase: PlanFitSnapshotCase, unit: PeriodUnit = .weekly) -> PlanFitModel {
+        PlanFitModelBuilder.build(
+            rows: PlanFitSnapshotMatrix.rows(for: snapshotCase),
+            unit: unit,
+            nowMs: PlanFitSnapshotMatrix.nowMs
+        )
+    }
+
+    static func render(
+        _ snapshotCase: PlanFitSnapshotCase,
+        unit: PeriodUnit = .weekly,
+        size: CGSize = CGSize(width: width, height: height)
+    ) -> PanelRaster? {
+        raster(
+            PlanFitContent(model: model(for: snapshotCase, unit: unit), unit: .constant(unit)),
+            theme: snapshotCase.theme,
+            size: size
+        )
+    }
+
+    /// Hosted in a real window with the appearance set on it, and captured
+    /// inside `performAsCurrentDrawingAppearance`. Both are load-bearing for
+    /// the same reason as in `PanelSnapshotHarness`: text that names no colour
+    /// resolves the label colour from the window and from the current drawing
+    /// appearance, so a capture without them draws dark-mode labels in black
+    /// and every contrast number below becomes a measurement of the harness.
+    ///
+    /// Unlike the panel renderer this adds no padding of its own — the claim
+    /// being tested is that the page's own layout holds at exactly 800pt.
+    static func raster<V: View>(_ view: V, theme: PlanFitSnapshotTheme, size: CGSize) -> PanelRaster? {
+        let root = ZStack {
+            theme.ground
+            view
+        }
+        .frame(width: size.width, height: size.height)
+        .environment(\.colorScheme, theme.colorScheme)
+
+        let host = NSHostingView(rootView: root)
+        host.frame = CGRect(origin: .zero, size: size)
+        let window = NSWindow(contentRect: host.frame, styleMask: [.borderless],
+                              backing: .buffered, defer: false)
+        window.appearance = theme.appearance
+        window.contentView = host
+        host.frame = CGRect(origin: .zero, size: size)
+        host.layoutSubtreeIfNeeded()
+
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return nil }
+        if let appearance = theme.appearance {
+            appearance.performAsCurrentDrawingAppearance {
+                host.cacheDisplay(in: host.bounds, to: rep)
+            }
+        } else {
+            host.cacheDisplay(in: host.bounds, to: rep)
+        }
+        guard let cg = rep.cgImage else { return nil }
+
+        let pixelWidth = cg.width, pixelHeight = cg.height
+        var pixels = [UInt8](repeating: 0, count: pixelWidth * pixelHeight * 4)
+        guard let ctx = CGContext(
+            data: &pixels, width: pixelWidth, height: pixelHeight, bitsPerComponent: 8,
+            bytesPerRow: pixelWidth * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
+        return PanelRaster(width: pixelWidth, height: pixelHeight, pixels: pixels)
+    }
+}
+
+extension PanelRaster {
+
+    /// The window ground, sampled from a corner the page never paints into.
+    var pageGround: (Double, Double, Double) { rgb(x: 2, y: 2) }
+
+    /// Ink measured against the window ground rather than against the panel
+    /// background `background` samples — this page has no card at its top edge.
+    var pageInkCoverage: Double {
+        let bg = pageGround
+        var marked = 0
+        for y in stride(from: 0, to: height, by: 2) {
+            for x in stride(from: 0, to: width, by: 2) {
+                let p = rgb(x: x, y: y)
+                if abs(p.0 - bg.0) + abs(p.1 - bg.1) + abs(p.2 - bg.2) > 0.08 { marked += 1 }
+            }
+        }
+        return Double(marked) / Double((height / 2) * (width / 2))
+    }
+
+    var pagePeakContrast: Double {
+        let bg = pageGround
+        var best = 1.0
+        for y in stride(from: 0, to: height, by: 2) {
+            for x in stride(from: 0, to: width, by: 2) {
+                best = max(best, PanelRaster.contrast(rgb(x: x, y: y), bg))
+            }
+        }
+        return best
+    }
+
+    /// Sampled pixels reaching a contrast against the window ground.
+    func pagePixelsAbove(contrast target: Double) -> Int {
+        let bg = pageGround
+        var count = 0
+        for y in stride(from: 0, to: height, by: 2) {
+            for x in stride(from: 0, to: width, by: 2) {
+                if PanelRaster.contrast(rgb(x: x, y: y), bg) >= target { count += 1 }
+            }
+        }
+        return count
+    }
+
+    /// Ink inside the outermost `margin` device pixels of the left and right
+    /// edges.
+    ///
+    /// The page pads itself by `DS.lg`, so a render whose content fits paints
+    /// nothing out there. Content too wide for 800pt is clipped by the scroll
+    /// view at the boundary, which leaves cut glyphs and card edges exactly
+    /// here — which is how a pixel test can speak to horizontal overflow at
+    /// all (FR-056).
+    func edgeInk(margin: Int) -> Int {
+        let bg = pageGround
+        var marked = 0
+        for y in stride(from: 0, to: height, by: 2) {
+            for x in 0..<margin {
+                for column in [x, width - 1 - x] {
+                    let p = rgb(x: column, y: y)
+                    if abs(p.0 - bg.0) + abs(p.1 - bg.1) + abs(p.2 - bg.2) > 0.08 { marked += 1 }
+                }
+            }
+        }
+        return marked
     }
 }

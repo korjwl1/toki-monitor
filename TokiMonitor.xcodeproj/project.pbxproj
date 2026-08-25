@@ -184,6 +184,7 @@
 		AA03PFTREND0B001 /* PeriodTrendSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFTREND0F001 /* PeriodTrendSection.swift */; };
 		AA03PFLIMIT0B001 /* LimitStatusSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFLIMIT0F001 /* LimitStatusSection.swift */; };
 		AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFACTIV0F001 /* ActiveUseSection.swift */; };
+		AA03PFSNAPT0B001 /* PlanFitSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFSNAPT0F001 /* PlanFitSnapshotTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -377,6 +378,7 @@
 		AA03PFTREND0F001 /* PeriodTrendSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodTrendSection.swift; sourceTree = "<group>"; };
 		AA03PFLIMIT0F001 /* LimitStatusSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LimitStatusSection.swift; sourceTree = "<group>"; };
 		AA03PFACTIV0F001 /* ActiveUseSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveUseSection.swift; sourceTree = "<group>"; };
+		AA03PFSNAPT0F001 /* PlanFitSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitSnapshotTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -601,6 +603,7 @@
 		AA03SNAPGROUP00000001 /* Snapshot */ = {
 			isa = PBXGroup;
 			children = (
+				AA03PFSNAPT0F001 /* PlanFitSnapshotTests.swift */,
 				AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */,
 				AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */,
 				AA03SNAPHARNESS000001 /* PlanFitSnapshotHarness.swift */,
@@ -1006,6 +1009,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA03PFSNAPT0B001 /* PlanFitSnapshotTests.swift in Sources */,
 				AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */,
 				AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */,
 				AA40PSNAPHARN00002 /* PanelSnapshotHarness.swift in Sources */,
