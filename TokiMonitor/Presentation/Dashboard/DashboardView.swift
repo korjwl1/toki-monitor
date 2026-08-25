@@ -32,7 +32,7 @@ struct DashboardView: View {
             .sheet(item: $inspectingPanel) { panel in
                 PanelInspectSheet(
                     panel: panel,
-                    state: viewModel.dataState(for: panel.id) ?? .idle
+                    state: viewModel.dataState(for: panel.id)
                 )
             }
             .sheet(item: $editingPanel) { panel in
