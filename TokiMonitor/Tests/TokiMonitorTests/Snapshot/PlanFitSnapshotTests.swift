@@ -921,3 +921,152 @@ struct PlanFitModelPatternTests {
         #expect(raster.edgeInk(margin: 8) == 0, "the model section overflows 800pt")
     }
 }
+
+// MARK: - Money never outranks limits (T058, T059)
+
+@Suite("Plan-fit money placement")
+@MainActor
+struct PlanFitMoneyTests {
+
+    /// A page with both providers, real spend, and enough windows for limit
+    /// cards to exist — the layout the placement claim has to hold in.
+    private func model() -> PlanFitModel {
+        let now = Date(timeIntervalSince1970: Double(WindowFixtures.nowMs) / 1000)
+        var samples: [ModelUsageSample] = []
+        for day in 0..<20 {
+            let date = now.addingTimeInterval(-Double(day) * 86_400)
+            samples.append(.init(provider: "claude_code", model: "claude-opus-4-5", day: date,
+                                 totalTokens: 800_000, costUsd: 6.5))
+            samples.append(.init(provider: "codex", model: "gpt-5-codex", day: date,
+                                 totalTokens: 400_000, costUsd: 1.25))
+        }
+        return PlanFitModelBuilder.build(
+            rows: WindowFixtures.twoProviders(), unit: .weekly,
+            nowMs: WindowFixtures.nowMs, modelUsage: .reported(samples)
+        )
+    }
+
+    private func raster(_ model: PlanFitModel) -> PanelRaster? {
+        PlanFitSnapshotRenderer.raster(
+            PlanFitContent(model: model, unit: .constant(.weekly)),
+            theme: .light,
+            size: CGSize(width: PlanFitSnapshotRenderer.width, height: 3600)
+        )
+    }
+
+    /// FR-045 / SC-005. Every figure carries "at current prices", because
+    /// there is no price history — a cost is always computed against today's
+    /// table, and a bare figure is a claim about the past that was never
+    /// measured. `MoneyNote`'s initialiser makes it unrepresentable otherwise;
+    /// this checks the type is the one being rendered from.
+    @Test("every monetary figure carries its qualifier")
+    func everyFigureIsQualified() {
+        let money = model().money
+        #expect(!money.notes.isEmpty)
+        for note in money.notes {
+            #expect(note.amount.contains("$"))
+            #expect(note.qualifier == L.tr("현재 가격 기준", "at current prices"),
+                    "\(note.label) prints \(note.amount) with no qualifier")
+        }
+        #expect(!money.placementNote.isEmpty)
+    }
+
+    /// A model whose price is unknown contributes nothing and is counted into
+    /// the coverage line. Adding it as zero would understate the one figure on
+    /// the page that is about money.
+    @Test("a model with no known price is declared, not counted as zero")
+    func unpricedModelsAreDeclared() {
+        let now = Date(timeIntervalSince1970: Double(WindowFixtures.nowMs) / 1000)
+        let money = PlanFitModelBuilder.build(
+            rows: WindowFixtures.accountA(), unit: .weekly, nowMs: WindowFixtures.nowMs,
+            modelUsage: .reported([
+                .init(provider: "claude_code", model: "known", day: now,
+                      totalTokens: 100, costUsd: 3),
+                .init(provider: "claude_code", model: "unpriced", day: now,
+                      totalTokens: 100, costUsd: nil),
+            ])
+        ).money
+        let note = money.notes.first
+        #expect(note?.amount == "$3.00", "an unknown price was folded in as a number")
+        #expect(note?.coverage?.isEmpty == false, "the excluded model is not declared")
+    }
+
+    /// No spend, no figure. An empty account does not get a "$0.00" that would
+    /// read as a measurement.
+    @Test("an account with no token events gets no monetary figure")
+    func noEventsNoMoney() {
+        let money = PlanFitModelBuilder.build(
+            rows: WindowFixtures.accountA(), unit: .weekly,
+            nowMs: WindowFixtures.nowMs, modelUsage: .reported([])
+        ).money
+        #expect(money.isPresentable == false)
+    }
+
+    /// FR-046, as type sizes. Money may not reach the size of a supporting
+    /// metric, let alone the page's conclusion.
+    @Test("money is drawn smaller than any number it must not outrank")
+    func moneyTypeIsSubordinate() {
+        #expect(MoneyFootnote.amountSize < PlanFitType.metric,
+                "money at \(MoneyFootnote.amountSize)pt against a metric at \(PlanFitType.metric)pt")
+        #expect(MoneyFootnote.amountSize < PlanFitType.lede)
+        #expect(MoneyFootnote.labelSize <= PlanFitType.caption)
+        #expect(MoneyFootnote.qualifierSize <= MoneyFootnote.amountSize)
+    }
+
+    /// **T059 / SC-017, in pixels.** The claim is about position and weight, so
+    /// it is measured rather than reviewed.
+    ///
+    /// Rendering the page with a block and without it leaves everything ABOVE
+    /// that block pixel-identical, so the first differing row is the block's
+    /// top edge. Money's top must come after the limit information starts, and
+    /// money must put less ink on the page than the limit information does.
+    @Test("money is below the limit information and lighter than it")
+    func moneySitsBelowLimits() throws {
+        let full = model()
+        let withoutMoney = PlanFitModel(
+            unit: full.unit, lede: full.lede, otherVerdicts: full.otherVerdicts,
+            trend: full.trend, limitGroups: full.limitGroups, activeUse: full.activeUse,
+            comparison: full.comparison, modelPattern: full.modelPattern,
+            money: .empty, quietLimitsNote: full.quietLimitsNote, sourceNote: full.sourceNote
+        )
+        let withoutLimits = PlanFitModel(
+            unit: full.unit, lede: full.lede, otherVerdicts: full.otherVerdicts,
+            trend: full.trend, limitGroups: [], activeUse: [],
+            comparison: full.comparison, modelPattern: full.modelPattern,
+            money: full.money, quietLimitsNote: full.quietLimitsNote, sourceNote: full.sourceNote
+        )
+
+        let fullRaster = try #require(raster(full))
+        let moneyRemoved = try #require(raster(withoutMoney))
+        let limitsRemoved = try #require(raster(withoutLimits))
+
+        let moneyTop = try #require(PanelRaster.firstDifferingRow(fullRaster, moneyRemoved),
+                                    "removing money changed nothing — it is not on the page")
+        let limitsTop = try #require(PanelRaster.firstDifferingRow(fullRaster, limitsRemoved),
+                                     "removing the limit cards changed nothing")
+        #expect(moneyTop > limitsTop,
+                "money starts at row \(moneyTop), the limit information at \(limitsTop) — money is above it")
+
+        // And it is the smaller of the two, so "below" is not being bought with
+        // a bigger block further down the page.
+        let moneyInk = fullRaster.pageInkCoverage - moneyRemoved.pageInkCoverage
+        let limitInk = fullRaster.pageInkCoverage - limitsRemoved.pageInkCoverage
+        #expect(moneyInk > 0, "money draws nothing")
+        #expect(moneyInk < limitInk,
+                "money puts \(moneyInk) of ink on the page against the limits' \(limitInk)")
+    }
+
+    /// The same in dark mode — a placement claim that only holds in one
+    /// appearance is not a placement claim.
+    @Test("the page with money on it renders in both themes",
+          arguments: PlanFitSnapshotTheme.allCases)
+    func moneyPageRenders(theme: PlanFitSnapshotTheme) throws {
+        let raster = try #require(PlanFitSnapshotRenderer.raster(
+            PlanFitContent(model: model(), unit: .constant(.weekly)),
+            theme: theme,
+            size: CGSize(width: PlanFitSnapshotRenderer.width, height: 3600)
+        ))
+        #expect(raster.pagePeakContrast >= 4.5)
+        #expect(raster.edgeInk(margin: 8) == 0)
+    }
+}

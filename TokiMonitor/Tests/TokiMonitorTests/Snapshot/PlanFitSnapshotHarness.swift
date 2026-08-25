@@ -252,6 +252,24 @@ enum PlanFitSnapshotRenderer {
 
 extension PanelRaster {
 
+    /// The first row where two renders of the same page differ.
+    ///
+    /// Used to locate a block vertically without asking the view where it drew
+    /// itself. Render the page with a block and without it: everything ABOVE
+    /// the block is pixel-identical, so the first differing row is the block's
+    /// top edge. Removing a block shifts what follows it, so only the FIRST
+    /// differing row means anything — the last one is always the page bottom.
+    static func firstDifferingRow(_ a: PanelRaster, _ b: PanelRaster) -> Int? {
+        guard a.width == b.width, a.height == b.height else { return 0 }
+        for y in 0..<a.height {
+            for x in stride(from: 0, to: a.width, by: 2) {
+                let p = a.rgb(x: x, y: y), q = b.rgb(x: x, y: y)
+                if abs(p.0 - q.0) + abs(p.1 - q.1) + abs(p.2 - q.2) > 0.04 { return y }
+            }
+        }
+        return nil
+    }
+
     /// The window ground, sampled from a corner the page never paints into.
     var pageGround: (Double, Double, Double) { rgb(x: 2, y: 2) }
 

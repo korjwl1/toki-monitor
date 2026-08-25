@@ -186,6 +186,12 @@ struct PlanFitContent: View {
                 if model.modelPattern.isPresentable {
                     ModelPatternSection(model: model.modelPattern)
                 }
+                // Last, and smallest. FR-046: on a flat-rate subscription the
+                // limits and the headroom are what the page is for, and money
+                // may not out-rank them visually.
+                if model.money.isPresentable {
+                    MoneyFootnote(model: model.money)
+                }
                 ProvenanceLegend()
             }
             .padding(DS.lg)

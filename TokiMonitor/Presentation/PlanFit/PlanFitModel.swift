@@ -530,6 +530,53 @@ enum ModelUsageInput: Equatable, Sendable {
     }
 }
 
+// MARK: - Money (T058 / FR-045, FR-046)
+
+/// A monetary figure and the two sentences that stop it being misread.
+///
+/// Both are structural rather than remembered, the same way `HeadroomNote`
+/// carries its caveat:
+///
+/// - **"At current prices" (FR-045).** There is no price history anywhere in
+///   this product — every cost is computed against today's table — so a figure
+///   printed bare is a claim about what the past cost, which was never
+///   measured. The qualifier is set by the initialiser and there is no way to
+///   build one without it.
+/// - **This is not a bill (FR-046).** The default reader is a flat-rate
+///   subscriber whose invoice does not move with any of this. Research §B-11
+///   (Lambrecht & Skiera) found that putting money in front of flat-rate users
+///   suppresses their usage, which is why money is a footnote on this page and
+///   never its headline.
+struct MoneyNote: Equatable, Hashable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    /// "$18.40".
+    let amount: String
+    /// "현재 가격 기준" — on this figure, always.
+    let qualifier: String
+    /// Models whose price is unknown, where any were left out.
+    let coverage: String?
+
+    init(id: String, label: String, usd: Double, coverage: String?) {
+        self.id = id
+        self.label = label
+        self.amount = TokenFormatter.formatCost(usd)
+        self.qualifier = L.tr("현재 가격 기준", "at current prices")
+        self.coverage = coverage
+    }
+}
+
+/// Every monetary figure on the page, in one place at the foot of it.
+struct MoneySummaryModel: Equatable, Sendable {
+    let notes: [MoneyNote]
+    /// Why money is down here rather than up there.
+    let placementNote: String
+
+    static let empty = MoneySummaryModel(notes: [], placementNote: "")
+
+    var isPresentable: Bool { !notes.isEmpty }
+}
+
 // MARK: - The page
 
 /// Everything the page draws.
@@ -545,6 +592,8 @@ struct PlanFitModel: Equatable, Sendable {
     let comparison: ProviderComparisonModel
     /// Per-model patterns, with the source of each side on screen (T056, T057).
     let modelPattern: ModelPatternModel
+    /// Money, in the supporting position it is required to keep (T058).
+    let money: MoneySummaryModel
     /// Limits with neither an exhaustion nor a worked window, named in one
     /// line instead of getting a card each (T050).
     let quietLimitsNote: String?
@@ -604,6 +653,7 @@ enum PlanFitModelBuilder {
             modelPattern: modelPattern(
                 segments: segments, usage: modelUsage, unit: unit, nowMs: nowMs
             ),
+            money: money(usage: modelUsage),
             quietLimitsNote: quietLimitsNote(paired),
             sourceNote: usingServerData
                 ? L.tr("동기화 서버 데이터 · 전체 디바이스 병합", "Sync-server data · all devices merged")
@@ -1617,5 +1667,80 @@ extension PlanFitModelBuilder {
         case "haiku": return "Haiku"
         default: return suffix.isEmpty ? limitId : suffix
         }
+    }
+}
+
+// MARK: - Money (T058)
+
+extension PlanFitModelBuilder {
+
+    /// Estimated spend from the token events already fetched.
+    ///
+    /// Deliberately narrow. This is the only producer of monetary text on the
+    /// page, so "every place a figure appears carries the qualifier" is a
+    /// property of one function rather than a rule reviewers have to keep
+    /// enforcing — and `MoneyNote` cannot be constructed without it anyway.
+    ///
+    /// A model with no known price contributes NOTHING and is counted into the
+    /// coverage line instead. Adding it as zero would quietly understate the
+    /// total, which for the one figure on the page that is about money is the
+    /// worst available failure.
+    static func money(usage: ModelUsageInput) -> MoneySummaryModel {
+        let samples = usage.samples
+        guard !samples.isEmpty else { return .empty }
+
+        var byProvider: [String: (cost: Double, priced: Set<String>, unpriced: Set<String>)] = [:]
+        for sample in samples {
+            var entry = byProvider[sample.provider] ?? (0, [], [])
+            if let cost = sample.costUsd {
+                entry.cost += cost
+                entry.priced.insert(sample.model)
+            } else {
+                entry.unpriced.insert(sample.model)
+            }
+            byProvider[sample.provider] = entry
+        }
+
+        var notes: [MoneyNote] = []
+        var total = 0.0
+        var anyUnpriced = 0
+        for provider in byProvider.keys.sorted() {
+            guard let entry = byProvider[provider], !entry.priced.isEmpty else { continue }
+            total += entry.cost
+            let missing = entry.unpriced.subtracting(entry.priced)
+            anyUnpriced += missing.count
+            notes.append(MoneyNote(
+                id: "money|\(provider)",
+                label: PlanFitFormat.providerTitle(provider),
+                usd: entry.cost,
+                coverage: missing.isEmpty
+                    ? nil
+                    : L.tr(
+                        "가격을 모르는 모델 \(missing.count)개는 빠져 있어 실제보다 작습니다",
+                        "\(missing.count) models have no known price and are left out, so this is under the real figure"
+                    )
+            ))
+        }
+        guard !notes.isEmpty else { return .empty }
+        if notes.count > 1 {
+            notes.append(MoneyNote(
+                id: "money|total",
+                label: L.tr("합계", "Total"),
+                usd: total,
+                coverage: anyUnpriced > 0
+                    ? L.tr(
+                        "가격을 모르는 모델 \(anyUnpriced)개는 빠져 있습니다",
+                        "\(anyUnpriced) models with no known price are left out"
+                    )
+                    : nil
+            ))
+        }
+        return MoneySummaryModel(
+            notes: notes,
+            placementNote: L.tr(
+                "정액 구독에서는 청구액이 아니라 참고 수치입니다. 이 페이지가 답하려는 것은 한도와 여유이고, 금액은 그 아래에 둡니다.",
+                "On a flat-rate subscription this is a reference figure, not a bill. What this page is for is limits and headroom; money sits below them."
+            )
+        )
     }
 }
