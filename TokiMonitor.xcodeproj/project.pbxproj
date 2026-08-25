@@ -11,6 +11,7 @@
 		AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */; };
 		AA40PSNAPHARN00002 /* PanelSnapshotHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */; };
 		AA40PSTATETEST0002 /* PanelStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSTATETEST0001 /* PanelStateTests.swift */; };
+		AA41PFCTEST0001B /* PanelFetchCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41PFCTEST0001F /* PanelFetchCoordinatorTests.swift */; };
 		AA40PANELSTATUS002 /* PanelStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PANELSTATUS001 /* PanelStatusView.swift */; };
 		AA40PANELSTATE0002 /* PanelState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PANELSTATE0001 /* PanelState.swift */; };
 		0237DEE9F5EB132AAB4AE384 /* TimeSeriesChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9BDCAC76DC2C743B8CE339 /* TimeSeriesChartView.swift */; };
@@ -110,6 +111,7 @@
 		9E36E60496F48745EAECB4C2 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B4788B94701C007A8F796E /* DashboardViewModel.swift */; };
 		A2DD4AB9FA9CE5CF0EF7B0C2 /* QueryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A70A035115715F915852D /* QueryDataSource.swift */; };
 		A44EE6876D0A1DB2E6036DFD /* PanelContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B5567C5B301D96AB614B4E /* PanelContainerView.swift */; };
+		AA41PCONTENT001B /* PanelContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41PCONTENT001F /* PanelContentView.swift */; };
 		A5A0153D1AF63F11B4BE8133 /* TokiEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4247163632AC4A7FF3582B /* TokiEvent.swift */; };
 		A673F7E773850A93FABC17EE /* DashboardToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8FB627746EE1DECBC2CBA2C /* DashboardToolbar.swift */; };
 		AE7388FE3592A7411AC81393 /* VersionHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E478EB5C5691C2D6693F41 /* VersionHistorySheet.swift */; };
@@ -194,6 +196,7 @@
 		AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateSnapshotTests.swift; sourceTree = "<group>"; };
 		AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelSnapshotHarness.swift; sourceTree = "<group>"; };
 		AA40PSTATETEST0001 /* PanelStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateTests.swift; sourceTree = "<group>"; };
+		AA41PFCTEST0001F /* PanelFetchCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelFetchCoordinatorTests.swift; sourceTree = "<group>"; };
 		AA40PANELSTATUS001 /* PanelStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStatusView.swift; sourceTree = "<group>"; };
 		AA40PANELSTATE0001 /* PanelState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelState.swift; sourceTree = "<group>"; };
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
@@ -303,6 +306,7 @@
 		A285CEF82274757C8A327142 /* TimeSeriesModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesModels.swift; sourceTree = "<group>"; };
 		A56E6C47FB0555F57056DA13 /* frame_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_02.png; sourceTree = "<group>"; };
 		A5B5567C5B301D96AB614B4E /* PanelContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelContainerView.swift; sourceTree = "<group>"; };
+		AA41PCONTENT001F /* PanelContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelContentView.swift; sourceTree = "<group>"; };
 		A5D13660AF9BC68A2AD56CB9 /* PanelPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelPlugin.swift; sourceTree = "<group>"; };
 		A6C1751117D1E380839B3A0E /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		A9F74A465DDBF407B395F8AA /* TokenAggregatorLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregatorLogicTests.swift; sourceTree = "<group>"; };
@@ -436,6 +440,7 @@
 				4AB11444FDF44AA3CB147AA1 /* BarChartPanelView.swift */,
 				F24D5C9A7319840C3B1F3CC6 /* GaugePanelView.swift */,
 				A5B5567C5B301D96AB614B4E /* PanelContainerView.swift */,
+				AA41PCONTENT001F /* PanelContentView.swift */,
 				4A62B05BBA5579FF67EA1B8D /* PieChartView.swift */,
 				096E04F1C2D87A5D5F1C0251 /* StatPanelView.swift */,
 				9CA03537C2F0CAF1D37B5252 /* TablePanelView.swift */,
@@ -607,6 +612,7 @@
 			children = (
 				AA40POPTTESTS00001 /* PanelOptionsTests.swift */,
 				AA40PSTATETEST0001 /* PanelStateTests.swift */,
+				AA41PFCTEST0001F /* PanelFetchCoordinatorTests.swift */,
 				F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */,
 				472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */,
 				D1F563B39918F892ABDEDA17 /* ModelPricingTests.swift */,
@@ -888,6 +894,7 @@
 				555FD7C25C250BCAB0806025 /* NotificationsSettingsPane.swift in Sources */,
 				C86ECFD5EE31C3BE52418E7D /* OAuthModels.swift in Sources */,
 				A44EE6876D0A1DB2E6036DFD /* PanelContainerView.swift in Sources */,
+				AA41PCONTENT001B /* PanelContentView.swift in Sources */,
 				3DA3BA25D0968CA27E13ECE3 /* PanelDataExtractor.swift in Sources */,
 				8396AA1A147DFFBD23FC72C6 /* PanelDragModifier.swift in Sources */,
 				DCB1716E3D21F804D2A001CB /* PanelEdgeResizeModifier.swift in Sources */,
@@ -967,6 +974,7 @@
 				AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */,
 				AA40PSNAPHARN00002 /* PanelSnapshotHarness.swift in Sources */,
 				AA40PSTATETEST0002 /* PanelStateTests.swift in Sources */,
+				AA41PFCTEST0001B /* PanelFetchCoordinatorTests.swift in Sources */,
 				B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */,
 				11722D0924027C0E6C2E6628 /* ClaudeAuthReaderTests.swift in Sources */,
 				4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */,

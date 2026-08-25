@@ -420,8 +420,9 @@ final class DashboardViewModel {
             if Task.isCancelled { return }
             guard let self else { return }
 
+            var projectResults: [UUID: PanelDataState] = [:]
             if !projectPanels.isEmpty {
-                await self.fetchProjectPanels(projectPanels, time: time)
+                projectResults = await self.fetchProjectPanels(projectPanels, time: time)
             }
             if Task.isCancelled { return }
 
@@ -431,6 +432,7 @@ final class DashboardViewModel {
             // results landing here.
             if Task.isCancelled { return }
             for (id, state) in results { self.panelData[id] = state }
+            for (id, state) in projectResults { self.panelData[id] = state }
 
             // Backward compatibility: global timeSeriesData from first
             // loaded regular panel. Order matches user's panel order.
@@ -468,7 +470,8 @@ final class DashboardViewModel {
     }
 
     /// Fetch project-grouped data. toki returns "date|project" in period field.
-    private func fetchProjectPanels(_ panels: [PanelConfig], time: TimeConfig) async {
+    private func fetchProjectPanels(_ panels: [PanelConfig], time: TimeConfig) async -> [UUID: PanelDataState] {
+        var out: [UUID: PanelDataState] = [:]
         let template = PanelMetric.tokensByProject.defaultQuery
         let query = interpolateQuery(template, time: time)
         // After the datasource refactor, `queryClient` is always a
@@ -485,14 +488,14 @@ final class DashboardViewModel {
             do {
                 let result = try await queryClient.queryPromQL(query: query, time: time)
                 for panel in panels {
-                    panelData[panel.id] = .loaded(result.timeSeries, frames: result.frames)
+                    out[panel.id] = .loaded(result.timeSeries, frames: result.frames)
                 }
             } catch {
                 for panel in panels {
-                    panelData[panel.id] = .error(error.localizedDescription)
+                    out[panel.id] = .error(error.localizedDescription)
                 }
             }
-            return
+            return out
         }
 
         // Local mode: use toki query with project-specific parsing
@@ -520,8 +523,8 @@ final class DashboardViewModel {
             }
 
             guard let report = try? JSONDecoder().decode(ProjectReport.self, from: rawData) else {
-                for panel in panels { panelData[panel.id] = .error("Parse error") }
-                return
+                for panel in panels { out[panel.id] = .error("Parse error") }
+                return out
             }
 
             // Build TimeSeriesData where "model" is actually the project name
@@ -552,13 +555,36 @@ final class DashboardViewModel {
                 // Synthesized locally rather than fetched, so there are no
                 // frames to attach — Inspect reports that honestly instead of
                 // showing an empty frame set as if the query returned nothing.
-                panelData[panel.id] = .loaded(data, frames: FrameSet())
+                out[panel.id] = .loaded(data, frames: FrameSet())
             }
         } catch {
             for panel in panels {
-                panelData[panel.id] = .error(error.localizedDescription)
+                out[panel.id] = .error(error.localizedDescription)
             }
         }
+        return out
+    }
+
+    /// Run one panel's queries the way the dashboard would, WITHOUT touching
+    /// the dashboard's own state.
+    ///
+    /// The panel editor needs this: its preview has to show the effect of the
+    /// query being edited, and that panel is not saved yet — writing its result
+    /// into `panelData` would put an unsaved query's answer on the dashboard
+    /// behind the editor.
+    func fetchPreview(for panel: PanelConfig) async -> PanelDataState {
+        let time = dashboardConfig.time
+        if panelTokensByProject(panel) {
+            return await fetchProjectPanels([panel], time: time)[panel.id] ?? .idle
+        }
+        let results = await fetchCoordinator.fetchRegular(
+            panels: [panel],
+            time: time,
+            variables: dashboardConfig.templating.list,
+            activeDatasource: activeDatasource,
+            defaultClient: queryClient
+        )
+        return results[panel.id] ?? .idle
     }
 
     // Project name resolution moved to `Domain/ProjectNameResolver`. Call
@@ -878,7 +904,8 @@ final class DashboardViewModel {
                     datasource: existingDatasources.indices.contains(index)
                         ? existingDatasources[index] : nil,
                     metric: target.metric,
-                    query: target.query
+                    query: target.query,
+                    hide: target.hide ? true : nil
                 )
                 let specData = (try? JSONEncoder().encode(spec)) ?? Data()
                 return Query(
@@ -909,6 +936,10 @@ final class DashboardViewModel {
             if q.spec.name != target.refId { return false }
             if spec.metric != target.metric { return false }
             if spec.query != target.query { return false }
+            // `hide` decides whether the query renders, and the fetch path
+            // reads it from the envelope — so a stale value here means the
+            // eye in the editor and the panel on screen disagree.
+            if (spec.hide ?? false) != target.hide { return false }
             // Datasource is deliberately NOT compared: it lives only on the
             // query envelope (PanelTarget has no such field), so a difference
             // here is not drift from the targets — treating it as drift would

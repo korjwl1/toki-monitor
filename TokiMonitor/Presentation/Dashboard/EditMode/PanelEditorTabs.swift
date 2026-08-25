@@ -9,6 +9,14 @@ import SwiftUI
 
 struct PanelEditorQueryTab: View {
     @Binding var panel: PanelConfig
+    /// Which backend the queries will be sent to. The two accept different
+    /// subsets, so a verdict is only meaningful against one of them
+    /// (contract Q3).
+    var backend: QueryBackend = .local
+    /// Needed to check what will actually be SENT: `$__interval` and the rest
+    /// are resolved before the backend ever sees the query.
+    var time: TimeConfig = TimeConfig()
+    var variables: [DashboardVariable] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -56,22 +64,11 @@ struct PanelEditorQueryTab: View {
     private func targetEditor(index: Int, target: PanelTarget) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                // Only query A is executed today: the fetch path resolves a
-                // single target and a panel receives one result, with no
-                // refId-keyed set for a second one to land in. The editor used
-                // to accept B..Z silently, so a user could write a query,
-                // save it, export it — and never see it run. Say so until the
-                // frame/FrameSet work makes multiple results possible.
-                if index > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text(L.tr("아직 실행되지 않습니다 — 현재는 쿼리 A만 조회됩니다",
-                                  "Not executed yet — only query A is run today"))
-                            .foregroundStyle(.secondary)
-                    }
-                    .font(.caption2)
-                }
+                // The "only query A is run" warning that stood here is gone
+                // because it is no longer true: `PanelFetchCoordinator`
+                // executes every refId (contract Q5). Leaving a warning up
+                // after the defect it described is fixed teaches the reader to
+                // ignore warnings.
                 HStack {
                     Text(L.tr("지표", "Metric"))
                         .font(.caption)
@@ -114,6 +111,8 @@ struct PanelEditorQueryTab: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.caption, design: .monospaced))
                 }
+
+                validationNotice(for: index, target: target)
             }
         } label: {
             HStack {
@@ -126,6 +125,24 @@ struct PanelEditorQueryTab: View {
 
                 Spacer()
 
+                // Hide runs the query and leaves it out of the drawing, so a
+                // reader can silence one series without losing it — and without
+                // the panel pretending the query was never written.
+                if panel.targets.indices.contains(index) {
+                    let hidden = panel.targets[index].hide
+                    Button {
+                        panel.targets[index].hide.toggle()
+                    } label: {
+                        Image(systemName: hidden ? "eye.slash" : "eye")
+                            .font(.caption)
+                            .foregroundStyle(hidden ? Color.secondary : Color.accentColor)
+                    }
+                    .buttonStyle(.plain)
+                    .help(hidden
+                          ? L.tr("실행하지만 그리지 않습니다", "Executed, but not drawn")
+                          : L.tr("이 쿼리를 숨깁니다", "Hide this query"))
+                }
+
                 if panel.targets.count > 1 {
                     Button(role: .destructive) {
                         panel.targets.removeAll { $0.id == target.id }
@@ -136,6 +153,33 @@ struct PanelEditorQueryTab: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    /// What the selected backend will make of this query, before it is sent.
+    ///
+    /// Advisory, not a gate: the daemon owns the query language and the check
+    /// here only describes it, so a query it dislikes is still sent and the
+    /// backend's own answer is what the panel shows. A wrong warning costs a
+    /// glance; a wrong refusal costs a query that would have worked.
+    @ViewBuilder
+    private func validationNotice(for index: Int, target: PanelTarget) -> some View {
+        let written = panel.targets.indices.contains(index)
+            ? panel.targets[index].query : target.query
+        let metric = panel.targets.indices.contains(index)
+            ? panel.targets[index].metric : target.metric
+        let template = (written?.isEmpty == false ? written! : metric.defaultQuery)
+        let result = QueryValidation.check(template: template, time: time,
+                                           variables: variables, backend: backend)
+        if !result.validation.isValid, let reason = result.validation.reason {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text(reason)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.caption2)
         }
     }
 }

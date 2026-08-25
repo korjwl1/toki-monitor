@@ -160,4 +160,36 @@ struct PanelStateSnapshotTests {
         }
         #expect(differing == 0, "\(theme.rawValue): table content reached past the panel edge")
     }
+
+    // MARK: - Partial failure (contract Q5)
+
+    /// A panel with several queries can be partly answered: the data it has is
+    /// still true, so it keeps drawing — which means the ONLY thing telling the
+    /// reader that a series is missing is the marker in the title bar. If it
+    /// draws nothing, a half-answered panel is indistinguishable from a whole
+    /// one.
+    @Test("a query that failed is visible on a panel that still drew",
+          arguments: PanelSnapshotTheme.allCases)
+    func partialFailureIsVisible(theme: PanelSnapshotTheme) throws {
+        func panel(failed: [String: String]) -> some View {
+            PanelContainerView(
+                title: "Tokens",
+                isEditing: false,
+                state: .loaded,
+                onDelete: {}, onEdit: {}, onRetry: {},
+                failedTargets: failed
+            ) {
+                PanelSnapshotRenderer.content(for: .table)
+            }
+        }
+        let clean = try #require(PanelSnapshotRenderer.raster(
+            panel(failed: [:]), theme: theme, size: PanelSnapshotRenderer.panelSize))
+        let partial = try #require(PanelSnapshotRenderer.raster(
+            panel(failed: ["B": "unsupported query: `offset`"]),
+            theme: theme, size: PanelSnapshotRenderer.panelSize))
+        #expect(PanelRaster.difference(clean, partial) > 0.002,
+                "\(theme.rawValue): a failed query changed nothing on screen")
+        #expect(partial.inkCoverage > clean.inkCoverage,
+                "\(theme.rawValue): the marker drew nothing")
+    }
 }

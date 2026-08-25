@@ -432,6 +432,34 @@ struct PanelTarget: Codable, Identifiable, Equatable {
     var refId: String = "A"
     var metric: PanelMetric
     var query: String?  // optional custom PromQL override
+    /// Run it, but leave it out of what the panel draws (Grafana's per-query
+    /// eye). It is not "disable": the query still executes, so hiding a series
+    /// costs nothing to un-hide and a transformation can still be fed by it.
+    /// Optional in the on-disk shape so dashboards written before this decode
+    /// unchanged.
+    var hide: Bool = false
+
+    enum CodingKeys: String, CodingKey {
+        case id, refId, metric, query, hide
+    }
+
+    init(id: UUID = UUID(), refId: String = "A", metric: PanelMetric,
+         query: String? = nil, hide: Bool = false) {
+        self.id = id
+        self.refId = refId
+        self.metric = metric
+        self.query = query
+        self.hide = hide
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        refId = try c.decodeIfPresent(String.self, forKey: .refId) ?? "A"
+        metric = try c.decode(PanelMetric.self, forKey: .metric)
+        query = try c.decodeIfPresent(String.self, forKey: .query)
+        hide = try c.decodeIfPresent(Bool.self, forKey: .hide) ?? false
+    }
 }
 
 struct PanelDisplayOptions: Codable, Equatable {

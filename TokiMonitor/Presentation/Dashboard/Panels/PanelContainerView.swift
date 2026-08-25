@@ -14,6 +14,11 @@ struct PanelContainerView<Content: View>: View {
     let onEdit: () -> Void
     /// Re-runs this panel's query. Only `.failed` offers it.
     var onRetry: (() -> Void)?
+    /// Queries of THIS panel that did not answer, keyed by refId, while at
+    /// least one other did (contract Q5). The panel keeps drawing what it has —
+    /// blanking it would throw away good data because of one bad query — so the
+    /// only way a reader learns that a series is missing is this marker.
+    var failedTargets: [String: String] = [:]
     /// Inspect is available whether or not the dashboard is in edit mode: the
     /// question it answers ("where did this number come from?") is asked while
     /// READING a dashboard, not while building one.
@@ -29,6 +34,7 @@ struct PanelContainerView<Content: View>: View {
         onDelete: @escaping () -> Void,
         onEdit: @escaping () -> Void,
         onRetry: (() -> Void)? = nil,
+        failedTargets: [String: String] = [:],
         onInspect: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
@@ -38,8 +44,34 @@ struct PanelContainerView<Content: View>: View {
         self.onDelete = onDelete
         self.onEdit = onEdit
         self.onRetry = onRetry
+        self.failedTargets = failedTargets
         self.onInspect = onInspect
         self.content = content()
+    }
+
+    /// Which queries failed, in refId order, with their reasons in the tooltip.
+    /// Shown beside the title rather than in place of the content: the content
+    /// is still true, it is just incomplete.
+    @ViewBuilder
+    private var partialFailureBadge: some View {
+        if !failedTargets.isEmpty {
+            let refIds = failedTargets.keys.sorted()
+            let detail = refIds.map { "\($0): \(failedTargets[$0] ?? "")" }
+                .joined(separator: "\n")
+            HStack(spacing: DS.xs) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text(L.tr("쿼리 \(refIds.joined(separator: ", ")) 실패",
+                          "Query \(refIds.joined(separator: ", ")) failed"))
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: DS.fontTiny))
+            .help(detail)
+            .accessibilityLabel(
+                L.tr("일부 쿼리가 실패했습니다. \(detail)",
+                     "Some queries failed. \(detail)")
+            )
+        }
     }
 
     var body: some View {
@@ -60,6 +92,8 @@ struct PanelContainerView<Content: View>: View {
                     // — a snapshot, a preview, a window mid-appearance-change —
                     // the title drew black on a dark card.
                     .foregroundStyle(Color.primary)
+
+                partialFailureBadge
 
                 Spacer()
 

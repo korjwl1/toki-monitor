@@ -106,6 +106,9 @@ struct TokiPromQLQuerySpec: Codable, Equatable, Sendable {
     var metric: PanelMetric?
     /// Raw PromQL override. Wins over `metric.defaultQuery`.
     var query: String?
+    /// Executed, but not rendered. Optional so a dashboard saved before this
+    /// decodes unchanged; nil reads as visible.
+    var hide: Bool?
 
     /// Resolve the effective PromQL string for this spec.
     var effectiveQuery: String? {

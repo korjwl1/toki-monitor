@@ -151,6 +151,10 @@ struct CustomDashboardView: View {
             onDelete: { viewModel.removePanel(id: panel.id) },
             onEdit: { onEditPanel?(panel) },
             onRetry: { viewModel.fetchData() },
+            // A panel with several queries can be partly answered. The state
+            // says `loaded` because there IS something to draw; which query is
+            // missing from it is carried separately (contract Q5).
+            failedTargets: viewModel.dataState(for: panel.id).frames?.errors ?? [:],
             onInspect: onInspectPanel.map { handler in { handler(panel) } }
         ) {
             panelContent(for: panel)
@@ -193,85 +197,22 @@ struct CustomDashboardView: View {
         }
     }
 
-    /// Dispatch panel content by type. PanelContainerView handles loading/error states.
-    /// Chart panels show "데이터 없음" for empty data. Stat/gauge show "-" or "0" naturally.
-    ///
-    /// Every case names exactly one view under `Panels/`. The rendering used to
-    /// be written out here while `Panels/` held a second, never-instantiated
-    /// copy per panel type; contract R2 requires one implementation per type,
-    /// and `Panels/` is where it lives.
+    /// Dispatch panel content by type. `PanelContainerView` handles the five
+    /// states; `PanelContentView` owns the render, and the panel editor draws
+    /// its preview through the same view so the two cannot diverge.
     @ViewBuilder
     private func panelContent(for panel: PanelConfig) -> some View {
         let state = viewModel.dataState(for: panel.id)
-        let data = state.timeSeriesData
-        let frames = state.frames
-        // No emptiness branches here any more: `PanelContainerView` decides
-        // between content and a status screen from the resolved `PanelState`,
-        // so every panel type gets the same five states instead of five
-        // different `Spacer()`s.
-        switch panel.panelType {
-        case .stat:
-            StatPanelView(panel: panel, data: data, frames: frames)
-        case .timeSeries:
-            TimeSeriesPanelView(
-                panel: panel,
-                data: data,
-                frames: frames,
-                viewModel: viewModel,
-                dateFormat: chartDateFormat
-            )
-        case .barChart:
-            BarChartPanelView(
-                panel: panel,
-                data: data,
-                frames: frames,
-                viewModel: viewModel,
-                dateFormat: chartDateFormat
-            )
-        case .pieChart:
-            pieChartContent(for: panel, data: data, frames: frames)
-        case .table:
-            TablePanelView(panel: panel, data: data, frames: frames)
-        case .gauge:
-            GaugePanelView(panel: panel, data: data, frames: frames)
-        case .stateTimeline:
-            StateTimelinePanelView(panel: panel, frames: frames,
-                                   dateFormat: chartDateFormat)
-        case .rowPanel:
-            EmptyView()
-        }
-    }
-
-    /// Pie has no wrapper view of its own: `PieChartView` under `Panels/` is
-    /// already the single render, and this is the slice preparation feeding it.
-    @ViewBuilder
-    private func pieChartContent(for panel: PanelConfig, data: TimeSeriesData?,
-                                 frames: FrameSet?) -> some View {
-        let metric = panel.effectiveMetric
-        let slices = PanelSeries.breakdown(metric: metric, panel: panel,
-                                           frames: frames, data: data)
-        if slices.isEmpty {
-            Text("-").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            PieChartView(
-                entries: slices.map { .init(label: $0.label, value: $0.value) },
-                // Projects have no colour of their own; models do, and keeping
-                // it means a model is the same colour in every panel.
-                colors: metric == .tokensByProject
-                    ? nil
-                    : slices.map { viewModel.colorForModel($0.label) }
-            )
-        }
+        PanelContentView(
+            panel: panel,
+            data: state.timeSeriesData,
+            frames: state.frames,
+            viewModel: viewModel,
+            dateFormat: chartDateFormat
+        )
     }
 
     private var chartDateFormat: Date.FormatStyle {
-        let secs = viewModel.dashboardConfig.time.bucketSeconds
-        if secs < 3600 {
-            return .dateTime.hour(.defaultDigits(amPM: .abbreviated)).minute(.twoDigits)
-        } else if secs < 86400 {
-            return .dateTime.month(.defaultDigits).day(.defaultDigits).hour(.defaultDigits(amPM: .abbreviated))
-        } else {
-            return .dateTime.month(.defaultDigits).day(.defaultDigits)
-        }
+        PanelDateFormat.forBucket(seconds: viewModel.dashboardConfig.time.bucketSeconds)
     }
 }

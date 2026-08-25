@@ -10,6 +10,15 @@ struct PanelEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTab: EditorTab = .query
 
+    /// This panel's own result, fetched for the preview. Not the dashboard's:
+    /// the panel being edited is unsaved, so its query has no entry in
+    /// `viewModel.panelData` and reading one would show the pre-edit answer.
+    @State private var previewState: PanelDataState = .idle
+    /// A re-fetch on every keystroke would fork a `toki` subprocess per
+    /// character, so the preview re-runs only when what would be SENT changes
+    /// — see `previewKey`.
+    @State private var previewTask: Task<Void, Never>?
+
     enum EditorTab: String, CaseIterable {
         case query
         case visualization
@@ -141,7 +150,13 @@ struct PanelEditorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 switch selectedTab {
-                case .query:         PanelEditorQueryTab(panel: $panel)
+                case .query:
+                    PanelEditorQueryTab(
+                        panel: $panel,
+                        backend: viewModel.suggestionDialect,
+                        time: viewModel.dashboardConfig.time,
+                        variables: viewModel.dashboardConfig.templating.list
+                    )
                 case .visualization: PanelEditorVisualizationTab(panel: $panel)
                 case .options:       PanelEditorOptionsTab(panel: $panel)
                 case .links:         PanelEditorDataLinksTab(panel: $panel)
@@ -158,40 +173,78 @@ struct PanelEditorView: View {
             GroupBox {
                 previewContent
             } label: {
-                Text(panel.title)
-                    .font(.headline)
+                HStack(spacing: DS.sm) {
+                    Text(panel.title)
+                        .font(.headline)
+                    if previewState.isLoading {
+                        ProgressView().controlSize(.small)
+                    }
+                    Spacer()
+                    Text(DatasourceKindDisplay.name(for: viewModel.activeDatasource.kind))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(16)
         }
         .background(.background)
+        .task(id: previewKey) { await refreshPreview() }
     }
 
+    /// The interpolated queries this panel would send. Preview re-runs when it
+    /// changes — and only then.
+    private var previewKey: String {
+        PanelFetchCoordinator
+            .plan(for: panel,
+                  time: viewModel.dashboardConfig.time,
+                  variables: viewModel.dashboardConfig.templating.list)
+            .map { "\($0.refId)|\($0.hidden)|\($0.query)" }
+            .joined(separator: "\n")
+    }
+
+    private func refreshPreview() async {
+        previewTask?.cancel()
+        previewState = .loading(previous: previewState.timeSeriesData,
+                                previousFrames: previewState.frames)
+        let target = panel
+        let task = Task { [weak viewModel] in
+            guard let viewModel else { return }
+            let state = await viewModel.fetchPreview(for: target)
+            if Task.isCancelled { return }
+            previewState = state
+        }
+        previewTask = task
+        await task.value
+    }
+
+    /// The real panel, drawn from this panel's own result, through the same
+    /// view the dashboard uses. It used to be the literal word "미리보기" for
+    /// every type but stat — and stat read the global `timeSeriesData`, so the
+    /// one screen whose job is showing what a query change does showed either
+    /// nothing or another panel's numbers.
     @ViewBuilder
     private var previewContent: some View {
-        switch panel.panelType {
-        case .stat:
-            let stat = PanelDataExtractor.statValue(
-                for: panel.effectiveMetric,
-                data: viewModel.timeSeriesData
-            )
-            VStack(alignment: .leading, spacing: 4) {
-                Text(stat.value)
-                    .font(.system(size: 28, weight: .semibold, design: .monospaced))
-                if let subtitle = stat.subtitle {
-                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
-                }
+        let state = PanelState.resolve(
+            previewState,
+            hasContent: CustomDashboardView.hasContent(previewState)
+        )
+        VStack(spacing: 0) {
+            switch state {
+            case .loaded, .loading(hasPrevious: true):
+                PanelContentView(
+                    panel: panel,
+                    data: previewState.timeSeriesData,
+                    frames: previewState.frames,
+                    viewModel: viewModel,
+                    dateFormat: PanelDateFormat.forBucket(
+                        seconds: viewModel.dashboardConfig.time.bucketSeconds
+                    )
+                )
+                .opacity(state.isStale ? 0.45 : 1)
+            case .idle, .loading(hasPrevious: false), .empty, .failed:
+                PanelStatusView(state: state, onRetry: { Task { await refreshPreview() } })
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-
-        case .timeSeries, .barChart, .pieChart, .gauge, .stateTimeline, .rowPanel:
-            Text(L.tr("미리보기", "Preview"))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-        case .table:
-            Text(L.tr("미리보기", "Preview"))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
