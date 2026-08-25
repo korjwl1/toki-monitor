@@ -595,7 +595,10 @@ enum PlanFitModelBuilder {
             ].joined(separator: " · ")
 
         let excluded = segment.activeWindowCount - segment.coveredCount
-        let hardStops = segment.maxedCount - (segment.sawCreditOverflow ? creditOverflowCount(segment) : 0)
+        // `maxedCount` and the exhaustion list are counted over the same rows,
+        // but the subtraction is clamped anyway: a negative "hard stops" would
+        // be a arithmetic artefact printed as a fact about the account.
+        let hardStops = max(0, segment.maxedCount - creditOverflowCount(segment))
 
         var exhaustion: String
         if segment.maxedCount == 0 {
