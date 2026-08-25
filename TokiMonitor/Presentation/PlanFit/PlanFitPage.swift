@@ -129,7 +129,7 @@ struct PlanFitContent: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.lg) {
                 header
-                lede
+                VerdictSection(lede: model.lede, others: model.otherVerdicts)
                 PeriodTrendSection(model: model.trend)
                 if model.hasSegments {
                     LimitStatusSection(groups: model.limitGroups)
@@ -188,67 +188,5 @@ struct PlanFitContent: View {
                 .font(.system(size: PlanFitType.tiny))
                 .foregroundStyle(PlanFitInk.faint)
         }
-    }
-
-    // MARK: Lede
-
-    /// The conclusion, at 24pt. Everything below it is why.
-    private var lede: some View {
-        VStack(alignment: .leading, spacing: DS.sm) {
-            HStack(alignment: .firstTextBaseline, spacing: DS.sm) {
-                Image(systemName: model.lede.kind.symbolName)
-                    .font(.system(size: PlanFitType.caption, weight: .semibold))
-                Text(model.lede.kind.badge)
-                    .font(.system(size: PlanFitType.caption, weight: .semibold))
-                if let scope = model.lede.scope {
-                    Text("· \(scope)")
-                        .font(.system(size: PlanFitType.caption))
-                }
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(PlanFitInk.support)
-
-            Text(model.lede.headline)
-                .font(.system(size: PlanFitType.lede, weight: .semibold))
-                .foregroundStyle(PlanFitInk.strong)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-
-            if let availability = model.lede.availability {
-                Text(availability)
-                    .font(.system(size: PlanFitType.body, weight: .medium))
-                    .foregroundStyle(PlanFitInk.support)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let headroom = model.lede.headroom {
-                Text(headroom.sensitivity)
-                    .font(.system(size: PlanFitType.body))
-                    .foregroundStyle(PlanFitInk.support)
-                    .fixedSize(horizontal: false, vertical: true)
-                // Contract V8. Bound to the sentence above by the type that
-                // carries them both — there is no render path with one and not
-                // the other.
-                Text(headroom.caveat)
-                    .font(.system(size: PlanFitType.caption))
-                    .foregroundStyle(PlanFitInk.support)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let detail = model.lede.detail {
-                Text(detail)
-                    .font(.system(size: PlanFitType.body))
-                    .foregroundStyle(PlanFitInk.support)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let basis = model.lede.basis {
-                HStack(alignment: .firstTextBaseline, spacing: DS.sm) {
-                    Text(basis)
-                        .font(.system(size: PlanFitType.caption))
-                        .foregroundStyle(PlanFitInk.faint)
-                        .fixedSize(horizontal: false, vertical: true)
-                    ProvenanceTag(provenance: .derived)
-                }
-            }
-        }
-        .planFitCard(.lede)
     }
 }

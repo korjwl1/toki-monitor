@@ -84,6 +84,18 @@ struct PlanFitLede: Equatable, Hashable, Sendable {
         }
     }
 
+    /// The badge vocabulary for a domain outcome. One mapping, used by the
+    /// lede and by every other limit's row, so the same outcome cannot pick up
+    /// two different words on one screen.
+    static func kind(for outcome: PlanFitVerdict.Outcome) -> Kind {
+        switch outcome {
+        case .withheld: return .withheld
+        case .fits: return .fits
+        case .considerUpgrade: return .considerUpgrade
+        case .considerDowngrade: return .considerDowngrade
+        }
+    }
+
     let kind: Kind
     /// The one sentence. Comes from `PlanFitVerdict.statement()` whenever a
     /// verdict exists, so the page cannot phrase a conclusion the domain did
@@ -100,6 +112,29 @@ struct PlanFitLede: Equatable, Hashable, Sendable {
     let availability: String?
     /// Extra guidance for the empty and failed screens.
     let detail: String?
+}
+
+// MARK: - Every other limit's verdict
+
+/// One segment's verdict as a row (T053).
+///
+/// The page elects one verdict to lead and has up to seven more. They are
+/// carried individually rather than summarised, because "four fit and one
+/// interrupts you" is a different account from "five fit" and the difference
+/// is the whole reason the reader opened the page.
+struct SegmentVerdictModel: Equatable, Sendable, Identifiable {
+    let id: String
+    /// The same badge vocabulary the lede uses.
+    let kind: PlanFitLede.Kind
+    /// "Claude Code · 주간 · Opus".
+    let scope: String
+    let headline: String
+    /// Sensitivity and its inseparable caveat (V8). nil while withheld.
+    let headroom: HeadroomNote?
+    /// Present exactly when withheld: when a verdict becomes possible (V1).
+    let availability: String?
+    /// Lookback, sample size, statistic — on every row, withheld included (V3).
+    let basis: String
 }
 
 // MARK: - Period trend
@@ -290,6 +325,8 @@ struct ActiveUseLimitModel: Equatable, Sendable, Identifiable {
 struct PlanFitModel: Equatable, Sendable {
     let unit: PeriodUnit
     let lede: PlanFitLede
+    /// The verdicts the lede did not speak for — one row per remaining limit.
+    let otherVerdicts: [SegmentVerdictModel]
     let trend: PeriodTrendModel
     let limitGroups: [LimitProviderGroup]
     let activeUse: [ActiveUseLimitModel]
@@ -343,6 +380,7 @@ enum PlanFitModelBuilder {
         return PlanFitModel(
             unit: unit,
             lede: lede,
+            otherVerdicts: otherVerdicts(paired),
             trend: trend(rows: rows, unit: unit, nowMs: nowMs),
             limitGroups: limitGroups(paired, rows: rows, nowMs: nowMs),
             activeUse: activeUse(paired),
@@ -389,18 +427,8 @@ enum PlanFitModelBuilder {
     static func verdictLede(_ paired: [(WindowStatsSegment, PlanFitVerdict)]) -> PlanFitLede {
         guard let (segment, verdict) = primary(paired) else { return noDataLede() }
         let statement = verdict.statement()
-        let kind: PlanFitLede.Kind = {
-            switch verdict.outcome {
-            case .withheld: return .withheld
-            case .fits: return .fits
-            case .considerUpgrade: return .considerUpgrade
-            case .considerDowngrade: return .considerDowngrade
-            }
-        }()
-        let scope = "\(PlanFitFormat.providerTitle(segment.provider)) · "
-            + PlanFitFormat.limitTitle(
-                provider: segment.provider, kind: segment.kind, limitId: segment.limitId
-            )
+        let kind = PlanFitLede.kind(for: verdict.outcome)
+        let scope = scopeLabel(segment)
         let others = paired.count - 1
         let detail = others > 0
             ? L.tr(
@@ -417,6 +445,53 @@ enum PlanFitModelBuilder {
             availability: statement.availability,
             detail: detail
         )
+    }
+
+    /// "Claude Code · 주간 · Opus". Provider first because two providers'
+    /// limits can carry the same name and mean different systems.
+    static func scopeLabel(_ segment: WindowStatsSegment) -> String {
+        "\(PlanFitFormat.providerTitle(segment.provider)) · "
+            + PlanFitFormat.limitTitle(
+                provider: segment.provider, kind: segment.kind, limitId: segment.limitId
+            )
+    }
+
+    /// Every verdict except the one that leads the page (T053).
+    ///
+    /// Ordered the way the lede was elected — an interruption first, a
+    /// withholding last — so a reader scanning down meets the limits that have
+    /// something to say before the ones that are still collecting.
+    static func otherVerdicts(
+        _ paired: [(WindowStatsSegment, PlanFitVerdict)]
+    ) -> [SegmentVerdictModel] {
+        guard let (ledeSegment, _) = primary(paired) else { return [] }
+        let ledeId = segmentKey(ledeSegment)
+        return paired
+            .filter { segmentKey($0.0) != ledeId }
+            .sorted { a, b in
+                let ra = ledeRank(a.1), rb = ledeRank(b.1)
+                if ra != rb { return ra < rb }
+                return segmentKey(a.0) < segmentKey(b.0)
+            }
+            .map { segment, verdict in
+                let statement = verdict.statement()
+                return SegmentVerdictModel(
+                    id: segmentKey(segment),
+                    kind: PlanFitLede.kind(for: verdict.outcome),
+                    scope: scopeLabel(segment),
+                    headline: statement.headline,
+                    headroom: statement.sensitivity.map(HeadroomNote.init),
+                    availability: statement.availability,
+                    basis: statement.basis
+                )
+            }
+    }
+
+    /// Identity of a segment on this page. Plan and account are part of it:
+    /// the same limit under two tiers is two segments, and merging them would
+    /// blend percentages whose denominators differ.
+    static func segmentKey(_ segment: WindowStatsSegment) -> String {
+        "\(segment.provider)|\(segment.kind)|\(segment.limitId)|\(segment.plan)|\(segment.account)"
     }
 
     static func noDataLede() -> PlanFitLede {
@@ -627,7 +702,7 @@ enum PlanFitModelBuilder {
             : nil
 
         return LimitStatusModel(
-            id: "\(segment.provider)|\(segment.kind)|\(segment.limitId)|\(segment.plan)|\(segment.account)",
+            id: segmentKey(segment),
             title: PlanFitFormat.limitTitle(
                 provider: segment.provider, kind: segment.kind, limitId: segment.limitId
             ),

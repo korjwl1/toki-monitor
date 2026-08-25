@@ -279,6 +279,7 @@ struct PlanFitControlSurfaceTests {
         let snapshotCase = PlanFitSnapshotCase(sufficiency: .sufficient, segments: .four, theme: .light)
         let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
         let sections: [(String, Any)] = [
+            ("VerdictSection", VerdictSection(lede: model.lede, others: model.otherVerdicts)),
             ("PeriodTrendSection", PeriodTrendSection(model: model.trend)),
             ("LimitStatusSection", LimitStatusSection(groups: model.limitGroups)),
             ("ActiveUseSection", ActiveUseSection(limits: model.activeUse,
@@ -488,5 +489,129 @@ struct PlanFitHonestyTests {
             #expect(!text.contains { $0.contains(phrase) },
                     "\(snapshotCase.name) mentions \(phrase)")
         }
+    }
+}
+
+// MARK: - The verdict section (T053)
+
+@Suite("Plan-fit verdicts on screen")
+@MainActor
+struct PlanFitVerdictSectionTests {
+
+    /// Every limit reaches the screen with a verdict of its own.
+    ///
+    /// A page with eight limits used to carry one conclusion and seven silences:
+    /// the lede spoke for the segment that ranked highest and the rest appeared
+    /// only as distributions. "Four limits fit and one interrupts you" is a
+    /// different account from "five limits fit", so the other seven are rows.
+    @Test("every limit's verdict reaches the screen", arguments: PlanFitSegmentCount.allCases)
+    func everySegmentHasAVerdict(segments: PlanFitSegmentCount) {
+        let snapshotCase = PlanFitSnapshotCase(sufficiency: .sufficient, segments: segments, theme: .light)
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
+        #expect(model.otherVerdicts.count == segments.rawValue - 1,
+                "\(segments.rawValue) limits produced \(model.otherVerdicts.count + 1) verdicts")
+        // The lede's own segment is not repeated underneath it.
+        #expect(Set(model.otherVerdicts.map(\.id)).count == model.otherVerdicts.count)
+    }
+
+    /// Contract V1. A withheld verdict is a full statement — its reason, and
+    /// when it stops being withheld — on the rows as much as on the lede.
+    @Test("a withheld row says why and when that changes")
+    func withheldRowsCarryTheirAvailability() {
+        let snapshotCase = PlanFitSnapshotCase(sufficiency: .underLookback, segments: .eight, theme: .light)
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
+        let withheld = model.otherVerdicts.filter { $0.kind == .withheld }
+        #expect(!withheld.isEmpty, "the under-lookback fixture reached a verdict on every limit")
+        for row in withheld {
+            #expect(!row.headline.isEmpty)
+            #expect(row.availability?.isEmpty == false, "\(row.scope) withholds without saying when that changes")
+            #expect(row.headroom == nil, "\(row.scope) states headroom while withholding")
+            #expect(!row.basis.isEmpty, "\(row.scope) has no basis")
+        }
+    }
+
+    /// Contract V3 / T032. Basis on every row, withheld included — a verdict
+    /// with no lookback, no sample size and no statistic beside it is an
+    /// assertion rather than a reading.
+    @Test("every verdict row carries its basis", arguments: PlanFitDataSufficiency.allCases)
+    func everyRowCarriesItsBasis(sufficiency: PlanFitDataSufficiency) {
+        let snapshotCase = PlanFitSnapshotCase(sufficiency: sufficiency, segments: .eight, theme: .light)
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
+        for row in model.otherVerdicts {
+            #expect(!row.basis.isEmpty, "\(row.scope)")
+            #expect(!row.scope.isEmpty)
+        }
+    }
+
+    /// Contract V8, on the rows as well as the lede: slack and the sentence
+    /// that stops it reading as a guarantee are one value.
+    @Test("no verdict row states headroom without its caveat",
+          arguments: PlanFitSnapshotMatrix.all)
+    func rowHeadroomCarriesItsCaveat(snapshotCase: PlanFitSnapshotCase) {
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
+        for row in model.otherVerdicts {
+            guard let headroom = row.headroom else { continue }
+            #expect(!headroom.sensitivity.isEmpty)
+            #expect(headroom.caveat.contains(L.tr("보증", "guarantee")),
+                    "\(row.scope): headroom without the V8 caveat")
+        }
+    }
+
+    /// Contract V7. There is no tier catalogue and no price feed for
+    /// subscriptions, so a verdict naming either could only have invented it.
+    /// The verdict speaks about *the current plan*.
+    @Test("no verdict names a tier or a price", arguments: PlanFitSnapshotMatrix.all)
+    func verdictsNameNoTierOrPrice(snapshotCase: PlanFitSnapshotCase) {
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
+        var text = [model.lede.headline, model.lede.availability ?? "", model.lede.detail ?? ""]
+        if let headroom = model.lede.headroom { text += [headroom.sensitivity, headroom.caveat] }
+        for row in model.otherVerdicts {
+            text += [row.headline, row.availability ?? "", row.basis]
+            if let headroom = row.headroom { text += [headroom.sensitivity, headroom.caveat] }
+        }
+        // A currency mark, a monthly rate, or a tier name from the provider's
+        // own ladder. None of the three is knowable from window rows.
+        for phrase in ["$", "₩", "USD", "/mo", "월 요금", "20x", "5x 요금제", "Pro 요금제", "Max 요금제"] {
+            #expect(!text.contains { $0.contains(phrase) },
+                    "\(snapshotCase.name): a verdict says \(phrase)")
+        }
+    }
+
+    /// The verdict rows rank the same way the lede was elected, so a reader
+    /// scanning down meets the limits with something to say before the ones
+    /// still collecting.
+    @Test("verdict rows lead with the limits that have something to say")
+    func rowsAreRankedNotArbitrary() {
+        let model = PlanFitModelBuilder.build(
+            rows: WindowFixtures.accountA() + PlanFitSnapshotMatrix.rows(
+                for: PlanFitSnapshotCase(sufficiency: .fewDays, segments: .four, theme: .light)
+            ),
+            unit: .weekly,
+            nowMs: WindowFixtures.nowMs
+        )
+        let ranks = model.otherVerdicts.map { row -> Int in
+            switch row.kind {
+            case .considerUpgrade: return 0
+            case .considerDowngrade: return 1
+            case .fits: return 2
+            default: return 3
+            }
+        }
+        #expect(ranks == ranks.sorted(), "verdict rows are not ordered by what they have to say")
+    }
+
+    /// The whole verdict block renders, in both themes, without spilling out
+    /// of 800pt — eight limits is eight verdicts.
+    @Test("the verdict block renders at eight limits", arguments: PlanFitSnapshotTheme.allCases)
+    func verdictBlockRenders(theme: PlanFitSnapshotTheme) throws {
+        let snapshotCase = PlanFitSnapshotCase(sufficiency: .sufficient, segments: .eight, theme: theme)
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
+        let raster = try #require(PlanFitSnapshotRenderer.raster(
+            VerdictSection(lede: model.lede, others: model.otherVerdicts),
+            theme: theme,
+            size: CGSize(width: PlanFitSnapshotRenderer.width, height: 1600)
+        ))
+        #expect(raster.pageInkCoverage > 0.03, "the verdict block is nearly empty")
+        #expect(raster.pagePeakContrast >= 4.5)
     }
 }
