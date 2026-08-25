@@ -25,7 +25,6 @@
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
 		11722D0924027C0E6C2E6628 /* ClaudeAuthReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48B81232926518156C12BDE /* ClaudeAuthReaderTests.swift */; };
 		125A70F9AEFAEA35D938E593 /* DashboardVersionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD104D8D23446C055623FC7D /* DashboardVersionStore.swift */; };
-		1509FB2BB2D41F678639FCAE /* ChartPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EB3ECA48F693919010308AC /* ChartPanel.swift */; };
 		15E2D0984BEAF7F2A8BA4F10 /* frame_00_thin.png in Resources */ = {isa = PBXBuildFile; fileRef = A0132BCEBA0D76465E41F08A /* frame_00_thin.png */; };
 		1737EF77B92E5AA23529AFC2 /* DashboardEditOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A80F24970E2F377FB13231 /* DashboardEditOverlay.swift */; };
 		18D9C1A849E7985D98AA3927 /* ServerQueryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB313CD4E60948212699989D /* ServerQueryClient.swift */; };
@@ -39,7 +38,6 @@
 		26D10DD5D09EF35BD729C643 /* DatasourcePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1246B6D3F3ED7B1F2A2BB791 /* DatasourcePlugin.swift */; };
 		27611784EBE8056DB13584F9 /* ProviderColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5952046CCD5E92A6AE3E38A5 /* ProviderColor.swift */; };
 		2B4230ABE31D423999570F70 /* frame_06.png in Resources */ = {isa = PBXBuildFile; fileRef = 551CF929C655CBA53D7A432E /* frame_06.png */; };
-		2B5BAB785ED50C752A107E13 /* CostChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ADB19DAAAC2A8BD63CB59C8 /* CostChart.swift */; };
 		2C3F97F7C70F8029872F46B7 /* TablePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA03537C2F0CAF1D37B5252 /* TablePanelView.swift */; };
 		2C5565559581A5B645B3349C /* ProviderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA89702E4E5B1108842AA475 /* ProviderRegistry.swift */; };
 		2FD39BD3817670D06BE68CEF /* ProviderRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507FA6EFF17810ED320DE318 /* ProviderRegistryTests.swift */; };
@@ -79,7 +77,6 @@
 		5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */; };
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
 		64CFC0046724FA45053F0D8B /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2419FCCD7EDF135528C44ACD /* UpdateChecker.swift */; };
-		654F14C7D25CBF073C885ED3 /* TokenUsageChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B4DCE60EE179E52F278B447 /* TokenUsageChart.swift */; };
 		656A44410727CE8BA928D746 /* GeneralSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 476DECAE0D1683A1642FEC9A /* GeneralSettingsPane.swift */; };
 		65AA1C3426510B47ECEC2529 /* TimeSeriesModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A285CEF82274757C8A327142 /* TimeSeriesModels.swift */; };
 		669753CC9D61AB01C3F2547C /* VersionCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4C36A205DFC4F7DA9CD54A9 /* VersionCompatibility.swift */; };
@@ -91,7 +88,6 @@
 		7A3A92BC03EC47C681AC5E76 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6576E137DF2FCFE73BE66102 /* DesignSystem.swift */; };
 		7D6BBA3AFFEEFB28562B393D /* ClaudeUsageSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47D7D33B62F737BE41C872F /* ClaudeUsageSection.swift */; };
 		7DA0347019C7908CB10BB85F /* ModelPricingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F563B39918F892ABDEDA17 /* ModelPricingTests.swift */; };
-		7EACF68C583C36145D434886 /* StatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC937E6C266ED917AE6D11A2 /* StatCard.swift */; };
 		7F7DBA23F9533DFA7039E150 /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDA0DC9C4300E5F7B2E3F2A /* SyncManager.swift */; };
 		8396AA1A147DFFBD23FC72C6 /* PanelDragModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 074C94EC60E9EE6F87E930EB /* PanelDragModifier.swift */; };
 		909F93389B2380F6E02D73AE /* TokiReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A27A6A118A446539806BB7 /* TokiReportModels.swift */; };
@@ -116,7 +112,6 @@
 		C33D79DB96B18D96790274FE /* DashboardWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530B806F812350D8094AA0EC /* DashboardWindow.swift */; };
 		C4A21221786A98400990A92C /* AnnotationListSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9778D3435D067DAE0CE34D6 /* AnnotationListSheet.swift */; };
 		C4E3FFDC972A212EEC371464 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B572F782B925386C0B035893 /* Assets.xcassets */; };
-		C81AE036CA73537935EC32CC /* EventsChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01FDADF849666205452FCAA1 /* EventsChart.swift */; };
 		C86ECFD5EE31C3BE52418E7D /* OAuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78A88F41ED20224F774C1ABA /* OAuthModels.swift */; };
 		C9B1B05E770D61B3E9D3108E /* PanelEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E131E3756214B21A8B8654B1 /* PanelEditorView.swift */; };
 		CA53B87359FD3833598A2E5C /* SparklineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */; };
@@ -177,7 +172,6 @@
 
 /* Begin PBXFileReference section */
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
-		01FDADF849666205452FCAA1 /* EventsChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsChart.swift; sourceTree = "<group>"; };
 		AA20INSPECT0000000001 /* PanelInspectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelInspectSheet.swift; sourceTree = "<group>"; };
 		02D478E261DC52C1328878D3 /* PlanFitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitView.swift; sourceTree = "<group>"; };
 		03A7FCA1C481A1421555EEF2 /* DatasourceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourceRegistry.swift; sourceTree = "<group>"; };
@@ -204,7 +198,6 @@
 		26621218B422BFA891C1CDF6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparklineView.swift; sourceTree = "<group>"; };
 		2913D0A5C411405B6E2BAE7E /* PromQLProxyDatasource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromQLProxyDatasource.swift; sourceTree = "<group>"; };
-		2ADB19DAAAC2A8BD63CB59C8 /* CostChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CostChart.swift; sourceTree = "<group>"; };
 		3126EF202F535714BFCD4F20 /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
 		3191102CF28F684FBE76F173 /* CustomDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomDashboardView.swift; sourceTree = "<group>"; };
 		34515E784769F22E891CE8F6 /* DashboardLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardLayout.swift; sourceTree = "<group>"; };
@@ -226,7 +219,6 @@
 		5903B69CBE449DB610E31F63 /* CodexUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageMonitor.swift; sourceTree = "<group>"; };
 		5952046CCD5E92A6AE3E38A5 /* ProviderColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderColor.swift; sourceTree = "<group>"; };
 		5B278895C8F3233433F88309 /* TokenFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenFormatter.swift; sourceTree = "<group>"; };
-		5B4DCE60EE179E52F278B447 /* TokenUsageChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenUsageChart.swift; sourceTree = "<group>"; };
 		5D10C2580CDF8F9EAD2AAACA /* DashboardModel+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardModel+Display.swift"; sourceTree = "<group>"; };
 		5D82D563F2B758C1208E987E /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		6045F68DCAE8A0E620C714FA /* DatasourceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourceStore.swift; sourceTree = "<group>"; };
@@ -235,7 +227,6 @@
 		6576E137DF2FCFE73BE66102 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		689790D76D5DEE3F14EB819D /* AppIcon_1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIcon_1024.png; sourceTree = "<group>"; };
 		6B17BA2BAF5855E537D1C1D0 /* AnimationTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationTheme.swift; sourceTree = "<group>"; };
-		6EB3ECA48F693919010308AC /* ChartPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartPanel.swift; sourceTree = "<group>"; };
 		7368908C5687B4CB8281CE2C /* ModelPricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPricing.swift; sourceTree = "<group>"; };
 		74A27A6A118A446539806BB7 /* TokiReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportModels.swift; sourceTree = "<group>"; };
 		AA12FRAMETEST000000001 /* FrameAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameAdapterTests.swift; sourceTree = "<group>"; };
@@ -320,7 +311,6 @@
 		DB89E56D927ABD7289F04084 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DB9BDCAC76DC2C743B8CE339 /* TimeSeriesChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesChartView.swift; sourceTree = "<group>"; };
 		AA34STPANEL00000001 /* StateTimelinePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateTimelinePanelView.swift; sourceTree = "<group>"; };
-		DC937E6C266ED917AE6D11A2 /* StatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCard.swift; sourceTree = "<group>"; };
 		DD104D8D23446C055623FC7D /* DashboardVersionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardVersionStore.swift; sourceTree = "<group>"; };
 		DFDF640C227D467E72826C64 /* DashboardMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMigrator.swift; sourceTree = "<group>"; };
 		E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
@@ -482,7 +472,6 @@
 				AA20INSPECT0000000001 /* PanelInspectSheet.swift */,
 				18AEF7A2555230D2AF60A455 /* TimeRangePickerPopover.swift */,
 				42E478EB5C5691C2D6693F41 /* VersionHistorySheet.swift */,
-				B1296CF4003E042DCC5B6F01 /* Charts */,
 				A94EA9B9E80F289225D4EF7F /* EditMode */,
 				5134C1CBEE67AA8413E45722 /* Localization */,
 				2A3062764644CB53A2DA4066 /* Panels */,
@@ -606,18 +595,6 @@
 				D1837716A9BFD555E0A36B8A /* SyncSettingsView.swift */,
 			);
 			path = Settings;
-			sourceTree = "<group>";
-		};
-		B1296CF4003E042DCC5B6F01 /* Charts */ = {
-			isa = PBXGroup;
-			children = (
-				6EB3ECA48F693919010308AC /* ChartPanel.swift */,
-				2ADB19DAAAC2A8BD63CB59C8 /* CostChart.swift */,
-				01FDADF849666205452FCAA1 /* EventsChart.swift */,
-				DC937E6C266ED917AE6D11A2 /* StatCard.swift */,
-				5B4DCE60EE179E52F278B447 /* TokenUsageChart.swift */,
-			);
-			path = Charts;
 			sourceTree = "<group>";
 		};
 		BD2650D4EB7E982A11AB3D8C /* CharacterFrames */ = {
@@ -795,7 +772,6 @@
 				96C312BC7B488E45DAB00737 /* AppSettings.swift in Sources */,
 				E5113FB852A0035ADFB20C19 /* BarChartPanelView.swift in Sources */,
 				D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */,
-				1509FB2BB2D41F678639FCAE /* ChartPanel.swift in Sources */,
 				ED31502F8415FBFD5DA3DA8B /* ClaudeAuthReader.swift in Sources */,
 				241394A7322151BD3060226E /* ClaudeUsageClient.swift in Sources */,
 				4DA4AF6FC2656FBDABF460BB /* ClaudeUsageMonitor.swift in Sources */,
@@ -803,7 +779,6 @@
 				DF1E83D524D2E5D935082DA9 /* CodexUsageClient.swift in Sources */,
 				C061672690CF6BA1C307A0E5 /* CodexUsageMonitor.swift in Sources */,
 				E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */,
-				2B5BAB785ED50C752A107E13 /* CostChart.swift in Sources */,
 				99C01AFD6FFFB72644AD3DEB /* CustomDashboardView.swift in Sources */,
 				1DF5998FCB1A3274BCB95F2A /* DashboardConfig.swift in Sources */,
 				062AE52FA18F6C3C5811BC25 /* DashboardConfigStore.swift in Sources */,
@@ -826,7 +801,6 @@
 				EFD5E942872C6B776577BF93 /* DatasourceStore.swift in Sources */,
 				7A3A92BC03EC47C681AC5E76 /* DesignSystem.swift in Sources */,
 				F46FA23BC5B95C607AC8D2A0 /* DetailHeaderView.swift in Sources */,
-				C81AE036CA73537935EC32CC /* EventsChart.swift in Sources */,
 				C1BD1342749879F37A5F8675 /* ExploreView.swift in Sources */,
 				5A9B8A4604691516E084F28B /* GaugePanelView.swift in Sources */,
 				656A44410727CE8BA928D746 /* GeneralSettingsPane.swift in Sources */,
@@ -863,7 +837,6 @@
 				789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */,
 				30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */,
 				CA53B87359FD3833598A2E5C /* SparklineView.swift in Sources */,
-				7EACF68C583C36145D434886 /* StatCard.swift in Sources */,
 				F786762BAD8B9D912858D747 /* StatPanelView.swift in Sources */,
 				0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */,
 				4D10457A9F0080B845753A2D /* StatusItemUnit.swift in Sources */,
@@ -879,7 +852,6 @@
 				98F08FDD937168036919376A /* TimeSeriesPanelView.swift in Sources */,
 				192041B631FA773F80879D97 /* TokenAggregator.swift in Sources */,
 				BCE0DA81930B1736E9AB03A5 /* TokenFormatter.swift in Sources */,
-				654F14C7D25CBF073C885ED3 /* TokenUsageChart.swift in Sources */,
 				69295AAE29A8D4FB6FBD903E /* TokenUsageModel.swift in Sources */,
 				63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */,
 				A5A0153D1AF63F11B4BE8133 /* TokiEvent.swift in Sources */,

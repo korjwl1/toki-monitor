@@ -149,7 +149,7 @@ struct PanelConfigBackCompatTests {
         let panel = statPanel()
         #expect(panel.fieldConfig == nil)
         #expect(panel.fieldSelection == nil)
-        let stat = CustomDashboardView.statValue(panel: panel, data: nil, frames: frames(1500))
+        let stat = StatPanelView.statValue(panel: panel, data: nil, frames: frames(1500))
         // Token formatting, exactly as the preset for totalTokens does it.
         #expect(stat.value.contains("1.5") || stat.value.contains("1500"))
     }
@@ -160,7 +160,7 @@ struct PanelConfigBackCompatTests {
         panel.fieldConfig = FieldConfigSource(
             defaults: FieldDisplayConfig(unit: "currencyUSD")
         )
-        let stat = CustomDashboardView.statValue(panel: panel, data: nil, frames: frames(12))
+        let stat = StatPanelView.statValue(panel: panel, data: nil, frames: frames(12))
         #expect(stat.value.contains("$"), "the panel's own config wins over the preset")
     }
 
@@ -173,7 +173,7 @@ struct PanelConfigBackCompatTests {
             Field(name: "total_tokens", values: .number([999])),
             Field(name: "other", values: .number([7])),
         ])])
-        let stat = CustomDashboardView.statValue(panel: panel, data: nil, frames: set)
+        let stat = StatPanelView.statValue(panel: panel, data: nil, frames: set)
         #expect(!stat.value.contains("999"), "must not read the preset's field")
         #expect(stat.value.contains("7"))
     }
@@ -182,10 +182,10 @@ struct PanelConfigBackCompatTests {
     /// card has to say which prices it used. Token counts do not move.
     @Test("a cost card says which prices it used, and a token card does not")
     func costCardIsLabelled() {
-        #expect(CustomDashboardView.costSubtitle(for: .totalCost) != nil)
-        #expect(CustomDashboardView.costSubtitle(for: .costByModel) != nil)
-        #expect(CustomDashboardView.costSubtitle(for: .totalTokens) == nil)
-        #expect(CustomDashboardView.costSubtitle(for: .apiCalls) == nil)
+        #expect(StatPanelView.costSubtitle(for: .totalCost) != nil)
+        #expect(StatPanelView.costSubtitle(for: .costByModel) != nil)
+        #expect(StatPanelView.costSubtitle(for: .totalTokens) == nil)
+        #expect(StatPanelView.costSubtitle(for: .apiCalls) == nil)
     }
 
     /// Encoding must stay stable for dashboards that predate these fields, or

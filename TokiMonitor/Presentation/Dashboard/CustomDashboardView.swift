@@ -1,5 +1,4 @@
 import SwiftUI
-import Charts
 
 /// Responsive dashboard grid view.
 /// Fills the available window space — panels resize dynamically with the window.
@@ -7,10 +6,6 @@ struct CustomDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
     var onEditPanel: ((PanelConfig) -> Void)?
     var onInspectPanel: ((PanelConfig) -> Void)?
-
-    @State private var barHoverState = BarHoverState()
-    @State private var barModelData: [(model: String, points: [TimeSeriesData.ChartPoint])] = []
-    @State private var barAnimated = false
 
 
     var body: some View {
@@ -163,6 +158,11 @@ struct CustomDashboardView: View {
 
     /// Dispatch panel content by type. PanelContainerView handles loading/error states.
     /// Chart panels show "데이터 없음" for empty data. Stat/gauge show "-" or "0" naturally.
+    ///
+    /// Every case names exactly one view under `Panels/`. The rendering used to
+    /// be written out here while `Panels/` held a second, never-instantiated
+    /// copy per panel type; contract R2 requires one implementation per type,
+    /// and `Panels/` is where it lives.
     @ViewBuilder
     private func panelContent(for panel: PanelConfig) -> some View {
         let state = viewModel.dataState(for: panel.id)
@@ -172,18 +172,17 @@ struct CustomDashboardView: View {
         let isEmpty = (data?.allModelNames.isEmpty ?? true) && (frames?.frames.isEmpty ?? true)
         switch panel.panelType {
         case .stat:
-            statContent(for: panel, data: data, frames: frames)
+            StatPanelView(panel: panel, data: data, frames: frames)
         case .timeSeries:
             if isEmpty {
                 Spacer()
             } else if viewModel.filteredModelNames.isEmpty {
                 noModelSelected
             } else {
-                TimeSeriesChartView(
-                    metric: panel.effectiveMetric,
+                TimeSeriesPanelView(
+                    panel: panel,
                     data: data,
                     frames: frames,
-                    panel: panel,
                     viewModel: viewModel,
                     dateFormat: chartDateFormat
                 )
@@ -194,14 +193,20 @@ struct CustomDashboardView: View {
             } else if viewModel.filteredModelNames.isEmpty {
                 noModelSelected
             } else {
-                barChartContent(for: panel, data: data, frames: frames)
+                BarChartPanelView(
+                    panel: panel,
+                    data: data,
+                    frames: frames,
+                    viewModel: viewModel,
+                    dateFormat: chartDateFormat
+                )
             }
         case .pieChart:
             if isEmpty { Spacer() } else { pieChartContent(for: panel, data: data, frames: frames) }
         case .table:
-            if isEmpty { Spacer() } else { tableContent(data: data, frames: frames) }
+            if isEmpty { Spacer() } else { TablePanelView(data: data, frames: frames) }
         case .gauge:
-            gaugeContent(for: panel, data: data, frames: frames)
+            GaugePanelView(panel: panel, data: data, frames: frames)
         case .stateTimeline:
             if isEmpty {
                 Spacer()
@@ -214,251 +219,8 @@ struct CustomDashboardView: View {
         }
     }
 
-    // MARK: - Pure Panel Renderers (data passed in, no global state reads)
-
-    /// Field-driven when frames are available, with the legacy extractor as a
-    /// fallback for sources that do not produce them yet.
-    ///
-    /// The value no longer comes from a switch on the metric: the preset says
-    /// which FIELD to read and how to reduce it, so a panel pointed at a column
-    /// no enum case knows about renders through this same path.
-    private func statContent(for panel: PanelConfig, data: TimeSeriesData?,
-                             frames: FrameSet?) -> some View {
-        let stat = Self.statValue(panel: panel, data: data, frames: frames)
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(stat.value)
-                .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .contentTransition(.numericText())
-                .animation(.easeOut(duration: 0.5), value: stat.value)
-            if let subtitle = stat.subtitle {
-                Text(subtitle)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// Resolve a stat card's number. Frames first; the legacy extractor only
-    /// when a datasource has not been migrated.
-    static func statValue(panel: PanelConfig, data: TimeSeriesData?,
-                          frames: FrameSet?) -> PanelDataExtractor.StatValue {
-        let metric = panel.effectiveMetric
-        guard let frames, !frames.frames.isEmpty else {
-            return PanelDataExtractor.statValue(for: metric, data: data)
-        }
-        // `topModel` names a series rather than reducing a column.
-        if metric == .topModel {
-            let name = FrameReader.topSeries(
-                frames, selection: PanelPreset.selection(for: metric), labelKey: "model"
-            )
-            return PanelDataExtractor.StatValue(value: name ?? "-", subtitle: nil)
-        }
-        let prepared = TransformationPipeline.apply(
-            PanelPreset.transformations(for: metric), to: frames
-        )
-        // The panel's own selection wins; the preset is the starting point a
-        // panel keeps until someone changes it.
-        let selection = panel.fieldSelection ?? PanelPreset.selection(for: metric)
-        guard let value = FrameReader.singleValue(prepared, selection: selection) else {
-            // Absent stays "-", never 0 — see FrameReader.singleValue.
-            return PanelDataExtractor.StatValue(value: "-", subtitle: nil)
-        }
-        // Formatting comes from the field's resolved config when the panel has
-        // one, so a card can read "$" while its neighbour reads tokens.
-        if let config = panel.fieldConfig,
-           let field = prepared.frames.compactMap({ selection.resolve(in: $0) }).first {
-            let resolved = config.resolve(for: field)
-            if !resolved.isEmpty {
-                return PanelDataExtractor.StatValue(
-                    value: FieldFormatter.format(value, config: resolved), subtitle: nil
-                )
-            }
-        }
-        return PanelDataExtractor.StatValue(
-            value: Self.format(value, metric: metric),
-            subtitle: Self.costSubtitle(for: metric)
-        )
-    }
-
-    /// A cost figure here is "valued at the prices we currently know", not
-    /// "what was billed at the time" — nothing in the pipeline stores a price
-    /// history, so a chart of last month's spend moves when a price does.
-    /// That is the useful reading on a flat-rate plan ("what would this cost
-    /// me on the API today?"), but only if it says so.
-    static func costSubtitle(for metric: PanelMetric) -> String? {
-        switch metric {
-        case .totalCost, .costByModel:
-            return L.tr("현재 가격 기준", "at current prices")
-        default:
-            return nil
-        }
-    }
-
-    static func format(_ value: Double, metric: PanelMetric) -> String {
-        switch metric {
-        case .totalCost, .costByModel:
-            return TokenFormatter.formatCost(value)
-        case .apiCalls, .eventsByModel:
-            return String(Int(value))
-        case .cacheHitRate:
-            return String(format: "%.1f%%", value * 100)
-        default:
-            return TokenFormatter.formatTokens(UInt64(max(0, value)))
-        }
-    }
-
-    @ViewBuilder
-    private func barChartContent(for panel: PanelConfig, data: TimeSeriesData?,
-                                 frames: FrameSet?) -> some View {
-        let bucketSecs = viewModel.dashboardConfig.time.bucketSeconds
-        return Chart {
-            ForEach(barModelData, id: \.model) { entry in
-                ForEach(entry.points) { point in
-                    BarMark(
-                        x: .value(L.dash.axisTime, point.date),
-                        y: .value(L.dash.axisCalls, point.value)
-                    )
-                    .foregroundStyle(by: .value(L.dash.axisModel, entry.model))
-                }
-            }
-        }
-        .chartForegroundStyleScale { (model: String) in
-            viewModel.colorForModel(model)
-        }
-        .chartXAxis {
-            AxisMarks(preset: .aligned, values: .automatic) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: chartDateFormat)
-                    .font(.system(size: 9))
-            }
-        }
-        .chartOverlay { proxy in
-            GeometryReader { geo in
-                ZStack(alignment: .topLeading) {
-                    if barHoverState.date != nil, let plotFrame = proxy.plotFrame {
-                        let plotRect = geo[plotFrame]
-                        Rectangle()
-                            .fill(.secondary.opacity(0.3))
-                            .frame(width: 1, height: plotRect.height)
-                            .offset(x: barHoverState.position.x, y: plotRect.minY)
-                            .allowsHitTesting(false)
-                    }
-
-                    Rectangle()
-                        .fill(.clear)
-                        .contentShape(Rectangle())
-                        .onContinuousHover { phase in
-                            switch phase {
-                            case .active(let location):
-                                barHoverState.date = snapToNearestBar(at: location, proxy: proxy, geo: geo, modelData: barModelData)
-                                barHoverState.position = location
-                            case .ended:
-                                barHoverState.date = nil
-                            }
-                        }
-                }
-            }
-        }
-        .overlay(alignment: .topLeading) {
-            BarChartTooltipOverlay(
-                state: barHoverState,
-                modelData: barModelData,
-                bucketSecs: bucketSecs,
-                colorForModel: { viewModel.colorForModel($0) },
-                formatDate: { formatBarDate($0) }
-            )
-        }
-        .onAppear { barAnimateIn(panel: panel, data: data, frames: frames) }
-        .onChange(of: viewModel.dataVersion) { _, _ in
-            barAnimateIn(panel: panel, data: data, frames: frames)
-        }
-        .onChange(of: viewModel.isLoading) { _, loading in
-            if loading { barCollapseToZero() }
-        }
-    }
-
-    private func barAnimateIn(panel: PanelConfig, data: TimeSeriesData?, frames: FrameSet?) {
-        let real = PanelSeries.chartPoints(
-            metric: panel.effectiveMetric, panel: panel, frames: frames,
-            data: data, enabled: viewModel.enabledModels
-        )
-        barModelData = real.map { entry in
-            (model: entry.model, points: entry.points.map {
-                TimeSeriesData.ChartPoint(date: $0.date, value: 0)
-            })
-        }
-        withAnimation(.easeOut(duration: 0.3)) {
-            barModelData = real
-        }
-    }
-
-    private func barCollapseToZero() {
-        withAnimation(.easeIn(duration: 0.15)) {
-            barModelData = barModelData.map { entry in
-                (model: entry.model, points: entry.points.map {
-                    TimeSeriesData.ChartPoint(date: $0.date, value: 0)
-                })
-            }
-        }
-    }
-
-    private func snapToNearestBar(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy, modelData: [(model: String, points: [TimeSeriesData.ChartPoint])]) -> Date? {
-        guard let plotFrame = proxy.plotFrame else { return nil }
-        let plotRect = geo[plotFrame]
-
-        // Only respond within the plot area
-        guard plotRect.contains(location) else { return nil }
-
-        let x = location.x - plotRect.minX
-        guard let date: Date = proxy.value(atX: x) else { return nil }
-        let allDates = modelData.flatMap { $0.points.map(\.date) }
-        let unique = Array(Set(allDates)).sorted()
-        return unique.min(by: { abs($0.timeIntervalSince(date)) < abs($1.timeIntervalSince(date)) })
-    }
-
-    private func isSameBucket(_ a: Date, _ b: Date, _ bucketSecs: Int) -> Bool {
-        BarChartTime.isSameBucket(a, b, bucketSecs: bucketSecs)
-    }
-
-    private func formatBarDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale.current
-        let secs = viewModel.dashboardConfig.time.bucketSeconds
-        if secs < 3600 {
-            f.dateFormat = "HH:mm"
-        } else if secs < 86400 {
-            f.dateFormat = "M/d HH:mm"
-        } else {
-            f.dateFormat = "M/d"
-        }
-        return f.string(from: date)
-    }
-
-    @ViewBuilder
-    private func tableContent(data: TimeSeriesData?, frames: FrameSet?) -> some View {
-        let rows = PanelSeries.rows(frames: frames, data: data)
-        if rows.isEmpty {
-            Text("-")
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            Table(rows) {
-                TableColumn(L.dash.axisModel, value: \.model)
-                TableColumn(L.dash.axisTokens) { row in
-                    Text(TokenFormatter.formatTokens(row.tokens))
-                        .monospacedDigit()
-                }
-                TableColumn(L.dash.axisCost) { row in
-                    Text(TokenFormatter.formatCost(row.cost))
-                        .monospacedDigit()
-                }
-            }
-        }
-    }
-
+    /// Pie has no wrapper view of its own: `PieChartView` under `Panels/` is
+    /// already the single render, and this is the slice preparation feeding it.
     @ViewBuilder
     private func pieChartContent(for panel: PanelConfig, data: TimeSeriesData?,
                                  frames: FrameSet?) -> some View {
@@ -479,18 +241,6 @@ struct CustomDashboardView: View {
         }
     }
 
-    private func gaugeContent(for panel: PanelConfig, data: TimeSeriesData?,
-                              frames: FrameSet?) -> some View {
-        let stat = Self.statValue(panel: panel, data: data, frames: frames)
-        return VStack {
-            Text(stat.value)
-                .font(.system(size: 24, weight: .bold, design: .monospaced))
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
     private var chartDateFormat: Date.FormatStyle {
         let secs = viewModel.dashboardConfig.time.bucketSeconds
         if secs < 3600 {
@@ -509,70 +259,5 @@ struct CustomDashboardView: View {
             description: Text(L.dash.selectModelDesc)
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-// MARK: - Bar Chart Hover State
-
-@Observable
-final class BarHoverState {
-    var date: Date?
-    var position: CGPoint = .zero
-}
-
-/// Isolated overlay that only re-renders when hover state changes,
-/// without causing the parent Chart to rebuild.
-struct BarChartTooltipOverlay: View {
-    let state: BarHoverState
-    let modelData: [(model: String, points: [TimeSeriesData.ChartPoint])]
-    let bucketSecs: Int
-    let colorForModel: (String) -> Color
-    let formatDate: (Date) -> String
-
-    var body: some View {
-        if let date = state.date {
-            let values = modelData.compactMap { entry -> (String, Int)? in
-                guard let pt = entry.points.first(where: { isSameBucket($0.date, date) }) else { return nil }
-                let v = Int(pt.value)
-                return v > 0 ? (entry.model, v) : nil
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(formatDate(date))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                ForEach(values, id: \.0) { name, value in
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(colorForModel(name))
-                            .frame(width: 6, height: 6)
-                        Text("\(name): \(value)")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    }
-                }
-            }
-            .padding(6)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
-            .offset(x: state.position.x - 40, y: max(state.position.y - 60, 0))
-            .allowsHitTesting(false)
-        }
-    }
-
-    private func isSameBucket(_ a: Date, _ b: Date) -> Bool {
-        BarChartTime.isSameBucket(a, b, bucketSecs: bucketSecs)
-    }
-}
-
-/// Bucket-equality helper used by both the bar chart hover lookup and
-/// the tooltip overlay's date lookup. Two separate copies had grown
-/// over time — extracted here so a future granularity tweak only has
-/// one place to land.
-enum BarChartTime {
-    static func isSameBucket(_ a: Date, _ b: Date, bucketSecs: Int) -> Bool {
-        if bucketSecs < 3600 {
-            return Calendar.current.isDate(a, equalTo: b, toGranularity: .minute)
-        } else if bucketSecs < 86400 {
-            return Calendar.current.isDate(a, equalTo: b, toGranularity: .hour)
-        }
-        return Calendar.current.isDate(a, inSameDayAs: b)
     }
 }
