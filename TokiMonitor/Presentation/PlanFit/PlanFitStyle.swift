@@ -256,7 +256,7 @@ struct PlanFitSectionHeader: View {
 /// A fact that carries a warning, rendered as symbol + word + colour, in that
 /// order of importance. Removing the colour must not remove the meaning.
 struct PlanFitMark: View {
-    enum Tone {
+    enum Tone: Equatable {
         case neutral
         case attention
         case blocked

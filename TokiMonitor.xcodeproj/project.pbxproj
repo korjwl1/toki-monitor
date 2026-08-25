@@ -180,6 +180,10 @@
 		FE6D7C67ACAE1D3ACB73C3A6 /* PieChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A62B05BBA5579FF67EA1B8D /* PieChartView.swift */; };
 		FFD77509DEB84844ECD8160D /* DashboardCustomLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A5104A31D681EDBBBFC0C0E /* DashboardCustomLayout.swift */; };
 		AA03PFSTYLE00B001 /* PlanFitStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFSTYLE00F001 /* PlanFitStyle.swift */; };
+		AA03PFMODEL0B001 /* PlanFitModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFMODEL0F001 /* PlanFitModel.swift */; };
+		AA03PFTREND0B001 /* PeriodTrendSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFTREND0F001 /* PeriodTrendSection.swift */; };
+		AA03PFLIMIT0B001 /* LimitStatusSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFLIMIT0F001 /* LimitStatusSection.swift */; };
+		AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFACTIV0F001 /* ActiveUseSection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -369,6 +373,10 @@
 		FC45E4DF1A7CDBFB1E6D3C49 /* AddPanelPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPanelPopover.swift; sourceTree = "<group>"; };
 		FE85317E2B7AE65F094494F0 /* ClaudeUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageClient.swift; sourceTree = "<group>"; };
 		AA03PFSTYLE00F001 /* PlanFitStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitStyle.swift; sourceTree = "<group>"; };
+		AA03PFMODEL0F001 /* PlanFitModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitModel.swift; sourceTree = "<group>"; };
+		AA03PFTREND0F001 /* PeriodTrendSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodTrendSection.swift; sourceTree = "<group>"; };
+		AA03PFLIMIT0F001 /* LimitStatusSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LimitStatusSection.swift; sourceTree = "<group>"; };
+		AA03PFACTIV0F001 /* ActiveUseSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveUseSection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -689,6 +697,7 @@
 		PF00PLANFIT000000000001 /* PlanFit */ = {
 			isa = PBXGroup;
 			children = (
+				AA03PFMODEL0F001 /* PlanFitModel.swift */,
 				AA03PFSTYLE00F001 /* PlanFitStyle.swift */,
 				02D478E261DC52C1328878D3 /* PlanFitPage.swift */,
 				PF00PLANFIT000000000002 /* Sections */,
@@ -699,6 +708,9 @@
 		PF00PLANFIT000000000002 /* Sections */ = {
 			isa = PBXGroup;
 			children = (
+				AA03PFACTIV0F001 /* ActiveUseSection.swift */,
+				AA03PFLIMIT0F001 /* LimitStatusSection.swift */,
+				AA03PFTREND0F001 /* PeriodTrendSection.swift */,
 			);
 			path = Sections;
 			sourceTree = "<group>";
@@ -861,6 +873,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */,
+				AA03PFLIMIT0B001 /* LimitStatusSection.swift in Sources */,
+				AA03PFTREND0B001 /* PeriodTrendSection.swift in Sources */,
+				AA03PFMODEL0B001 /* PlanFitModel.swift in Sources */,
 				AA03PFSTYLE00B001 /* PlanFitStyle.swift in Sources */,
 				AA40PANELSTATUS002 /* PanelStatusView.swift in Sources */,
 				AA40PANELSTATE0002 /* PanelState.swift in Sources */,

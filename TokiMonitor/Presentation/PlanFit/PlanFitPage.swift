@@ -1,211 +1,58 @@
 import SwiftUI
-import Charts
 
-/// Plan-fit analytics: long-term rate-limit window statistics per provider.
-///
-/// Deliberately a fixed view rather than a PanelPlugin: the panel pipeline's
-/// contract is TimeSeriesData, and window statistics (percentiles over window
-/// instances, censoring flags, tier advice) are not a time series. Forcing
-/// them through that contract would mean fake models; a dedicated view is the
-/// honest shape. (Documented deviation from the original plan §3.5.)
-struct PlanFitView: View {
+// MARK: - The plan-fit page (T043, T044, T049, T050, T052)
+//
+// A curated page, not a locked dashboard preset (constitution VI). The two
+// layers share the domain aggregation and nothing else, and the difference
+// shows up here as a structural rule rather than as a convention:
+//
+//   **The period unit is the only control, and it is the only control the code
+//   can express.** `PlanFitContent` holds exactly one `Binding` — the unit —
+//   and every section below it takes a value and returns a view. Sections have
+//   no bindings and no closures, so there is nothing for an editor entry point
+//   to be attached to; a Button anywhere in this view tree changes the STATIC
+//   TYPE of `PlanFitContent.body`, which is what `PlanFitControlSurfaceTests`
+//   reads. The refresh button the old page carried is gone for the same
+//   reason: FR-001 says one control, and "one control plus a refresh" is two.
+//
+// The other half of the rebuild is hierarchy (research §5). The verdict used
+// to render at 10pt as a top-right caption while supporting statistics
+// rendered at 12pt. It now leads the page at 24pt — a 1.6x step over the
+// largest supporting number — and the sections beneath it are evidence for it,
+// in the order a reader needs them: what the conclusion is, how usage is
+// trending, how each limit is running, and what was happening while the user
+// was actually working.
+
+struct PlanFitPage: View {
     let reportClient: TokiReportClient
 
-    @State private var segments: [WindowStatsSegment] = []
-    @State private var historyBySegment: [WindowStatsSegment: [WindowRow]] = [:]
+    /// FR-006: the choice survives relaunch. `@AppStorage` rather than a row
+    /// in `AppSettings` because this is the page's own state, not a preference
+    /// the settings window should offer (FR-063 keeps *settings* out of the
+    /// page; it does not make the page's one control a setting).
+    @AppStorage("planFit.periodUnit") private var periodUnit: PeriodUnit = .weekly
+
+    @State private var rows: [(provider: String, row: WindowRow)] = []
     @State private var isLoading = false
-    @State private var loadError: String?
+    @State private var loadFailed = false
     /// true = rows came from the sync server (multi-device merged statistics).
     @State private var usingServerData = false
+
     private let serverClient = ServerQueryClient()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DS.lg) {
-                header
-                if isLoading && segments.isEmpty {
-                    ProgressView().frame(maxWidth: .infinity, alignment: .center)
-                } else if let loadError {
-                    Text(loadError)
-                        .font(.system(size: DS.fontBody))
-                        .foregroundStyle(.secondary)
-                } else if segments.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(segments, id: \.self) { segment in
-                        segmentCard(segment)
-                    }
-                }
-            }
-            .padding(DS.lg)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        PlanFitContent(
+            model: PlanFitModelBuilder.build(
+                rows: rows,
+                unit: periodUnit,
+                nowMs: Int64(Date().timeIntervalSince1970 * 1000),
+                usingServerData: usingServerData,
+                loadFailed: loadFailed,
+                isLoading: isLoading
+            ),
+            unit: $periodUnit
+        )
         .task { await load() }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: DS.xs) {
-                Text(L.tr("요금제 적합도", "Plan Fit"))
-                    .font(.system(size: DS.fontTitle, weight: .semibold))
-                Text(L.tr(
-                    "최근 28일 rate-limit 윈도우 통계 — 한도 소진 빈도와 peak 분포로 요금제 여유를 진단합니다",
-                    "Trailing 28-day rate-limit window statistics — limit exhaustion and peak distribution"
-                ))
-                .font(.system(size: DS.fontCaption))
-                .foregroundStyle(.secondary)
-                if usingServerData {
-                    Text(L.tr("동기화 서버 데이터 (전체 디바이스 병합)", "Sync-server data (all devices merged)"))
-                        .font(.system(size: DS.fontTiny))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            Spacer()
-            Button {
-                Task { await load() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .disabled(isLoading)
-        }
-    }
-
-    private var emptyState: some View {
-        VStack(alignment: .leading, spacing: DS.sm) {
-            Text(L.tr("아직 윈도우 데이터가 없습니다", "No window data yet"))
-                .font(.system(size: DS.fontBody, weight: .medium))
-            Text(L.tr(
-                "toki daemon(v2.3+)이 사용량 윈도우를 수집하면 여기에 통계가 쌓입니다. Codex는 과거 세션에서 즉시 복원되고, Claude는 수집 시작 후 4주에 걸쳐 채워집니다.",
-                "Statistics accumulate once toki daemon (v2.3+) records usage windows. Codex history backfills immediately; Claude ramps over ~4 weeks from collection start."
-            ))
-            .font(.system(size: DS.fontCaption))
-            .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(DS.lg)
-        .background(RoundedRectangle(cornerRadius: DS.widgetRadius).fill(.quaternary.opacity(0.3)))
-    }
-
-    // MARK: - Segment card
-
-    private func segmentCard(_ s: WindowStatsSegment) -> some View {
-        VStack(alignment: .leading, spacing: DS.md) {
-            HStack(spacing: DS.sm) {
-                Text(providerTitle(s.provider))
-                    .font(.system(size: DS.fontBody, weight: .semibold))
-                Text(limitLabel(s))
-                    .font(.system(size: DS.fontCaption))
-                    .padding(.horizontal, DS.sm).padding(.vertical, 2)
-                    .background(Capsule().fill(.quaternary))
-                if !s.plan.isEmpty {
-                    Text(s.plan)
-                        .font(.system(size: DS.fontCaption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                adviceBadge(s.advice)
-            }
-
-            peakHistoryChart(for: s)
-
-            HStack(spacing: DS.lg) {
-                stat(
-                    L.tr("한도 소진", "Maxed out"),
-                    "\(s.maxedCount) / \(s.activeWindowCount)",
-                    detail: s.medianTimeTo100Sec.map {
-                        L.tr("중앙값 \(formatDuration($0))만에 소진", "median \(formatDuration($0)) to hit")
-                    }
-                )
-                stat(
-                    L.tr("Peak 분포", "Peak distribution"),
-                    percentileText(s),
-                    detail: s.p95IsCensored
-                        ? L.tr("일부 윈도우가 100%에서 잘림(실수요는 더 높음)", "some windows censored at 100% (true demand higher)")
-                        : nil
-                )
-                stat(
-                    L.tr("사용 중 평균", "Active mean"),
-                    s.meanPeakActive.map { "\(pct($0))%" } ?? "—",
-                    // Any max-out makes this a lower bound: those windows
-                    // contribute their capped 100, not the demand they had.
-                    detail: [
-                        s.approxOverallMean.map {
-                            L.tr("전체 평균 ~\(pct($0))% (캘린더 근사)", "overall ~\(pct($0))% (calendar approx.)")
-                        },
-                        s.maxedCount > 0
-                            ? L.tr("소진 윈도우 포함 — 실제 평균은 더 높음", "includes maxed windows — true mean is higher")
-                            : nil,
-                    ].compactMap { $0 }.joined(separator: " · ").nilIfEmpty
-                )
-                stat(
-                    L.tr("가동률", "Duty cycle"),
-                    "\(Int(s.dutyCycle * 100))%",
-                    detail: s.impliedDemandP90.map {
-                        L.tr("잠재 수요 p90 ~\(pct($0))%", "implied demand p90 ~\(pct($0))%")
-                    }
-                )
-            }
-        }
-        .padding(DS.lg)
-        .background(RoundedRectangle(cornerRadius: DS.widgetRadius).fill(.quaternary.opacity(0.3)))
-    }
-
-    private func peakHistoryChart(for s: WindowStatsSegment) -> some View {
-        let history = historyBySegment[s] ?? []
-        return Chart(history, id: \.windowEndMs) { row in
-            BarMark(
-                x: .value("Reset", Date(timeIntervalSince1970: Double(row.windowEndMs) / 1000)),
-                y: .value("Peak %", row.peakPct)
-            )
-            .foregroundStyle(row.maxedOut ? Color.red : (row.peakPct > 75 ? Color.orange : Color.accentColor))
-        }
-        // Upper bound follows the data: credit-overflow windows exceed 100%
-        // and a fixed domain clipped them to look exactly maxed.
-        // Guarded: a NaN upper bound would violate ClosedRange's precondition.
-        .chartYScale(domain: 0...max(100.0, min(history.compactMap { $0.peakPct.isFinite ? $0.peakPct : nil }.max() ?? 100, 9_999).rounded(.up)))
-        .frame(height: 120)
-    }
-
-    private func stat(_ title: String, _ value: String, detail: String?) -> some View {
-        // (see String.nilIfEmpty below — an empty joined() would render a
-        // blank caption line rather than no line at all)
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.system(size: DS.fontCaption))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: DS.fontBody, weight: .semibold))
-            if let detail {
-                Text(detail)
-                    .font(.system(size: DS.fontTiny))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func adviceBadge(_ advice: TierAdvice) -> some View {
-        let (text, color): (String, Color) = {
-            switch advice {
-            case .collecting(let days):
-                return (L.tr("수집 중 (\(days)일째)", "Collecting (day \(days))"), .secondary)
-            case .upgrade(let reason):
-                return (L.tr("업그레이드 고려 — \(reason)", "Consider upgrade — \(reason)"), .orange)
-            case .downgrade(let reason):
-                return (L.tr("다운그레이드 여지 — \(reason)", "Downgrade room — \(reason)"), .blue)
-            case .keep(let reason):
-                return (L.tr("적정 — \(reason)", "Right-sized — \(reason)"), .green)
-            case .evidenceOnly:
-                return (L.tr("근거만 표시 (플랜 미확인)", "Evidence only (plan unknown)"), .secondary)
-            case .historical:
-                return (L.tr("이전 요금제 · 근거만", "Previous plan · evidence only"), .secondary)
-            }
-        }()
-        return Text(text)
-            .font(.system(size: DS.fontCaption))
-            .foregroundStyle(color)
-            .lineLimit(2)
-            .multilineTextAlignment(.trailing)
     }
 
     // MARK: - Data
@@ -246,38 +93,12 @@ struct PlanFitView: View {
         for entry in localRows { localProviders.insert(entry.provider) }
         usingServerData = !serverRows.isEmpty && localProviders.isSubset(of: serverProviders)
 
-        if fetched.isEmpty {
-            segments = []
-            historyBySegment = [:]
-            // Distinguish "both sources answered: no data yet" (guidance
-            // empty-state) from "every source FAILED" (real error): masking
-            // a missing CLI or a server 500 as 'no data' hides the problem.
-            loadError = (localFailed && serverFailed)
-                ? L.tr(
-                    "윈도우 데이터를 불러오지 못했습니다 — toki daemon(v2.3+)과 동기화 서버 연결을 확인하세요",
-                    "Could not load window data — check toki daemon (v2.3+) and sync-server connectivity"
-                )
-                : nil
-            return
-        }
-        let segs = WindowStats.segments(rows: fetched)
-        var history: [WindowStatsSegment: [WindowRow]] = [:]
-        for s in segs {
-            history[s] = fetched
-                .filter {
-                    $0.provider == s.provider && $0.row.kind == s.kind
-                        && $0.row.limitId == s.limitId
-                        && $0.row.plan == s.plan && $0.row.account == s.account
-                        && $0.row.finalized
-                }
-                .map(\.row)
-                .sorted { $0.windowEndMs < $1.windowEndMs }
-                .suffix(60)
-                .map { $0 }
-        }
-        segments = segs
-        historyBySegment = history
-        loadError = nil
+        rows = fetched
+        // Distinguish "both sources answered: no data yet" (guidance screen)
+        // from "every source FAILED" (real problem): masking a missing CLI or
+        // a server 500 as 'no data' hides it, and the two screens say
+        // different things about what the reader should do next.
+        loadFailed = fetched.isEmpty && localFailed && serverFailed
     }
 
     private func fetchLocal(start: Int, end: Int) async -> ([(provider: String, row: WindowRow)], failed: Bool) {
@@ -289,52 +110,145 @@ struct PlanFitView: View {
         do { return (try await serverClient.queryWindows(startEpoch: start, endEpoch: end), false) }
         catch { return ([], true) }
     }
-
-    private func providerTitle(_ name: String) -> String {
-        switch name {
-        case "claude_code": return "Claude Code"
-        case "codex": return "Codex"
-        default: return name
-        }
-    }
-
-    private func limitLabel(_ s: WindowStatsSegment) -> String {
-        switch s.limitId {
-        case "five_hour": return L.tr("5시간", "5-hour")
-        case "seven_day": return L.tr("주간", "Weekly")
-        case "seven_day_sonnet": return L.tr("주간 · Sonnet", "Weekly · Sonnet")
-        case "seven_day_opus": return L.tr("주간 · Opus", "Weekly · Opus")
-        case "codex", "": return s.kind == "session" ? L.tr("5시간", "5-hour") : L.tr("주간", "Weekly")
-        default:
-            let base = s.kind == "session" ? L.tr("5시간", "5-hour") : L.tr("주간", "Weekly")
-            return "\(base) · \(s.limitId)"
-        }
-    }
-
-    /// Wire values are only checked for finiteness daemon-side; a garbage
-    /// magnitude must degrade the display, never trap the Int conversion.
-    private func pct(_ v: Double) -> Int {
-        Int((v.isFinite ? min(max(v, 0), 9_999) : 0).rounded())
-    }
-
-    private func percentileText(_ s: WindowStatsSegment) -> String {
-        guard let p50 = s.p50Peak, let p95 = s.p95Peak else { return "—" }
-        let p95Str = s.p95IsCensored ? "≥\(Int(p95))%" : "\(pct(p95))%"
-        return "p50 \(Int(p50))% · p95 \(p95Str)"
-    }
-
-    private func formatDuration(_ seconds: Double) -> String {
-        let hours = Int(seconds) / 3600
-        let minutes = (Int(seconds) % 3600) / 60
-        if hours >= 24 { return L.tr("\(hours / 24)일 \(hours % 24)시간", "\(hours / 24)d \(hours % 24)h") }
-        if hours > 0 { return L.tr("\(hours)시간 \(minutes)분", "\(hours)h \(minutes)m") }
-        return L.tr("\(minutes)분", "\(minutes)m")
-    }
 }
 
+// MARK: - The page, as a pure function of its model
 
-private extension String {
-    /// Joining optional detail fragments yields "" when every fragment is
-    /// absent; `stat` wants nil in that case so no caption row is drawn.
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+/// Everything the page draws, given a value and the one control.
+///
+/// Split from `PlanFitPage` so the whole screen — header, toggle and all — can
+/// be rendered from fixtures with no daemon, no network and no clock. Nobody
+/// reviewing this work can see the screen, so the render has to be something a
+/// machine can look at.
+struct PlanFitContent: View {
+    let model: PlanFitModel
+    /// The page's one and only control (FR-001).
+    @Binding var unit: PeriodUnit
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DS.lg) {
+                header
+                lede
+                PeriodTrendSection(model: model.trend)
+                if model.hasSegments {
+                    LimitStatusSection(groups: model.limitGroups)
+                    ActiveUseSection(
+                        limits: model.activeUse,
+                        quietLimitsNote: model.quietLimitsNote
+                    )
+                }
+                ProvenanceLegend()
+            }
+            .padding(DS.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: DS.lg) {
+            VStack(alignment: .leading, spacing: DS.xs) {
+                Text(L.tr("요금제 적합도", "Plan Fit"))
+                    .font(.system(size: PlanFitType.sectionTitle, weight: .semibold))
+                    .foregroundStyle(PlanFitInk.support)
+                Text(L.tr(
+                    "최근 \(Int(WindowStats.lookbackDays))일의 rate-limit 윈도우 기록. 다른 사용자와 비교하지 않으며, 이 데이터는 기기를 벗어나지 않습니다.",
+                    "The trailing \(Int(WindowStats.lookbackDays)) days of rate-limit windows. Nothing here compares you with anyone else, and none of it leaves this machine."
+                ))
+                .font(.system(size: PlanFitType.caption))
+                .foregroundStyle(PlanFitInk.faint)
+                .fixedSize(horizontal: false, vertical: true)
+                if let sourceNote = model.sourceNote {
+                    Text(sourceNote)
+                        .font(.system(size: PlanFitType.tiny))
+                        .foregroundStyle(PlanFitInk.faint)
+                }
+            }
+            Spacer(minLength: DS.sm)
+            periodPicker
+        }
+    }
+
+    /// The only control on the page. Segmented so both options are visible and
+    /// reachable from the keyboard without opening anything (FR-060).
+    private var periodPicker: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Picker(L.tr("기간 단위", "Period unit"), selection: $unit) {
+                ForEach(PeriodUnit.allCases, id: \.self) { candidate in
+                    Text(candidate.label).tag(candidate)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 160)
+            .accessibilityLabel(L.tr("기간 단위", "Period unit"))
+            Text(L.tr("이 페이지의 유일한 설정입니다", "The page's only setting"))
+                .font(.system(size: PlanFitType.tiny))
+                .foregroundStyle(PlanFitInk.faint)
+        }
+    }
+
+    // MARK: Lede
+
+    /// The conclusion, at 24pt. Everything below it is why.
+    private var lede: some View {
+        VStack(alignment: .leading, spacing: DS.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: DS.sm) {
+                Image(systemName: model.lede.kind.symbolName)
+                    .font(.system(size: PlanFitType.caption, weight: .semibold))
+                Text(model.lede.kind.badge)
+                    .font(.system(size: PlanFitType.caption, weight: .semibold))
+                if let scope = model.lede.scope {
+                    Text("· \(scope)")
+                        .font(.system(size: PlanFitType.caption))
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(PlanFitInk.support)
+
+            Text(model.lede.headline)
+                .font(.system(size: PlanFitType.lede, weight: .semibold))
+                .foregroundStyle(PlanFitInk.strong)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+
+            if let availability = model.lede.availability {
+                Text(availability)
+                    .font(.system(size: PlanFitType.body, weight: .medium))
+                    .foregroundStyle(PlanFitInk.support)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let headroom = model.lede.headroom {
+                Text(headroom.sensitivity)
+                    .font(.system(size: PlanFitType.body))
+                    .foregroundStyle(PlanFitInk.support)
+                    .fixedSize(horizontal: false, vertical: true)
+                // Contract V8. Bound to the sentence above by the type that
+                // carries them both — there is no render path with one and not
+                // the other.
+                Text(headroom.caveat)
+                    .font(.system(size: PlanFitType.caption))
+                    .foregroundStyle(PlanFitInk.support)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let detail = model.lede.detail {
+                Text(detail)
+                    .font(.system(size: PlanFitType.body))
+                    .foregroundStyle(PlanFitInk.support)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let basis = model.lede.basis {
+                HStack(alignment: .firstTextBaseline, spacing: DS.sm) {
+                    Text(basis)
+                        .font(.system(size: PlanFitType.caption))
+                        .foregroundStyle(PlanFitInk.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ProvenanceTag(provenance: .derived)
+                }
+            }
+        }
+        .planFitCard(.lede)
+    }
 }

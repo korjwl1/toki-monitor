@@ -5,7 +5,7 @@ import Foundation
 // A rate-limit window IS an interval: it opens, it fills, it resets, and what
 // matters about it is the outcome — how high it peaked, whether it was maxed
 // out, how long it took to get there. Until now that data had exactly one
-// consumer, `PlanFitView`, because the panel pipeline's contract was
+// consumer, `PlanFitPage`, because the panel pipeline's contract was
 // TimeSeriesData and a window is not a time series.
 //
 // With the frame contract it is one: a frame whose rows are spans. That makes

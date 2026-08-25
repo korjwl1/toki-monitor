@@ -84,7 +84,7 @@ struct DashboardView: View {
                 case .explore:
                     ExploreView(viewModel: viewModel)
                 case .planFit:
-                    PlanFitView(reportClient: viewModel.reportClient)
+                    PlanFitPage(reportClient: viewModel.reportClient)
                 case nil:
                     dashboardContent
                 }
