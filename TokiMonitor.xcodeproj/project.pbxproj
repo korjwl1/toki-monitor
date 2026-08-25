@@ -31,7 +31,7 @@
 		0AD59AAAF77D174E97E09FF8 /* MenuContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B1AC7C10926C1E37F7B0FF /* MenuContentView.swift */; };
 		0C102E5047654E452890DC1C /* frame_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 0C1FFE59530A1D2FC18F1651 /* frame_00.png */; };
 		AA20INSPECT0000000002 /* PanelInspectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA20INSPECT0000000001 /* PanelInspectSheet.swift */; };
-		0CF104220993B0F559EDBC8E /* PlanFitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D478E261DC52C1328878D3 /* PlanFitView.swift */; };
+		0CF104220993B0F559EDBC8E /* PlanFitPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02D478E261DC52C1328878D3 /* PlanFitPage.swift */; };
 		0D8BF2892ACFC5D57EC5B3A6 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1751117D1E380839B3A0E /* StatusBarController.swift */; };
 		11722D0924027C0E6C2E6628 /* ClaudeAuthReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48B81232926518156C12BDE /* ClaudeAuthReaderTests.swift */; };
 		125A70F9AEFAEA35D938E593 /* DashboardVersionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD104D8D23446C055623FC7D /* DashboardVersionStore.swift */; };
@@ -201,7 +201,7 @@
 		AA40PANELSTATE0001 /* PanelState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelState.swift; sourceTree = "<group>"; };
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		AA20INSPECT0000000001 /* PanelInspectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelInspectSheet.swift; sourceTree = "<group>"; };
-		02D478E261DC52C1328878D3 /* PlanFitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitView.swift; sourceTree = "<group>"; };
+		02D478E261DC52C1328878D3 /* PlanFitPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitPage.swift; sourceTree = "<group>"; };
 		03A7FCA1C481A1421555EEF2 /* DatasourceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourceRegistry.swift; sourceTree = "<group>"; };
 		03F503F3516997ED1304E8F7 /* DashboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfig.swift; sourceTree = "<group>"; };
 		06C3FEAA3CC51E39C20F779C /* VariablePluginLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariablePluginLoader.swift; sourceTree = "<group>"; };
@@ -515,7 +515,6 @@
 				530B806F812350D8094AA0EC /* DashboardWindow.swift */,
 				F103561D8BF06FC314BAD0B9 /* DetailHeaderView.swift */,
 				3126EF202F535714BFCD4F20 /* ExploreView.swift */,
-				02D478E261DC52C1328878D3 /* PlanFitView.swift */,
 				AA20INSPECT0000000001 /* PanelInspectSheet.swift */,
 				18AEF7A2555230D2AF60A455 /* TimeRangePickerPopover.swift */,
 				42E478EB5C5691C2D6693F41 /* VersionHistorySheet.swift */,
@@ -685,12 +684,29 @@
 			path = CharacterFrames;
 			sourceTree = "<group>";
 		};
+		PF00PLANFIT000000000001 /* PlanFit */ = {
+			isa = PBXGroup;
+			children = (
+				02D478E261DC52C1328878D3 /* PlanFitPage.swift */,
+				PF00PLANFIT000000000002 /* Sections */,
+			);
+			path = PlanFit;
+			sourceTree = "<group>";
+		};
+		PF00PLANFIT000000000002 /* Sections */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Sections;
+			sourceTree = "<group>";
+		};
 		EE3DFCBD1DA2E2C5ECCB7E9D /* Presentation */ = {
 			isa = PBXGroup;
 			children = (
 				6576E137DF2FCFE73BE66102 /* DesignSystem.swift */,
 				5952046CCD5E92A6AE3E38A5 /* ProviderColor.swift */,
 				5CB76EE9FE876C983A62E891 /* Dashboard */,
+				PF00PLANFIT000000000001 /* PlanFit */,
 				3CC06E198D87E843450910CE /* MenuBar */,
 				AC4F582F1B6F74BCEB60BC78 /* Settings */,
 			);
@@ -904,7 +920,7 @@
 				B7533A6F032F66AA318EECD8 /* PanelPlugin.swift in Sources */,
 				D8262FCBDC499382103DEA43 /* PanelPluginSpec.swift in Sources */,
 				FE6D7C67ACAE1D3ACB73C3A6 /* PieChartView.swift in Sources */,
-				0CF104220993B0F559EDBC8E /* PlanFitView.swift in Sources */,
+				0CF104220993B0F559EDBC8E /* PlanFitPage.swift in Sources */,
 				AA20INSPECT0000000002 /* PanelInspectSheet.swift in Sources */,
 				43499D46A4DAEA3D71BE7F9C /* ProjectNameResolver.swift in Sources */,
 				3FC14A4CEE21EB76B9B950AA /* PromQLProxyDatasource.swift in Sources */,
