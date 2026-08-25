@@ -249,6 +249,12 @@ struct DashboardView: View {
             // Unified controls bar: variables + toolbar controls
             controlsBar
 
+            // Two notices that must NOT replace the dashboard: in both cases
+            // what is on screen is worth reading, and hiding it behind a full
+            // -page message would cost the user more than the message is worth.
+            if viewModel.isReadOnlyDashboard { readOnlyNotice }
+            if let failure = viewModel.saveFailure { saveFailureNotice(failure) }
+
             // Main content — always show panel layout, panels handle empty state internally
             Group {
                 if let error = viewModel.errorMessage {
@@ -483,6 +489,46 @@ struct DashboardView: View {
         return "\(active)/\(total)"
     }
 
+    // MARK: - Notices
+
+    /// 계약 C2. A document from a newer schema is shown, not converted: this
+    /// build cannot know what the fields it does not have are for, and a save
+    /// that re-encoded it would drop them. It says which schema, because
+    /// "cannot edit" without a reason reads as a bug.
+    private var readOnlyNotice: some View {
+        noticeBar(
+            symbol: "lock",
+            tint: .secondary,
+            text: L.tr(
+                "이 대시보드는 더 새로운 형식(스키마 v\(viewModel.dashboardConfig.schemaVersion))으로 저장되어 있습니다. 이 버전은 v\(DashboardMigrator.currentVersion)까지 읽고 쓸 수 있어, 편집하지 않고 원본 그대로 둡니다.",
+                "This dashboard is stored in a newer format (schema v\(viewModel.dashboardConfig.schemaVersion)). This version reads and writes up to v\(DashboardMigrator.currentVersion), so it is shown as it is and left untouched."
+            )
+        )
+    }
+
+    /// 계약 C6. A save that failed is not a save that did nothing: the disk
+    /// still holds the last good state, and the screen does not.
+    private func saveFailureNotice(_ reason: String) -> some View {
+        noticeBar(symbol: "exclamationmark.triangle.fill", tint: .orange, text: reason)
+    }
+
+    private func noticeBar(symbol: String, tint: Color, text: String) -> some View {
+        HStack(spacing: DS.xs) {
+            Image(systemName: symbol)
+                .foregroundStyle(tint)
+            Text(text)
+                .foregroundStyle(Color.primary.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: DS.fontCaption))
+        .padding(.horizontal, 16)
+        .padding(.vertical, DS.xs)
+        .background(.quaternary.opacity(0.5))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
+    }
+
     // MARK: - Edit Mode Controls
 
     @ViewBuilder
@@ -533,6 +579,14 @@ struct DashboardView: View {
             .modifier(ToolbarPillModifier(isActive: viewModel.isEditing))
         }
         .buttonStyle(.plain)
+        // 계약 C2: a newer-schema document is read-only here. The button stays
+        // visible with its reason attached rather than disappearing, so the
+        // absence of editing is explained instead of just observed.
+        .disabled(viewModel.isReadOnlyDashboard)
+        .help(viewModel.isReadOnlyDashboard
+              ? L.tr("이 버전으로는 편집할 수 없습니다 — 더 새로운 형식입니다.",
+                     "This version cannot edit it — it is in a newer format.")
+              : "")
 
         if viewModel.isEditing {
             Button {

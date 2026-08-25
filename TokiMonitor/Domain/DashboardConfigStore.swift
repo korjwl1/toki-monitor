@@ -1,6 +1,22 @@
 import Foundation
 import AppKit
 
+/// What a save did.
+///
+/// A save that quietly does nothing is the worst of the three: the user sees an
+/// edit on screen, the edit is not on disk, and nothing says so (계약 C6).
+enum DashboardSaveOutcome: Equatable {
+    /// Written.
+    case saved
+    /// 계약 C2: the document was written against a schema beyond this build, so
+    /// the bytes it came in as went back down untouched rather than a re-encode
+    /// of the parts this build happens to understand.
+    case keptOriginalBytes
+    /// Nothing was written and the previous state is intact. The string is for
+    /// the user, not the log.
+    case failed(String)
+}
+
 /// Persists dashboard configurations. Supports multiple dashboards,
 /// JSON import/export, and schema migration.
 @MainActor
@@ -20,27 +36,62 @@ final class DashboardConfigStore {
         }
     }()
 
-    init() {
+    /// Where this store reads and writes.
+    ///
+    /// Injectable for one reason: a test that exercised the save path against
+    /// `.standard` would write into the real installation's dashboards. A
+    /// previous session did exactly that and destroyed the user's work.
+    private let defaults: UserDefaults
+
+    /// The bytes a document came in as, for documents whose `schemaVersion` is
+    /// beyond what this build writes. Keyed by `uid`, filled at decode time.
+    ///
+    /// Re-encoding one of these would let this build decide what a future
+    /// schema looks like — it would write back only the fields it happens to
+    /// have, plus whatever `unknownFields` caught, and silently normalise the
+    /// rest. An unknown VALUE in a known key (a refresh interval this build has
+    /// no case for, say) is not something `unknownFields` can carry. So the
+    /// original goes back verbatim instead (계약 C2).
+    private static var originalBytes: [String: Data] = [:]
+
+    /// The reason the last save did not happen, or nil. The UI reads this
+    /// rather than letting a failed save look like a successful one.
+    private(set) var lastSaveError: String?
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         // Touch the static so the cleanup runs once per app launch.
         _ = Self.purgeRemovedFeatureKeysOnce
     }
+
+    /// Remember a read-only document's bytes so a later save can hand them back.
+    /// A no-op for anything this build's schema covers.
+    static func rememberOriginal(_ config: DashboardConfig, bytes: Data) {
+        guard config.isReadOnlyForThisBuild else { return }
+        originalBytes[config.uid] = bytes
+    }
+
+    /// The untouched bytes of a read-only document, if they were captured when
+    /// it was read.
+    static func originalBytes(forUID uid: String) -> Data? { originalBytes[uid] }
 
     // MARK: - Single Dashboard (backward compatible)
 
     func load() -> DashboardConfig {
         // Prefer the single-dashboard key (legacy / "active" surface).
-        if let data = UserDefaults.standard.data(forKey: Self.userDefaultsKey),
+        if let data = defaults.data(forKey: Self.userDefaultsKey),
            let stored = try? JSONDecoder().decode(DashboardConfig.self, from: data) {
+            Self.rememberOriginal(stored, bytes: data)
             return migrateAndPersist(stored)
         }
         // No single-config blob, but the user may already have a
         // dashboard list from a newer build. Reading the list as the
         // source of truth here avoids the "active dashboard suddenly
         // becomes Default" drift where the two keys disagreed.
-        if let data = UserDefaults.standard.data(forKey: Self.dashboardListKey) {
+        if let data = defaults.data(forKey: Self.dashboardListKey) {
             let list = Self.decodeList(data).list
             guard !list.isEmpty else { return Self.defaultConfig }
-            let activeUID = UserDefaults.standard.string(forKey: Self.activeDashboardKey)
+            let activeUID = defaults.string(forKey: Self.activeDashboardKey)
             let chosen = list.first(where: { $0.uid == activeUID }) ?? list[0]
             return migrateAndPersist(chosen)
         }
@@ -58,7 +109,7 @@ final class DashboardConfigStore {
         // if known.)
         if config.activeDatasource?.kind == BuiltinDatasourceKind.localCLI,
            original.activeDatasource == nil,
-           let raw = UserDefaults.standard.string(forKey: "dashboardDataSource"),
+           let raw = defaults.string(forKey: "dashboardDataSource"),
            let legacy = DashboardDataSource(rawValue: raw) {
             let kind = legacy == .server
                 ? BuiltinDatasourceKind.promQLProxy
@@ -72,9 +123,29 @@ final class DashboardConfigStore {
         return config
     }
 
-    func save(_ config: DashboardConfig) {
-        guard let data = try? JSONEncoder().encode(config) else { return }
-        UserDefaults.standard.set(data, forKey: Self.userDefaultsKey)
+    @discardableResult
+    func save(_ config: DashboardConfig) -> DashboardSaveOutcome {
+        if config.isReadOnlyForThisBuild {
+            // 계약 C2. Hand the original back rather than a re-encode; if it was
+            // never captured, write nothing at all — either way this build does
+            // not get to rewrite a document it cannot fully read.
+            if let original = Self.originalBytes(forUID: config.uid) {
+                defaults.set(original, forKey: Self.userDefaultsKey)
+            }
+            lastSaveError = nil
+            return .keptOriginalBytes
+        }
+        guard let data = try? JSONEncoder().encode(config) else {
+            let reason = L.tr(
+                "'\(config.title)'을(를) 저장하지 못했습니다. 이전 상태는 그대로입니다.",
+                "Could not save '\(config.title)'. The previous state is unchanged."
+            )
+            lastSaveError = reason
+            return .failed(reason)
+        }
+        defaults.set(data, forKey: Self.userDefaultsKey)
+        lastSaveError = nil
+        return .saved
     }
 
     func resetToDefault() {
@@ -84,7 +155,7 @@ final class DashboardConfigStore {
     // MARK: - Dashboard List (multiple dashboards)
 
     func loadDashboardList() -> [DashboardConfig] {
-        guard let data = UserDefaults.standard.data(forKey: Self.dashboardListKey) else {
+        guard let data = defaults.data(forKey: Self.dashboardListKey) else {
             return [load()]
         }
         let (list, decodedAll) = Self.decodeList(data)
@@ -120,7 +191,10 @@ final class DashboardConfigStore {
     /// Returns the entries that decoded, and whether all of them did.
     static func decodeList(_ data: Data) -> (list: [DashboardConfig], decodedAll: Bool) {
         let decoder = JSONDecoder()
+        // Even on the fast path the elements are walked once, so that a
+        // read-only document's own bytes are captured for a later save.
         if let list = try? decoder.decode([DashboardConfig].self, from: data) {
+            captureOriginals(in: data, for: list)
             return (list, true)
         }
         // Split the array at the JSON level so each element can be attempted
@@ -135,15 +209,51 @@ final class DashboardConfigStore {
                     withJSONObject: element, options: [.fragmentsAllowed]),
                   let config = try? decoder.decode(DashboardConfig.self, from: elementData)
             else { continue }
+            rememberOriginal(config, bytes: elementData)
             out.append(config)
         }
         return (out, out.count == elements.count)
     }
 
-    func saveDashboardList(_ list: [DashboardConfig]) {
+    /// Capture the on-disk bytes of every read-only entry in a list. Only the
+    /// read-only ones are kept, so the cost on an ordinary list is one pass and
+    /// no storage.
+    private static func captureOriginals(in data: Data, for list: [DashboardConfig]) {
+        guard list.contains(where: \.isReadOnlyForThisBuild),
+              let elements = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
+        else { return }
+        for (config, element) in zip(list, elements) where config.isReadOnlyForThisBuild {
+            guard let bytes = try? JSONSerialization.data(
+                withJSONObject: element, options: [.fragmentsAllowed]) else { continue }
+            rememberOriginal(config, bytes: bytes)
+        }
+    }
+
+    @discardableResult
+    func saveDashboardList(_ list: [DashboardConfig]) -> DashboardSaveOutcome {
         guard let encoded = try? JSONEncoder().encode(list),
               var elements = (try? JSONSerialization.jsonObject(with: encoded)) as? [Any]
-        else { return }
+        else {
+            // Nothing has been written, so the list on disk is still the last
+            // good one. Saying so is the whole point — a silent `return` here
+            // let an edit vanish between the screen and the disk (계약 C6).
+            let reason = L.tr("대시보드 목록을 저장하지 못했습니다. 이전 상태는 그대로입니다.",
+                              "Could not save the dashboard list. The previous state is unchanged.")
+            lastSaveError = reason
+            return .failed(reason)
+        }
+
+        // A document from a schema beyond this build goes back as the bytes it
+        // came in as, never as a re-encode (계약 C2).
+        var keptOriginal = false
+        for (index, config) in list.enumerated() where config.isReadOnlyForThisBuild {
+            guard let bytes = Self.originalBytes(forUID: config.uid),
+                  let object = try? JSONSerialization.jsonObject(
+                    with: bytes, options: [.fragmentsAllowed])
+            else { continue }
+            elements[index] = object
+            keptOriginal = true
+        }
 
         // Carry forward any stored entry this build could not decode.
         //
@@ -153,17 +263,25 @@ final class DashboardConfigStore {
         // dashboard the newer build had written, on the first edit. The user
         // cannot see them, so they cannot have meant to remove them.
         let known = Set(list.map(\.uid))
-        elements.append(contentsOf: Self.unreadableEntries(excludingUIDs: known))
+        elements.append(contentsOf: Self.unreadableEntries(in: defaults, excludingUIDs: known))
 
-        guard let data = try? JSONSerialization.data(withJSONObject: elements) else { return }
-        UserDefaults.standard.set(data, forKey: Self.dashboardListKey)
+        guard let data = try? JSONSerialization.data(withJSONObject: elements) else {
+            let reason = L.tr("대시보드 목록을 저장하지 못했습니다. 이전 상태는 그대로입니다.",
+                              "Could not save the dashboard list. The previous state is unchanged.")
+            lastSaveError = reason
+            return .failed(reason)
+        }
+        defaults.set(data, forKey: Self.dashboardListKey)
+        lastSaveError = nil
+        return keptOriginal ? .keptOriginalBytes : .saved
     }
 
     /// Stored list elements that do not decode into a `DashboardConfig`, minus
     /// any whose `uid` is already accounted for. `uid` is a plain string field,
     /// so it is readable even when the entry as a whole is not.
-    private static func unreadableEntries(excludingUIDs known: Set<String>) -> [Any] {
-        guard let data = UserDefaults.standard.data(forKey: dashboardListKey),
+    private static func unreadableEntries(in defaults: UserDefaults,
+                                          excludingUIDs known: Set<String>) -> [Any] {
+        guard let data = defaults.data(forKey: dashboardListKey),
               let elements = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
         else { return [] }
 
@@ -181,8 +299,8 @@ final class DashboardConfigStore {
     }
 
     var activeDashboardUID: String? {
-        get { UserDefaults.standard.string(forKey: Self.activeDashboardKey) }
-        set { UserDefaults.standard.set(newValue, forKey: Self.activeDashboardKey) }
+        get { defaults.string(forKey: Self.activeDashboardKey) }
+        set { defaults.set(newValue, forKey: Self.activeDashboardKey) }
     }
 
     // MARK: - Multi-Dashboard Operations
@@ -212,7 +330,8 @@ final class DashboardConfigStore {
         return original
     }
 
-    func updateDashboardInList(_ config: DashboardConfig) {
+    @discardableResult
+    func updateDashboardInList(_ config: DashboardConfig) -> DashboardSaveOutcome {
         var list = loadDashboardList()
         // Identity is the UID, and ONLY the UID. Matching on title first meant
         // that two dashboards sharing a title — which a rename or an import
@@ -223,7 +342,7 @@ final class DashboardConfigStore {
             list[idx] = config
         }
         // Don't append if not found — prevents duplication
-        saveDashboardList(list)
+        return saveDashboardList(list)
     }
 
     func dashboard(for uid: String) -> DashboardConfig? {

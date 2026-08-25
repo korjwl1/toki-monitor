@@ -1082,9 +1082,28 @@ final class DashboardViewModel {
 
     // MARK: - Save / Persist
 
-    func saveDashboard() {
-        configStore.save(dashboardConfig)
-        configStore.updateDashboardInList(dashboardConfig)
+    /// Set when a save did not happen. The screen is then showing something
+    /// the disk does not have, and the only thing that can tell the user is
+    /// this (계약 C6). Cleared by the next save that succeeds.
+    var saveFailure: String?
+
+    /// Whether the open dashboard was written against a schema beyond this
+    /// build. Such a document opens read-only: this build must not decide what
+    /// a future schema looks like (계약 C2).
+    var isReadOnlyDashboard: Bool { dashboardConfig.isReadOnlyForThisBuild }
+
+    @discardableResult
+    func saveDashboard() -> DashboardSaveOutcome {
+        let single = configStore.save(dashboardConfig)
+        let inList = configStore.updateDashboardInList(dashboardConfig)
+        for outcome in [single, inList] {
+            if case let .failed(reason) = outcome {
+                saveFailure = reason
+                return outcome
+            }
+        }
+        saveFailure = nil
+        return single
     }
 
     func saveDashboardWithVersion(message: String = "") {
@@ -1155,6 +1174,9 @@ final class DashboardViewModel {
 
     func switchDashboard(_ config: DashboardConfig) {
         dashboardConfig = config
+        // Leaving edit mode on while switching into a read-only document would
+        // offer drag handles and a delete button that cannot write (계약 C2).
+        if config.isReadOnlyForThisBuild { isEditing = false }
         registerInlineDatasources()
         populateProviderOptions()
         refreshVariables()

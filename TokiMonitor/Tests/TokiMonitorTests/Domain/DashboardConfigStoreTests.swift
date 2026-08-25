@@ -354,3 +354,205 @@ struct DashboardRoundTripTests {
         #expect(loaded.panels.filter { $0.panelType == .unknown }.count == 1)
     }
 }
+
+// MARK: - A document from a newer schema (계약 C2)
+
+/// A newer build's dashboard is shown, never converted. The fields this build
+/// has no name for cannot all be caught by `unknownFields` — an unknown VALUE
+/// in a KNOWN key (a refresh interval that did not exist yet, say) fails the
+/// decode of that key, and there is no honest way to re-encode what was not
+/// understood. So the bytes go back exactly as they came.
+///
+/// These work on the store's byte-level helpers and on the migrator, never on
+/// the live `com.toki.monitor` defaults domain.
+@Suite("A newer-schema dashboard is shown, not rewritten")
+@MainActor
+struct DashboardReadOnlySchemaTests {
+
+    private func config(schemaVersion: Int, uid: String) -> DashboardConfig {
+        var c = DashboardConfigStore.defaultConfig
+        c.uid = uid
+        c.schemaVersion = schemaVersion
+        return c
+    }
+
+    @Test("a schema beyond this build marks the document read-only")
+    func higherSchemaIsReadOnly() {
+        #expect(config(schemaVersion: DashboardMigrator.currentVersion + 1, uid: "a")
+            .isReadOnlyForThisBuild)
+    }
+
+    @Test("the current schema and older ones are editable")
+    func currentAndOlderAreEditable() {
+        #expect(!config(schemaVersion: DashboardMigrator.currentVersion, uid: "a")
+            .isReadOnlyForThisBuild)
+        #expect(!config(schemaVersion: 1, uid: "a").isReadOnlyForThisBuild)
+    }
+
+    @Test("a read-only document is not migrated")
+    func readOnlyIsNotMigrated() {
+        let future = config(schemaVersion: DashboardMigrator.currentVersion + 3, uid: "a")
+        #expect(DashboardMigrator.migrate(future) == future)
+    }
+
+    @Test("the bytes a read-only document came in as are kept for a later save")
+    func originalBytesAreCaptured() throws {
+        let future = config(schemaVersion: DashboardMigrator.currentVersion + 1, uid: "future1")
+        var object = try #require(
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(future)) as? [String: Any]
+        )
+        // Something this build has no field for AND no way to re-derive.
+        object["aShapeFromLater"] = ["nested": ["deep": true]]
+        let (list, _) = DashboardConfigStore.decodeList(
+            try JSONSerialization.data(withJSONObject: [object])
+        )
+        #expect(list.map(\.uid) == ["future1"])
+
+        let kept = try #require(DashboardConfigStore.originalBytes(forUID: "future1"))
+        #expect(NSDictionary(dictionary:
+            try #require(try JSONSerialization.jsonObject(with: kept) as? [String: Any]))
+            == NSDictionary(dictionary: object))
+    }
+
+    @Test("a document this build can write is not hoarded as original bytes")
+    func currentSchemaIsNotCaptured() throws {
+        let ordinary = config(schemaVersion: DashboardMigrator.currentVersion, uid: "ordinary1")
+        let data = try JSONSerialization.data(
+            withJSONObject: [try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(ordinary))]
+        )
+        _ = DashboardConfigStore.decodeList(data)
+        #expect(DashboardConfigStore.originalBytes(forUID: "ordinary1") == nil)
+    }
+}
+
+// MARK: - Saving against a throwaway container
+
+/// The save path, exercised against a `UserDefaults` suite created for the test
+/// and removed afterwards. It never touches `com.toki.monitor`.
+@Suite("Saving does not lose what it cannot write", .serialized)
+@MainActor
+struct DashboardSavePathTests {
+
+    /// A defaults container of its own per test, so one test's dashboards are
+    /// invisible to the next and neither is visible to the installed app.
+    private final class Sandbox {
+        let name = "toki.monitor.tests.\(UUID().uuidString)"
+        let defaults: UserDefaults
+        init() { defaults = UserDefaults(suiteName: name)! }
+        deinit { UserDefaults().removePersistentDomain(forName: name) }
+    }
+
+    private func seedList(_ sandbox: Sandbox, _ elements: [Any]) throws {
+        sandbox.defaults.set(try JSONSerialization.data(withJSONObject: elements),
+                             forKey: "dashboardList")
+    }
+
+    private func storedList(_ sandbox: Sandbox) throws -> [[String: Any]] {
+        let data = try #require(sandbox.defaults.data(forKey: "dashboardList"))
+        return try #require(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+    }
+
+    private func object(_ config: DashboardConfig) throws -> [String: Any] {
+        try #require(try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(config)) as? [String: Any])
+    }
+
+    // MARK: 계약 C2
+
+    @Test("saving a newer-schema dashboard writes back the bytes it came in as")
+    func readOnlyDocumentIsWrittenBackVerbatim() throws {
+        let sandbox = Sandbox()
+        var future = DashboardConfigStore.defaultConfig
+        future.uid = "future-save"
+        future.schemaVersion = DashboardMigrator.currentVersion + 1
+        var stored = try object(future)
+        // A shape this build has no field for, at a key it does not know.
+        stored["timelineOverlays"] = [["kind": "deploys", "opacity": 0.4]]
+        // And a value this build cannot parse inside a key it DOES know —
+        // the case `unknownFields` cannot cover.
+        stored["refresh"] = "45s"
+        try seedList(sandbox, [stored])
+
+        let store = DashboardConfigStore(defaults: sandbox.defaults)
+        // The entry does not decode at all — `refresh: "45s"` is a value inside
+        // a key this build knows, which no unknown-key mechanism can carry — so
+        // it is held as unreadable bytes rather than as a config.
+        let list = store.loadDashboardList()
+        #expect(!list.contains { $0.uid == "future-save" })
+
+        var mine = DashboardConfigStore.defaultConfig
+        mine.uid = "mine"
+        #expect(store.saveDashboardList([mine]) == .saved)
+
+        let after = try storedList(sandbox)
+        let carried = try #require(after.first { ($0["uid"] as? String) == "future-save" })
+        #expect(NSDictionary(dictionary: carried) == NSDictionary(dictionary: stored),
+                "not one byte of a document this build cannot read may change")
+    }
+
+    @Test("a readable newer-schema dashboard is also written back verbatim")
+    func readableButNewerIsWrittenBackVerbatim() throws {
+        let sandbox = Sandbox()
+        var future = DashboardConfigStore.defaultConfig
+        future.uid = "future-readable"
+        future.schemaVersion = DashboardMigrator.currentVersion + 1
+        var stored = try object(future)
+        stored["timelineOverlays"] = [["kind": "deploys", "opacity": 0.4]]
+        try seedList(sandbox, [stored])
+
+        let store = DashboardConfigStore(defaults: sandbox.defaults)
+        let list = store.loadDashboardList()
+        #expect(list.map(\.uid) == ["future-readable"])
+        #expect(list[0].isReadOnlyForThisBuild)
+        #expect(store.saveDashboardList(list) == .keptOriginalBytes)
+
+        let after = try storedList(sandbox)
+        #expect(NSDictionary(dictionary: after[0]) == NSDictionary(dictionary: stored))
+    }
+
+    @Test("an ordinary dashboard still saves")
+    func ordinaryDashboardSaves() throws {
+        let sandbox = Sandbox()
+        var mine = DashboardConfigStore.defaultConfig
+        mine.uid = "mine-ordinary"
+        mine.title = "Mine"
+        let store = DashboardConfigStore(defaults: sandbox.defaults)
+        #expect(store.saveDashboardList([mine]) == .saved)
+
+        let after = try storedList(sandbox)
+        #expect(after.count == 1)
+        #expect(after[0]["title"] as? String == "Mine")
+    }
+
+    // MARK: 계약 C6
+
+    @Test("a save that cannot be encoded leaves the previous state alone and says so")
+    func failedSaveKeepsPreviousState() throws {
+        let sandbox = Sandbox()
+        var good = DashboardConfigStore.defaultConfig
+        good.uid = "good"
+        good.title = "Good"
+        let store = DashboardConfigStore(defaults: sandbox.defaults)
+        #expect(store.saveDashboardList([good]) == .saved)
+
+        var broken = good
+        broken.uid = "broken"
+        broken.title = "Broken"
+        // A value JSON has no representation for. `JSONEncoder` throws rather
+        // than writing something wrong, which is exactly the case C6 is about.
+        broken.panels[0].options.fillOpacity = .nan
+
+        let outcome = store.saveDashboardList([broken])
+        guard case let .failed(reason) = outcome else {
+            Issue.record("expected a reported failure, got \(outcome)")
+            return
+        }
+        #expect(!reason.isEmpty, "the user has to be told")
+        #expect(store.lastSaveError == reason)
+
+        let after = try storedList(sandbox)
+        #expect(after.count == 1)
+        #expect(after[0]["title"] as? String == "Good", "the last good state must survive")
+    }
+}
