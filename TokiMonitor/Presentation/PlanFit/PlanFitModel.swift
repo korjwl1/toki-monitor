@@ -319,6 +319,83 @@ struct ActiveUseLimitModel: Equatable, Sendable, Identifiable {
     let thresholdNote: String
 }
 
+// MARK: - Provider comparison (T054, T055 / contract W2, FR-022…FR-025)
+
+/// Claude against Codex, on the axes where that means something.
+///
+/// Two facts make this harder than putting two numbers side by side, and both
+/// of them are on screen rather than in a comment:
+///
+/// 1. **The two histories do not start at the same time.** Codex windows are
+///    recovered retroactively from rollout files, so they reach back as far as
+///    the files do; Claude windows exist only from the moment active polling
+///    began. Comparing over each provider's own span would credit Codex with
+///    weeks Claude was never watched for, so the comparison is computed on the
+///    OVERLAP and the overlap is named.
+/// 2. **The limit systems differ.** Claude splits its weekly limit by model;
+///    every Codex window carries `limit_id="codex"`. Neither provider
+///    publishes the absolute size of a limit, so 40% of one is not 40% of the
+///    other — utilisation is reported per provider and never put on a shared
+///    axis.
+struct ProviderComparisonModel: Equatable, Sendable {
+
+    enum State: Equatable, Sendable {
+        /// Both providers have history and the spans overlap.
+        case comparable
+        /// Only one provider has any window history (T055).
+        case singleProvider
+        /// Both have history, but not at the same time — there is no period
+        /// both were observed in, so there is nothing to compare over.
+        case noOverlap
+        /// No provider has history.
+        case none
+    }
+
+    /// One comparable figure. Same unit on both sides or it does not belong
+    /// here.
+    struct Metric: Equatable, Sendable, Hashable, Identifiable {
+        let id: String
+        let label: String
+        let value: String
+        let provenance: Provenance
+    }
+
+    struct Side: Equatable, Sendable, Identifiable {
+        let id: String
+        let title: String
+        /// This provider's own history, start to end.
+        let historySpan: String
+        /// How that history was obtained — retroactive recovery or live
+        /// polling. This is why the two spans differ.
+        let collectionNote: String
+        /// Figures computed inside the common period only.
+        let metrics: [Metric]
+        /// The limit system, spelled out. Deliberately NOT a metric: it is the
+        /// thing that makes the utilisation figures incomparable.
+        let limitSystem: String
+        /// Windows this provider has outside the common period, left out.
+        let excludedNote: String?
+    }
+
+    let state: State
+    /// "공통 기간 8월 8일 – 8월 26일 · 18일" — present whenever the state is
+    /// `.comparable`, and required by FR-024.
+    let commonPeriodNote: String?
+    let sides: [Side]
+    /// Why utilisation is not on one axis (FR-023).
+    let incomparableNote: String
+    /// Present on `.singleProvider` and `.noOverlap`: what is missing and why
+    /// that is not evidence of anything.
+    let unavailableNote: String?
+
+    static let none = ProviderComparisonModel(
+        state: .none, commonPeriodNote: nil, sides: [],
+        incomparableNote: "", unavailableNote: nil
+    )
+
+    var isPresentable: Bool { state != .none }
+}
+
 // MARK: - The page
 
 /// Everything the page draws.
@@ -330,6 +407,8 @@ struct PlanFitModel: Equatable, Sendable {
     let trend: PeriodTrendModel
     let limitGroups: [LimitProviderGroup]
     let activeUse: [ActiveUseLimitModel]
+    /// Claude against Codex on the overlap of their histories (T054, T055).
+    let comparison: ProviderComparisonModel
     /// Limits with neither an exhaustion nor a worked window, named in one
     /// line instead of getting a card each (T050).
     let quietLimitsNote: String?
@@ -384,6 +463,7 @@ enum PlanFitModelBuilder {
             trend: trend(rows: rows, unit: unit, nowMs: nowMs),
             limitGroups: limitGroups(paired, rows: rows, nowMs: nowMs),
             activeUse: activeUse(paired),
+            comparison: comparison(rows: rows, nowMs: nowMs),
             quietLimitsNote: quietLimitsNote(paired),
             sourceNote: usingServerData
                 ? L.tr("동기화 서버 데이터 · 전체 디바이스 병합", "Sync-server data · all devices merged")
@@ -534,12 +614,45 @@ enum PlanFitModelBuilder {
 
     // MARK: Trend
 
+    /// Finished windows to read recorded work time off, one series per
+    /// provider.
+    ///
+    /// A provider reports several OVERLAPPING window series: Claude's
+    /// five-hour windows sit inside its weekly ones, and its model-scoped
+    /// weekly limits cover the same days again. Every one of those rows
+    /// accumulates its own `activeMs` over the same work, so summing every row
+    /// reports the same afternoon once per limit the account happens to have —
+    /// four times over on a Claude account, and the figure grows when a
+    /// provider adds a limit rather than when the user works more.
+    ///
+    /// Within one series windows do not overlap, so this picks one per
+    /// provider — the series with the most finished windows, which is the
+    /// finest-grained one and therefore the one that resolves the work best —
+    /// and reads only that. Session before weekly on a tie for the same
+    /// reason.
+    static func workTimeRows(_ rows: [(provider: String, row: WindowRow)]) -> [WindowRow] {
+        var series: [String: [String: [WindowRow]]] = [:]
+        for (provider, row) in rows where row.finalized {
+            series[provider, default: [:]]["\(row.kind)|\(row.limitId)", default: []].append(row)
+        }
+        return series.keys.sorted().flatMap { provider -> [WindowRow] in
+            let byLimit = series[provider] ?? [:]
+            let chosen = byLimit.max { a, b in
+                if a.value.count != b.value.count { return a.value.count < b.value.count }
+                let aSession = a.key.hasPrefix("session|"), bSession = b.key.hasPrefix("session|")
+                if aSession != bSession { return bSession }
+                return a.key > b.key
+            }
+            return chosen?.value ?? []
+        }
+    }
+
     static func trend(
         rows: [(provider: String, row: WindowRow)],
         unit: PeriodUnit,
         nowMs: Int64
     ) -> PeriodTrendModel {
-        let finalized = rows.map(\.row).filter(\.finalized)
+        let finalized = workTimeRows(rows)
         guard !finalized.isEmpty else { return .empty }
 
         let now = Date(timeIntervalSince1970: Double(nowMs) / 1000)
@@ -555,7 +668,12 @@ enum PlanFitModelBuilder {
         // Exhaustions are counted into the bucket their window closed in, on
         // the same boundaries — a second bucketing rule here is how the two
         // rows of the same chart start disagreeing.
-        let exhaustionDates = finalized.filter(\.maxedOut).map {
+        //
+        // Counted over EVERY limit, not just the series the hours came from:
+        // overlapping series double-count the same hour of work, but running
+        // out of the weekly limit and running out of the five-hour limit are
+        // two separate times the user was stopped.
+        let exhaustionDates = rows.map(\.row).filter { $0.finalized && $0.maxedOut }.map {
             Date(timeIntervalSince1970: Double($0.windowEndMs) / 1000)
         }
 
@@ -932,5 +1050,232 @@ enum PlanFitModelBuilder {
             "기준: 기록된 실사용 \(floor) 이상이면 '실사용', 주기의 \(harmless)% 이하를 남기고 소진하면 방해로 세지 않고, \(full)% 이상 남기고 소진하면 온전히 셉니다.",
             "Thresholds: \(floor) or more of recorded work counts as worked; running out with \(harmless)% or less of the cycle left counts as no interruption, and with \(full)% or more it counts in full."
         )
+    }
+}
+
+// MARK: - Provider comparison (T054, T055)
+
+extension PlanFitModelBuilder {
+
+    /// The two providers, compared only where comparing means something.
+    ///
+    /// Everything below the common period is computed by handing the domain a
+    /// row set already clipped to the overlap — `WindowStats.segments` does the
+    /// statistics, this decides what may be put beside what.
+    static func comparison(
+        rows: [(provider: String, row: WindowRow)],
+        nowMs: Int64
+    ) -> ProviderComparisonModel {
+        var byProvider: [String: [WindowRow]] = [:]
+        for (provider, row) in rows where row.finalized {
+            byProvider[provider, default: []].append(row)
+        }
+        let providers = byProvider.keys.sorted()
+        guard !providers.isEmpty else { return .none }
+
+        // T055 — one provider is not a comparison. Say what is missing and,
+        // importantly, that its absence proves nothing about usage.
+        guard providers.count > 1 else {
+            let present = providers[0]
+            return ProviderComparisonModel(
+                state: .singleProvider,
+                commonPeriodNote: nil,
+                sides: [
+                    side(
+                        provider: present,
+                        allRows: byProvider[present] ?? [],
+                        inCommon: byProvider[present] ?? [],
+                        nowMs: nowMs
+                    ),
+                ],
+                incomparableNote: incomparableNote,
+                unavailableNote: missingProviderNote(present: present)
+            )
+        }
+
+        // Each provider's own span, then the intersection.
+        var spans: [String: (start: Int64, end: Int64)] = [:]
+        for provider in providers {
+            let ends = (byProvider[provider] ?? []).map(\.windowEndMs)
+            guard let first = ends.min(), let last = ends.max() else { continue }
+            spans[provider] = (first, last)
+        }
+        let commonStart = spans.values.map(\.start).max() ?? 0
+        let commonEnd = spans.values.map(\.end).min() ?? 0
+
+        // Disjoint histories. This is a real state — a user who stopped using
+        // one provider before starting the other — and inventing an overlap
+        // for it would compare two different months.
+        guard commonEnd > commonStart else {
+            return ProviderComparisonModel(
+                state: .noOverlap,
+                commonPeriodNote: nil,
+                sides: providers.map {
+                    side(provider: $0, allRows: byProvider[$0] ?? [], inCommon: [], nowMs: nowMs)
+                },
+                incomparableNote: incomparableNote,
+                unavailableNote: L.tr(
+                    "두 공급자의 기록이 겹치는 기간이 없습니다. 같은 기간을 관측한 적이 없어 나란히 놓을 수 없고, 각자의 기간을 그대로 비교하면 서로 다른 달을 비교하게 됩니다.",
+                    "The two histories never overlap. There is no period both were observed in, and comparing each provider's own span would be comparing different months."
+                )
+            )
+        }
+
+        let days = max(1, Int(((commonEnd - commonStart) / 86_400_000)))
+        return ProviderComparisonModel(
+            state: .comparable,
+            commonPeriodNote: L.tr(
+                "공통 기간 \(PlanFitFormat.day(commonStart)) – \(PlanFitFormat.day(commonEnd)) · \(days)일. 아래 수치는 전부 이 기간 안에서만 셌습니다.",
+                "Common period \(PlanFitFormat.day(commonStart)) – \(PlanFitFormat.day(commonEnd)) · \(days) days. Every figure below is counted inside it and nowhere else."
+            ),
+            sides: providers.map { provider in
+                let all = byProvider[provider] ?? []
+                return side(
+                    provider: provider,
+                    allRows: all,
+                    inCommon: all.filter { $0.windowEndMs >= commonStart && $0.windowEndMs <= commonEnd },
+                    nowMs: nowMs
+                )
+            },
+            incomparableNote: incomparableNote,
+            unavailableNote: nil
+        )
+    }
+
+    /// FR-023. The one sentence that stops the two columns being read as one
+    /// scale.
+    static var incomparableNote: String {
+        L.tr(
+            "소진율은 한 축에 올리지 않습니다. 퍼센트의 분모는 각 공급자가 공개하지 않는 자기 한도라서, 한쪽의 40%와 다른 쪽의 40%는 같은 양이 아닙니다. 위의 수치는 시간과 횟수 — 두 공급자에서 같은 단위인 것 — 뿐입니다.",
+            "Utilisation is not put on a shared axis. Each percentage is relative to that provider's own undisclosed limit, so 40% on one side is not the same quantity as 40% on the other. What is compared above is time and counts — the units that mean the same thing on both sides."
+        )
+    }
+
+    static func missingProviderNote(present: String) -> String {
+        let missing: String
+        switch present {
+        case "codex": missing = PlanFitFormat.providerTitle("claude_code")
+        case "claude_code": missing = PlanFitFormat.providerTitle("codex")
+        default: missing = L.tr("다른 공급자", "the other provider")
+        }
+        return L.tr(
+            "\(missing) 쪽에는 윈도우 기록이 없어 비교 대신 단독 표시로 줄였습니다. 쓰지 않았을 수도 있고, 폴링이 꺼져 있거나 로그인이 만료됐을 수도 있습니다 — 기록이 없다는 것은 사용이 없었다는 증거가 아닙니다.",
+            "There are no windows on the \(missing) side, so this is a single-provider readout rather than a comparison. It may be unused, or polling may be off, or the login may have expired — an absence of records is not evidence of an absence of use."
+        )
+    }
+
+    /// One provider's column.
+    ///
+    /// `allRows` sets the history span; `inCommon` is what the figures are
+    /// counted over. Keeping them separate is what lets the column say "18 of
+    /// my 46 windows are outside the compared period" instead of quietly
+    /// dropping them.
+    static func side(
+        provider: String,
+        allRows: [WindowRow],
+        inCommon: [WindowRow],
+        nowMs: Int64
+    ) -> ProviderComparisonModel.Side {
+        let ends = allRows.map(\.windowEndMs)
+        let span = (ends.min()).flatMap { first in
+            ends.max().map { last in
+                L.tr(
+                    "기록 \(PlanFitFormat.day(first)) – \(PlanFitFormat.day(last))",
+                    "History \(PlanFitFormat.day(first)) – \(PlanFitFormat.day(last))"
+                )
+            }
+        } ?? L.tr("기록 없음", "no history")
+
+        let segments = WindowStats.segments(
+            rows: inCommon.map { (provider, $0) }, nowMs: nowMs
+        )
+        let workHours = workTimeRows(inCommon.map { (provider, $0) })
+            .reduce(0.0) { $0 + Double($1.activeMs) / 3_600_000 }
+        let exhaustions = inCommon.filter(\.maxedOut).count
+        let workedWindows = segments.reduce(0) { $0 + $1.activeUse.activeCount }
+        let interruptions = segments.reduce(0.0) { $0 + $1.activeUse.interruptionsPerWeek }
+
+        let excluded = allRows.count - inCommon.count
+        return ProviderComparisonModel.Side(
+            id: provider,
+            title: PlanFitFormat.providerTitle(provider),
+            historySpan: span,
+            collectionNote: collectionNote(provider),
+            metrics: [
+                .init(
+                    id: "\(provider)|hours",
+                    label: L.tr("기록된 실사용 시간", "Recorded work time"),
+                    value: PlanFitFormat.hours(workHours),
+                    // `activeMs` restarts with the daemon, so this can only
+                    // ever understate.
+                    provenance: .lowerBound
+                ),
+                .init(
+                    id: "\(provider)|worked",
+                    label: L.tr("실사용이 확인된 창", "Windows worked in"),
+                    value: L.tr("\(workedWindows)개 / 완료 \(inCommon.count)개",
+                                "\(workedWindows) of \(inCommon.count)"),
+                    provenance: .observed
+                ),
+                .init(
+                    id: "\(provider)|exhaustions",
+                    label: L.tr("한도 소진", "Times the limit ran out"),
+                    value: L.tr("\(exhaustions)회", "\(exhaustions)"),
+                    provenance: .observed
+                ),
+                .init(
+                    id: "\(provider)|interruptions",
+                    label: L.tr("방해 빈도 (주당)", "Interruptions per week"),
+                    value: String(format: "%.1f", interruptions),
+                    // Weighted by how much of the cycle was left (V5).
+                    provenance: .derived
+                ),
+            ],
+            limitSystem: limitSystem(inCommon.isEmpty ? allRows : inCommon),
+            excludedNote: excluded > 0
+                ? L.tr(
+                    "공통 기간 밖의 창 \(excluded)개는 비교에서 뺐습니다 — 상대 공급자가 관측되지 않은 기간입니다.",
+                    "\(excluded) windows fall outside the common period and are out of the comparison — the other provider was not being observed then."
+                )
+                : nil
+        )
+    }
+
+    /// Contract W2. The two collection mechanisms, which is the reason the two
+    /// spans differ at all.
+    static func collectionNote(_ provider: String) -> String {
+        switch provider {
+        case "codex":
+            return L.tr(
+                "rollout 로그에서 소급 복원 — 파일이 남아 있는 만큼 과거가 있습니다.",
+                "Recovered retroactively from rollout logs — history reaches as far back as the files do."
+            )
+        case "claude_code":
+            return L.tr(
+                "능동 폴링 — 폴링을 시작한 뒤의 창만 있고, 그 이전은 복원할 수 없습니다.",
+                "Active polling — windows exist only from when polling started, and nothing earlier can be recovered."
+            )
+        default:
+            return L.tr("수집 방식이 확인되지 않았습니다.", "The collection method is not known.")
+        }
+    }
+
+    /// The limit series this provider actually reports. Claude splits its
+    /// weekly limit by model; Codex reports one `limit_id` for everything.
+    static func limitSystem(_ rows: [WindowRow]) -> String {
+        var seen: [String] = []
+        for row in rows {
+            let key = "\(row.kind)|\(row.limitId)"
+            if !seen.contains(key) { seen.append(key) }
+        }
+        guard !seen.isEmpty else { return L.tr("한도 없음", "no limits reported") }
+        let names = seen.sorted().map { key -> String in
+            let parts = key.split(separator: "|", maxSplits: 1).map(String.init)
+            return PlanFitFormat.limitTitle(
+                provider: "", kind: parts.first ?? "", limitId: parts.count > 1 ? parts[1] : ""
+            )
+        }
+        return L.tr("한도 \(seen.count)종 · \(names.joined(separator: ", "))",
+                    "\(seen.count) limit series · \(names.joined(separator: ", "))")
     }
 }

@@ -165,4 +165,77 @@ enum WindowFixtures {
         }
         return rows
     }
+
+    // MARK: - Two providers, two history lengths (contract W2)
+
+    /// The asymmetry the comparison exists to handle.
+    ///
+    /// Codex windows are recovered from rollout files, so this account has 26
+    /// days of them. Claude polling started nine days ago, so its history stops
+    /// there. Comparing each provider over its own span would credit Codex with
+    /// seventeen days Claude was never watched for; the common period is the
+    /// nine days both were observed in.
+    static func twoProviders(
+        nowMs: Int64 = WindowFixtures.nowMs,
+        codexDays: Double = 26,
+        claudeDays: Double = 9
+    ) -> [(provider: String, row: WindowRow)] {
+        var rows: [(provider: String, row: WindowRow)] = []
+        // Codex: one limit series for everything (`limit_id="codex"`).
+        for i in 0..<40 {
+            let offset = codexDays * Double(i) / 39.0
+            rows.append(window(
+                provider: "codex", kind: "session", limitId: "codex",
+                endOffsetDays: offset, peakPct: Double(35 + (i * 7) % 45),
+                activeMs: i % 4 == 0 ? 0 : 100 * 60_000,
+                maxedOut: i % 9 == 0,
+                timeLeftFractionAtExhaustion: i % 9 == 0 ? 0.4 : nil,
+                plan: "codex_plus", account: "acct-codex", nowMs: nowMs
+            ))
+        }
+        // Claude: a five-hour limit and a weekly limit over the same days —
+        // overlapping series, which is why work time may only be read off one
+        // of them.
+        for i in 0..<18 {
+            let offset = claudeDays * Double(i) / 17.0
+            rows.append(window(
+                provider: "claude_code", kind: "session", limitId: "five_hour",
+                endOffsetDays: offset, peakPct: Double(40 + (i * 11) % 50),
+                activeMs: i % 3 == 0 ? 0 : 120 * 60_000,
+                maxedOut: i % 6 == 0,
+                timeLeftFractionAtExhaustion: i % 6 == 0 ? 0.7 : nil,
+                plan: "max_5x", account: "acct-claude", nowMs: nowMs
+            ))
+        }
+        for i in 0..<2 {
+            rows.append(window(
+                provider: "claude_code", kind: "weekly", limitId: "seven_day",
+                endOffsetDays: claudeDays * Double(i) / 1.0, peakPct: 55,
+                activeMs: 20 * 3_600_000,
+                plan: "max_5x", account: "acct-claude", nowMs: nowMs
+            ))
+        }
+        return rows
+    }
+
+    /// Two providers whose histories never overlap: Codex was abandoned before
+    /// Claude polling began.
+    static func disjointProviders(nowMs: Int64 = WindowFixtures.nowMs) -> [(provider: String, row: WindowRow)] {
+        var rows: [(provider: String, row: WindowRow)] = []
+        for i in 0..<10 {
+            rows.append(window(
+                provider: "codex", kind: "session", limitId: "codex",
+                endOffsetDays: 20 + Double(i) * 0.6, peakPct: 50,
+                activeMs: 60 * 60_000, plan: "codex_plus", account: "acct-codex", nowMs: nowMs
+            ))
+        }
+        for i in 0..<10 {
+            rows.append(window(
+                provider: "claude_code", kind: "session", limitId: "five_hour",
+                endOffsetDays: Double(i) * 0.6, peakPct: 50,
+                activeMs: 60 * 60_000, plan: "max_5x", account: "acct-claude", nowMs: nowMs
+            ))
+        }
+        return rows
+    }
 }

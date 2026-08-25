@@ -284,6 +284,7 @@ struct PlanFitControlSurfaceTests {
             ("LimitStatusSection", LimitStatusSection(groups: model.limitGroups)),
             ("ActiveUseSection", ActiveUseSection(limits: model.activeUse,
                                                   quietLimitsNote: model.quietLimitsNote)),
+            ("ProviderComparisonSection", ProviderComparisonSection(model: model.comparison)),
         ]
         for (name, section) in sections {
             for child in Mirror(reflecting: section).children {
@@ -613,5 +614,168 @@ struct PlanFitVerdictSectionTests {
         ))
         #expect(raster.pageInkCoverage > 0.03, "the verdict block is nearly empty")
         #expect(raster.pagePeakContrast >= 4.5)
+    }
+}
+
+// MARK: - Provider comparison (T054, T055)
+
+@Suite("Plan-fit provider comparison")
+@MainActor
+struct PlanFitProviderComparisonTests {
+
+    private func comparison(_ rows: [(provider: String, row: WindowRow)]) -> ProviderComparisonModel {
+        PlanFitModelBuilder.build(rows: rows, unit: .weekly, nowMs: WindowFixtures.nowMs).comparison
+    }
+
+    /// FR-024 / contract W2. The two histories start at different times —
+    /// Codex is recovered from rollout files, Claude exists only from when
+    /// polling began — so a comparison that does not name the period it used
+    /// is crediting one provider with weeks the other was never watched for.
+    @Test("the comparison names the common period it used")
+    func commonPeriodIsStated() {
+        let model = comparison(WindowFixtures.twoProviders())
+        #expect(model.state == .comparable)
+        let note = try? #require(model.commonPeriodNote)
+        #expect(note?.isEmpty == false, "the comparison does not say what period it compared over")
+        #expect(model.sides.count == 2)
+    }
+
+    /// And the windows outside it are named rather than silently dropped.
+    @Test("windows outside the common period are declared, not dropped")
+    func excludedWindowsAreDeclared() {
+        let model = comparison(WindowFixtures.twoProviders())
+        let codex = model.sides.first { $0.id == "codex" }
+        #expect(codex?.excludedNote?.isEmpty == false,
+                "Codex has 17 days Claude was never observed for, and the column does not say so")
+        // Every side states its own span and how that history was collected.
+        for side in model.sides {
+            #expect(!side.historySpan.isEmpty)
+            #expect(!side.collectionNote.isEmpty, "\(side.id) does not say how its history was collected")
+        }
+        let claude = model.sides.first { $0.id == "claude_code" }
+        #expect(claude?.collectionNote != codex?.collectionNote,
+                "both providers claim the same collection method")
+    }
+
+    /// FR-023. Utilisation percentages are relative to each provider's own
+    /// undisclosed limit, so they never share an axis. What is compared is time
+    /// and counts.
+    @Test("no percentage is put on a shared axis")
+    func noSharedUtilisationAxis() {
+        let model = comparison(WindowFixtures.twoProviders())
+        #expect(!model.incomparableNote.isEmpty)
+        for side in model.sides {
+            for metric in side.metrics {
+                #expect(!metric.value.contains("%"),
+                        "\(side.id) compares \(metric.label) as a percentage — the denominators differ")
+            }
+            // The limit system is described, not measured.
+            #expect(!side.limitSystem.isEmpty)
+        }
+        // Both sides offer the same axes, or they are not being compared.
+        let labels = model.sides.map { $0.metrics.map(\.label) }
+        #expect(labels.dropFirst().allSatisfy { $0 == labels.first })
+    }
+
+    /// T055. One provider is a readout, not a comparison — and the empty side
+    /// is explained, because polling switched off looks exactly like a provider
+    /// that is not being used.
+    @Test("one provider collapses to a single readout that explains the gap")
+    func singleProviderCollapses() {
+        let model = comparison(WindowFixtures.accountA())
+        #expect(model.state == .singleProvider)
+        #expect(model.sides.count == 1)
+        #expect(model.commonPeriodNote == nil, "a single provider has no common period to state")
+        let note = model.unavailableNote ?? ""
+        #expect(!note.isEmpty, "the empty side is not explained")
+        #expect(note.contains(PlanFitFormat.providerTitle("codex")),
+                "the missing provider is not named: \(note)")
+    }
+
+    /// Two providers that were never observed at the same time. Inventing an
+    /// overlap for them would compare different months.
+    @Test("disjoint histories are reported as having nothing to compare")
+    func disjointHistories() {
+        let model = comparison(WindowFixtures.disjointProviders())
+        #expect(model.state == .noOverlap)
+        #expect(model.commonPeriodNote == nil)
+        #expect(model.unavailableNote?.isEmpty == false)
+    }
+
+    @Test("an account with no windows has no comparison to draw")
+    func noRowsNoComparison() {
+        #expect(comparison([]).state == .none)
+        #expect(comparison([]).isPresentable == false)
+    }
+
+    /// The section renders in both themes and holds 800pt.
+    @Test("the comparison renders in both themes", arguments: PlanFitSnapshotTheme.allCases)
+    func comparisonRenders(theme: PlanFitSnapshotTheme) throws {
+        for rows in [WindowFixtures.twoProviders(),
+                     WindowFixtures.accountA(),
+                     WindowFixtures.disjointProviders()] {
+            let model = PlanFitModelBuilder.build(rows: rows, unit: .weekly, nowMs: WindowFixtures.nowMs)
+            let raster = try #require(PlanFitSnapshotRenderer.raster(
+                PlanFitContent(model: model, unit: .constant(.weekly)),
+                theme: theme,
+                size: CGSize(width: PlanFitSnapshotRenderer.width, height: 2400)
+            ))
+            #expect(raster.pageInkCoverage > 0.03)
+            #expect(raster.pagePeakContrast >= 4.5)
+            #expect(raster.edgeInk(margin: 8) == 0, "the comparison overflows 800pt")
+        }
+    }
+}
+
+// MARK: - Recorded work time is not counted twice
+
+@Suite("Plan-fit work time")
+@MainActor
+struct PlanFitWorkTimeTests {
+
+    /// A provider reports overlapping window series — Claude's five-hour
+    /// windows sit inside its weekly ones, and each of them accumulates its own
+    /// `activeMs` over the same work. Summing every row reports the same
+    /// afternoon once per limit the account happens to have, so the total grows
+    /// when a provider adds a limit rather than when the user works more.
+    @Test("overlapping limit series do not each contribute the same hours")
+    func overlappingSeriesAreNotSummedTwice() {
+        let fiveHour = (0..<8).map { i in
+            WindowFixtures.window(
+                kind: "session", limitId: "five_hour", endOffsetDays: Double(i) * 3,
+                peakPct: 50, activeMs: 3_600_000
+            )
+        }
+        // One weekly window covering the same days, carrying the same work.
+        let weekly = [WindowFixtures.window(
+            kind: "weekly", limitId: "seven_day", endOffsetDays: 1,
+            peakPct: 50, activeMs: 8 * 3_600_000
+        )]
+        let sessionOnly = PlanFitModelBuilder.build(
+            rows: fiveHour, unit: .weekly, nowMs: WindowFixtures.nowMs
+        ).trend.totalHours
+        let both = PlanFitModelBuilder.build(
+            rows: fiveHour + weekly, unit: .weekly, nowMs: WindowFixtures.nowMs
+        ).trend.totalHours
+        #expect(abs(both - sessionOnly) < 0.001,
+                "adding the weekly limit added \(both - sessionOnly)h of work the user never did")
+    }
+
+    /// Running out of the weekly limit and running out of the five-hour limit
+    /// are two separate times the user was stopped, so exhaustions are still
+    /// counted across every series.
+    @Test("exhaustions are still counted on every limit")
+    func exhaustionsCountAcrossSeries() {
+        let rows = [
+            WindowFixtures.window(kind: "session", limitId: "five_hour", endOffsetDays: 1,
+                                  peakPct: 100, activeMs: 3_600_000, maxedOut: true,
+                                  timeLeftFractionAtExhaustion: 0.5),
+            WindowFixtures.window(kind: "weekly", limitId: "seven_day", endOffsetDays: 1,
+                                  peakPct: 100, activeMs: 3_600_000, maxedOut: true,
+                                  timeLeftFractionAtExhaustion: 0.5),
+        ]
+        let model = PlanFitModelBuilder.build(rows: rows, unit: .weekly, nowMs: WindowFixtures.nowMs)
+        #expect(model.trend.bars.reduce(0) { $0 + $1.exhaustions } == 2,
+                "one of the two limits running out went uncounted")
     }
 }

@@ -138,6 +138,9 @@ struct PlanFitContent: View {
                         quietLimitsNote: model.quietLimitsNote
                     )
                 }
+                if model.comparison.isPresentable {
+                    ProviderComparisonSection(model: model.comparison)
+                }
                 ProvenanceLegend()
             }
             .padding(DS.lg)
