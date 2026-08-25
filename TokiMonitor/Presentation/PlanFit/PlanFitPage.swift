@@ -33,6 +33,9 @@ struct PlanFitPage: View {
     @AppStorage("planFit.periodUnit") private var periodUnit: PeriodUnit = .weekly
 
     @State private var rows: [(provider: String, row: WindowRow)] = []
+    /// Token events per provider per model. The only source of a per-model
+    /// breakdown for Codex, which has no model-scoped windows at all.
+    @State private var modelUsage: ModelUsageInput = .notFetched
     @State private var isLoading = false
     @State private var loadFailed = false
     /// true = rows came from the sync server (multi-device merged statistics).
@@ -46,6 +49,7 @@ struct PlanFitPage: View {
                 rows: rows,
                 unit: periodUnit,
                 nowMs: Int64(Date().timeIntervalSince1970 * 1000),
+                modelUsage: modelUsage,
                 usingServerData: usingServerData,
                 loadFailed: loadFailed,
                 isLoading: isLoading
@@ -78,8 +82,10 @@ struct PlanFitPage: View {
         // Codex history — and a broken local CLI must not gate the server.
         async let localAsync = fetchLocal(start: start, end: end)
         async let serverAsync = fetchServer(start: start, end: end)
+        async let usageAsync = fetchModelUsage(start: start, end: now)
         let (localRows, localFailed) = await localAsync
         let (serverRows, serverFailed) = await serverAsync
+        modelUsage = await usageAsync
 
         var serverProviders = Set<String>()
         for entry in serverRows { serverProviders.insert(entry.provider) }
@@ -109,6 +115,42 @@ struct PlanFitPage: View {
     private func fetchServer(start: Int, end: Int) async -> ([(provider: String, row: WindowRow)], failed: Bool) {
         do { return (try await serverClient.queryWindows(startEpoch: start, endEpoch: end), false) }
         catch { return ([], true) }
+    }
+
+    /// Per-model token usage, in daily buckets, keeping the provider key.
+    ///
+    /// Daily rather than at the page's period unit: the unit is a control the
+    /// reader flips, and re-querying the daemon on every flip would make a
+    /// display choice cost a subprocess. Days re-bucket into weeks and months
+    /// locally, on the same boundaries the trend uses.
+    private func fetchModelUsage(start: Int, end: Int) async -> ModelUsageInput {
+        do {
+            let byProvider = try await reportClient.queryModelUsageByProvider(
+                query: "usage[1d] by (model)",
+                since: "\(start)",
+                until: "\(end)"
+            )
+            var samples: [ModelUsageSample] = []
+            for (provider, points) in byProvider {
+                for (day, summaries) in points {
+                    for summary in summaries {
+                        guard summary.totalTokens > 0 else { continue }
+                        samples.append(ModelUsageSample(
+                            provider: provider,
+                            model: summary.model,
+                            day: day,
+                            totalTokens: Double(summary.totalTokens),
+                            costUsd: summary.costUsd
+                        ))
+                    }
+                }
+            }
+            return .reported(samples)
+        } catch {
+            // A failed query is NOT "no models used". The two say different
+            // things about the account and get different screens.
+            return .notFetched
+        }
     }
 }
 
@@ -140,6 +182,9 @@ struct PlanFitContent: View {
                 }
                 if model.comparison.isPresentable {
                     ProviderComparisonSection(model: model.comparison)
+                }
+                if model.modelPattern.isPresentable {
+                    ModelPatternSection(model: model.modelPattern)
                 }
                 ProvenanceLegend()
             }

@@ -184,6 +184,7 @@
 		AA03PFTREND0B001 /* PeriodTrendSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFTREND0F001 /* PeriodTrendSection.swift */; };
 		AA03PFLIMIT0B001 /* LimitStatusSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFLIMIT0F001 /* LimitStatusSection.swift */; };
 		AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFACTIV0F001 /* ActiveUseSection.swift */; };
+		AA03PFMODP0B001 /* ModelPatternSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFMODP0F001 /* ModelPatternSection.swift */; };
 		AA03PFCOMP0B001 /* ProviderComparisonSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFCOMP0F001 /* ProviderComparisonSection.swift */; };
 		AA03PFVERD0B001 /* VerdictSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFVERD0F001 /* VerdictSection.swift */; };
 		AA03PFSNAPT0B001 /* PlanFitSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFSNAPT0F001 /* PlanFitSnapshotTests.swift */; };
@@ -380,6 +381,7 @@
 		AA03PFTREND0F001 /* PeriodTrendSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodTrendSection.swift; sourceTree = "<group>"; };
 		AA03PFLIMIT0F001 /* LimitStatusSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LimitStatusSection.swift; sourceTree = "<group>"; };
 		AA03PFACTIV0F001 /* ActiveUseSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveUseSection.swift; sourceTree = "<group>"; };
+		AA03PFMODP0F001 /* ModelPatternSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPatternSection.swift; sourceTree = "<group>"; };
 		AA03PFCOMP0F001 /* ProviderComparisonSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderComparisonSection.swift; sourceTree = "<group>"; };
 		AA03PFVERD0F001 /* VerdictSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerdictSection.swift; sourceTree = "<group>"; };
 		AA03PFSNAPT0F001 /* PlanFitSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitSnapshotTests.swift; sourceTree = "<group>"; };
@@ -716,6 +718,7 @@
 			isa = PBXGroup;
 			children = (
 				AA03PFACTIV0F001 /* ActiveUseSection.swift */,
+				AA03PFMODP0F001 /* ModelPatternSection.swift */,
 				AA03PFCOMP0F001 /* ProviderComparisonSection.swift */,
 				AA03PFVERD0F001 /* VerdictSection.swift */,
 				AA03PFLIMIT0F001 /* LimitStatusSection.swift */,
@@ -883,6 +886,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */,
+				AA03PFMODP0B001 /* ModelPatternSection.swift in Sources */,
 				AA03PFCOMP0B001 /* ProviderComparisonSection.swift in Sources */,
 				AA03PFVERD0B001 /* VerdictSection.swift in Sources */,
 				AA03PFLIMIT0B001 /* LimitStatusSection.swift in Sources */,

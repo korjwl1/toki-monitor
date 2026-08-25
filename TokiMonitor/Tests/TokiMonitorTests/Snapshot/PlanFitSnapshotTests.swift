@@ -285,6 +285,7 @@ struct PlanFitControlSurfaceTests {
             ("ActiveUseSection", ActiveUseSection(limits: model.activeUse,
                                                   quietLimitsNote: model.quietLimitsNote)),
             ("ProviderComparisonSection", ProviderComparisonSection(model: model.comparison)),
+            ("ModelPatternSection", ModelPatternSection(model: model.modelPattern)),
         ]
         for (name, section) in sections {
             for child in Mirror(reflecting: section).children {
@@ -777,5 +778,146 @@ struct PlanFitWorkTimeTests {
         let model = PlanFitModelBuilder.build(rows: rows, unit: .weekly, nowMs: WindowFixtures.nowMs)
         #expect(model.trend.bars.reduce(0) { $0 + $1.exhaustions } == 2,
                 "one of the two limits running out went uncounted")
+    }
+}
+
+// MARK: - Model patterns (T056, T057)
+
+@Suite("Plan-fit model patterns")
+@MainActor
+struct PlanFitModelPatternTests {
+
+    /// Claude reports model-scoped weekly limits; Codex reports one limit for
+    /// everything. Token events exist for both.
+    private func rows() -> [(provider: String, row: WindowRow)] {
+        var rows: [(provider: String, row: WindowRow)] = []
+        for i in 0..<4 {
+            rows.append(WindowFixtures.window(
+                provider: "claude_code", kind: "weekly", limitId: "seven_day_opus",
+                endOffsetDays: Double(i) * 6, peakPct: Double(60 + i * 10),
+                activeMs: 6 * 3_600_000, plan: "max_5x", account: "a"
+            ))
+            rows.append(WindowFixtures.window(
+                provider: "claude_code", kind: "weekly", limitId: "seven_day_sonnet",
+                endOffsetDays: Double(i) * 6, peakPct: Double(20 + i * 5),
+                activeMs: 6 * 3_600_000, plan: "max_5x", account: "a"
+            ))
+            rows.append(WindowFixtures.window(
+                provider: "codex", kind: "session", limitId: "codex",
+                endOffsetDays: Double(i) * 6, peakPct: Double(40 + i * 5),
+                activeMs: 4 * 3_600_000, plan: "codex_plus", account: "c"
+            ))
+        }
+        return rows
+    }
+
+    private func samples() -> [ModelUsageSample] {
+        let now = Date(timeIntervalSince1970: Double(WindowFixtures.nowMs) / 1000)
+        var out: [ModelUsageSample] = []
+        for day in 0..<20 {
+            let date = now.addingTimeInterval(-Double(day) * 86_400)
+            out.append(.init(provider: "claude_code", model: "claude-opus-4-5", day: date,
+                             totalTokens: 900_000 - Double(day) * 10_000, costUsd: 4.2))
+            out.append(.init(provider: "claude_code", model: "claude-sonnet-4-5", day: date,
+                             totalTokens: 300_000, costUsd: 0.9))
+            out.append(.init(provider: "codex", model: "gpt-5-codex", day: date,
+                             totalTokens: 500_000, costUsd: 1.1))
+            out.append(.init(provider: "codex", model: "gpt-5-mini", day: date,
+                             totalTokens: 100_000, costUsd: 0.1))
+        }
+        return out
+    }
+
+    private func pattern(usage: ModelUsageInput) -> ModelPatternModel {
+        PlanFitModelBuilder.build(
+            rows: rows(), unit: .weekly, nowMs: WindowFixtures.nowMs, modelUsage: usage
+        ).modelPattern
+    }
+
+    /// **T057, the core asymmetry.** Claude splits part of its weekly limit by
+    /// model, so its per-model utilisation is a real observation. Every Codex
+    /// window carries `limit_id="codex"` — there is no per-model utilisation to
+    /// report — so its breakdown comes from token events, and the screen says
+    /// so rather than presenting the two sides as symmetric.
+    @Test("Codex has no per-model windows and the screen says so")
+    func codexHasNoModelScopedWindows() {
+        let model = pattern(usage: .reported(samples()))
+        let claude = model.blocks.first { $0.id == "claude_code" }
+        let codex = model.blocks.first { $0.id == "codex" }
+
+        #expect(claude?.limitRows.isEmpty == false,
+                "Claude's model-scoped weekly limits produced no per-model utilisation")
+        #expect(claude?.limitRows.allSatisfy { $0.source == .windowLimits } == true)
+
+        #expect(codex?.limitRows.isEmpty == true,
+                "Codex was given per-model limit rows it cannot have")
+        #expect(codex?.asymmetryNote?.isEmpty == false,
+                "Codex's missing per-model limit reads as absent data, not as a fact about the provider")
+        #expect(codex?.usageRows.isEmpty == false, "Codex has no breakdown at all")
+        #expect(codex?.usageRows.allSatisfy { $0.source == .tokenEvents } == true)
+    }
+
+    /// FR-028. Every row says where it came from, and the two sources answer
+    /// different questions — one is about a limit, the other is not.
+    @Test("every row carries its source")
+    func everyRowCarriesItsSource() {
+        let model = pattern(usage: .reported(samples()))
+        #expect(!model.blocks.isEmpty)
+        for block in model.blocks {
+            #expect(!block.sourceNote.isEmpty, "\(block.id) does not say where its rows came from")
+            for row in block.limitRows + block.usageRows {
+                #expect(!row.source.label.isEmpty)
+                #expect(!row.source.explanation.isEmpty)
+            }
+            // A limit's utilisation is not a share of anything, so it never
+            // gets a share bar or a share percentage.
+            #expect(block.limitRows.allSatisfy { $0.sharePct == nil })
+            #expect(block.usageRows.allSatisfy { $0.sharePct != nil })
+        }
+    }
+
+    /// FR-026. Shares are per provider and add to 100 on each side — never
+    /// across providers, whose token counts are different accounts of
+    /// different work.
+    @Test("shares are per provider and add up")
+    func sharesArePerProvider() {
+        let model = pattern(usage: .reported(samples()))
+        for block in model.blocks where !block.usageRows.isEmpty {
+            let total = block.usageRows.compactMap(\.sharePct).reduce(0, +)
+            #expect(abs(total - 100) < 0.5, "\(block.id) shares add to \(total)")
+        }
+    }
+
+    /// A failed token-events query is not "no models used". The first is a
+    /// fact about the daemon, the second a fact about the account.
+    @Test("unreadable token events are distinguished from having none")
+    func unreadableIsNotEmpty() {
+        let unread = pattern(usage: .notFetched)
+        #expect(unread.unavailableNote?.isEmpty == false)
+        #expect(unread.blocks.allSatisfy { $0.usageRows.isEmpty })
+        // Claude's per-model limits still come through — they are read off the
+        // windows, and one thin source must not blank the other.
+        #expect(unread.blocks.first { $0.id == "claude_code" }?.limitRows.isEmpty == false,
+                "an unreadable token query blanked the window-sourced rows too")
+
+        let none = pattern(usage: .reported([]))
+        #expect(none.unavailableNote == nil, "an empty answer is being reported as a failure")
+    }
+
+    /// The section renders in both themes at 800pt.
+    @Test("the model section renders", arguments: PlanFitSnapshotTheme.allCases)
+    func modelSectionRenders(theme: PlanFitSnapshotTheme) throws {
+        let model = PlanFitModelBuilder.build(
+            rows: rows(), unit: .weekly, nowMs: WindowFixtures.nowMs,
+            modelUsage: .reported(samples())
+        )
+        let raster = try #require(PlanFitSnapshotRenderer.raster(
+            PlanFitContent(model: model, unit: .constant(.weekly)),
+            theme: theme,
+            size: CGSize(width: PlanFitSnapshotRenderer.width, height: 2800)
+        ))
+        #expect(raster.pageInkCoverage > 0.03)
+        #expect(raster.pagePeakContrast >= 4.5)
+        #expect(raster.edgeInk(margin: 8) == 0, "the model section overflows 800pt")
     }
 }

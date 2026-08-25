@@ -396,6 +396,140 @@ struct ProviderComparisonModel: Equatable, Sendable {
     var isPresentable: Bool { state != .none }
 }
 
+// MARK: - Model patterns (T056, T057 / contract W2, FR-026…FR-028)
+
+/// Where a per-model figure came from.
+///
+/// This is not bookkeeping. **Claude splits its weekly limit by model
+/// (`seven_day_opus`, `seven_day_sonnet`), so its per-model exhaustion is a
+/// real observation off the window rows. Codex has no model-scoped windows at
+/// all — every Codex window carries `limit_id="codex"`** — so the only per-model
+/// answer for Codex is the token events recorded on this machine.
+///
+/// Drawing the two sides the same way would promise a Codex per-model limit
+/// that does not exist, so the source is on every row.
+enum ModelBreakdownSource: String, Equatable, Hashable, Sendable, CaseIterable {
+    /// The provider's own model-scoped window limits.
+    case windowLimits
+    /// Token events recorded locally. Says nothing about a limit.
+    case tokenEvents
+
+    var label: String {
+        switch self {
+        case .windowLimits: return L.tr("모델별 한도 창", "model-scoped limit windows")
+        case .tokenEvents: return L.tr("토큰 이벤트", "token events")
+        }
+    }
+
+    /// A word AND a shape, so the source never depends on colour.
+    var symbolName: String {
+        switch self {
+        case .windowLimits: return "gauge.with.dots.needle.bottom.50percent"
+        case .tokenEvents: return "list.bullet.rectangle"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .windowLimits:
+            return L.tr(
+                "공급자가 모델별로 나눠 보고하는 한도 창에서 왔습니다 — 소진율이 그 모델에 직접 연결됩니다.",
+                "From limit windows the provider reports per model — the utilisation belongs to that model directly."
+            )
+        case .tokenEvents:
+            return L.tr(
+                "이 기기에 기록된 토큰 이벤트에서 왔습니다. 사용 비중은 알 수 있지만 모델별 한도에 대해서는 아무 말도 하지 않습니다.",
+                "From token events recorded on this machine. It shows the share of use and says nothing about any per-model limit."
+            )
+        }
+    }
+}
+
+/// Per-model usage and, where the provider has them, per-model limits.
+struct ModelPatternModel: Equatable, Sendable {
+
+    struct Row: Equatable, Sendable, Identifiable {
+        let id: String
+        let model: String
+        /// Share of this provider's tokens over the lookback. nil on a limit
+        /// row — a limit's utilisation is not a share of anything.
+        let sharePct: Double?
+        /// "42% · 1.2M 토큰", or "p50 38% · p95 71%" on a limit row.
+        let detail: String
+        /// Change against the previous period of the selected unit (FR-026).
+        let changeText: String?
+        let source: ModelBreakdownSource
+        let provenance: Provenance
+    }
+
+    struct ProviderBlock: Equatable, Sendable, Identifiable {
+        let id: String
+        let title: String
+        /// Model-scoped limit windows. Empty for Codex, and that emptiness is
+        /// the point (T057).
+        let limitRows: [Row]
+        /// Token-event share. The only per-model source Codex has.
+        let usageRows: [Row]
+        /// What this provider's limit system does and does not split by model.
+        let sourceNote: String
+        /// Present when the provider has no model-scoped windows: the sentence
+        /// that stops the block being read as a symmetric one.
+        let asymmetryNote: String?
+        /// Present when neither source produced a row.
+        let emptyNote: String?
+    }
+
+    let unit: PeriodUnit
+    /// "최근 28일 · 주별 변화" — the span the shares are over.
+    let periodNote: String
+    let blocks: [ProviderBlock]
+    /// Token events could not be read at all. Distinct from having none.
+    let unavailableNote: String?
+
+    static let none = ModelPatternModel(
+        unit: .weekly, periodNote: "", blocks: [], unavailableNote: nil
+    )
+
+    var isPresentable: Bool { !blocks.isEmpty || unavailableNote != nil }
+}
+
+// MARK: - Token events, as they arrive
+
+/// One provider's usage of one model on one day.
+struct ModelUsageSample: Equatable, Sendable, Hashable {
+    let provider: String
+    let model: String
+    let day: Date
+    let totalTokens: Double
+    /// nil when no price is known for the model. Not zero — an unknown cost
+    /// added as zero silently understates the total.
+    let costUsd: Double?
+}
+
+/// Whether the token-event query ran at all.
+///
+/// A plain empty array would have collapsed "there are no token events" into
+/// "the events could not be read", and those want different screens: the first
+/// is a fact about the account, the second is a fact about the daemon.
+enum ModelUsageInput: Equatable, Sendable {
+    /// The query ran. An empty list is a real answer.
+    case reported([ModelUsageSample])
+    /// Not asked, or the query failed.
+    case unavailable(reason: String)
+
+    static var notFetched: ModelUsageInput {
+        .unavailable(reason: L.tr(
+            "토큰 이벤트를 읽지 못했습니다 — 모델별 사용 비중은 이 데이터에서만 나옵니다.",
+            "Token events could not be read — the per-model share comes from them and nowhere else."
+        ))
+    }
+
+    var samples: [ModelUsageSample] {
+        if case .reported(let samples) = self { return samples }
+        return []
+    }
+}
+
 // MARK: - The page
 
 /// Everything the page draws.
@@ -409,6 +543,8 @@ struct PlanFitModel: Equatable, Sendable {
     let activeUse: [ActiveUseLimitModel]
     /// Claude against Codex on the overlap of their histories (T054, T055).
     let comparison: ProviderComparisonModel
+    /// Per-model patterns, with the source of each side on screen (T056, T057).
+    let modelPattern: ModelPatternModel
     /// Limits with neither an exhaustion nor a worked window, named in one
     /// line instead of getting a card each (T050).
     let quietLimitsNote: String?
@@ -437,6 +573,7 @@ enum PlanFitModelBuilder {
         rows: [(provider: String, row: WindowRow)],
         unit: PeriodUnit,
         nowMs: Int64,
+        modelUsage: ModelUsageInput = .notFetched,
         usingServerData: Bool = false,
         loadFailed: Bool = false,
         isLoading: Bool = false
@@ -464,6 +601,9 @@ enum PlanFitModelBuilder {
             limitGroups: limitGroups(paired, rows: rows, nowMs: nowMs),
             activeUse: activeUse(paired),
             comparison: comparison(rows: rows, nowMs: nowMs),
+            modelPattern: modelPattern(
+                segments: segments, usage: modelUsage, unit: unit, nowMs: nowMs
+            ),
             quietLimitsNote: quietLimitsNote(paired),
             sourceNote: usingServerData
                 ? L.tr("동기화 서버 데이터 · 전체 디바이스 병합", "Sync-server data · all devices merged")
@@ -1277,5 +1417,205 @@ extension PlanFitModelBuilder {
         }
         return L.tr("한도 \(seen.count)종 · \(names.joined(separator: ", "))",
                     "\(seen.count) limit series · \(names.joined(separator: ", "))")
+    }
+}
+
+// MARK: - Model patterns (T056, T057)
+
+extension PlanFitModelBuilder {
+
+    /// Limit ids that name a model. Claude scopes part of its weekly limit to a
+    /// model family; the id is the only place that scope appears.
+    static let modelScopedLimitPrefix = "seven_day_"
+
+    /// Per-model patterns, with each side's source on it.
+    ///
+    /// The two providers are NOT built the same way, because they are not the
+    /// same: Claude reports model-scoped limit windows and Codex reports one
+    /// `limit_id` for everything. Both get a token-event share — that source
+    /// exists for both — and only Claude gets limit rows. The block for a
+    /// provider without model-scoped windows says so outright rather than
+    /// leaving an empty half the reader has to interpret.
+    static func modelPattern(
+        segments: [WindowStatsSegment],
+        usage: ModelUsageInput,
+        unit: PeriodUnit,
+        nowMs: Int64
+    ) -> ModelPatternModel {
+        var providers: [String] = []
+        for segment in segments where !providers.contains(segment.provider) {
+            providers.append(segment.provider)
+        }
+        for sample in usage.samples where !providers.contains(sample.provider) {
+            providers.append(sample.provider)
+        }
+        guard !providers.isEmpty else { return .none }
+
+        let unavailable: String?
+        if case .unavailable(let reason) = usage { unavailable = reason } else { unavailable = nil }
+
+        let blocks = providers.sorted().map { provider in
+            modelBlock(
+                provider: provider,
+                segments: segments.filter { $0.provider == provider },
+                samples: usage.samples.filter { $0.provider == provider },
+                usageWasRead: unavailable == nil,
+                unit: unit,
+                nowMs: nowMs
+            )
+        }
+        return ModelPatternModel(
+            unit: unit,
+            periodNote: L.tr(
+                "최근 \(Int(WindowStats.lookbackDays))일의 비중과 \(unit.label) 변화",
+                "Share over the trailing \(Int(WindowStats.lookbackDays)) days, changing \(unit.label.lowercased())"
+            ),
+            blocks: blocks,
+            unavailableNote: unavailable
+        )
+    }
+
+    static func modelBlock(
+        provider: String,
+        segments: [WindowStatsSegment],
+        samples: [ModelUsageSample],
+        usageWasRead: Bool,
+        unit: PeriodUnit,
+        nowMs: Int64
+    ) -> ModelPatternModel.ProviderBlock {
+        // FR-027 — a model-scoped limit's utilisation belongs to that model,
+        // and this is the only provider that has any.
+        let scoped = segments.filter { $0.limitId.hasPrefix(modelScopedLimitPrefix) }
+        let limitRows = scoped.map { segment -> ModelPatternModel.Row in
+            let censored = segment.p95IsCensored
+            let detail = segment.p50Peak == nil
+                ? L.tr("분포를 낼 표본이 없습니다", "no sample to distribute")
+                : "p50 \(PlanFitFormat.pct(segment.p50Peak)) · "
+                    + "p95 \(PlanFitFormat.pctAtLeast(segment.p95Peak, isLowerBound: censored))"
+            return ModelPatternModel.Row(
+                id: "\(provider)|limit|\(segment.limitId)|\(segment.plan)",
+                model: modelName(fromLimitId: segment.limitId),
+                sharePct: nil,
+                detail: L.tr(
+                    "\(detail) · 소진 \(segment.maxedCount)회",
+                    "\(detail) · ran out \(segment.maxedCount)×"
+                ),
+                changeText: nil,
+                source: .windowLimits,
+                provenance: censored ? .lowerBound : .observed
+            )
+        }
+
+        let usageRows = tokenUsageRows(provider: provider, samples: samples, unit: unit, nowMs: nowMs)
+
+        // T057. A provider with no model-scoped windows gets the sentence
+        // saying so; without it, an empty limit half reads as missing data
+        // rather than as a fact about the provider.
+        let asymmetry: String? = scoped.isEmpty && !segments.isEmpty
+            ? L.tr(
+                "이 공급자에는 모델별 한도 창이 없습니다 — 모든 윈도우가 한도 하나로 보고됩니다. 아래 비중은 토큰 이벤트에서 온 것이고, 모델별 소진율은 존재하지 않습니다.",
+                "This provider has no model-scoped limit windows — every window is reported under one limit. The shares below come from token events, and a per-model utilisation does not exist here."
+            )
+            : nil
+
+        let empty: String? = (limitRows.isEmpty && usageRows.isEmpty)
+            ? (usageWasRead
+                ? L.tr(
+                    "이 기간에 이 공급자의 모델별 기록이 없습니다.",
+                    "No per-model record for this provider in this period."
+                )
+                : L.tr(
+                    "토큰 이벤트를 읽지 못해 모델별 비중을 낼 수 없습니다.",
+                    "Token events could not be read, so no per-model share can be given."
+                ))
+            : nil
+
+        return ModelPatternModel.ProviderBlock(
+            id: provider,
+            title: PlanFitFormat.providerTitle(provider),
+            limitRows: limitRows,
+            usageRows: usageRows,
+            sourceNote: scoped.isEmpty
+                ? L.tr(
+                    "출처: 토큰 이벤트",
+                    "Source: token events"
+                )
+                : L.tr(
+                    "출처: 모델별 한도 창(소진율) + 토큰 이벤트(비중). 두 줄은 서로 다른 것을 재는 값입니다.",
+                    "Source: model-scoped limit windows for utilisation, token events for share. The two rows measure different things."
+                ),
+            asymmetryNote: asymmetry,
+            emptyNote: empty
+        )
+    }
+
+    /// Token-event share per model, plus its change against the previous
+    /// period of the selected unit (FR-026).
+    static func tokenUsageRows(
+        provider: String,
+        samples: [ModelUsageSample],
+        unit: PeriodUnit,
+        nowMs: Int64
+    ) -> [ModelPatternModel.Row] {
+        guard !samples.isEmpty else { return [] }
+        let now = Date(timeIntervalSince1970: Double(nowMs) / 1000)
+
+        var totals: [String: Double] = [:]
+        for sample in samples { totals[sample.model, default: 0] += sample.totalTokens }
+        let grand = totals.values.reduce(0, +)
+        guard grand > 0 else { return [] }
+
+        // The last two buckets of the chosen unit, per model. Bucketing goes
+        // through `PeriodAggregation` so the change rate here lands on the same
+        // boundaries as the trend above it — a second bucketing rule is how two
+        // rows of the same page start disagreeing.
+        var change: [String: Double] = [:]
+        for (model, _) in totals {
+            let modelSamples = samples.filter { $0.model == model }.map {
+                UsageSample(date: $0.day, amount: $0.totalTokens)
+            }
+            let periods = PeriodAggregation.aggregate(samples: modelSamples, unit: unit, now: now)
+            // The daily-average rate, not the total one: a period still running
+            // held against a finished one reports a collapse that is only the
+            // calendar.
+            if let latest = periods.last, let rate = latest.dailyAverageChangeRatePct {
+                change[model] = rate
+            }
+        }
+
+        return totals
+            .sorted { a, b in a.value != b.value ? a.value > b.value : a.key < b.key }
+            .map { model, tokens in
+                let share = tokens / grand * 100
+                return ModelPatternModel.Row(
+                    id: "\(provider)|usage|\(model)",
+                    model: model,
+                    sharePct: share,
+                    detail: L.tr(
+                        "\(PlanFitFormat.pct(share)) · \(TokenFormatter.formatTokens(UInt64(max(0, tokens)))) 토큰",
+                        "\(PlanFitFormat.pct(share)) · \(TokenFormatter.formatTokens(UInt64(max(0, tokens)))) tokens"
+                    ),
+                    changeText: PlanFitFormat.changeRate(change[model]).map {
+                        L.tr("일평균 \($0)", "\($0) per day")
+                    },
+                    source: .tokenEvents,
+                    // A share of observed events. Nothing was inferred, but the
+                    // division itself is ours.
+                    provenance: .derived
+                )
+            }
+    }
+
+    /// The model a Claude limit id is scoped to. The id is the only place the
+    /// scope appears, and an id this does not recognise keeps its own name
+    /// rather than being folded into a family it may not belong to.
+    static func modelName(fromLimitId limitId: String) -> String {
+        let suffix = String(limitId.dropFirst(modelScopedLimitPrefix.count))
+        switch suffix {
+        case "opus": return "Opus"
+        case "sonnet": return "Sonnet"
+        case "haiku": return "Haiku"
+        default: return suffix.isEmpty ? limitId : suffix
+        }
     }
 }

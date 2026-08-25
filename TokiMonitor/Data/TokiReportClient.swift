@@ -28,6 +28,37 @@ final class TokiReportClient: Sendable, QueryDataSource {
         return TokiReportParser.parseReport(data)
     }
 
+    /// Per-model token usage with the PROVIDER key kept.
+    ///
+    /// `queryPromQL` folds every provider into one date-keyed dictionary, which
+    /// is right for a total and wrong for the plan-fit model breakdown: Claude
+    /// has model-scoped window limits and Codex has none, so the two sides come
+    /// from different sources and must not be presented as symmetric. Merging
+    /// the providers here would erase the distinction before the page could
+    /// draw it.
+    func queryModelUsageByProvider(
+        query: String,
+        since: String? = nil,
+        until: String? = nil
+    ) async throws -> [String: [Date: [TokiModelSummary]]] {
+        var arguments = ["query", "-z", "UTC", "--output-format", "json"]
+        if let since { arguments += ["--start", since] }
+        if let until { arguments += ["--end", until] }
+        arguments.append(query)
+        let data = try await CLIProcessRunner.run(
+            executable: TokiPath.resolved,
+            arguments: arguments
+        )
+        var byProvider: [String: [Date: [TokiModelSummary]]] = [:]
+        for (provider, entries) in TokiReportParser.providerEntries(data) {
+            var points: [Date: [TokiModelSummary]] = [:]
+            TokiReportParser.parseEntries(entries, into: &points)
+            guard !points.isEmpty else { continue }
+            byProvider[provider] = points
+        }
+        return byProvider
+    }
+
     /// Fetch rate-limit window rows via `toki query windows` for the plan-fit
     /// statistics view. Returns (provider, row) pairs.
     func queryWindows(startEpoch: Int, endEpoch: Int) async throws -> [(provider: String, row: WindowRow)] {
