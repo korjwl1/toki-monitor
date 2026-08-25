@@ -19,6 +19,7 @@ struct StatPanelView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(stat.value)
                 .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .contentTransition(.numericText())
@@ -75,10 +76,44 @@ struct StatPanelView: View {
                 )
             }
         }
+        // Then the panel's own unit and decimals. These sat in the editor
+        // reaching nothing at all; a panel that says "percent, 1 decimal"
+        // should read that way whether or not it also has a field override.
+        if let display = Self.panelDisplayConfig(panel) {
+            return PanelDataExtractor.StatValue(
+                value: FieldFormatter.format(value, config: display), subtitle: nil
+            )
+        }
         return PanelDataExtractor.StatValue(
             value: Self.format(value, metric: metric),
             subtitle: Self.costSubtitle(for: metric)
         )
+    }
+
+    /// The unit and decimals set on the panel itself, or nil when it said
+    /// nothing and the metric's own default formatting should stand.
+    static func panelDisplayConfig(_ panel: PanelConfig) -> FieldDisplayConfig? {
+        guard panel.options.unit != nil || panel.options.decimals != nil else { return nil }
+        return FieldDisplayConfig(unit: panel.options.unit, decimals: panel.options.decimals)
+    }
+
+    /// The number behind `statValue`, unformatted.
+    ///
+    /// `GaugePanelView` needs it to place the value on a scale. Returns nil
+    /// where there is no number to place — including `topModel`, which names a
+    /// series rather than reducing a column.
+    static func numericValue(panel: PanelConfig, data: TimeSeriesData?,
+                             frames: FrameSet?) -> Double? {
+        let metric = panel.effectiveMetric
+        guard metric != .topModel else { return nil }
+        guard let frames, !frames.frames.isEmpty else {
+            return PanelDataExtractor.statNumber(for: metric, data: data)
+        }
+        let prepared = TransformationPipeline.apply(
+            PanelPreset.transformations(for: metric), to: frames
+        )
+        let selection = panel.fieldSelection ?? PanelPreset.selection(for: metric)
+        return FrameReader.singleValue(prepared, selection: selection)
     }
 
     /// A cost figure here is "valued at the prices we currently know", not

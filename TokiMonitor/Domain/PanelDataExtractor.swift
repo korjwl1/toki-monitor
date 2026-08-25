@@ -37,6 +37,23 @@ enum PanelDataExtractor {
         }
     }
 
+    /// The same reduction as `statValue`, before it becomes a string.
+    ///
+    /// A gauge needs the number itself — it has to place it on a scale — and
+    /// re-parsing "1.2M" back out of the formatted string would be a second,
+    /// lossier way of computing the same thing.
+    static func statNumber(for metric: PanelMetric, data: TimeSeriesData?) -> Double? {
+        guard let data else { return nil }
+        switch metric {
+        case .totalTokens: return Double(data.totalTokens)
+        case .totalCost: return data.totalCost
+        case .apiCalls: return Double(data.totalEvents)
+        case .cacheHitRate: return computeCacheHitRate(from: data)
+        case .reasoningTokens: return Double(computeReasoningTokens(from: data))
+        default: return nil
+        }
+    }
+
     // MARK: - Time Series Output
 
     static func chartPoints(

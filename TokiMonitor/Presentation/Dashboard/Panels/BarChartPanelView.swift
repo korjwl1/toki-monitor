@@ -25,6 +25,8 @@ struct BarChartPanelView: View {
     @State private var hoverState = BarHoverState()
     @State private var modelData: [(model: String, points: [TimeSeriesData.ChartPoint])] = []
 
+    private var options: PanelDisplayOptions { panel.options }
+
     var body: some View {
         let bucketSecs = viewModel.dashboardConfig.time.bucketSeconds
         return Chart {
@@ -48,6 +50,8 @@ struct BarChartPanelView: View {
                     .font(.system(size: 9))
             }
         }
+        .chartLegend(position: .bottom, alignment: .center, spacing: DS.sm)
+        .chartLegend(options.showLegend ? .visible : .hidden)
         .chartOverlay { proxy in
             GeometryReader { geo in
                 ZStack(alignment: .topLeading) {
@@ -64,25 +68,39 @@ struct BarChartPanelView: View {
                         .fill(.clear)
                         .contentShape(Rectangle())
                         .onContinuousHover { phase in
+                            guard options.tooltipMode != .hidden else { return }
                             switch phase {
                             case .active(let location):
                                 hoverState.date = snapToNearestBar(at: location, proxy: proxy, geo: geo, modelData: modelData)
                                 hoverState.position = location
+                                // Which stacked band the cursor is in. Only
+                                // `.single` needs it, but reading it here keeps
+                                // the geometry in the one place that has it.
+                                if let plotFrame = proxy.plotFrame {
+                                    let plotRect = geo[plotFrame]
+                                    hoverState.value = proxy.value(
+                                        atY: location.y - plotRect.minY, as: Double.self
+                                    )
+                                }
                             case .ended:
                                 hoverState.date = nil
+                                hoverState.value = nil
                             }
                         }
                 }
             }
         }
         .overlay(alignment: .topLeading) {
-            BarChartTooltipOverlay(
-                state: hoverState,
-                modelData: modelData,
-                bucketSecs: bucketSecs,
-                colorForModel: { viewModel.colorForModel($0) },
-                formatDate: { formatBarDate($0) }
-            )
+            if options.tooltipMode != .hidden {
+                BarChartTooltipOverlay(
+                    state: hoverState,
+                    modelData: modelData,
+                    bucketSecs: bucketSecs,
+                    mode: options.tooltipMode,
+                    colorForModel: { viewModel.colorForModel($0) },
+                    formatDate: { formatBarDate($0) }
+                )
+            }
         }
         .onAppear { animateIn() }
         .onChange(of: viewModel.dataVersion) { _, _ in
@@ -153,6 +171,8 @@ struct BarChartPanelView: View {
 final class BarHoverState {
     var date: Date?
     var position: CGPoint = .zero
+    /// The data value under the cursor, used to pick one band out of a stack.
+    var value: Double?
 }
 
 /// Isolated overlay that only re-renders when hover state changes,
@@ -161,16 +181,21 @@ struct BarChartTooltipOverlay: View {
     let state: BarHoverState
     let modelData: [(model: String, points: [TimeSeriesData.ChartPoint])]
     let bucketSecs: Int
+    /// `.single` names the one bar under the cursor; `.all` lists the bucket.
+    /// Both were offered in the editor and neither was implemented — the
+    /// tooltip always listed everything.
+    let mode: PanelDisplayOptions.TooltipMode
     let colorForModel: (String) -> Color
     let formatDate: (Date) -> String
 
     var body: some View {
         if let date = state.date {
-            let values = modelData.compactMap { entry -> (String, Int)? in
+            let all = modelData.compactMap { entry -> (String, Int)? in
                 guard let pt = entry.points.first(where: { isSameBucket($0.date, date) }) else { return nil }
                 let v = Int(pt.value)
                 return v > 0 ? (entry.model, v) : nil
             }
+            let values = mode == .single ? Self.bandUnderCursor(all, at: state.value) : all
             VStack(alignment: .leading, spacing: 2) {
                 Text(formatDate(date))
                     .font(.system(size: 9))
@@ -194,6 +219,20 @@ struct BarChartTooltipOverlay: View {
 
     private func isSameBucket(_ a: Date, _ b: Date) -> Bool {
         BarChartTime.isSameBucket(a, b, bucketSecs: bucketSecs)
+    }
+
+    /// The stacked band containing `value`. Bars are drawn bottom-up in series
+    /// order, so the bands are the running sums; a cursor above the stack
+    /// belongs to the topmost band rather than to nothing.
+    static func bandUnderCursor(_ values: [(String, Int)], at value: Double?) -> [(String, Int)] {
+        guard let value, !values.isEmpty else { return values }
+        var lower = 0.0
+        for entry in values {
+            let upper = lower + Double(entry.1)
+            if value <= upper { return [entry] }
+            lower = upper
+        }
+        return values.suffix(1).map { $0 }
     }
 }
 

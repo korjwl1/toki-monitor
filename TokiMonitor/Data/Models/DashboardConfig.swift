@@ -451,6 +451,12 @@ struct PanelDisplayOptions: Codable, Equatable {
 
     // Gauge
     var showThresholdMarkers: Bool = true
+    /// The ends of the gauge's scale. A gauge without them is a number in a
+    /// circle: "80" means nothing until the reader knows whether the dial runs
+    /// to 100 or to 100,000. Absent, the panel derives a scale from the
+    /// thresholds and the value, and says which it used.
+    var gaugeMin: Double?
+    var gaugeMax: Double?
 
     // Field config
     var unit: String?

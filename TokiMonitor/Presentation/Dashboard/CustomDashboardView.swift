@@ -147,12 +147,49 @@ struct CustomDashboardView: View {
         PanelContainerView(
             title: panel.title,
             isEditing: viewModel.isEditing,
-            dataState: viewModel.dataState(for: panel.id),
+            state: panelState(for: panel),
             onDelete: { viewModel.removePanel(id: panel.id) },
             onEdit: { onEditPanel?(panel) },
+            onRetry: { viewModel.fetchData() },
             onInspect: onInspectPanel.map { handler in { handler(panel) } }
         ) {
             panelContent(for: panel)
+        }
+    }
+
+    /// What this panel is showing. The fetch layer reports whether the query
+    /// ran; whether it produced anything to draw is a question about THIS
+    /// panel, so it is answered here and the two are combined into the state
+    /// the container renders.
+    private func panelState(for panel: PanelConfig) -> PanelState {
+        let fetch = viewModel.dataState(for: panel.id)
+        return PanelState.resolve(
+            fetch,
+            hasContent: Self.hasContent(fetch),
+            // The toolbar's model filter hides series after the query has run,
+            // so "everything is switched off" is a different answer from "the
+            // query found nothing" and has a different remedy.
+            hasVisibleSeries: !usesModelFilter(panel) || !viewModel.filteredModelNames.isEmpty
+        )
+    }
+
+    /// Whether there is anything to draw. A datasource that serves frames and
+    /// no legacy points is not empty — and neither is one that serves points
+    /// under no model name.
+    static func hasContent(_ state: PanelDataState) -> Bool {
+        if let frames = state.frames, !frames.frames.isEmpty { return true }
+        if let data = state.timeSeriesData,
+           !(data.points.isEmpty && data.allModelNames.isEmpty) { return true }
+        return false
+    }
+
+    /// Only the per-series panels are narrowed by the model filter. A stat card
+    /// reduces every series into one number, so switching a model off does not
+    /// leave it with nothing to show.
+    private func usesModelFilter(_ panel: PanelConfig) -> Bool {
+        switch panel.panelType {
+        case .timeSeries, .barChart: return true
+        default: return false
         }
     }
 
@@ -168,52 +205,38 @@ struct CustomDashboardView: View {
         let state = viewModel.dataState(for: panel.id)
         let data = state.timeSeriesData
         let frames = state.frames
-        // A datasource that serves frames and no legacy points is not empty.
-        let isEmpty = (data?.allModelNames.isEmpty ?? true) && (frames?.frames.isEmpty ?? true)
+        // No emptiness branches here any more: `PanelContainerView` decides
+        // between content and a status screen from the resolved `PanelState`,
+        // so every panel type gets the same five states instead of five
+        // different `Spacer()`s.
         switch panel.panelType {
         case .stat:
             StatPanelView(panel: panel, data: data, frames: frames)
         case .timeSeries:
-            if isEmpty {
-                Spacer()
-            } else if viewModel.filteredModelNames.isEmpty {
-                noModelSelected
-            } else {
-                TimeSeriesPanelView(
-                    panel: panel,
-                    data: data,
-                    frames: frames,
-                    viewModel: viewModel,
-                    dateFormat: chartDateFormat
-                )
-            }
+            TimeSeriesPanelView(
+                panel: panel,
+                data: data,
+                frames: frames,
+                viewModel: viewModel,
+                dateFormat: chartDateFormat
+            )
         case .barChart:
-            if isEmpty {
-                Spacer()
-            } else if viewModel.filteredModelNames.isEmpty {
-                noModelSelected
-            } else {
-                BarChartPanelView(
-                    panel: panel,
-                    data: data,
-                    frames: frames,
-                    viewModel: viewModel,
-                    dateFormat: chartDateFormat
-                )
-            }
+            BarChartPanelView(
+                panel: panel,
+                data: data,
+                frames: frames,
+                viewModel: viewModel,
+                dateFormat: chartDateFormat
+            )
         case .pieChart:
-            if isEmpty { Spacer() } else { pieChartContent(for: panel, data: data, frames: frames) }
+            pieChartContent(for: panel, data: data, frames: frames)
         case .table:
-            if isEmpty { Spacer() } else { TablePanelView(data: data, frames: frames) }
+            TablePanelView(panel: panel, data: data, frames: frames)
         case .gauge:
             GaugePanelView(panel: panel, data: data, frames: frames)
         case .stateTimeline:
-            if isEmpty {
-                Spacer()
-            } else {
-                StateTimelinePanelView(panel: panel, frames: frames,
-                                       dateFormat: chartDateFormat)
-            }
+            StateTimelinePanelView(panel: panel, frames: frames,
+                                   dateFormat: chartDateFormat)
         case .rowPanel:
             EmptyView()
         }
@@ -250,14 +273,5 @@ struct CustomDashboardView: View {
         } else {
             return .dateTime.month(.defaultDigits).day(.defaultDigits)
         }
-    }
-
-    private var noModelSelected: some View {
-        ContentUnavailableView(
-            L.dash.selectModel,
-            systemImage: "line.3.horizontal.decrease.circle",
-            description: Text(L.dash.selectModelDesc)
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

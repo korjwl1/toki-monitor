@@ -64,6 +64,33 @@ enum PanelSeries {
         }
     }
 
+    /// Per-series points that keep an absent bucket ABSENT.
+    ///
+    /// `chartPoints` fills gaps with zero, which is the right reading for a bar
+    /// chart of counters. It is the wrong reading for a line: joining across a
+    /// gap draws a descent to zero and a climb back out, and a reader cannot
+    /// tell that invented V from a real one. A line chart asks here instead and
+    /// breaks the line at the gap (contract R4).
+    ///
+    /// The legacy extractor has no absence to report — it computes every bucket
+    /// — so that path yields all-present points and behaves exactly as before.
+    static func chartSeriesWithGaps(metric: PanelMetric, panel: PanelConfig?, frames: FrameSet?,
+                                    data: TimeSeriesData?, enabled: Set<String>)
+        -> [(model: String, points: [(date: Date, value: Double?)])] {
+        guard let frames, !frames.frames.isEmpty else {
+            return PanelDataExtractor.allModelChartPoints(
+                for: metric, enabledModels: enabled, data: data
+            ).map { ($0.model, $0.points.map { (date: $0.date, value: Double?($0.value)) }) }
+        }
+        let (set, selection) = prepared(metric: metric, panel: panel, frames: frames)
+        return FrameReader.series(set, selection: selection).compactMap { entry in
+            let modelPart = entry.name.components(separatedBy: " · ").first ?? entry.name
+            guard enabled.isEmpty || enabled.contains(modelPart) || enabled.contains(entry.name)
+            else { return nil }
+            return (entry.name, entry.points)
+        }
+    }
+
     // MARK: - Tables
 
     /// One row per series. The frame path keeps every grouping dimension in the

@@ -390,7 +390,10 @@ final class DashboardViewModel {
         // Mark all panels as loading, keeping the current data as `previous` so
         // charts render the last values during refresh instead of blinking empty.
         for panel in allPanels {
-            panelData[panel.id] = .loading(previous: panelData[panel.id]?.timeSeriesData)
+            panelData[panel.id] = .loading(
+                previous: panelData[panel.id]?.timeSeriesData,
+                previousFrames: panelData[panel.id]?.frames
+            )
         }
         isLoading = true
         errorMessage = nil

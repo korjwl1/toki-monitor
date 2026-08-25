@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40POPTTESTS00001 /* PanelOptionsTests.swift */; };
+		AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */; };
+		AA40PSNAPHARN00002 /* PanelSnapshotHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */; };
+		AA40PSTATETEST0002 /* PanelStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSTATETEST0001 /* PanelStateTests.swift */; };
+		AA40PANELSTATUS002 /* PanelStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PANELSTATUS001 /* PanelStatusView.swift */; };
+		AA40PANELSTATE0002 /* PanelState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PANELSTATE0001 /* PanelState.swift */; };
 		0237DEE9F5EB132AAB4AE384 /* TimeSeriesChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9BDCAC76DC2C743B8CE339 /* TimeSeriesChartView.swift */; };
 		AA34STPANEL00000002 /* StateTimelinePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34STPANEL00000001 /* StateTimelinePanelView.swift */; };
 		AA34FIELDCFG00000002 /* FieldConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA34FIELDCFG00000001 /* FieldConfig.swift */; };
@@ -180,6 +186,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AA40POPTTESTS00001 /* PanelOptionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelOptionsTests.swift; sourceTree = "<group>"; };
+		AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateSnapshotTests.swift; sourceTree = "<group>"; };
+		AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelSnapshotHarness.swift; sourceTree = "<group>"; };
+		AA40PSTATETEST0001 /* PanelStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateTests.swift; sourceTree = "<group>"; };
+		AA40PANELSTATUS001 /* PanelStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStatusView.swift; sourceTree = "<group>"; };
+		AA40PANELSTATE0001 /* PanelState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelState.swift; sourceTree = "<group>"; };
 		0103BDEAC6066E0274029149 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		AA20INSPECT0000000001 /* PanelInspectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelInspectSheet.swift; sourceTree = "<group>"; };
 		02D478E261DC52C1328878D3 /* PlanFitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitView.swift; sourceTree = "<group>"; };
@@ -411,6 +423,7 @@
 		2A3062764644CB53A2DA4066 /* Panels */ = {
 			isa = PBXGroup;
 			children = (
+				AA40PANELSTATUS001 /* PanelStatusView.swift */,
 				4AB11444FDF44AA3CB147AA1 /* BarChartPanelView.swift */,
 				F24D5C9A7319840C3B1F3CC6 /* GaugePanelView.swift */,
 				A5B5567C5B301D96AB614B4E /* PanelContainerView.swift */,
@@ -565,6 +578,8 @@
 		AA03SNAPGROUP00000001 /* Snapshot */ = {
 			isa = PBXGroup;
 			children = (
+				AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */,
+				AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */,
 				AA03SNAPHARNESS000001 /* PlanFitSnapshotHarness.swift */,
 			);
 			path = Snapshot;
@@ -581,6 +596,8 @@
 		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AA40POPTTESTS00001 /* PanelOptionsTests.swift */,
+				AA40PSTATETEST0001 /* PanelStateTests.swift */,
 				F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */,
 				472F2F7AB9F295A874844E6D /* ConnectionManagerTests.swift */,
 				D1F563B39918F892ABDEDA17 /* ModelPricingTests.swift */,
@@ -667,6 +684,7 @@
 		F742507F177D260FFECA176D /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AA40PANELSTATE0001 /* PanelState.swift */,
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				6B17BA2BAF5855E537D1C1D0 /* AnimationTheme.swift */,
 				E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */,
@@ -806,6 +824,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA40PANELSTATUS002 /* PanelStatusView.swift in Sources */,
+				AA40PANELSTATE0002 /* PanelState.swift in Sources */,
 				DCECAC1B3A4EEA97415FC579 /* AboutPane.swift in Sources */,
 				DDE1EB2EC7A1FBCF494362FC /* AddPanelPopover.swift in Sources */,
 				4DBBE21D70D7916D7F2DC175 /* AnimationStateMapper.swift in Sources */,
@@ -929,6 +949,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */,
+				AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */,
+				AA40PSNAPHARN00002 /* PanelSnapshotHarness.swift in Sources */,
+				AA40PSTATETEST0002 /* PanelStateTests.swift in Sources */,
 				B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */,
 				11722D0924027C0E6C2E6628 /* ClaudeAuthReaderTests.swift in Sources */,
 				4D1811384018CA0358835E59 /* ConnectionManagerTests.swift in Sources */,

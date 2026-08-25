@@ -6,9 +6,14 @@ import SwiftUI
 struct PanelContainerView<Content: View>: View {
     let title: String
     let isEditing: Bool
-    var dataState: PanelDataState?
+    /// What the panel is showing. `nil` for a panel that manages its own
+    /// content entirely (a row header), which is why this is optional rather
+    /// than defaulting to `.idle`.
+    var state: PanelState?
     let onDelete: () -> Void
     let onEdit: () -> Void
+    /// Re-runs this panel's query. Only `.failed` offers it.
+    var onRetry: (() -> Void)?
     /// Inspect is available whether or not the dashboard is in edit mode: the
     /// question it answers ("where did this number come from?") is asked while
     /// READING a dashboard, not while building one.
@@ -20,17 +25,19 @@ struct PanelContainerView<Content: View>: View {
     init(
         title: String,
         isEditing: Bool,
-        dataState: PanelDataState? = nil,
+        state: PanelState? = nil,
         onDelete: @escaping () -> Void,
         onEdit: @escaping () -> Void,
+        onRetry: (() -> Void)? = nil,
         onInspect: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.isEditing = isEditing
-        self.dataState = dataState
+        self.state = state
         self.onDelete = onDelete
         self.onEdit = onEdit
+        self.onRetry = onRetry
         self.onInspect = onInspect
         self.content = content()
     }
@@ -47,6 +54,12 @@ struct PanelContainerView<Content: View>: View {
 
                 Text(title)
                     .font(.system(size: DS.Dashboard.panelTitleFont, weight: .semibold))
+                    // Named, not inherited. A `Text` that states no colour
+                    // takes it from the AppKit drawing appearance rather than
+                    // from the SwiftUI colour scheme, so under a forced scheme
+                    // — a snapshot, a preview, a window mid-appearance-change —
+                    // the title drew black on a dark card.
+                    .foregroundStyle(Color.primary)
 
                 Spacer()
 
@@ -95,19 +108,33 @@ struct PanelContainerView<Content: View>: View {
                 .fill(Color.primary.opacity(0.1))
                 .frame(height: 0.5)
 
-            // Content — with centralized data state handling
-            if let state = dataState {
+            // Content — one branch per state (contract R3). These used to be
+            // three: idle, loading and loaded shared a branch and drew the
+            // content regardless, so "nothing yet", "nothing here" and
+            // "on its way" were the same empty rectangle.
+            if let state {
                 switch state {
-                case .idle, .loading, .loaded:
-                    // Always show panel frame; content renders empty chart if no data yet
+                case .loaded:
                     content
-                case .error(let message):
-                    ContentUnavailableView(
-                        L.tr("오류", "Error"),
-                        systemImage: "exclamationmark.triangle",
-                        description: Text(message)
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .loading(hasPrevious: true):
+                    // The previous result stays on screen, dimmed, with the
+                    // progress marker in the corner. Clearing it made every
+                    // time-range change flash the whole dashboard blank, which
+                    // reads as a fault rather than as a refresh.
+                    content
+                        .opacity(0.45)
+                        .allowsHitTesting(false)
+                        .overlay(alignment: .topTrailing) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .padding(DS.xs)
+                        }
+                        .accessibilityLabel(
+                            L.tr("이전 결과 — 새로 불러오는 중",
+                                 "Previous result — refreshing")
+                        )
+                case .idle, .loading(hasPrevious: false), .empty, .failed:
+                    PanelStatusView(state: state, onRetry: onRetry)
                 }
             } else {
                 content

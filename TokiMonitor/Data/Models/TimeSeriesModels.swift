@@ -149,14 +149,18 @@ struct TimeSeriesData {
 
 enum PanelDataState {
     case idle
-    case loading(previous: TimeSeriesData?)
+    /// A refresh is in flight. It carries BOTH previous shapes: a panel whose
+    /// datasource serves frames and no legacy points would otherwise look
+    /// empty for the duration of every refresh, which is the blink that
+    /// keeping the previous result exists to prevent.
+    case loading(previous: TimeSeriesData?, previousFrames: FrameSet?)
     case loaded(TimeSeriesData, frames: FrameSet)
     case error(String)
 
     var timeSeriesData: TimeSeriesData? {
         switch self {
         case .loaded(let data, _): return data
-        case .loading(let prev): return prev
+        case .loading(let prev, _): return prev
         default: return nil
         }
     }
@@ -165,8 +169,11 @@ enum PanelDataState {
     /// and, later, transformations can read the labelled data while renderers
     /// still consume `timeSeriesData`.
     var frames: FrameSet? {
-        if case let .loaded(_, frames) = self { return frames }
-        return nil
+        switch self {
+        case .loaded(_, let frames): return frames
+        case .loading(_, let frames): return frames
+        default: return nil
+        }
     }
 
     var isLoading: Bool {

@@ -192,26 +192,17 @@ struct PanelEditorVisualizationTab: View {
         }
     }
 
+    /// The colour-mode and graph-mode pickers used to live here. Neither
+    /// reached the render — a stat card is a number and a subtitle, with no
+    /// sparkline to switch on and no threshold colouring to apply — so under
+    /// contract R1 they are not offered. They will come back with the
+    /// threshold work that gives them something to do.
     private var statOptions: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(L.tr("색상 모드", "Color mode"))
-                .font(.subheadline.bold())
-            Picker("", selection: $panel.options.colorMode) {
-                ForEach(PanelDisplayOptions.ColorMode.allCases, id: \.rawValue) { mode in
-                    Text(mode.displayName).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            Text(L.tr("그래프 모드", "Graph mode"))
-                .font(.subheadline.bold())
-            Picker("", selection: $panel.options.graphMode) {
-                ForEach(PanelDisplayOptions.GraphMode.allCases, id: \.rawValue) { mode in
-                    Text(mode.displayName).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-        }
+        Text(L.tr("스탯 패널의 표시는 단위와 소수 자릿수로 정합니다 — 옵션 탭에 있습니다.",
+                  "A stat panel is styled by its unit and decimals, on the Options tab."))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var timeSeriesOptions: some View {
@@ -265,7 +256,26 @@ struct PanelEditorVisualizationTab: View {
     }
 
     private var gaugeOptions: some View {
-        Toggle(L.tr("임계값 표시", "Show thresholds"), isOn: $panel.options.showThresholdMarkers)
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(L.tr("임계값 밴드 표시", "Show threshold bands"),
+                   isOn: $panel.options.showThresholdMarkers)
+
+            // A dial with no stated ends is decoration. Left blank the panel
+            // derives them — from the thresholds, or from a round ceiling
+            // above the value — and prints whichever it used under the arc.
+            HStack {
+                Text(L.tr("최소", "Min"))
+                    .font(.caption)
+                    .frame(width: 40, alignment: .leading)
+                TextField(L.tr("0", "0"), value: $panel.options.gaugeMin, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                Text(L.tr("최대", "Max"))
+                    .font(.caption)
+                    .frame(width: 40, alignment: .trailing)
+                TextField(L.tr("자동", "auto"), value: $panel.options.gaugeMax, format: .number)
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
     }
 
     /// A continuous measure has a different value in every sample, so merging
@@ -314,14 +324,19 @@ struct PanelEditorOptionsTab: View {
             Text(L.tr("단위", "Unit"))
                 .font(.subheadline.bold())
 
-            TextField(
-                L.tr("예: tokens, $, %", "e.g. tokens, $, %"),
-                text: Binding(
-                    get: { panel.options.unit ?? "" },
-                    set: { panel.options.unit = $0.isEmpty ? nil : $0 }
-                )
-            )
-            .textFieldStyle(.roundedBorder)
+            // Was a free-text field. Anything the formatter did not recognise
+            // fell through to a default that ignored it, so "$" or "토큰"
+            // typed by hand changed nothing — the failure R1 exists to stop.
+            Picker("", selection: Binding(
+                get: { panel.options.unit ?? "" },
+                set: { panel.options.unit = $0.isEmpty ? nil : $0 }
+            )) {
+                Text(L.tr("기본", "Default")).tag("")
+                ForEach(FieldFormatter.knownUnits, id: \.id) { unit in
+                    Text(unit.label).tag(unit.id)
+                }
+            }
+            .pickerStyle(.menu)
 
             HStack {
                 Text(L.tr("소수점 자릿수", "Decimals"))
@@ -332,8 +347,21 @@ struct PanelEditorOptionsTab: View {
                     .frame(width: 60)
             }
 
-            Divider()
+            if honoursThresholds {
+                Divider()
+                thresholdEditor
+            }
+        }
+    }
 
+    /// Thresholds colour a gauge's bands and a state timeline's spans. Nothing
+    /// else reads them yet, so nothing else offers them (contract R1).
+    private var honoursThresholds: Bool {
+        panel.panelType == .gauge || panel.panelType == .stateTimeline
+    }
+
+    private var thresholdEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text(L.tr("임계값", "Thresholds"))
                 .font(.subheadline.bold())
 
