@@ -48,29 +48,33 @@ struct TimeSeriesChartView: View {
         // The legend is drawn beside the chart rather than by it: Swift Charts'
         // own legend cannot be clicked, and clicking it is the whole point
         // (contract R7).
+        // Resolved once per render and handed down. Read as a computed property
+        // it would re-run the panel's whole pipeline for every series the
+        // colour scale asks about.
+        let styles = self.styles
         switch legendPlacement {
         case .none:
-            chartBody
+            chartBody(styles: styles)
         case .bottom:
             VStack(spacing: DS.xs) {
-                chartBody
-                legend
+                chartBody(styles: styles)
+                legend(styles: styles)
             }
         case .trailing:
             HStack(alignment: .center, spacing: DS.sm) {
-                chartBody
-                legend.frame(maxWidth: 140)
+                chartBody(styles: styles)
+                legend(styles: styles).frame(maxWidth: 140)
             }
         }
     }
 
-    private var chartBody: some View {
+    private func chartBody(styles: [String: FieldDisplayConfig]) -> some View {
         chart
             .chartLegend(.hidden)
             .chartForegroundStyleScale { (model: String) in
-                self.color(for: model)
+                self.color(for: model, styles: styles)
             }
-            .modifier(YAxisDomain(range: pinnedYDomain))
+            .modifier(YAxisDomain(range: pinnedYDomain(styles: styles)))
             .chartXAxis {
                 AxisMarks(preset: .aligned, values: .automatic) { _ in
                     AxisGridLine()
@@ -95,7 +99,7 @@ struct TimeSeriesChartView: View {
             }
             .overlay(alignment: .topLeading) {
                 if showsTooltip, let hoveredDate {
-                    tooltipView(date: hoveredDate)
+                    tooltipView(date: hoveredDate, styles: styles)
                         .offset(x: max(8, min(hoverX - 80, plotWidth - 170)), y: 4)
                 }
             }
@@ -199,11 +203,11 @@ struct TimeSeriesChartView: View {
 
     /// Every series the panel would draw, hidden ones included — a legend
     /// missing its own hidden entries could not bring them back.
-    private var legend: some View {
+    private func legend(styles: [String: FieldDisplayConfig]) -> some View {
         PanelLegendView(
             entries: PanelSeries.seriesNames(metric: metric, panel: panel,
                                              frames: frames, data: data)
-                .map { .init(name: $0, color: color(for: $0)) },
+                .map { .init(name: $0, color: color(for: $0, styles: styles)) },
             hidden: hiddenSeries,
             position: options.legendPosition,
             onToggle: { name in
@@ -233,7 +237,8 @@ struct TimeSeriesChartView: View {
     /// A series' colour: the override's, when one names it, else the shared
     /// model palette — so a model keeps one colour across every panel that did
     /// not deliberately say otherwise.
-    private func color(for series: String) -> Color {
+    private func color(for series: String,
+                       styles: [String: FieldDisplayConfig]) -> Color {
         DS.seriesColor(styles[series]?.color) ?? viewModel.colorForModel(series)
     }
 
@@ -243,7 +248,7 @@ struct TimeSeriesChartView: View {
     /// A half-stated range is completed from the data rather than from zero: a
     /// reader who wrote only a maximum meant "cap the top", not "and start at
     /// whatever you like".
-    private var pinnedYDomain: ClosedRange<Double>? {
+    private func pinnedYDomain(styles: [String: FieldDisplayConfig]) -> ClosedRange<Double>? {
         let bounds = styles.values
         let low = bounds.compactMap(\.min).min()
         let high = bounds.compactMap(\.max).max()
@@ -256,7 +261,8 @@ struct TimeSeriesChartView: View {
     }
 
     /// A value in the unit its own series was given.
-    private func format(_ value: Double, series: String) -> String {
+    private func format(_ value: Double, series: String,
+                        styles: [String: FieldDisplayConfig]) -> String {
         if let config = styles[series], !config.isEmpty {
             return FieldFormatter.format(value, config: config)
         }
@@ -401,7 +407,8 @@ struct TimeSeriesChartView: View {
         return [nearest]
     }
 
-    private func tooltipView(date: Date) -> some View {
+    private func tooltipView(date: Date,
+                             styles: [String: FieldDisplayConfig]) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(date, format: .dateTime.month(.defaultDigits).day(.defaultDigits).hour(.defaultDigits(amPM: .abbreviated)).minute(.twoDigits))
                 .font(.system(size: DS.fontTiny, weight: .semibold))
@@ -409,13 +416,13 @@ struct TimeSeriesChartView: View {
             ForEach(tooltipRows(date: date), id: \.model) { row in
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(color(for: row.model))
+                        .fill(color(for: row.model, styles: styles))
                         .frame(width: 6, height: 6)
                     Text(row.model)
                         .font(.system(size: 9))
                         .lineLimit(1)
                     Spacer()
-                    Text(format(row.value, series: row.model))
+                    Text(format(row.value, series: row.model, styles: styles))
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                 }
             }

@@ -31,23 +31,27 @@ struct BarChartPanelView: View {
         // Same arrangement as the time series: the legend is ours, because a
         // legend that cannot be clicked is not the series control the contract
         // asks for (R7).
+        // Resolved once per render and handed down. Read as a computed property
+        // it would re-run the panel's whole pipeline for every series the
+        // colour scale asks about.
+        let styles = self.styles
         switch legendPlacement {
         case .none:
-            chartBody
+            chartBody(styles: styles)
         case .bottom:
             VStack(spacing: DS.xs) {
-                chartBody
-                legend
+                chartBody(styles: styles)
+                legend(styles: styles)
             }
         case .trailing:
             HStack(alignment: .center, spacing: DS.sm) {
-                chartBody
-                legend.frame(maxWidth: 140)
+                chartBody(styles: styles)
+                legend(styles: styles).frame(maxWidth: 140)
             }
         }
     }
 
-    private var chartBody: some View {
+    private func chartBody(styles: [String: FieldDisplayConfig]) -> some View {
         let bucketSecs = viewModel.dashboardConfig.time.bucketSeconds
         return Chart {
             ForEach(modelData, id: \.model) { entry in
@@ -61,7 +65,7 @@ struct BarChartPanelView: View {
             }
         }
         .chartForegroundStyleScale { (model: String) in
-            self.color(for: model)
+            self.color(for: model, styles: styles)
         }
         .chartXAxis {
             AxisMarks(preset: .aligned, values: .automatic) { _ in
@@ -116,8 +120,8 @@ struct BarChartPanelView: View {
                     modelData: modelData,
                     bucketSecs: bucketSecs,
                     mode: options.tooltipMode,
-                    colorForModel: { color(for: $0) },
-                    formatValue: { format($0, series: $1) },
+                    colorForModel: { color(for: $0, styles: styles) },
+                    formatValue: { format($0, series: $1, styles: styles) },
                     formatDate: { formatBarDate($0) }
                 )
             }
@@ -141,11 +145,11 @@ struct BarChartPanelView: View {
         return options.legendPosition == .right ? .trailing : .bottom
     }
 
-    private var legend: some View {
+    private func legend(styles: [String: FieldDisplayConfig]) -> some View {
         PanelLegendView(
             entries: PanelSeries.seriesNames(metric: panel.effectiveMetric, panel: panel,
                                              frames: frames, data: data)
-                .map { .init(name: $0, color: color(for: $0)) },
+                .map { .init(name: $0, color: color(for: $0, styles: styles)) },
             hidden: hiddenSeries,
             position: options.legendPosition,
             onToggle: { viewModel.toggleSeries($0, panelID: panel.id) }
@@ -162,13 +166,15 @@ struct BarChartPanelView: View {
 
     /// The override's colour when one names this series, else the shared model
     /// palette — so a model keeps one colour across panels.
-    private func color(for series: String) -> Color {
+    private func color(for series: String,
+                       styles: [String: FieldDisplayConfig]) -> Color {
         DS.seriesColor(styles[series]?.color) ?? viewModel.colorForModel(series)
     }
 
     /// A bar's value in the unit its own series was given. The tooltip printed
     /// a bare integer before, so a cost series read "3" for three dollars.
-    private func format(_ value: Double, series: String) -> String {
+    private func format(_ value: Double, series: String,
+                        styles: [String: FieldDisplayConfig]) -> String {
         if let config = styles[series], !config.isEmpty {
             return FieldFormatter.format(value, config: config)
         }
