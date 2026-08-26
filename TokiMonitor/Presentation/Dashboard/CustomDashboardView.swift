@@ -162,6 +162,16 @@ struct CustomDashboardView: View {
         ) {
             panelContent(for: panel)
         }
+        // 계약 C5. One panel, as JSON, for pasting into another dashboard.
+        // This is what stands in for library panels.
+        .contextMenu {
+            Button {
+                viewModel.copyPanelJSON(panel)
+            } label: {
+                Label(L.tr("패널을 JSON으로 복사", "Copy Panel as JSON"),
+                      systemImage: "doc.on.doc")
+            }
+        }
     }
 
     /// What this panel is showing. The fetch layer reports whether the query

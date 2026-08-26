@@ -367,74 +367,69 @@ final class DashboardConfigStore {
 
     // MARK: - JSON File Import/Export
 
-    func exportToFile(_ config: DashboardConfig) {
+    /// Write a dashboard to a file the user picks.
+    ///
+    /// The save panel carries the disclosure: the export holds no results and
+    /// no usage figures, but query strings are the user's own words and often
+    /// name their projects and models (계약 C3).
+    @discardableResult
+    func exportToFile(_ config: DashboardConfig) -> Bool {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "\(config.title).json"
         panel.title = L.tr("대시보드 내보내기", "Export Dashboard")
+        panel.message = DashboardExchange.exportDisclosure
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
 
         do {
             let data = try config.exportJSON()
             try data.write(to: url)
+            lastExportError = nil
+            return true
         } catch {
-            // Error handled silently — could add alert later
+            // Writing nothing and saying nothing is how a user comes back next
+            // week to a file that was never there.
+            lastExportError = L.tr(
+                "'\(url.lastPathComponent)'에 내보내지 못했습니다: \(error.localizedDescription)",
+                "Could not export to '\(url.lastPathComponent)': \(error.localizedDescription)"
+            )
+            return false
         }
     }
 
-    func importFromFile() -> DashboardConfig? {
+    /// Set when `exportToFile` fails; nil after a success or a cancel.
+    private(set) var lastExportError: String?
+
+    /// Ask for a file and return its bytes. Decoding is the caller's, because
+    /// the caller is the one that shows the reader what is in it before adding
+    /// it (계약 C4).
+    ///
+    /// `nil` with `lastImportError` set means the file could not be read; `nil`
+    /// with it cleared means the user pressed Cancel. Those are different, and
+    /// a bare `nil` could not tell them apart.
+    func chooseImportFile() -> Data? {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
         panel.title = L.tr("대시보드 가져오기", "Import Dashboard")
 
+        lastImportError = nil
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
 
         do {
-            let data = try Data(contentsOf: url)
-            return try DashboardConfig.importJSON(data)
+            return try Data(contentsOf: url)
         } catch {
-            // A malformed file must not look like "user pressed Cancel". The
-            // caller cannot tell those apart from a bare nil, so the reason
-            // surfaces here.
-            lastImportError = Self.describeImportFailure(error, url: url)
+            lastImportError = L.tr(
+                "\(url.lastPathComponent): \(error.localizedDescription)",
+                "\(url.lastPathComponent): \(error.localizedDescription)"
+            )
             return nil
         }
     }
 
-    /// Set when `importFromFile` fails; nil after a success or a cancel.
+    /// Set when `chooseImportFile` fails; nil after a success or a cancel.
     private(set) var lastImportError: String?
-
-    private static func describeImportFailure(_ error: Error, url: URL) -> String {
-        let name = url.lastPathComponent
-        if let decoding = error as? DecodingError {
-            switch decoding {
-            case let .keyNotFound(key, ctx):
-                return L.tr("\(name): 필수 항목 '\(key.stringValue)'이 없습니다 (\(Self.path(ctx)))",
-                            "\(name): missing required field '\(key.stringValue)' at \(Self.path(ctx))")
-            case let .typeMismatch(_, ctx):
-                return L.tr("\(name): 형식이 맞지 않습니다 (\(Self.path(ctx)))",
-                            "\(name): type mismatch at \(Self.path(ctx))")
-            case let .valueNotFound(_, ctx):
-                return L.tr("\(name): 값이 비어 있습니다 (\(Self.path(ctx)))",
-                            "\(name): null where a value is required at \(Self.path(ctx))")
-            case .dataCorrupted:
-                return L.tr("\(name): JSON을 읽을 수 없습니다", "\(name): not valid JSON")
-            @unknown default:
-                return L.tr("\(name): 불러오기 실패", "\(name): import failed")
-            }
-        }
-        return L.tr("\(name): \(error.localizedDescription)", "\(name): \(error.localizedDescription)")
-    }
-
-    /// "panels[2].targets[0].metric" — a path the user can act on, rather than
-    /// Swift's default coding-key dump.
-    private static func path(_ ctx: DecodingError.Context) -> String {
-        ctx.codingPath.map { $0.intValue.map { "[\($0)]" } ?? ".\($0.stringValue)" }
-            .joined()
-            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
-    }
 
     // MARK: - Default Layout (24-column grid)
 

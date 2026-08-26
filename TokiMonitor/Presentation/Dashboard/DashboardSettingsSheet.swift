@@ -653,6 +653,14 @@ struct DashboardSettingsSheet: View {
                 .buttonStyle(.plain)
             }
 
+            // What is in this JSON, and what is not (계약 C3). Shown beside the
+            // text rather than behind a confirmation, because the text is
+            // already on screen and already selectable.
+            Text(DashboardExchange.exportDisclosure)
+                .font(.caption)
+                .foregroundStyle(Color.primary.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
+
             ScrollView {
                 Text(jsonString)
                     .font(.system(.caption, design: .monospaced))

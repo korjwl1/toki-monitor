@@ -130,6 +130,26 @@ enum VariableResolver {
         return (rewrite.query, rewrite.appliedFilters)
     }
 
+    /// Every variable name a template refers to, in any of the three forms
+    /// interpolation accepts: `$name`, `${name}`, `${name:format}`.
+    ///
+    /// Built-ins (`$__interval`, `$__all`, …) are left out: they are provided by
+    /// the renderer, not by the dashboard, so a target that lacks them is not
+    /// missing anything.
+    static func referencedVariableNames(in template: String) -> Set<String> {
+        let pattern = "\\$\\{?([A-Za-z_][A-Za-z0-9_]*)(?::[A-Za-z]+)?\\}?"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(template.startIndex..., in: template)
+        var names: Set<String> = []
+        for match in regex.matches(in: template, range: range) {
+            guard let r = Range(match.range(at: 1), in: template) else { continue }
+            let name = String(template[r])
+            if name.hasPrefix("__") { continue }
+            names.insert(name)
+        }
+        return names
+    }
+
     /// Every ad hoc filter on the dashboard, in variable order.
     ///
     /// Applied after substitution rather than before, so a filter value that

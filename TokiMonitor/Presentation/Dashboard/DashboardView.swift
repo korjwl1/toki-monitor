@@ -16,6 +16,9 @@ struct DashboardView: View {
     @State private var editableDashboardList: [DashboardConfig] = []
     @State private var dashboardToDelete: DashboardConfig?
     @State private var isEditingTitle = false
+    /// The clipboard is an export too. Copying asks first, for the same reason
+    /// the save panel says it (계약 C3).
+    @State private var showCopyDisclosure = false
     @State private var preEditConfig: DashboardConfig?
 
     enum SidebarItem: Hashable {
@@ -49,6 +52,29 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showAnnotationList) {
                 AnnotationListSheet(viewModel: viewModel)
+            }
+            .sheet(item: $viewModel.pendingImport) { pending in
+                DashboardImportSheet(
+                    pending: pending,
+                    existingTitle: pending.conflictsWithTitle,
+                    onCancel: { viewModel.cancelPendingImport() },
+                    onAdd: { viewModel.confirmPendingImport($0) }
+                )
+            }
+            .confirmationDialog(
+                L.tr("JSON 복사", "Copy JSON"),
+                isPresented: $showCopyDisclosure,
+                titleVisibility: .visible
+            ) {
+                Button(L.tr("복사", "Copy")) {
+                    if let json = try? viewModel.dashboardConfig.exportJSONString() {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(json, forType: .string)
+                    }
+                }
+                Button(L.dash.cancel, role: .cancel) {}
+            } message: {
+                Text(DashboardExchange.exportDisclosure)
             }
             .alert(
                 L.tr("대시보드 삭제", "Delete Dashboard"),
@@ -254,6 +280,7 @@ struct DashboardView: View {
             // -page message would cost the user more than the message is worth.
             if viewModel.isReadOnlyDashboard { readOnlyNotice }
             if let failure = viewModel.saveFailure { saveFailureNotice(failure) }
+            if let paste = viewModel.panelPasteNotice { panelPasteNotice(paste) }
 
             // Main content — always show panel layout, panels handle empty state internally
             Group {
@@ -512,6 +539,27 @@ struct DashboardView: View {
         noticeBar(symbol: "exclamationmark.triangle.fill", tint: .orange, text: reason)
     }
 
+    /// 계약 C5. A pasted panel that names a variable this dashboard lacks came
+    /// in anyway; the reader is told which one so they can add it.
+    private func panelPasteNotice(_ reason: String) -> some View {
+        HStack(spacing: DS.xs) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(reason)
+                .foregroundStyle(Color.primary.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button(L.tr("닫기", "Dismiss")) { viewModel.panelPasteNotice = nil }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+        }
+        .font(.system(size: DS.fontCaption))
+        .padding(.horizontal, 16)
+        .padding(.vertical, DS.xs)
+        .background(.quaternary.opacity(0.5))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(reason)
+    }
+
     private func noticeBar(symbol: String, tint: Color, text: String) -> some View {
         HStack(spacing: DS.xs) {
             Image(systemName: symbol)
@@ -663,16 +711,27 @@ struct DashboardView: View {
                 Label(L.tr("JSON 가져오기", "Import JSON"), systemImage: "square.and.arrow.down")
             }
 
+            Button {
+                viewModel.importDashboardFromClipboard()
+            } label: {
+                Label(L.tr("클립보드에서 가져오기", "Import from Clipboard"),
+                      systemImage: "doc.on.clipboard")
+            }
+
             Divider()
 
             Button {
-                if let json = try? viewModel.dashboardConfig.exportJSONString() {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(json, forType: .string)
-                }
+                showCopyDisclosure = true
             } label: {
-                Label(L.tr("JSON 복사", "Copy JSON"), systemImage: "doc.on.clipboard")
+                Label(L.tr("JSON 복사", "Copy JSON"), systemImage: "doc.on.doc")
             }
+
+            Button {
+                viewModel.pastePanelFromClipboard()
+            } label: {
+                Label(L.tr("패널 붙여넣기", "Paste Panel"), systemImage: "rectangle.badge.plus")
+            }
+            .disabled(viewModel.isReadOnlyDashboard)
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: DS.fontCaption))

@@ -30,6 +30,7 @@
 		AA03PERIODAGG0000002 /* PeriodAggregation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PERIODAGG0000001 /* PeriodAggregation.swift */; };
 		AA03ACCTSHAPE0000002 /* AccountShape.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03ACCTSHAPE0000001 /* AccountShape.swift */; };
 		062AE52FA18F6C3C5811BC25 /* DashboardConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617E28351290F97E1B3742F0 /* DashboardConfigStore.swift */; };
+		AA80EXCHANGE00000002 /* DashboardExchange.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80EXCHANGE00000001 /* DashboardExchange.swift */; };
 		0AD59AAAF77D174E97E09FF8 /* MenuContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B1AC7C10926C1E37F7B0FF /* MenuContentView.swift */; };
 		0C102E5047654E452890DC1C /* frame_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 0C1FFE59530A1D2FC18F1651 /* frame_00.png */; };
 		AA20INSPECT0000000002 /* PanelInspectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA20INSPECT0000000001 /* PanelInspectSheet.swift */; };
@@ -123,6 +124,7 @@
 		B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */; };
 		BCE0DA81930B1736E9AB03A5 /* TokenFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B278895C8F3233433F88309 /* TokenFormatter.swift */; };
 		BD0727E1C8B4DA7BCB2CBFD4 /* DashboardSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB0CA29129542559BD4F7E3 /* DashboardSettingsSheet.swift */; };
+		AA80IMPORTSHEET00002 /* DashboardImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80IMPORTSHEET00001 /* DashboardImportSheet.swift */; };
 		C061672690CF6BA1C307A0E5 /* CodexUsageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5903B69CBE449DB610E31F63 /* CodexUsageMonitor.swift */; };
 		C1BD1342749879F37A5F8675 /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3126EF202F535714BFCD4F20 /* ExploreView.swift */; };
 		C33D79DB96B18D96790274FE /* DashboardWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530B806F812350D8094AA0EC /* DashboardWindow.swift */; };
@@ -144,6 +146,7 @@
 		AA35STTLTEST0000002 /* StateTimelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35STTLTEST0000001 /* StateTimelineTests.swift */; };
 		AA35SUGGTEST0000002 /* PromQLSuggesterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35SUGGTEST0000001 /* PromQLSuggesterTests.swift */; };
 		AA35STORETEST000002 /* DashboardConfigStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA35STORETEST000001 /* DashboardConfigStoreTests.swift */; };
+		AA80EXCHTEST00000002 /* DashboardExchangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80EXCHTEST00000001 /* DashboardExchangeTests.swift */; };
 		AA33FIELDTEST00000002 /* FieldSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA33FIELDTEST00000001 /* FieldSelectionTests.swift */; };
 		AA31TRANSTEST00000002 /* TransformationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA31TRANSTEST00000001 /* TransformationTests.swift */; };
 		CC0857BF78965AF7CCC554E8 /* WindowStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */; };
@@ -237,6 +240,7 @@
 		1A83167497A1EE039A2B2494 /* TokiMonitorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiMonitorApp.swift; sourceTree = "<group>"; };
 		1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterAnimationView.swift; sourceTree = "<group>"; };
 		1CB0CA29129542559BD4F7E3 /* DashboardSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSettingsSheet.swift; sourceTree = "<group>"; };
+		AA80IMPORTSHEET00001 /* DashboardImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardImportSheet.swift; sourceTree = "<group>"; };
 		1DC4403CA1CEB595A2E79560 /* TokiWindowsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiWindowsClient.swift; sourceTree = "<group>"; };
 		23B4788B94701C007A8F796E /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		2419FCCD7EDF135528C44ACD /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
@@ -268,6 +272,7 @@
 		5D82D563F2B758C1208E987E /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		6045F68DCAE8A0E620C714FA /* DatasourceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourceStore.swift; sourceTree = "<group>"; };
 		617E28351290F97E1B3742F0 /* DashboardConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfigStore.swift; sourceTree = "<group>"; };
+		AA80EXCHANGE00000001 /* DashboardExchange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExchange.swift; sourceTree = "<group>"; };
 		61DDA70E53ACA059A333371E /* frame_04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_04.png; sourceTree = "<group>"; };
 		6576E137DF2FCFE73BE66102 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		689790D76D5DEE3F14EB819D /* AppIcon_1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIcon_1024.png; sourceTree = "<group>"; };
@@ -306,6 +311,7 @@
 		AA35STTLTEST0000001 /* StateTimelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateTimelineTests.swift; sourceTree = "<group>"; };
 		AA35SUGGTEST0000001 /* PromQLSuggesterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromQLSuggesterTests.swift; sourceTree = "<group>"; };
 		AA35STORETEST000001 /* DashboardConfigStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardConfigStoreTests.swift; sourceTree = "<group>"; };
+		AA80EXCHTEST00000001 /* DashboardExchangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardExchangeTests.swift; sourceTree = "<group>"; };
 		AA33FIELDTEST00000001 /* FieldSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldSelectionTests.swift; sourceTree = "<group>"; };
 		AA31TRANSTEST00000001 /* TransformationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransformationTests.swift; sourceTree = "<group>"; };
 		931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStatsTests.swift; sourceTree = "<group>"; };
@@ -536,6 +542,7 @@
 				8A5104A31D681EDBBBFC0C0E /* DashboardCustomLayout.swift */,
 				77B9855FE6D408AAA8CF6F61 /* DashboardGridLayout.swift */,
 				1CB0CA29129542559BD4F7E3 /* DashboardSettingsSheet.swift */,
+				AA80IMPORTSHEET00001 /* DashboardImportSheet.swift */,
 				D8FB627746EE1DECBC2CBA2C /* DashboardToolbar.swift */,
 				3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */,
 				23B4788B94701C007A8F796E /* DashboardViewModel.swift */,
@@ -665,6 +672,7 @@
 				AA35STTLTEST0000001 /* StateTimelineTests.swift */,
 				AA35SUGGTEST0000001 /* PromQLSuggesterTests.swift */,
 				AA35STORETEST000001 /* DashboardConfigStoreTests.swift */,
+				AA80EXCHTEST00000001 /* DashboardExchangeTests.swift */,
 				AA02PANELNORM00000000001 /* PanelNormalizationTests.swift */,
 			);
 			path = Domain;
@@ -764,6 +772,7 @@
 				5903B69CBE449DB610E31F63 /* CodexUsageMonitor.swift */,
 				0103BDEAC6066E0274029149 /* ConnectionManager.swift */,
 				617E28351290F97E1B3742F0 /* DashboardConfigStore.swift */,
+				AA80EXCHANGE00000001 /* DashboardExchange.swift */,
 				DD104D8D23446C055623FC7D /* DashboardVersionStore.swift */,
 				DA62A18D444F7F8A7D39F9B6 /* Localization.swift */,
 				7368908C5687B4CB8281CE2C /* ModelPricing.swift */,
@@ -930,6 +939,7 @@
 				99C01AFD6FFFB72644AD3DEB /* CustomDashboardView.swift in Sources */,
 				1DF5998FCB1A3274BCB95F2A /* DashboardConfig.swift in Sources */,
 				062AE52FA18F6C3C5811BC25 /* DashboardConfigStore.swift in Sources */,
+				AA80EXCHANGE00000002 /* DashboardExchange.swift in Sources */,
 				FFD77509DEB84844ECD8160D /* DashboardCustomLayout.swift in Sources */,
 				1737EF77B92E5AA23529AFC2 /* DashboardEditOverlay.swift in Sources */,
 				19B6898855A3D644A90C6F70 /* DashboardExtensions.swift in Sources */,
@@ -938,6 +948,7 @@
 				EC7E072D4B8145B6FFB1942B /* DashboardMigrator.swift in Sources */,
 				D38B80ADCF36C11E8E64C488 /* DashboardModel+Display.swift in Sources */,
 				BD0727E1C8B4DA7BCB2CBFD4 /* DashboardSettingsSheet.swift in Sources */,
+				AA80IMPORTSHEET00002 /* DashboardImportSheet.swift in Sources */,
 				A673F7E773850A93FABC17EE /* DashboardToolbar.swift in Sources */,
 				125A70F9AEFAEA35D938E593 /* DashboardVersionStore.swift in Sources */,
 				F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */,
@@ -1073,6 +1084,7 @@
 				AA35STTLTEST0000002 /* StateTimelineTests.swift in Sources */,
 				AA35SUGGTEST0000002 /* PromQLSuggesterTests.swift in Sources */,
 				AA35STORETEST000002 /* DashboardConfigStoreTests.swift in Sources */,
+				AA80EXCHTEST00000002 /* DashboardExchangeTests.swift in Sources */,
 				AA02PANELNORM00000000002 /* PanelNormalizationTests.swift in Sources */,
 				AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */,
 				AA41QREFTEST001B /* QueryRefusalTests.swift in Sources */,

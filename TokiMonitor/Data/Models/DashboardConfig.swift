@@ -892,25 +892,24 @@ enum PanelMetric: String, Codable, CaseIterable {
 // MARK: - JSON Import/Export
 
 extension DashboardConfig {
-    /// Export dashboard as shareable JSON
+    /// Export dashboard as shareable JSON.
+    ///
+    /// Configuration only, plus the minimum versions needed to open it. The
+    /// serialisation itself lives in `DashboardExchange` so there is one
+    /// answer to "what leaves this machine" (계약 C3).
     func exportJSON() throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return try encoder.encode(self)
+        try DashboardExchange.exportData(self)
     }
 
     /// Export as JSON string
     func exportJSONString() throws -> String {
-        let data = try exportJSON()
-        return String(data: data, encoding: .utf8) ?? "{}"
+        try DashboardExchange.exportString(self)
     }
 
-    /// Import dashboard from JSON data
+    /// Import dashboard from JSON data, refusing a schema this build cannot
+    /// open with a reason that says what is missing (계약 C4).
     static func importJSON(_ data: Data) throws -> DashboardConfig {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        var config = try decoder.decode(DashboardConfig.self, from: data)
+        var config = try DashboardExchange.decode(data)
         // Generate new IDs to avoid conflicts
         config.id = UUID()
         config.uid = generateUID()

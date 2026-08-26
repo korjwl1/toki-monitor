@@ -1140,29 +1140,170 @@ final class DashboardViewModel {
         dashboardList = configStore.loadDashboardList()
     }
 
+    /// A document the reader has been shown but has not yet accepted.
+    ///
+    /// Adding a dashboard sight unseen is how someone ends up with a document
+    /// that names panels they did not want and a schema their build cannot
+    /// open. The bytes are held here until they say yes (계약 C4).
+    struct PendingImport: Identifiable {
+        let id = UUID()
+        var data: Data
+        var source: String
+        /// What is in it, when this build could read it.
+        var preview: DashboardExchange.Preview?
+        /// Why it cannot be added, when it cannot.
+        var refusal: String?
+        /// A dashboard already open under the same `uid`, if any. The reader
+        /// chooses between replacing it and keeping both.
+        var conflictsWithTitle: String?
+    }
+
+    var pendingImport: PendingImport?
+
+    /// Ask for a file, read it, and describe it. Nothing is added yet.
     func importDashboard() {
-        guard var imported = configStore.importFromFile() else {
-            // Distinguish a failed import from a cancelled one: the store sets
-            // a reason only for the former. Swallowing it made a malformed
-            // file look exactly like pressing Cancel.
-            if let reason = configStore.lastImportError {
-                errorMessage = reason
-            }
+        guard let data = configStore.chooseImportFile() else {
+            // A failed read and a cancel are not the same thing; the store sets
+            // a reason only for the former.
+            if let reason = configStore.lastImportError { errorMessage = reason }
             return
         }
         errorMessage = nil
-        // Migrate imported config and normalize each panel so plugin /
-        // queries envelopes are accurate (imports might originate from
-        // older exports or be hand-edited).
-        imported = DashboardMigrator.migrate(imported)
-        imported.panels = imported.panels.map { panel in
-            var p = panel
-            Self.normalizePanel(&p)
-            return p
+        pendingImport = makePendingImport(
+            data: data, source: L.tr("파일", "File")
+        )
+    }
+
+    /// Read a dashboard from the clipboard and describe it. Nothing is added
+    /// yet (계약 C4, T068).
+    func importDashboardFromClipboard() {
+        guard let text = NSPasteboard.general.string(forType: .string),
+              let data = text.data(using: .utf8), !text.isEmpty else {
+            errorMessage = L.tr("클립보드에 붙여넣을 텍스트가 없습니다.",
+                                "The clipboard has no text to paste.")
+            return
         }
-        dashboardConfig = imported
-        saveDashboard()
-        fetchData()
+        errorMessage = nil
+        pendingImport = makePendingImport(
+            data: data, source: L.tr("클립보드", "Clipboard")
+        )
+    }
+
+    private func makePendingImport(data: Data, source: String) -> PendingImport {
+        var pending = PendingImport(data: data, source: source)
+        do {
+            let preview = try DashboardExchange.preview(data)
+            pending.preview = preview
+            if !preview.isOpenableByThisBuild {
+                pending.refusal = DashboardExchange.message(for: .schemaTooNew(
+                    required: preview.schemaVersion,
+                    supported: DashboardMigrator.currentVersion,
+                    requiredAppVersion: preview.minAppVersion,
+                    thisAppVersion: DashboardExchange.currentAppVersion
+                ))
+            }
+            pending.conflictsWithTitle = dashboardList
+                .first { $0.uid == preview.uid }?.title
+        } catch let refusal as DashboardExchange.ImportRefusal {
+            pending.refusal = DashboardExchange.message(for: refusal)
+        } catch {
+            pending.refusal = DashboardExchange.describe(error)
+        }
+        return pending
+    }
+
+    /// How an import that collides with an existing `uid` is resolved.
+    enum ImportResolution { case addAsCopy, replaceExisting }
+
+    /// Accept the document the reader was shown.
+    func confirmPendingImport(_ resolution: ImportResolution = .addAsCopy) {
+        guard let pending = pendingImport, pending.refusal == nil else { return }
+        pendingImport = nil
+        do {
+            var imported = try DashboardExchange.decode(pending.data)
+            // Migrate imported config and normalize each panel so plugin /
+            // queries envelopes are accurate (imports might originate from
+            // older exports or be hand-edited).
+            imported = DashboardMigrator.migrate(imported)
+            imported.panels = imported.panels.map { panel in
+                var p = panel
+                Self.normalizePanel(&p)
+                return p
+            }
+            imported.version = 1
+            imported.id = UUID()
+            errorMessage = nil
+            switch resolution {
+            case .addAsCopy:
+                // A fresh uid, so whatever is already on disk under the
+                // document's own uid is left exactly as it was.
+                imported.uid = DashboardConfig.generateUID()
+                configStore.addDashboard(imported)
+            case .replaceExisting:
+                // Only reachable from the sheet, and only when the reader was
+                // shown the title of the dashboard being replaced.
+                configStore.updateDashboardInList(imported)
+            }
+            dashboardConfig = imported
+            configStore.activeDashboardUID = imported.uid
+            reloadDashboardList()
+            saveDashboard()
+            fetchData()
+        } catch let refusal as DashboardExchange.ImportRefusal {
+            errorMessage = DashboardExchange.message(for: refusal)
+        } catch {
+            errorMessage = DashboardExchange.describe(error)
+        }
+    }
+
+    func cancelPendingImport() { pendingImport = nil }
+
+    // MARK: - Panel exchange (계약 C5)
+
+    /// Put one panel on the clipboard as JSON. The substitute for library
+    /// panels, which are out of scope.
+    func copyPanelJSON(_ panel: PanelConfig) {
+        guard let json = try? DashboardExchange.panelJSON(panel) else {
+            errorMessage = L.tr("패널을 JSON으로 복사하지 못했습니다.",
+                                "Could not copy the panel as JSON.")
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(json, forType: .string)
+        panelPasteNotice = nil
+    }
+
+    /// What the last paste had to say — a missing-variable warning, or a
+    /// failure. Nil when there is nothing to report.
+    var panelPasteNotice: String?
+
+    /// Paste a panel from the clipboard into the open dashboard.
+    ///
+    /// A variable the panel names that this dashboard does not define is a
+    /// warning, not a refusal: the panel is pasted, the query keeps the
+    /// unresolved variable and renders as failed, and the reader can fix it by
+    /// adding the variable (계약 C5).
+    func pastePanelFromClipboard() {
+        guard let json = NSPasteboard.general.string(forType: .string), !json.isEmpty else {
+            panelPasteNotice = L.tr("클립보드에 붙여넣을 텍스트가 없습니다.",
+                                    "The clipboard has no text to paste.")
+            return
+        }
+        do {
+            let paste = try DashboardExchange.pastePanel(json: json, into: dashboardConfig)
+            addPanel(paste.panel)
+            panelPasteNotice = paste.missingVariables.isEmpty
+                ? nil
+                : DashboardExchange.missingVariableWarning(paste.missingVariables)
+            fetchData()
+        } catch let refusal as DashboardExchange.ImportRefusal {
+            panelPasteNotice = L.tr(
+                "붙여넣은 내용은 패널이 아닙니다 — \(DashboardExchange.message(for: refusal))",
+                "The pasted content is not a panel — \(DashboardExchange.message(for: refusal))"
+            )
+        } catch {
+            panelPasteNotice = DashboardExchange.describe(error)
+        }
     }
 
     // MARK: - Dashboard List
