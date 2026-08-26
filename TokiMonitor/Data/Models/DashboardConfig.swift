@@ -509,6 +509,16 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     /// resolves to exactly what it showed before.
     var fieldConfig: FieldConfigSource?
 
+    /// Steps run over this panel's frames before it draws them, in order.
+    ///
+    /// The pipeline and its six transformations have existed with tests since
+    /// the frame contract landed; what did not exist was anywhere to put the
+    /// user's own steps, so only the hardcoded preset path ever ran. Empty on
+    /// every panel that has not been given one, and omitted from the encoded
+    /// form when empty so dashboards written before this field re-encode
+    /// unchanged.
+    var transformations: [TransformationStep] = []
+
     /// Which field a visualization reads, and how it collapses it. Nil means
     /// "use the preset for `metric`", which is what every existing panel does.
     var fieldSelection: FieldSelection?
@@ -556,7 +566,7 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey, CaseIterable {
         case id, title, description, panelType, metric, gridPosition, targets
         case options, dataLinks, collapsed, plugin, queries, fieldConfig
-        case fieldSelection
+        case fieldSelection, transformations
         case `repeat`, repeatDirection
     }
 
@@ -641,6 +651,8 @@ extension PanelConfig {
         queries = try c.decodeIfPresent([Query].self, forKey: .queries)
         fieldConfig = try c.decodeIfPresent(FieldConfigSource.self, forKey: .fieldConfig)
         fieldSelection = try c.decodeIfPresent(FieldSelection.self, forKey: .fieldSelection)
+        transformations = try c.decodeIfPresent([TransformationStep].self,
+                                                forKey: .transformations) ?? []
         `repeat` = try c.decodeIfPresent(String.self, forKey: .repeat)
         repeatDirection = try c.decodeIfPresent(RepeatDirection.self, forKey: .repeatDirection)
         unknownFields = decoder.unknownFields(besides: Self.knownKeys)
@@ -662,6 +674,11 @@ extension PanelConfig {
         try c.encodeIfPresent(queries, forKey: .queries)
         try c.encodeIfPresent(fieldConfig, forKey: .fieldConfig)
         try c.encodeIfPresent(fieldSelection, forKey: .fieldSelection)
+        // Omitted when empty: a panel that has never been given a pipeline
+        // should re-encode exactly as it arrived.
+        if !transformations.isEmpty {
+            try c.encode(transformations, forKey: .transformations)
+        }
         try c.encodeIfPresent(`repeat`, forKey: .repeat)
         try c.encodeIfPresent(repeatDirection, forKey: .repeatDirection)
         try encoder.encodeUnknownFields(unknownFields, besides: Self.knownKeys)

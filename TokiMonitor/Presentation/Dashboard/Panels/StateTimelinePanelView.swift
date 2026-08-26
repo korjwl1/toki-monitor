@@ -17,9 +17,7 @@ struct StateTimelinePanelView: View {
     private var spans: [TimelineSpan] {
         guard let frames, !frames.frames.isEmpty else { return [] }
         let metric = panel.effectiveMetric
-        let prepared = TransformationPipeline.apply(
-            PanelPreset.transformations(for: metric), to: frames
-        )
+        let prepared = PanelPreset.prepared(frames, panel: panel, metric: metric)
         return StateTimelineBuilder.spans(
             prepared,
             selection: panel.fieldSelection ?? PanelPreset.selection(for: metric),

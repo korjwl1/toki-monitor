@@ -55,9 +55,7 @@ struct StatPanelView: View {
             )
             return PanelDataExtractor.StatValue(value: name ?? "-", subtitle: nil)
         }
-        let prepared = TransformationPipeline.apply(
-            PanelPreset.transformations(for: metric), to: frames
-        )
+        let prepared = PanelPreset.prepared(frames, panel: panel, metric: metric)
         // The panel's own selection wins; the preset is the starting point a
         // panel keeps until someone changes it.
         let selection = panel.fieldSelection ?? PanelPreset.selection(for: metric)
@@ -109,9 +107,7 @@ struct StatPanelView: View {
         guard let frames, !frames.frames.isEmpty else {
             return PanelDataExtractor.statNumber(for: metric, data: data)
         }
-        let prepared = TransformationPipeline.apply(
-            PanelPreset.transformations(for: metric), to: frames
-        )
+        let prepared = PanelPreset.prepared(frames, panel: panel, metric: metric)
         let selection = panel.fieldSelection ?? PanelPreset.selection(for: metric)
         return FrameReader.singleValue(prepared, selection: selection)
     }

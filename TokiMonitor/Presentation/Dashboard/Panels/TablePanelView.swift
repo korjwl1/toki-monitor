@@ -40,7 +40,7 @@ struct TablePanelView: View {
     }
 
     var body: some View {
-        let rows = PanelSeries.rows(frames: frames, data: data)
+        let rows = PanelSeries.rows(panel: panel, frames: frames, data: data)
         GeometryReader { geo in
             // Fit first, scroll second. Fixed column widths meant a panel one
             // grid cell wide showed the model names and hid every number

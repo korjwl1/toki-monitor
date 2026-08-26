@@ -21,9 +21,7 @@ enum PanelSeries {
     /// keeps until someone changes it.
     private static func prepared(metric: PanelMetric, panel: PanelConfig?,
                                  frames: FrameSet) -> (FrameSet, FieldSelection) {
-        let set = TransformationPipeline.apply(
-            PanelPreset.transformations(for: metric), to: frames
-        )
+        let set = PanelPreset.prepared(frames, panel: panel, metric: metric)
         return (set, panel?.fieldSelection ?? PanelPreset.selection(for: metric))
     }
 
@@ -113,11 +111,20 @@ enum PanelSeries {
     /// One row per series. The frame path keeps every grouping dimension in the
     /// row name, so the same project under two providers stays two rows instead
     /// of being silently blended into one.
-    static func rows(frames: FrameSet?, data: TimeSeriesData?) -> [PanelDataExtractor.ModelRow] {
+    ///
+    /// `panel` is not decoration: a table has to run the panel's own
+    /// transformation pipeline like every other visualization does, or a step
+    /// the reader added would apply to the chart above and not to the table
+    /// below it.
+    static func rows(panel: PanelConfig? = nil, frames: FrameSet?,
+                     data: TimeSeriesData?) -> [PanelDataExtractor.ModelRow] {
         guard let frames, !frames.frames.isEmpty else {
             return PanelDataExtractor.tableRows(from: data)
         }
-        return frames.frames.map { frame in
+        let prepared = PanelPreset.prepared(
+            frames, panel: panel, metric: panel?.effectiveMetric ?? .totalTokens
+        )
+        return prepared.frames.map { frame in
             func sum(_ name: String) -> Double? {
                 guard let numbers = frame.field(named: name)?.values.numbers else { return nil }
                 return ReduceTransformation.reduce(numbers, using: .sum)

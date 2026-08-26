@@ -197,3 +197,26 @@ struct PanelPreset: Equatable, Sendable {
         }
     }
 }
+
+// MARK: - What a panel actually draws
+
+extension PanelPreset {
+    /// The frames a panel draws: the preset's own steps first, then the steps
+    /// the user stored on the panel.
+    ///
+    /// One entry point rather than the four copies of
+    /// `TransformationPipeline.apply(PanelPreset.transformations(for:), to:)`
+    /// that had accumulated, because the panel's own pipeline has to run in
+    /// every one of them. A transformation that applied on the stat card and
+    /// not on the chart beside it would be worse than no transformation at all.
+    ///
+    /// Preset first: the preset is what the panel starts with, and a user step
+    /// composes on top of it — `cacheHitRate`'s computed column has to exist
+    /// before a filter can name it.
+    static func prepared(_ frames: FrameSet, panel: PanelConfig?,
+                         metric: PanelMetric) -> FrameSet {
+        let seeded = TransformationPipeline.apply(transformations(for: metric), to: frames)
+        guard let panel, !panel.transformations.isEmpty else { return seeded }
+        return TransformationPipeline.apply(steps: panel.transformations, to: seeded)
+    }
+}
