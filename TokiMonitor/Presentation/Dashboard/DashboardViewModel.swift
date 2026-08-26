@@ -402,7 +402,7 @@ final class DashboardViewModel {
     func fetchData() {
         fetchTask?.cancel()
 
-        let allPanels = dashboardConfig.panels.filter { $0.panelType != .rowPanel }
+        let allPanels = expandedPanels.filter { $0.panelType != .rowPanel }
         let time = dashboardConfig.time
         let variables = dashboardConfig.templating.list
 
@@ -759,6 +759,50 @@ final class DashboardViewModel {
         saveDashboard()
     }
 
+    /// Copy a panel, and put the copy directly under the original.
+    ///
+    /// The cheapest way to build the second version of a chart is to start
+    /// from the first one. Everything about the panel comes across — queries,
+    /// options, field config, overrides — with fresh identity, so editing the
+    /// copy cannot reach back into the original.
+    ///
+    /// A copy is a separate panel, not a repeat: `repeat` produces instances
+    /// of one definition and they change together, this produces a second
+    /// definition that goes its own way.
+    @discardableResult
+    func duplicatePanel(id: UUID) -> PanelConfig? {
+        guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == id })
+        else { return nil }
+        let original = dashboardConfig.panels[index]
+        var copy = original
+        copy.id = UUID()
+        copy.title = L.tr("\(original.title) 사본", "\(original.title) copy")
+        // Fresh ids for the parts that carry one, so the two panels' queries
+        // are not the same objects under two titles.
+        copy.targets = original.targets.map { target in
+            var t = target
+            t.id = UUID()
+            return t
+        }
+        copy.queries = original.queries.map { queries in
+            queries.map { query in
+                var q = query
+                q.id = UUID()
+                return q
+            }
+        }
+        copy.gridPosition.row = original.gridPosition.row + max(1, original.gridPosition.height)
+        // An expansion is derived state and belongs to no stored panel.
+        copy.repeatedValue = nil
+        copy.repeatSourceID = nil
+        dashboardConfig.panels.insert(copy, at: index + 1)
+        resolveOverlaps(anchorPanelID: copy.id)
+        syncLayoutsWithPanels()
+        saveDashboard()
+        fetchData()
+        return copy
+    }
+
     func updatePanel(_ panel: PanelConfig) {
         guard let index = dashboardConfig.panels.firstIndex(where: { $0.id == panel.id }) else { return }
         var p = panel
@@ -1065,10 +1109,22 @@ final class DashboardViewModel {
         return groups
     }
 
+    /// The panels the screen and the fetch layer both work from: what is
+    /// stored, with every `repeat` expanded into one panel per variable value
+    /// (contract US4).
+    ///
+    /// Derived on the way out, never written back. A panel that repeats is one
+    /// panel in the document; how many of it there are is a fact about the
+    /// reader's current selection, and storing that would hand the next reader
+    /// somebody else's filter as if it were the design.
+    var expandedPanels: [PanelConfig] {
+        PanelRepeat.expand(dashboardConfig.panels, variables: dashboardConfig.templating.list)
+    }
+
     /// Visible panels accounting for collapsed rows
     var visiblePanels: [PanelConfig] {
         var visible: [PanelConfig] = []
-        let sorted = dashboardConfig.panels.sorted { $0.gridPosition.row < $1.gridPosition.row }
+        let sorted = expandedPanels.sorted { $0.gridPosition.row < $1.gridPosition.row }
         var inCollapsedRow = false
 
         for panel in sorted {

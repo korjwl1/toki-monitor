@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA61PANELRPTTEST02 /* PanelRepeatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA61PANELRPTTEST01 /* PanelRepeatTests.swift */; };
+		AA61PANELRPT000002 /* PanelRepeat.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA61PANELRPT000001 /* PanelRepeat.swift */; };
 		AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */; };
 		AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40POPTTESTS00001 /* PanelOptionsTests.swift */; };
 		AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */; };
@@ -209,6 +211,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AA61PANELRPTTEST01 /* PanelRepeatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelRepeatTests.swift; sourceTree = "<group>"; };
+		AA61PANELRPT000001 /* PanelRepeat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelRepeat.swift; sourceTree = "<group>"; };
 		AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableRefreshPolicyTests.swift; sourceTree = "<group>"; };
 		AA40POPTTESTS00001 /* PanelOptionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelOptionsTests.swift; sourceTree = "<group>"; };
 		AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateSnapshotTests.swift; sourceTree = "<group>"; };
@@ -647,6 +651,7 @@
 		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AA61PANELRPTTEST01 /* PanelRepeatTests.swift */,
 				AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */,
 				AA40POPTTESTS00001 /* PanelOptionsTests.swift */,
 				AA40PSTATETEST0001 /* PanelStateTests.swift */,
@@ -766,6 +771,7 @@
 		F742507F177D260FFECA176D /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AA61PANELRPT000001 /* PanelRepeat.swift */,
 				AA40PANELSTATE0001 /* PanelState.swift */,
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				6B17BA2BAF5855E537D1C1D0 /* AnimationTheme.swift */,
@@ -909,6 +915,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA61PANELRPT000002 /* PanelRepeat.swift in Sources */,
 				AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */,
 				AA03PFEMPT0B001 /* EmptyStateSection.swift in Sources */,
 				AA03PFMONE0B001 /* MoneyFootnote.swift in Sources */,
@@ -1051,6 +1058,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA61PANELRPTTEST02 /* PanelRepeatTests.swift in Sources */,
 				AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */,
 				AA03PFSNAPT0B001 /* PlanFitSnapshotTests.swift in Sources */,
 				AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */,

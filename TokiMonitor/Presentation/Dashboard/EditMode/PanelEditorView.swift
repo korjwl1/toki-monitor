@@ -158,7 +158,11 @@ struct PanelEditorView: View {
                         variables: viewModel.dashboardConfig.templating.list
                     )
                 case .visualization: PanelEditorVisualizationTab(panel: $panel)
-                case .options:       PanelEditorOptionsTab(panel: $panel)
+                case .options:
+                    PanelEditorOptionsTab(
+                        panel: $panel,
+                        variables: viewModel.dashboardConfig.templating.list
+                    )
                 case .links:         PanelEditorDataLinksTab(panel: $panel)
                 }
             }

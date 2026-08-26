@@ -346,6 +346,10 @@ struct PanelEditorVisualizationTab: View {
 
 struct PanelEditorOptionsTab: View {
     @Binding var panel: PanelConfig
+    /// The dashboard's variables, for the repeat picker. A repeat names one of
+    /// them, so the choice has to be the real list rather than a text field
+    /// where a typo produces a panel that simply does not repeat.
+    var variables: [DashboardVariable] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -395,7 +399,72 @@ struct PanelEditorOptionsTab: View {
                 Divider()
                 thresholdEditor
             }
+
+            Divider()
+            repeatEditor
         }
+    }
+
+    // MARK: - Repeat
+
+    /// Which variable turns this one panel into one panel per value.
+    ///
+    /// The list is the dashboard's own variables plus "none". A repeat over a
+    /// variable that is not multi-select draws exactly one panel — true, and
+    /// almost certainly not what the person picking it wanted — so that is
+    /// said next to the picker rather than discovered afterwards.
+    @ViewBuilder
+    private var repeatEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L.tr("반복", "Repeat"))
+                .font(.subheadline.bold())
+
+            Picker("", selection: Binding(
+                get: { panel.repeat ?? "" },
+                set: { panel.repeat = $0.isEmpty ? nil : $0 }
+            )) {
+                Text(L.tr("반복 안 함", "No repeat")).tag("")
+                ForEach(variables, id: \.id) { variable in
+                    Text("$\(variable.name)").tag(variable.name)
+                }
+            }
+            .pickerStyle(.menu)
+
+            if let name = panel.repeat, !name.isEmpty {
+                Picker("", selection: Binding(
+                    get: { panel.repeatDirection ?? .horizontal },
+                    set: { panel.repeatDirection = $0 }
+                )) {
+                    Text(L.tr("가로", "Horizontal")).tag(RepeatDirection.horizontal)
+                    Text(L.tr("세로", "Vertical")).tag(RepeatDirection.vertical)
+                }
+                .pickerStyle(.segmented)
+
+                Text(repeatNote(for: name))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// What this repeat will actually do, in the dashboard as it stands.
+    private func repeatNote(for name: String) -> String {
+        guard let variable = variables.first(where: { $0.name == name }) else {
+            return L.tr("이 대시보드에 `\(name)` 변수가 없습니다. 패널은 하나만 그려집니다.",
+                        "This dashboard has no variable named `\(name)`. The panel is drawn once.")
+        }
+        guard variable.multi || variable.includeAll else {
+            return L.tr("`\(name)`는 값을 하나만 고를 수 있는 변수입니다. 반복은 다중 선택 변수에서만 여러 패널이 됩니다.",
+                        "`\(name)` is a single-select variable. Repeat only produces several panels from a multi-value variable.")
+        }
+        let count = VariableResolver.repeatValues(for: variable).count
+        guard count > 0 else {
+            return L.tr("`\(name)`에 지금 선택된 값이 없어 패널은 하나만 그려집니다.",
+                        "`\(name)` has no values selected right now, so the panel is drawn once.")
+        }
+        return L.tr("지금 선택된 값 \(count)개마다 패널이 하나씩 그려집니다.",
+                    "One panel per selected value — \(count) right now.")
     }
 
     /// Thresholds colour a gauge's bands and a state timeline's spans. Nothing

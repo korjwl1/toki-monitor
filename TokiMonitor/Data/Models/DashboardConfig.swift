@@ -513,9 +513,39 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     /// "use the preset for `metric`", which is what every existing panel does.
     var fieldSelection: FieldSelection?
 
+    // MARK: - Repeat (contract US4)
+
+    /// Name of the variable this panel repeats over. One panel is drawn per
+    /// selected value of it; nil — which is nearly every panel — is one panel.
+    ///
+    /// Backticked because `repeat` is a keyword. The JSON key is `repeat`
+    /// too, matching what a Grafana dashboard writes, so a dashboard authored
+    /// there keeps its repeats when it arrives here.
+    var `repeat`: String?
+
+    /// Which way the copies are laid out. Nil means `.horizontal`, which is
+    /// what a reader expects of "one per project": a row of them.
+    var repeatDirection: RepeatDirection?
+
     /// Panel-level keys written by a build newer than this one, kept verbatim
     /// through load→save (계약 C1).
     var unknownFields: [String: JSONValue] = [:]
+
+    // MARK: - Derived at render time, never stored
+
+    /// The value this instance was expanded for, on a panel produced by a
+    /// `repeat`. Nil on every stored panel.
+    ///
+    /// Not in `CodingKeys`, so it is never written: it is derived from what
+    /// the variable happens to be set to right now, and persisting it would
+    /// freeze today's selection into the document.
+    var repeatedValue: String?
+
+    /// The stored panel a copy came from — set on the second and later copies
+    /// only. The first keeps the stored panel's own id so that moving,
+    /// resizing, editing and deleting still reach the definition; the copies
+    /// have derived ids, and this is how a copy finds its way home.
+    var repeatSourceID: UUID?
 
     /// The `panelType` string exactly as it was written, when this build has no
     /// case for it. Re-encoded in place of `panelType` so that opening a
@@ -527,6 +557,7 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         case id, title, description, panelType, metric, gridPosition, targets
         case options, dataLinks, collapsed, plugin, queries, fieldConfig
         case fieldSelection
+        case `repeat`, repeatDirection
     }
 
     static let knownKeys: Set<String> = Set(CodingKeys.allCases.map(\.stringValue))
@@ -610,6 +641,8 @@ extension PanelConfig {
         queries = try c.decodeIfPresent([Query].self, forKey: .queries)
         fieldConfig = try c.decodeIfPresent(FieldConfigSource.self, forKey: .fieldConfig)
         fieldSelection = try c.decodeIfPresent(FieldSelection.self, forKey: .fieldSelection)
+        `repeat` = try c.decodeIfPresent(String.self, forKey: .repeat)
+        repeatDirection = try c.decodeIfPresent(RepeatDirection.self, forKey: .repeatDirection)
         unknownFields = decoder.unknownFields(besides: Self.knownKeys)
     }
 
@@ -629,8 +662,19 @@ extension PanelConfig {
         try c.encodeIfPresent(queries, forKey: .queries)
         try c.encodeIfPresent(fieldConfig, forKey: .fieldConfig)
         try c.encodeIfPresent(fieldSelection, forKey: .fieldSelection)
+        try c.encodeIfPresent(`repeat`, forKey: .repeat)
+        try c.encodeIfPresent(repeatDirection, forKey: .repeatDirection)
         try encoder.encodeUnknownFields(unknownFields, besides: Self.knownKeys)
     }
+}
+
+/// Which way a repeated panel's copies run.
+///
+/// Raw values match Grafana's (`h` / `v`) so an imported dashboard keeps its
+/// direction rather than silently reverting to the default.
+enum RepeatDirection: String, Codable, Equatable, CaseIterable, Sendable {
+    case horizontal = "h"
+    case vertical = "v"
 }
 
 struct PanelTarget: Codable, Identifiable, Equatable {

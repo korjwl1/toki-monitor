@@ -58,12 +58,19 @@ struct CustomDashboardView: View {
                                 if panel.panelType == .rowPanel {
                                     rowPanelView(panel: panel, containerWidth: containerWidth)
                                 } else {
+                                    // A repeat's copies have no stored position
+                                    // of their own — theirs is computed from the
+                                    // panel they copy. Offering a drag handle
+                                    // that moves nothing is worse than offering
+                                    // none, so they do not get one.
+                                    let movable = viewModel.isEditing
+                                        && panel.repeatSourceID == nil
                                     panelView(for: panel, containerWidth: containerWidth)
                                         .panelDrag(
                                             panelID: panel.id,
                                             containerWidth: containerWidth,
                                             rowHeight: rowHeight,
-                                            isEditing: viewModel.isEditing,
+                                            isEditing: movable,
                                             viewModel: viewModel
                                         )
                                         .panelEdgeResize(
@@ -71,7 +78,7 @@ struct CustomDashboardView: View {
                                             panelType: panel.panelType,
                                             containerWidth: containerWidth,
                                             rowHeight: rowHeight,
-                                            isEditing: viewModel.isEditing,
+                                            isEditing: movable,
                                             viewModel: viewModel
                                         )
                                 }
@@ -152,13 +159,17 @@ struct CustomDashboardView: View {
             // `nil` hands the whole box to the content (contract R5).
             state: panel.panelType == .unknown ? nil : panelState(for: panel),
             onDelete: { viewModel.removePanel(id: panel.id) },
-            onEdit: { onEditPanel?(panel) },
+            // Editing a copy edits the definition it came from: a copy has no
+            // definition of its own, and a save that went to the copy would be
+            // discarded the moment the dashboard redrew.
+            onEdit: { onEditPanel?(definition(of: panel)) },
             onRetry: { viewModel.fetchData() },
             // A panel with several queries can be partly answered. The state
             // says `loaded` because there IS something to draw; which query is
             // missing from it is carried separately (contract Q5).
             failedTargets: viewModel.dataState(for: panel.id).frames?.errors ?? [:],
-            onInspect: onInspectPanel.map { handler in { handler(panel) } }
+            onInspect: onInspectPanel.map { handler in { handler(panel) } },
+            isRepeatInstance: panel.repeatSourceID != nil
         ) {
             panelContent(for: panel)
         }
@@ -166,12 +177,27 @@ struct CustomDashboardView: View {
         // This is what stands in for library panels.
         .contextMenu {
             Button {
-                viewModel.copyPanelJSON(panel)
+                viewModel.duplicatePanel(id: definition(of: panel).id)
+            } label: {
+                Label(L.tr("패널 복제", "Duplicate Panel"),
+                      systemImage: "plus.square.on.square")
+            }
+            Button {
+                viewModel.copyPanelJSON(definition(of: panel))
             } label: {
                 Label(L.tr("패널을 JSON으로 복사", "Copy Panel as JSON"),
                       systemImage: "doc.on.doc")
             }
         }
+    }
+
+    /// The stored panel behind what is on screen. For everything except the
+    /// copies a `repeat` produced, that is the panel itself.
+    private func definition(of panel: PanelConfig) -> PanelConfig {
+        guard let sourceID = panel.repeatSourceID,
+              let stored = viewModel.dashboardConfig.panels.first(where: { $0.id == sourceID })
+        else { return panel }
+        return stored
     }
 
     /// What this panel is showing. The fetch layer reports whether the query

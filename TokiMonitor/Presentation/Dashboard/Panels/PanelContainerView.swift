@@ -23,6 +23,10 @@ struct PanelContainerView<Content: View>: View {
     /// question it answers ("where did this number come from?") is asked while
     /// READING a dashboard, not while building one.
     var onInspect: (() -> Void)?
+    /// A copy a `repeat` produced, rather than a panel of its own. It has no
+    /// separate definition to delete or to drag, so it offers neither — and
+    /// its edit button opens the panel it is a copy OF.
+    var isRepeatInstance: Bool = false
     @ViewBuilder let content: Content
 
     @State private var isHovered = false
@@ -36,6 +40,7 @@ struct PanelContainerView<Content: View>: View {
         onRetry: (() -> Void)? = nil,
         failedTargets: [String: String] = [:],
         onInspect: (() -> Void)? = nil,
+        isRepeatInstance: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -46,6 +51,7 @@ struct PanelContainerView<Content: View>: View {
         self.onRetry = onRetry
         self.failedTargets = failedTargets
         self.onInspect = onInspect
+        self.isRepeatInstance = isRepeatInstance
         self.content = content()
     }
 
@@ -78,7 +84,7 @@ struct PanelContainerView<Content: View>: View {
         VStack(alignment: .leading, spacing: DS.sm) {
             // Title bar
             HStack(spacing: DS.sm) {
-                if isEditing {
+                if isEditing && !isRepeatInstance {
                     Image(systemName: "line.3.horizontal")
                         .foregroundStyle(.tertiary)
                         .font(.system(size: DS.fontBody))
@@ -128,12 +134,14 @@ struct PanelContainerView<Content: View>: View {
                     }
                     .buttonStyle(.plain)
 
-                    Button(role: .destructive, action: onDelete) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: DS.fontBody))
-                            .foregroundStyle(.secondary)
+                    if !isRepeatInstance {
+                        Button(role: .destructive, action: onDelete) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: DS.fontBody))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 

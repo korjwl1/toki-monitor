@@ -285,3 +285,96 @@ extension VariableResolver {
         list.filter { shouldRefresh($0.refresh, onTimeRangeChange: onTimeRangeChange) }
     }
 }
+
+// MARK: - Substituting one variable at one value
+//
+// Panel repeat needs something the full interpolation cannot give it: the same
+// template resolved once per value of ONE variable, with every other variable
+// — and the ad hoc filters, and `$__interval` — left alone for the normal pass
+// to handle later. Running the full interpolation early would apply the ad hoc
+// filters here and then again downstream, which is how a query ends up with
+// the same matcher twice.
+extension VariableResolver {
+
+    /// Replace every reference to `variable` in `template` with `value`.
+    ///
+    /// Honours the same three forms interpolation accepts — `$name`,
+    /// `${name}`, `${name:format}` — and the same word boundary, so
+    /// `$projectId` is not half-rewritten by a variable called `project`.
+    /// Everything else in the template is returned untouched.
+    static func substituting(_ variable: DashboardVariable,
+                             value: String,
+                             in template: String) -> String {
+        // `provider` expands to a label matcher rather than to a bare value,
+        // because panel templates write `usage{$provider}`. Substituting the
+        // value alone there would produce `usage{claude_code}`, which is not a
+        // query. This mirrors `interpolateReporting`'s special case; the one
+        // difference is that a repeat honours whatever value the reader chose
+        // rather than dropping an unrecognised provider, since the repeat was
+        // asked for over exactly those values.
+        if variable.name == "provider" {
+            guard let regex = try? NSRegularExpression(
+                pattern: "\\$provider(?![A-Za-z0-9_])"
+            ) else { return template }
+            let replacement = NSRegularExpression
+                .escapedTemplate(for: "provider=\"\(value)\"")
+            return regex.stringByReplacingMatches(
+                in: template, range: NSRange(template.startIndex..., in: template),
+                withTemplate: replacement
+            )
+        }
+
+        // A one-value stand-in for the variable, so formats resolve exactly as
+        // they would for a single selection. `capturingRegexp` is cleared
+        // because `value` has already been through it.
+        var single = variable
+        single.multi = false
+        single.includeAll = false
+        single.capturingRegexp = nil
+        single.current = VariableSelection(text: [value], value: [value])
+
+        let escaped = NSRegularExpression.escapedPattern(for: variable.name)
+        var out = template
+        if let formatted = try? NSRegularExpression(
+            pattern: "\\$\\{\(escaped):([A-Za-z]+)\\}"
+        ) {
+            out = replaceFormatted(in: out, regex: formatted, variable: single)
+        }
+        let resolved = interpolatedValue(for: single)
+        out = out.replacingOccurrences(of: "${\(variable.name)}", with: resolved)
+        if let bare = try? NSRegularExpression(pattern: "\\$\(escaped)(?![A-Za-z0-9_])") {
+            out = bare.stringByReplacingMatches(
+                in: out, range: NSRange(out.startIndex..., in: out),
+                withTemplate: NSRegularExpression.escapedTemplate(for: resolved)
+            )
+        }
+        return out
+    }
+
+    /// The values a panel repeating over `variable` expands into.
+    ///
+    /// Empty means "do not expand" — which the caller renders as the one
+    /// original panel, never as nothing.
+    static func repeatValues(for variable: DashboardVariable) -> [String] {
+        let selected = distinct(selectedValues(for: variable))
+        if !selected.isEmpty {
+            // A single-select variable holds one value however many are stored,
+            // so repeating over it yields one panel. That is not a failure; it
+            // is what "repeat over a variable with one value" means.
+            return variable.multi ? selected : Array(selected.prefix(1))
+        }
+        // "All" is selected, or nothing is: with `includeAll` the whole option
+        // list is what All stands for, so the repeat covers it.
+        guard variable.includeAll else { return [] }
+        var all = variable
+        all.current = VariableSelection(text: [], value: variable.sortedOptions.map(\.value))
+        return distinct(selectedValues(for: all))
+    }
+
+    /// Order-preserving de-duplication. Two panels drawing the same value would
+    /// run the same query twice and read as a rendering fault.
+    private static func distinct(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+}
