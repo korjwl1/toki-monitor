@@ -200,6 +200,7 @@
 		E58E37541C010557CB0C1865 /* DatasourceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A7FCA1C481A1421555EEF2 /* DatasourceRegistry.swift */; };
 		E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0103BDEAC6066E0274029149 /* ConnectionManager.swift */; };
 		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
+		AA90AGGRATE000002 /* TokenAggregatorRateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */; };
 		AA90IPCBND000002 /* TokiIPCBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90IPCBND000001 /* TokiIPCBoundaryTests.swift */; };
 		AA90UDSSOCK000002 /* TokiTraceSocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */; };
 		AA90EVSTRBND000002 /* TokiEventStreamBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90EVSTRBND000001 /* TokiEventStreamBoundaryTests.swift */; };
@@ -353,6 +354,7 @@
 		AA41QREFTEST001F /* QueryRefusalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryRefusalTests.swift; sourceTree = "<group>"; };
 		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
+		AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregatorRateTests.swift; sourceTree = "<group>"; };
 		AA90IPCBND000001 /* TokiIPCBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiIPCBoundaryTests.swift; sourceTree = "<group>"; };
 		AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiTraceSocketTests.swift; sourceTree = "<group>"; };
 		AA90EVSTRBND000001 /* TokiEventStreamBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamBoundaryTests.swift; sourceTree = "<group>"; };
@@ -738,6 +740,7 @@
 		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */,
 				AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */,
 				AA62FILTNOTETEST01 /* UnappliedFilterNoticeTests.swift */,
 				AA61PANELRPTTEST01 /* PanelRepeatTests.swift */,
@@ -1206,6 +1209,7 @@
 				EE77CFE802FBAEF03819DC89 /* SemVerTests.swift in Sources */,
 				40CC603230947A99EB36F064 /* TokenAggregatorLogicTests.swift in Sources */,
 				EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */,
+				AA90AGGRATE000002 /* TokenAggregatorRateTests.swift in Sources */,
 				AA90IPCBND000002 /* TokiIPCBoundaryTests.swift in Sources */,
 				AA90UDSSOCK000002 /* TokiTraceSocketTests.swift in Sources */,
 				AA90EVSTRBND000002 /* TokiEventStreamBoundaryTests.swift in Sources */,
