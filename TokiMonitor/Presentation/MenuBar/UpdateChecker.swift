@@ -4,6 +4,15 @@ import SwiftUI
 /// Checks for app + toki CLI updates via Homebrew and GitHub releases.
 /// Shows a custom centered window with release notes.
 @MainActor
+/// Lives in Presentation because that is what it is: it owns an `NSWindow`,
+/// hosts SwiftUI in it, activates the app, raises `NSAlert`s and drives
+/// Terminal through `NSWorkspace` to run brew. Domain depends on neither
+/// AppKit nor SwiftUI (constitution IV, subordinate §5).
+///
+/// Version comparison and the GitHub/tap lookups travelled with it rather than
+/// being split out — they exist only to decide what this window says, and a
+/// half-move that left the window handle behind would not have removed the
+/// import anyway.
 final class UpdateChecker {
     private static let lastNotifiedKey = "lastNotifiedUpdateVersion"
     private static let checkIntervalKey = "lastUpdateCheckDate"

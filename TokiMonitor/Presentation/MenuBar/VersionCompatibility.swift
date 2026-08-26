@@ -6,6 +6,14 @@ import SwiftUI
 let requiredTokiMajorVersion = 2
 
 /// Checks toki CLI major version and shows an update-required modal if outdated.
+///
+/// Lives in Presentation, not Domain, because that is what it is: it owns an
+/// `NSWindow`, hosts a SwiftUI view in it, activates the app and opens Terminal
+/// to run `brew upgrade`. Domain depends on neither AppKit nor SwiftUI
+/// (constitution IV, subordinate §5), and splitting the controller from its
+/// modal would have left the window handle and `NSWorkspace` behind anyway.
+/// The one genuinely domain-level fact here — `requiredTokiMajorVersion` — is
+/// a free constant and stays readable from anywhere.
 @MainActor
 final class VersionCompatibilityChecker {
 
