@@ -577,6 +577,68 @@ struct MoneySummaryModel: Equatable, Sendable {
     var isPresentable: Bool { !notes.isEmpty }
 }
 
+// MARK: - Subscription comparison (T066…T070 / contract V9)
+
+/// What the page shows where "a subscription would have cost you $X instead"
+/// would go.
+///
+/// The refusal is modelled the same way the verdict's is: it is one of the
+/// outcomes rather than an absent section, and **the money is reachable only
+/// through `result`, which also carries the interruptions.** There are not two
+/// optionals here that a view could unwrap one at a time — there is one, and
+/// it holds both halves (T066, T070).
+struct SubscriptionComparisonModel: Equatable, Sendable {
+
+    enum Status: String, Equatable, Hashable, Sendable {
+        /// The lookback is too short; nothing was calculated (T068).
+        case notCalculated
+        /// It was attempted and refused for this account (T067).
+        case undeterminable
+        /// Both halves present.
+        case determined
+    }
+
+    /// Both numbers, or neither. The type V9 is enforced by.
+    struct Result: Equatable, Sendable {
+        /// Carries "at current prices" by construction (FR-045).
+        let money: MoneyNote
+        /// How often the work was actually stopped, and for how long.
+        let exposure: String
+        /// The rate rather than the raw total, so two spans of different
+        /// lengths are comparable.
+        let rate: String
+    }
+
+    let status: Status
+    let title: String
+    /// The question the block answers, in one sentence.
+    let purpose: String
+    /// "이 계정에서는 판단 불가" and the like. Never an error tone.
+    let headline: String
+    /// Every reason, one per line. Never summarised into "not enough data".
+    let reasons: [String]
+    /// What it would take — a state of the world, not a wait.
+    let whatWouldMakeItPossible: String?
+    /// Why the money is refused rather than shown on its own. On screen
+    /// always, because it is the part a reader would otherwise supply
+    /// themselves with the wrong answer.
+    let structuralNote: String
+    /// The refusal's own basis, the way a verdict carries one.
+    let basis: String?
+    /// nil unless `status == .determined`.
+    let result: Result?
+
+    /// T067: the block is drawn in every state. A section that disappears
+    /// when it has nothing to say reads as a feature that forgot.
+    var isPresentable: Bool { true }
+
+    static let placeholder = SubscriptionComparisonModel(
+        status: .notCalculated, title: "", purpose: "", headline: "",
+        reasons: [], whatWouldMakeItPossible: nil, structuralNote: "",
+        basis: nil, result: nil
+    )
+}
+
 // MARK: - Readiness (T060…T064 / contract W3, W4, FR-051…FR-054)
 
 /// What one metric on this page needs before it means anything.
@@ -676,6 +738,9 @@ struct PlanFitModel: Equatable, Sendable {
     let modelPattern: ModelPatternModel
     /// Money, in the supporting position it is required to keep (T058).
     let money: MoneySummaryModel
+    /// The subscription comparison, which for every account this product can
+    /// see today is a reasoned refusal (T066…T070).
+    let subscriptionComparison: SubscriptionComparisonModel
     /// What the page cannot yet say, and when it will be able to (T060…T064).
     let readiness: DataReadinessModel
     /// Limits with neither an exhaustion nor a worked window, named in one
@@ -746,6 +811,9 @@ enum PlanFitModelBuilder {
             comparison: comparisonModel,
             modelPattern: patternModel,
             money: money(usage: modelUsage),
+            subscriptionComparison: subscriptionComparison(
+                segments: segments, usage: modelUsage
+            ),
             readiness: readiness(
                 paired: paired,
                 trend: trendModel,
@@ -1843,6 +1911,119 @@ extension PlanFitModelBuilder {
                 "On a flat-rate subscription this is a reference figure, not a bill. What this page is for is limits and headroom; money sits below them."
             )
         )
+    }
+}
+
+// MARK: - Subscription comparison (T066…T070)
+
+extension PlanFitModelBuilder {
+
+    /// The block that answers "would a subscription have been cheaper?" —
+    /// which, for every account this product can see today, it answers with a
+    /// reasoned no-answer.
+    ///
+    /// Two things this function deliberately does not do:
+    ///
+    /// - **It does not pass a price it made up.** `observedSubscriptionPriceUsd`
+    ///   stays nil because no provider field carries what the user pays and
+    ///   contract V7 forbids shipping a tier catalogue. Filling it from a table
+    ///   would make the block produce a figure, which is the failure mode.
+    /// - **It does not claim the cost figure is a bill.** The daemon prices
+    ///   every token event against today's table whether or not the account is
+    ///   billed that way, so `perTokenBillingConfirmed` is false: the provider
+    ///   does not report billing mode, and inferring it from the presence of
+    ///   events is the same shape of guess FR-040 rules out for account type.
+    static func subscriptionComparison(
+        segments: [WindowStatsSegment],
+        usage: ModelUsageInput
+    ) -> SubscriptionComparisonModel {
+        let priced = usage.samples.compactMap(\.costUsd)
+        let comparison = SubscriptionComparison.evaluate(SubscriptionComparison.Input(
+            segments: segments,
+            notionalPerTokenCostUsd: priced.isEmpty ? nil : priced.reduce(0, +),
+            observedSubscriptionPriceUsd: nil,
+            perTokenBillingConfirmed: false
+        ))
+
+        let title = L.tr("구독으로 바꿨다면", "If this had been a subscription")
+        let purpose = L.tr(
+            "토큰 단가로 쓴 사용량을 구독으로 환산하면 얼마였을지에 대한 답입니다.",
+            "What the same usage would have come to on a subscription instead of per token."
+        )
+        // The sentence that has to be on screen in EVERY state, because it is
+        // the reasoning a reader would otherwise supply for themselves — and
+        // the answer they would supply is the optimistic one.
+        let structuralNote = L.tr(
+            "금액만 보여주지 않습니다. 클라우드의 약정 할인은 가격만 바꾸지만 구독 전환은 가격과 함께 한도를 부과하고, 토큰 단가로 쓰던 계정은 그 한도를 한 번도 만난 적이 없습니다. 그래서 이 비교는 금액과 함께 '같은 작업이 몇 번 막혔을지와 얼마나 기다렸을지'를 반드시 같이 냅니다 — 둘 중 하나만 낼 수는 없습니다.",
+            "The money is never shown on its own. A cloud commitment discount changes only the price; switching to a subscription imposes limits along with it, and an account that paid per token has never met those limits. So this comparison reports the money together with how often the same work would have been stopped and for how long — one without the other is not available."
+        )
+
+        switch comparison {
+        case .notCalculated(let reason):
+            return SubscriptionComparisonModel(
+                status: .notCalculated,
+                title: title,
+                purpose: purpose,
+                headline: reason.summary,
+                reasons: [],
+                whatWouldMakeItPossible: L.tr(
+                    "룩백이 \(Int(SubscriptionComparison.requiredObservedDays))일에 도달하면 계산을 시도합니다.",
+                    "The calculation is attempted once the lookback reaches \(Int(SubscriptionComparison.requiredObservedDays)) days."
+                ),
+                structuralNote: structuralNote,
+                basis: nil,
+                result: nil
+            )
+
+        case .undeterminable(let undeterminable):
+            return SubscriptionComparisonModel(
+                status: .undeterminable,
+                title: title,
+                purpose: purpose,
+                headline: L.tr(
+                    "이 계정에서는 판단 불가",
+                    "Cannot be determined for this account"
+                ),
+                reasons: undeterminable.reasons.map(\.summary),
+                whatWouldMakeItPossible: undeterminable.whatWouldMakeItPossible,
+                structuralNote: structuralNote,
+                basis: L.tr(
+                    "관측 \(Int(undeterminable.observedDays.rounded()))일 · 룩백 \(Int(WindowStats.lookbackDays))일",
+                    "\(Int(undeterminable.observedDays.rounded()))d observed · \(Int(WindowStats.lookbackDays))d lookback"
+                ),
+                result: nil
+            )
+
+        case .determined(let determination):
+            return SubscriptionComparisonModel(
+                status: .determined,
+                title: title,
+                purpose: purpose,
+                headline: determination.money.savingUsd > 0
+                    ? L.tr("구독이 더 쌌을 금액", "What a subscription would have cost less")
+                    : L.tr("구독이 더 비쌌을 금액", "What a subscription would have cost more"),
+                reasons: [],
+                whatWouldMakeItPossible: nil,
+                structuralNote: structuralNote,
+                basis: L.tr(
+                    "관측 \(Int(determination.observedDays.rounded()))일 · 한도 \(determination.exposure.limitCount)종",
+                    "\(Int(determination.observedDays.rounded()))d observed · \(determination.exposure.limitCount) limits"
+                ),
+                result: SubscriptionComparisonModel.Result(
+                    money: MoneyNote(
+                        id: "money|subscription-difference",
+                        label: L.tr("차액", "Difference"),
+                        usd: abs(determination.money.savingUsd),
+                        coverage: nil
+                    ),
+                    exposure: determination.exposure.summary,
+                    rate: L.tr(
+                        "주당 \(String(format: "%.1f", determination.exposure.interruptionsPerWeek))회",
+                        "\(String(format: "%.1f", determination.exposure.interruptionsPerWeek))×/week"
+                    )
+                )
+            )
+        }
     }
 }
 

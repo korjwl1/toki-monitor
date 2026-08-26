@@ -31,6 +31,8 @@
 		AA96PVSUMT0000002 /* PanelValueSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA96PVSUMT0000001 /* PanelValueSummaryTests.swift */; };
 		AA95MOTIONT000002 /* DashboardMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA95MOTIONT000001 /* DashboardMotionTests.swift */; };
 		AA94CONTRAST00002 /* ContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA94CONTRAST00001 /* ContrastTests.swift */; };
+		AA03PFAUDIT0002 /* PlanFitSourceAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFAUDIT0001 /* PlanFitSourceAuditTests.swift */; };
+		AA03PFTEXT0002 /* PlanFitModelText.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFTEXT0001 /* PlanFitModelText.swift */; };
 		AA41PFCTEST0001B /* PanelFetchCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41PFCTEST0001F /* PanelFetchCoordinatorTests.swift */; };
 		AA40PANELSTATUS002 /* PanelStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PANELSTATUS001 /* PanelStatusView.swift */; };
 		AA80JSONVALUE0000002 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80JSONVALUE0000001 /* JSONValue.swift */; };
@@ -218,6 +220,7 @@
 		AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFACTIV0F001 /* ActiveUseSection.swift */; };
 		AA03PFEMPT0B001 /* EmptyStateSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFEMPT0F001 /* EmptyStateSection.swift */; };
 		AA03PFMONE0B001 /* MoneyFootnote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFMONE0F001 /* MoneyFootnote.swift */; };
+		AA03PFSUBC0B001 /* SubscriptionComparisonSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFSUBC0F001 /* SubscriptionComparisonSection.swift */; };
 		AA03PFMODP0B001 /* ModelPatternSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFMODP0F001 /* ModelPatternSection.swift */; };
 		AA03PFCOMP0B001 /* ProviderComparisonSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFCOMP0F001 /* ProviderComparisonSection.swift */; };
 		AA03PFVERD0B001 /* VerdictSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFVERD0F001 /* VerdictSection.swift */; };
@@ -259,6 +262,8 @@
 		AA96PVSUMT0000001 /* PanelValueSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelValueSummaryTests.swift; sourceTree = "<group>"; };
 		AA95MOTIONT000001 /* DashboardMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMotionTests.swift; sourceTree = "<group>"; };
 		AA94CONTRAST00001 /* ContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContrastTests.swift; sourceTree = "<group>"; };
+		AA03PFAUDIT0001 /* PlanFitSourceAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitSourceAuditTests.swift; sourceTree = "<group>"; };
+		AA03PFTEXT0001 /* PlanFitModelText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitModelText.swift; sourceTree = "<group>"; };
 		AA41PFCTEST0001F /* PanelFetchCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelFetchCoordinatorTests.swift; sourceTree = "<group>"; };
 		AA40PANELSTATUS001 /* PanelStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStatusView.swift; sourceTree = "<group>"; };
 		AA80JSONVALUE0000001 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
@@ -449,6 +454,7 @@
 		AA03PFACTIV0F001 /* ActiveUseSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveUseSection.swift; sourceTree = "<group>"; };
 		AA03PFEMPT0F001 /* EmptyStateSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateSection.swift; sourceTree = "<group>"; };
 		AA03PFMONE0F001 /* MoneyFootnote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyFootnote.swift; sourceTree = "<group>"; };
+		AA03PFSUBC0F001 /* SubscriptionComparisonSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionComparisonSection.swift; sourceTree = "<group>"; };
 		AA03PFMODP0F001 /* ModelPatternSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPatternSection.swift; sourceTree = "<group>"; };
 		AA03PFCOMP0F001 /* ProviderComparisonSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderComparisonSection.swift; sourceTree = "<group>"; };
 		AA03PFVERD0F001 /* VerdictSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerdictSection.swift; sourceTree = "<group>"; };
@@ -701,6 +707,7 @@
 				AA96PVSUMT0000001 /* PanelValueSummaryTests.swift */,
 				AA95MOTIONT000001 /* DashboardMotionTests.swift */,
 				AA94CONTRAST00001 /* ContrastTests.swift */,
+				AA03PFAUDIT0001 /* PlanFitSourceAuditTests.swift */,
 			);
 			path = Presentation;
 			sourceTree = "<group>";
@@ -709,6 +716,7 @@
 			isa = PBXGroup;
 			children = (
 				AA03WINFIXTURE0000001 /* WindowFixtures.swift */,
+				AA03PFTEXT0001 /* PlanFitModelText.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -821,6 +829,7 @@
 				AA03PFMONE0F001 /* MoneyFootnote.swift */,
 				AA03PFMODP0F001 /* ModelPatternSection.swift */,
 				AA03PFCOMP0F001 /* ProviderComparisonSection.swift */,
+				AA03PFSUBC0F001 /* SubscriptionComparisonSection.swift */,
 				AA03PFVERD0F001 /* VerdictSection.swift */,
 				AA03PFLIMIT0F001 /* LimitStatusSection.swift */,
 				AA03PFTREND0F001 /* PeriodTrendSection.swift */,
@@ -1002,6 +1011,7 @@
 				AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */,
 				AA03PFEMPT0B001 /* EmptyStateSection.swift in Sources */,
 				AA03PFMONE0B001 /* MoneyFootnote.swift in Sources */,
+				AA03PFSUBC0B001 /* SubscriptionComparisonSection.swift in Sources */,
 				AA03PFMODP0B001 /* ModelPatternSection.swift in Sources */,
 				AA03PFCOMP0B001 /* ProviderComparisonSection.swift in Sources */,
 				AA03PFVERD0B001 /* VerdictSection.swift in Sources */,
@@ -1169,6 +1179,8 @@
 				AA96PVSUMT0000002 /* PanelValueSummaryTests.swift in Sources */,
 				AA95MOTIONT000002 /* DashboardMotionTests.swift in Sources */,
 				AA94CONTRAST00002 /* ContrastTests.swift in Sources */,
+				AA03PFAUDIT0002 /* PlanFitSourceAuditTests.swift in Sources */,
+				AA03PFTEXT0002 /* PlanFitModelText.swift in Sources */,
 				AA41PFCTEST0001B /* PanelFetchCoordinatorTests.swift in Sources */,
 				B87610314D4693D729AF3D54 /* AnimationStateMapperTests.swift in Sources */,
 				11722D0924027C0E6C2E6628 /* ClaudeAuthReaderTests.swift in Sources */,

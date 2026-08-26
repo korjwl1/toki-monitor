@@ -201,6 +201,10 @@ struct PlanFitContent: View {
                 if model.modelPattern.isPresentable {
                     ModelPatternSection(model: model.modelPattern)
                 }
+                // Always drawn, in every state (T067). This block's usual
+                // content is a refusal, and a refusal that hides itself is
+                // indistinguishable from a feature that forgot to run.
+                SubscriptionComparisonSection(model: model.subscriptionComparison)
                 // Last, and smallest. FR-046: on a flat-rate subscription the
                 // limits and the headroom are what the page is for, and money
                 // may not out-rank them visually.

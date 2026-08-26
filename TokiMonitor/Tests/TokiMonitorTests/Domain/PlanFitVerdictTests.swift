@@ -595,3 +595,234 @@ struct PlanFitVerdictTests {
         )
     }
 }
+
+// MARK: - Subscription comparison (T066…T070 / contract V9)
+
+/// The comparison that mostly refuses itself.
+///
+/// The property under test is not "the numbers are right" — for every account
+/// this product can see, there are no numbers. It is that **the money cannot
+/// leave this layer on its own**, that a short lookback produces no
+/// calculation at all, and that the refusal names every reason rather than
+/// collapsing them into "not enough data".
+@Suite("Subscription comparison")
+@MainActor
+struct SubscriptionComparisonTests {
+
+    private let nowMs = WindowFixtures.nowMs
+
+    private func segments(_ rows: [(provider: String, row: WindowRow)]) -> [WindowStatsSegment] {
+        WindowStats.segments(rows: rows, nowMs: nowMs)
+    }
+
+    /// 28 days of real history, worked in, with exhaustions — an account that
+    /// HAS observed its own limits.
+    private var livedUnderLimits: [WindowStatsSegment] {
+        segments(WindowFixtures.accountA(nowMs: nowMs))
+    }
+
+    // MARK: T068 — below the gate, nothing is calculated
+
+    @Test("a lookback shorter than four cycles performs no calculation")
+    func shortLookbackDoesNotCalculate() {
+        let rows = (0..<20).map { i in
+            WindowFixtures.window(
+                endOffsetDays: Double(i) * 0.5, peakPct: 80,
+                activeMs: 2 * 3_600_000, nowMs: nowMs
+            )
+        }
+        let result = SubscriptionComparison.evaluate(
+            SubscriptionComparison.Input(
+                segments: segments(rows),
+                // Both halves of the money offered, so the only thing that can
+                // stop the calculation is the gate itself.
+                notionalPerTokenCostUsd: 400,
+                observedSubscriptionPriceUsd: 200,
+                perTokenBillingConfirmed: true
+            )
+        )
+        guard case .notCalculated(let reason) = result else {
+            Issue.record("10 days of history produced \(result) instead of no calculation")
+            return
+        }
+        guard case .lookbackShorterThanFourCycles(let observed, let required) = reason else {
+            Issue.record("wrong reason: \(reason)")
+            return
+        }
+        #expect(required == WindowStats.lookbackDays)
+        #expect(observed < required)
+    }
+
+    @Test("an account with nothing at all is not calculated either")
+    func noHistoryDoesNotCalculate() {
+        let result = SubscriptionComparison.evaluate(
+            SubscriptionComparison.Input(segments: [])
+        )
+        #expect(result == .notCalculated(.noHistoryAtAll))
+    }
+
+    // MARK: T067 — the refusal, with its reasons
+
+    @Test("an account that never lived under a limit cannot be compared")
+    func neverLivedUnderLimits() {
+        // 28 days of per-token spend and not one window: the account this
+        // question is actually about.
+        let result = SubscriptionComparison.evaluate(
+            SubscriptionComparison.Input(
+                segments: [],
+                notionalPerTokenCostUsd: 512.40
+            )
+        )
+        // With no segments AND spend present, the gate is the lookback, which
+        // no window history can satisfy — the calculation still never runs,
+        // and it still never emits a figure.
+        #expect(result != .determined(SubscriptionComparison.Determination(
+            money: SubscriptionMoneyDifference(
+                perTokenCostUsd: 512.40, subscriptionCostUsd: 0, spanDays: 28
+            ),
+            exposure: ObservedLimitExposure(
+                interruptionCount: 0, harmlessCount: 0, totalWaitMs: 0,
+                waitUnknownCount: 0, observedDays: 28, limitCount: 0
+            ),
+            observedDays: 28
+        )))
+        if case .determined = result {
+            Issue.record("an account with no observed limits produced a determination")
+        }
+    }
+
+    @Test("a full lookback with no confirmable billing is undeterminable, with every reason")
+    func fullLookbackStillUndeterminable() {
+        let result = SubscriptionComparison.evaluate(
+            SubscriptionComparison.Input(
+                segments: livedUnderLimits,
+                notionalPerTokenCostUsd: 300
+            )
+        )
+        guard case .undeterminable(let undeterminable) = result else {
+            Issue.record("expected a refusal, got \(result)")
+            return
+        }
+        // The limits WERE observed here, so that reason must not be given —
+        // a refusal that lists reasons it does not have is not a refusal a
+        // reader can act on.
+        #expect(!undeterminable.reasons.contains(.limitExposureNeverObserved))
+        #expect(undeterminable.reasons.contains(.perTokenBillingNotConfirmed))
+        #expect(undeterminable.reasons.contains(.subscriptionPriceNotObserved))
+        #expect(!undeterminable.reasons.isEmpty)
+        #expect(undeterminable.observedDays >= WindowStats.lookbackDays - 1)
+        #expect(!undeterminable.whatWouldMakeItPossible.isEmpty)
+    }
+
+    @Test("every reason says what was never observed")
+    func everyReasonHasWording() {
+        for reason in SubscriptionComparison.Reason.allCases {
+            #expect(reason.summary.count > 40, "\(reason) has no explanation worth reading")
+        }
+    }
+
+    // MARK: T066 / T070 — the money never travels alone
+
+    /// The structural claim, stated as a test over every reachable outcome:
+    /// a monetary figure exists in exactly one case, and that case also stores
+    /// the interruption count and the waiting time.
+    @Test("no outcome carries money without the interruptions")
+    func moneyNeverTravelsAlone() {
+        let inputs: [SubscriptionComparison.Input] = [
+            .init(segments: []),
+            .init(segments: [], notionalPerTokenCostUsd: 900),
+            .init(segments: livedUnderLimits),
+            .init(segments: livedUnderLimits, notionalPerTokenCostUsd: 900),
+            .init(segments: livedUnderLimits, observedSubscriptionPriceUsd: 200),
+            .init(segments: livedUnderLimits, notionalPerTokenCostUsd: 900,
+                  perTokenBillingConfirmed: true),
+            .init(segments: livedUnderLimits, notionalPerTokenCostUsd: 900,
+                  observedSubscriptionPriceUsd: 200),
+        ]
+        for input in inputs {
+            switch SubscriptionComparison.evaluate(input) {
+            case .notCalculated, .undeterminable:
+                // Neither case has a field a figure could sit in. That is the
+                // point: this is checked by the compiler, and asserted here so
+                // that adding one to either case fails a test as well.
+                continue
+            case .determined(let determination):
+                #expect(determination.exposure.interruptionCount >= 0)
+                #expect(determination.money.perTokenCostUsd > 0)
+                Issue.record("an input missing a half still produced a determination")
+            }
+        }
+    }
+
+    /// The one path that does produce a figure produces both halves.
+    @Test("a determination carries the money and the interruptions together")
+    func determinationCarriesBoth() {
+        let result = SubscriptionComparison.evaluate(
+            SubscriptionComparison.Input(
+                segments: livedUnderLimits,
+                notionalPerTokenCostUsd: 900,
+                observedSubscriptionPriceUsd: 200,
+                perTokenBillingConfirmed: true
+            )
+        )
+        guard case .determined(let determination) = result else {
+            Issue.record("expected a determination, got \(result)")
+            return
+        }
+        #expect(determination.money.savingUsd == 700)
+        // FR-045 is on the figure by construction.
+        #expect(!determination.money.qualifier.isEmpty)
+        // Account A ran out of its five-hour limit twenty times, early.
+        #expect(determination.exposure.interruptionCount > 0)
+        #expect(determination.exposure.totalWaitMs > 0)
+        #expect(determination.exposure.interruptionsPerWeek > 0)
+        #expect(determination.exposure.summary.contains(
+            "\(determination.exposure.interruptionCount)"))
+    }
+
+    /// Account B ran out as often as account A but always at the reset, so the
+    /// exposure it reports is not an interruption count (contract V5).
+    @Test("exhaustions at the reset are not counted as interruptions")
+    func resetEdgeExhaustionsAreNotInterruptions() throws {
+        let a = try #require(ObservedLimitExposure.fromObservedHistory(
+            segments(WindowFixtures.accountA(nowMs: nowMs))))
+        let b = try #require(ObservedLimitExposure.fromObservedHistory(
+            segments(WindowFixtures.accountB(nowMs: nowMs))))
+        #expect(b.harmlessCount > 0)
+        #expect(b.interruptionCount < a.interruptionCount,
+                "B ran out more often than A and must still show fewer interruptions")
+    }
+
+    @Test("an account with no windows has no observed limit exposure")
+    func noWindowsNoExposure() {
+        #expect(ObservedLimitExposure.fromObservedHistory([]) == nil)
+    }
+
+    // MARK: T069 — the tier's size is never a number this code knows
+
+    /// A tier's absolute limit, if one were hardcoded anywhere, would make a
+    /// KNOWN tier behave differently from an invented one. Every figure the
+    /// comparison and the verdict produce is identical across four plan
+    /// strings — two the provider actually mints, one from the other provider,
+    /// and one that does not exist.
+    @Test("no plan string changes any number")
+    func planStringChangesNothing() {
+        let plans = ["max_5x", "max_20x", "codex_plus", "plan_that_does_not_exist"]
+        var exposures: [ObservedLimitExposure] = []
+        var headrooms: [Double] = []
+        for plan in plans {
+            let rows = WindowFixtures.accountA(nowMs: nowMs, plan: plan)
+            let segs = segments(rows)
+            exposures.append(ObservedLimitExposure.fromObservedHistory(segs)!)
+            for verdict in PlanFitVerdict.evaluateAll(segments: segs) {
+                headrooms.append(verdict.headroom?.conservativeGrowthPct ?? -1)
+                headrooms.append(verdict.basis.statisticValue ?? -1)
+                headrooms.append(Double(verdict.basis.activeWindowCount))
+            }
+        }
+        #expect(Set(exposures).count == 1,
+                "the observed exposure moved with the plan string: \(exposures)")
+        #expect(Set(headrooms.map { Int($0 * 1000) }).count == headrooms.count / plans.count,
+                "a verdict figure moved with the plan string")
+    }
+}

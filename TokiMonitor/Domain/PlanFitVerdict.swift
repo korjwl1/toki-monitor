@@ -711,3 +711,357 @@ extension PlanFitVerdict {
         }
     }
 }
+
+// MARK: - Subscription comparison (contract V9 / T066–T070)
+//
+// "You would have saved $X on a subscription."
+//
+// The calculation is structurally identical to a cloud Savings Plan
+// recommendation — take the past usage, re-price it under a commitment — with
+// one decisive difference: **a Savings Plan changes only the price, while
+// switching to a subscription imposes limits at the same time.** An account
+// that paid per token has never met a 5-hour or a weekly limit, so a pure
+// money comparison holds the future's conditions (limited) at the past's
+// (unlimited). That is the same class of mistake that got Ofgem's personalised
+// saving projections withdrawn (research §B-4), and it is why V9 requires the
+// money and the interruptions to arrive together or not at all.
+//
+// Three properties, each structural rather than remembered:
+//
+// 1. **The money cannot travel alone.** `Determination` stores the money AND
+//    the limit exposure, both non-optional, and no other case of the enum
+//    carries a monetary figure at all. There is no value in this file that a
+//    view could render as "$X saved" with nothing beside it.
+// 2. **Below the 28-day gate nothing is computed** (T068) — not even the money.
+//    Computing it and then declining to show it is how a figure leaks; the
+//    early return happens before any arithmetic.
+// 3. **No tier's absolute limit appears anywhere** (T069 / constitution II,
+//    contract V7). Providers expose a utilisation *percentage* and never the
+//    size of the limit it is a percentage of, so a simulation of "how often
+//    would this workload have hit Max 5x" could only run on a hardcoded number.
+//    Community tools hardcode it; it goes stale silently. The only honest
+//    source of the interruption count is an account that actually lived under
+//    the limits and recorded its own windows.
+
+// MARK: Money
+
+/// The monetary half of a subscription comparison. Never constructible on its
+/// own into anything the page can draw: it exists only as a stored property of
+/// `SubscriptionComparison.Determination`, which also stores the other half.
+struct SubscriptionMoneyDifference: Equatable, Hashable, Sendable {
+    /// What the observed tokens came to at per-token prices, USD.
+    let perTokenCostUsd: Double
+    /// What the subscription cost over the same span, USD. **Observed for this
+    /// account**, never read from a catalogue: V7 forbids shipping tier prices,
+    /// which have no public machine-readable source and go stale in silence.
+    let subscriptionCostUsd: Double
+    /// The span both figures cover.
+    let spanDays: Double
+    /// FR-045, set by the initialiser. There is no way to build one without it.
+    let qualifier: String
+
+    /// Positive = the subscription would have cost less over this span.
+    var savingUsd: Double { perTokenCostUsd - subscriptionCostUsd }
+
+    init(perTokenCostUsd: Double, subscriptionCostUsd: Double, spanDays: Double) {
+        self.perTokenCostUsd = perTokenCostUsd
+        self.subscriptionCostUsd = subscriptionCostUsd
+        self.spanDays = spanDays
+        self.qualifier = L.tr("현재 가격 기준", "at current prices")
+    }
+}
+
+// MARK: Limit exposure
+
+/// The other half: how often the work actually ran into a limit, and how long
+/// it waited. **Read off windows the account itself lived through**, never
+/// simulated — see the file note above for why a simulation is not available.
+struct ObservedLimitExposure: Equatable, Hashable, Sendable {
+    /// Exhaustions that carried interruption weight (contract V5). An
+    /// exhaustion with the reset already imminent is not an interruption and
+    /// is counted separately rather than inflated into one.
+    let interruptionCount: Int
+    /// Exhaustions that happened with the reset imminent.
+    let harmlessCount: Int
+    /// Σ time still to run at exhaustion over the interrupting events — the
+    /// waiting the work actually did. A LOWER BOUND: an exhaustion whose
+    /// moment was never sampled contributes nothing here while still counting
+    /// as an interruption.
+    let totalWaitMs: Int64
+    /// Interrupting exhaustions whose timing was never sampled, so their wait
+    /// is missing from `totalWaitMs`.
+    let waitUnknownCount: Int
+    /// Days of window history the exposure was read off.
+    let observedDays: Double
+    /// The limits it was read off, by name. Carried so the figure can say what
+    /// it is about rather than presenting one number for an account.
+    let limitCount: Int
+
+    /// Weighted interruptions per observed week — the rate, not the raw total,
+    /// because the two spans being compared are rarely the same length.
+    var interruptionsPerWeek: Double {
+        guard observedDays > 0 else { return 0 }
+        return Double(interruptionCount) / (observedDays / 7)
+    }
+
+    /// The one constructor. Returns nil when the account never lived under a
+    /// limit at all — which is exactly the account this comparison is for, and
+    /// exactly why it usually cannot be answered.
+    static func fromObservedHistory(_ segments: [WindowStatsSegment]) -> ObservedLimitExposure? {
+        // A finalized window row exists only because a provider reported a
+        // rate limit for this account. No rows means the limits were never
+        // observed — and they cannot be inferred, because the provider never
+        // publishes the size of the limit a percentage is a percentage of.
+        let withHistory = segments.filter { $0.activeWindowCount > 0 }
+        guard !withHistory.isEmpty else { return nil }
+
+        var interrupting = 0
+        var harmless = 0
+        var wait: Int64 = 0
+        var waitUnknown = 0
+        for segment in withHistory {
+            for event in segment.activeUse.exhaustions {
+                guard event.interruptionWeight > 0 else {
+                    harmless += 1
+                    continue
+                }
+                interrupting += 1
+                if let left = event.timeLeftMs {
+                    wait += left
+                } else {
+                    waitUnknown += 1
+                }
+            }
+        }
+        return ObservedLimitExposure(
+            interruptionCount: interrupting,
+            harmlessCount: harmless,
+            totalWaitMs: wait,
+            waitUnknownCount: waitUnknown,
+            observedDays: withHistory.map(\.observedDays).max() ?? 0,
+            limitCount: withHistory.count
+        )
+    }
+}
+
+// MARK: The comparison
+
+/// Contract V9. A subscription comparison, or the reasoned refusal to make one.
+enum SubscriptionComparison: Equatable, Sendable {
+
+    /// T068. The lookback is shorter than four times the longest limit cycle,
+    /// so **no calculation is performed** — AWS asks for a 32-day lookback to
+    /// capture a monthly cycle and Azure writes that 7 days cannot be trusted
+    /// (research §B-1, §B-2).
+    case notCalculated(NotCalculatedReason)
+
+    /// T067. The calculation was attempted and refused. Every reason it was
+    /// refused travels with it, and **no monetary figure does**.
+    case undeterminable(Undeterminable)
+
+    /// Both halves present. Reachable only for an account that lived through
+    /// both states — see `Undeterminable.whatWouldMakeItPossible`.
+    case determined(Determination)
+
+    // MARK: Cases' payloads
+
+    enum NotCalculatedReason: Equatable, Hashable, Sendable {
+        /// V2.1's gate, applied to this calculation as well.
+        case lookbackShorterThanFourCycles(observedDays: Double, requiredDays: Double)
+        /// Not one finalized window and not one priced token event: there is
+        /// nothing to calculate from in either direction.
+        case noHistoryAtAll
+    }
+
+    /// Why the answer for this account is "cannot be determined".
+    ///
+    /// Each reason is a fact about what was never observed, not a fault. All
+    /// of them are reported: an account usually fails more than one, and
+    /// naming only the first would make the gap look narrower than it is.
+    enum Reason: Equatable, Hashable, Sendable, CaseIterable {
+        /// No finalized window under any limit for this account, so how often
+        /// the work would have been stopped was never observed — and it cannot
+        /// be simulated, because a provider exposes a utilisation percentage
+        /// and never the size of the limit behind it.
+        case limitExposureNeverObserved
+        /// The provider does not report how an account is billed. A cost
+        /// computed from the price table is notional, not a bill, and a
+        /// "saving" against a bill nobody observed is a guess.
+        case perTokenBillingNotConfirmed
+        /// No subscription price was ever observed for this account, and V7
+        /// forbids shipping a tier catalogue: there is no public
+        /// machine-readable source for it and a copied figure goes stale in
+        /// silence.
+        case subscriptionPriceNotObserved
+
+        var summary: String {
+            switch self {
+            case .limitExposureNeverObserved:
+                return L.tr(
+                    "이 계정이 한도 아래에서 일한 기록이 없습니다 — 같은 작업이 몇 번 막혔을지가 관측된 적이 없습니다. 공급자는 소진율을 퍼센트로만 알려주고 그 퍼센트의 분모(티어별 실제 한도 크기)는 공개하지 않으므로, 시뮬레이션으로 대신할 수도 없습니다.",
+                    "This account has no record of working under a limit, so how often the same work would have been stopped was never observed. It cannot be simulated either: providers report exhaustion as a percentage and never publish the limit that percentage is of."
+                )
+            case .perTokenBillingNotConfirmed:
+                return L.tr(
+                    "공급자는 이 계정이 토큰 단가로 청구되는지 알려주지 않습니다. 가격표로 계산한 금액은 청구액이 아니라 참고값이며, 관측되지 않은 청구액과의 차액은 추측입니다.",
+                    "The provider does not report whether this account is billed per token. A figure computed from the price table is a reference value, not a bill, and a difference against a bill nobody observed is a guess."
+                )
+            case .subscriptionPriceNotObserved:
+                return L.tr(
+                    "이 계정이 낸 구독료가 관측된 적이 없습니다. 티어별 월 요금표는 제품에 담지 않습니다 — 기계가 읽을 공개 출처가 없고, 베껴 넣으면 값이 바뀔 때 조용히 틀립니다.",
+                    "No subscription price was ever observed for this account. Tier prices are deliberately not shipped in this product: there is no public machine-readable source for them, and a copied figure goes quietly wrong when it changes."
+                )
+            }
+        }
+    }
+
+    struct Undeterminable: Equatable, Sendable {
+        /// Non-empty. Built only through `SubscriptionComparison.evaluate`,
+        /// which appends one entry per missing half.
+        let reasons: [Reason]
+        /// Days of history the refusal was made on, so the refusal carries a
+        /// basis the same way a verdict does (V3).
+        let observedDays: Double
+
+        /// What it would take. Not "wait longer" — no amount of waiting
+        /// produces this for an account that never lived under a limit.
+        var whatWouldMakeItPossible: String {
+            L.tr(
+                "같은 계정이 두 상태를 모두 겪은 경우에만 답할 수 있습니다 — 토큰 단가로 쓰다가 구독으로 전환해, 전환 후 자기 윈도우로 한도에 걸린 횟수와 대기 시간을 직접 관측하고, 실제로 낸 구독료가 확인되는 경우입니다. 그전까지 금액만 보여주는 것은 한도가 없던 과거의 조건으로 한도가 있는 미래의 절감액을 말하는 것입니다.",
+                "Only an account that lived through both states can answer it: paid per token, then subscribed, then observed in its own windows how often the same work hit a limit and how long it waited — with the subscription price it actually paid confirmed. Until then, showing the money alone would price a limited future on the terms of an unlimited past."
+            )
+        }
+    }
+
+    /// Both halves, stored and non-optional. This is the whole of T066: there
+    /// is no initialiser, and no other case, that produces the money without
+    /// the interruptions.
+    struct Determination: Equatable, Sendable {
+        let money: SubscriptionMoneyDifference
+        let exposure: ObservedLimitExposure
+        let observedDays: Double
+    }
+
+    // MARK: Evaluation
+
+    /// Everything the comparison is allowed to read.
+    ///
+    /// `observedSubscriptionPriceUsd` has no producer in this build, and that
+    /// is deliberate rather than unfinished: V7 rules out a shipped catalogue,
+    /// and there is no provider field carrying what the user pays. It is a
+    /// parameter so the calculation is a real, exercised path the day an
+    /// observed price exists — not a branch that has to be written then.
+    struct Input: Equatable, Sendable {
+        let segments: [WindowStatsSegment]
+        /// Tokens re-priced at today's table, USD. Notional by construction —
+        /// see `Reason.perTokenBillingNotConfirmed`.
+        let notionalPerTokenCostUsd: Double?
+        /// A subscription price this account was observed to pay over the same
+        /// span, USD.
+        let observedSubscriptionPriceUsd: Double?
+        /// Whether the account was confirmed to be billed per token. No
+        /// provider field carries this today, so it is false in production.
+        let perTokenBillingConfirmed: Bool
+
+        init(
+            segments: [WindowStatsSegment],
+            notionalPerTokenCostUsd: Double? = nil,
+            observedSubscriptionPriceUsd: Double? = nil,
+            perTokenBillingConfirmed: Bool = false
+        ) {
+            self.segments = segments
+            self.notionalPerTokenCostUsd = notionalPerTokenCostUsd
+            self.observedSubscriptionPriceUsd = observedSubscriptionPriceUsd
+            self.perTokenBillingConfirmed = perTokenBillingConfirmed
+        }
+    }
+
+    /// The lookback this calculation needs, shared with the verdict gate: both
+    /// are "four times the longest limit cycle" and having two numbers for one
+    /// rule is how they drift apart.
+    static var requiredObservedDays: Double { PlanFitVerdict.requiredObservedDays }
+    static var observedDaysTolerance: Double { PlanFitVerdict.observedDaysTolerance }
+
+    static func evaluate(_ input: Input) -> SubscriptionComparison {
+        let observedDays = input.segments.map(\.observedDays).max() ?? 0
+
+        // T068, first and before any arithmetic. A figure that is computed and
+        // then withheld is a figure one refactor away from being rendered.
+        if input.segments.isEmpty && input.notionalPerTokenCostUsd == nil {
+            return .notCalculated(.noHistoryAtAll)
+        }
+        guard observedDays >= requiredObservedDays - observedDaysTolerance else {
+            return .notCalculated(.lookbackShorterThanFourCycles(
+                observedDays: observedDays, requiredDays: requiredObservedDays
+            ))
+        }
+
+        let exposure = ObservedLimitExposure.fromObservedHistory(input.segments)
+
+        var reasons: [Reason] = []
+        if exposure == nil { reasons.append(.limitExposureNeverObserved) }
+        if !input.perTokenBillingConfirmed || input.notionalPerTokenCostUsd == nil {
+            reasons.append(.perTokenBillingNotConfirmed)
+        }
+        if input.observedSubscriptionPriceUsd == nil {
+            reasons.append(.subscriptionPriceNotObserved)
+        }
+
+        guard reasons.isEmpty,
+              let exposure,
+              let perToken = input.notionalPerTokenCostUsd,
+              let subscription = input.observedSubscriptionPriceUsd
+        else {
+            return .undeterminable(Undeterminable(
+                // Never empty: reaching here with no reason would mean every
+                // half was present, which the guard above already accepted.
+                reasons: reasons.isEmpty ? [.limitExposureNeverObserved] : reasons,
+                observedDays: observedDays
+            ))
+        }
+
+        return .determined(Determination(
+            money: SubscriptionMoneyDifference(
+                perTokenCostUsd: perToken,
+                subscriptionCostUsd: subscription,
+                spanDays: observedDays
+            ),
+            exposure: exposure,
+            observedDays: observedDays
+        ))
+    }
+}
+
+// MARK: - Wording
+
+extension SubscriptionComparison.NotCalculatedReason {
+    var summary: String {
+        switch self {
+        case .lookbackShorterThanFourCycles(let observed, let required):
+            return L.tr(
+                "계산하지 않았습니다 — 최장 한도 주기의 4배(\(Int(required))일)가 필요한데 관측은 \(Int(observed.rounded()))일입니다.",
+                "No calculation was run — this needs four times the longest limit cycle (\(Int(required)) days) and \(Int(observed.rounded())) are observed."
+            )
+        case .noHistoryAtAll:
+            return L.tr(
+                "계산하지 않았습니다 — 아직 윈도우 기록도 토큰 사용 기록도 없습니다.",
+                "No calculation was run — there is neither a window record nor a token record yet."
+            )
+        }
+    }
+}
+
+extension ObservedLimitExposure {
+    /// The interruption sentence. The waiting time is a floor whenever an
+    /// exhaustion's moment was never sampled, and it says so.
+    var summary: String {
+        let hours = Double(totalWaitMs) / 3_600_000
+        let waitText = waitUnknownCount > 0
+            ? L.tr("\(String(format: "%.1f", hours))시간 이상", "\(String(format: "%.1f", hours))h or more")
+            : L.tr("\(String(format: "%.1f", hours))시간", "\(String(format: "%.1f", hours))h")
+        return L.tr(
+            "관측된 한도 노출: 실질적으로 막힌 소진 \(interruptionCount)회, 총 대기 \(waitText) (주당 \(String(format: "%.1f", interruptionsPerWeek))회, 리셋 직전 소진 \(harmlessCount)회는 방해로 세지 않음)",
+            "Observed limit exposure: \(interruptionCount) exhaustions that actually stopped the work, \(waitText) waiting in total (\(String(format: "%.1f", interruptionsPerWeek))×/week; \(harmlessCount) that landed just before a reset are not counted as interruptions)"
+        )
+    }
+}

@@ -1029,14 +1029,16 @@ struct PlanFitMoneyTests {
             unit: full.unit, lede: full.lede, otherVerdicts: full.otherVerdicts,
             trend: full.trend, limitGroups: full.limitGroups, activeUse: full.activeUse,
             comparison: full.comparison, modelPattern: full.modelPattern,
-            money: .empty, readiness: full.readiness,
+            money: .empty, subscriptionComparison: full.subscriptionComparison,
+            readiness: full.readiness,
             quietLimitsNote: full.quietLimitsNote, sourceNote: full.sourceNote
         )
         let withoutLimits = PlanFitModel(
             unit: full.unit, lede: full.lede, otherVerdicts: full.otherVerdicts,
             trend: full.trend, limitGroups: [], activeUse: [],
             comparison: full.comparison, modelPattern: full.modelPattern,
-            money: full.money, readiness: full.readiness,
+            money: full.money, subscriptionComparison: full.subscriptionComparison,
+            readiness: full.readiness,
             quietLimitsNote: full.quietLimitsNote, sourceNote: full.sourceNote
         )
 
