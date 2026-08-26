@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftUI
 @testable import TokiMonitor
 
 // MARK: - Two absences, proved over the sources (T069, T077)
@@ -289,5 +290,181 @@ struct NoCohortComparisonTests {
             let offenders = text.filter { $0.contains(phrase) }
             #expect(offenders.isEmpty, "\(snapshotCase.name) says \(phrase): \(offenders)")
         }
+    }
+}
+
+// MARK: - T075 / T076
+
+@Suite("Colour is never the only carrier, and the page never moves")
+@MainActor
+struct PlanFitColourAndMotionTests {
+
+    // MARK: T075 — every varying colour has a varying shape or word beside it
+
+    /// Enumerated rather than described: each of these is a place on the page
+    /// where the colour changes with the meaning, and each has to change
+    /// something else at the same time.
+    @Test("every semantic tone brings a distinct symbol")
+    func markTonesCarryShape() {
+        let tones: [PlanFitMark.Tone] = [.neutral, .attention, .blocked]
+        #expect(Set(tones.map(\.symbolName)).count == tones.count)
+    }
+
+    @Test("every provenance brings a distinct symbol and a distinct word")
+    func provenanceCarriesShapeAndWord() {
+        let all = Provenance.allCases
+        #expect(Set(all.map(\.symbolName)).count == all.count)
+        #expect(Set(all.map(\.label)).count == all.count)
+        #expect(all.allSatisfy { !$0.explanation.isEmpty })
+    }
+
+    /// An exhaustion's severity picks its tick colour AND its tick height, and
+    /// every severity has a word for the row beside the strip.
+    @Test("exhaustion severity changes the tick's height, not only its colour")
+    func severityCarriesHeight() {
+        let severities: [ActiveUseLimitModel.Severity] =
+            [.interrupting, .partial, .harmless, .unknownTiming]
+        #expect(Set(severities.map(\.label)).count == severities.count)
+        // `harmless` and `unknownTiming` deliberately share a height: they are
+        // both short marks, and they are told apart by the word, which is why
+        // the label check above is the one that has to be exhaustive.
+        #expect(ExhaustionTimingStrip.tickHeight(.interrupting)
+                > ExhaustionTimingStrip.tickHeight(.partial))
+        #expect(ExhaustionTimingStrip.tickHeight(.partial)
+                > ExhaustionTimingStrip.tickHeight(.harmless))
+    }
+
+    /// A period still running is drawn hollow with a dashed edge, and it also
+    /// carries a note in words. The note is what this can assert from the
+    /// model; the dashed edge is asserted in pixels below.
+    @Test("an unfinished period is named in words, not only drawn differently",
+          arguments: PlanFitSnapshotMatrix.all)
+    func incompletePeriodsCarryAWord(snapshotCase: PlanFitSnapshotCase) {
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
+        for bar in model.trend.bars where !bar.isComplete {
+            #expect(bar.incompleteNote?.isEmpty == false,
+                    "\(snapshotCase.name): an unfinished period is distinguished only by its outline")
+        }
+    }
+
+    /// The pixel half of FR-058, and the only kind of proof that catches a
+    /// hue-only distinction: strip the hue and the two marks must still differ.
+    ///
+    /// If `attention` and `blocked` were the same lightness in different hues,
+    /// their luminance fields would be identical and a reader who cannot
+    /// separate the hues would see one mark twice.
+    @Test("two semantic marks stay different with the hue removed",
+          arguments: PlanFitSnapshotTheme.allCases)
+    func marksDifferInGreyscale(theme: PlanFitSnapshotTheme) throws {
+        let size = CGSize(width: 220, height: 40)
+        let same = L.tr("한도에 걸렸습니다", "the limit was reached")
+        let attention = try #require(PlanFitSnapshotRenderer.raster(
+            PlanFitMark(tone: .attention, text: same), theme: theme, size: size))
+        let blocked = try #require(PlanFitSnapshotRenderer.raster(
+            PlanFitMark(tone: .blocked, text: same), theme: theme, size: size))
+        let neutral = try #require(PlanFitSnapshotRenderer.raster(
+            PlanFitMark(tone: .neutral, text: same), theme: theme, size: size))
+
+        // The same words in all three, so anything that differs is the symbol
+        // or the weight — never the hue, which greyscale has already removed.
+        for (name, other) in [("blocked", blocked), ("neutral", neutral)] {
+            let difference = PanelRaster.luminanceDifference(attention, other)
+            #expect(difference > 0.001,
+                    "attention and \(name) are identical once the hue is removed (\(difference)) in \(theme)")
+        }
+    }
+
+    /// And the timing strip: a strip of early exhaustions must not look like a
+    /// strip of harmless ones in greyscale either.
+    @Test("the timing strip encodes severity in more than hue",
+          arguments: PlanFitSnapshotTheme.allCases)
+    func timingStripDiffersInGreyscale(theme: PlanFitSnapshotTheme) throws {
+        let size = CGSize(width: 300, height: 60)
+        func strip(_ severity: ActiveUseLimitModel.Severity) -> some View {
+            ExhaustionTimingStrip(ticks: (0..<6).map { index in
+                ActiveUseLimitModel.Tick(
+                    id: Int64(index),
+                    fractionLeft: 0.2 + Double(index) * 0.1,
+                    severity: severity
+                )
+            })
+        }
+        let early = try #require(PlanFitSnapshotRenderer.raster(
+            strip(.interrupting), theme: theme, size: size))
+        let harmless = try #require(PlanFitSnapshotRenderer.raster(
+            strip(.harmless), theme: theme, size: size))
+        let difference = PanelRaster.luminanceDifference(early, harmless)
+        #expect(difference > 0.001,
+                "early and harmless exhaustions are identical without hue (\(difference)) in \(theme)")
+    }
+
+    // MARK: T076 — the page respects the system, because it never moves
+
+    /// Reduce Motion is honoured structurally rather than by consulting it:
+    /// **the page has no animation to reduce.** Nothing on it grows out of an
+    /// axis, fades in or slides, so there is no state in which the setting
+    /// would change what a reader sees.
+    ///
+    /// The scan is the guarantee. A `withAnimation` added later would make the
+    /// page animate without anyone remembering that `Motion` exists, and this
+    /// is what fails when that happens.
+    @Test("no plan-fit source can animate")
+    func planFitDoesNotAnimate() throws {
+        let files = try #require(SourceTree.files(under: "Presentation/PlanFit"))
+        var findings: [String] = []
+        for file in files {
+            for (number, text) in SourceTree.code(of: file) {
+                for construct in ["withAnimation", ".animation(", ".transition(",
+                                  "matchedGeometryEffect", "repeatForever"] {
+                    if text.contains(construct) {
+                        findings.append("\(file.lastPathComponent):\(number) — \(construct)")
+                    }
+                }
+            }
+        }
+        #expect(findings.isEmpty,
+                "FR-061: the page animates, so it must consult `Motion` / accessibilityReduceMotion; found \(findings)")
+    }
+
+    /// System appearance is honoured the same way: every colour on the page is
+    /// dynamic. Nothing is a fixed sRGB triple except the two semantic tones,
+    /// and those resolve through `NSAppearance.bestMatch` — which is exactly
+    /// what makes them appearance-aware rather than what makes them fixed.
+    @Test("no plan-fit source hardcodes a colour that cannot follow the appearance")
+    func planFitColoursAreDynamic() throws {
+        let files = try #require(SourceTree.files(under: "Presentation/PlanFit"))
+        var findings: [String] = []
+        for file in files {
+            for (number, text) in SourceTree.code(of: file) {
+                // `Color(nsColor: .init(name:))` is the appearance-resolving
+                // form and is the one exemption; a bare literal is not.
+                let appearanceResolved = text.contains("appearance.bestMatch")
+                    || text.contains("srgbRed")
+                for literal in ["Color.black", "Color.white", "Color(red:", "Color(white:",
+                                "Color.red", "Color.orange", "Color.green", "Color.yellow"] {
+                    if text.contains(literal), !appearanceResolved {
+                        findings.append("\(file.lastPathComponent):\(number) — \(literal)")
+                    }
+                }
+            }
+        }
+        #expect(findings.isEmpty,
+                "FR-061: a fixed colour cannot follow the system appearance; found \(findings)")
+    }
+
+    /// And the render proof: light and dark are genuinely different pages, not
+    /// one page with a tinted background.
+    @Test("the two appearances produce different ink, not just different grounds")
+    func appearancesDifferInInk() throws {
+        let light = try #require(PlanFitSnapshotRenderer.render(
+            PlanFitSnapshotCase(sufficiency: .sufficient, segments: .four, theme: .light)))
+        let dark = try #require(PlanFitSnapshotRenderer.render(
+            PlanFitSnapshotCase(sufficiency: .sufficient, segments: .four, theme: .dark)))
+        // Both must carry readable text against their own ground; a page that
+        // followed only the backdrop would fail on one of them.
+        #expect(light.pagePeakContrast >= 4.5)
+        #expect(dark.pagePeakContrast >= 4.5)
+        #expect(PanelRaster.luminanceDifference(light, dark) > 0.5,
+                "the two appearances are nearly the same render")
     }
 }

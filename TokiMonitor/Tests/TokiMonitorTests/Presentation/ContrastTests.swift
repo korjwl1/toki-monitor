@@ -256,3 +256,143 @@ struct ContrastTests {
         #expect(abs(half.r - 0.5) < 0.0001)
     }
 }
+
+// MARK: - The plan-fit page's own tokens (T073)
+//
+// The page has its own ink scale and its own card stack, so the dashboard's
+// four grounds do not describe it: `PlanFitSurface` nests an `.inner` card
+// inside a `.section` card inside the window, and each fill darkens (or lifts)
+// the one under it. Text drawn in the deepest card sits on the worst ground
+// the page produces, and that is the ground the floor has to be cleared on.
+//
+// The grounds are COMPOSITED from `PlanFitSurface.fill` rather than written
+// down as hexes, so a change to a surface moves the measurement with it
+// instead of leaving the table describing a page that no longer exists.
+//
+// This is the measurement that found the one failure: `PlanFitMark.Tone
+// .attention` was rgb(0.62, 0.36, 0.0), which clears 4.5:1 on the bare page
+// and measures 4.29:1 in the deepest card — legible enough to pass a glance
+// and not enough to pass FR-057.
+
+@Suite("Plan-fit colour token contrast", .serialized)
+@MainActor
+struct PlanFitContrastTests {
+
+    /// A ground the plan-fit page actually produces.
+    struct Ground: Sendable {
+        let name: String
+        let dark: Bool
+        let rgb: WCAG.RGB
+    }
+
+    /// The window ground, then each card stacked on it. `.lede` is the darkest
+    /// single card and `.inner` inside `.section` is the deepest stack the page
+    /// builds; both are measured because either can be the worst depending on
+    /// appearance.
+    static var grounds: [Ground] {
+        var out: [Ground] = []
+        for dark in [false, true] {
+            let page = WCAG.resolve(dark ? Color(white: 0.11) : Color(white: 0.96), dark: dark)
+            let base = page.rgb
+            out.append(Ground(name: dark ? "page dark" : "page light", dark: dark, rgb: base))
+
+            func stack(_ surfaces: [PlanFitSurface]) -> WCAG.RGB {
+                surfaces.reduce(base) { ground, surface in
+                    let fill = WCAG.resolve(surface.fill, dark: dark)
+                    return WCAG.composite(fill.rgb, alpha: fill.alpha, over: ground)
+                }
+            }
+            out.append(Ground(name: dark ? "lede dark" : "lede light",
+                              dark: dark, rgb: stack([.lede])))
+            out.append(Ground(name: dark ? "section+inner dark" : "section+inner light",
+                              dark: dark, rgb: stack([.section, .inner])))
+        }
+        return out
+    }
+
+    /// Every foreground the page draws with, and the floor its job sets.
+    ///
+    /// `PlanFitInk.faint` is held to the TEXT floor, not the 3:1 one, even
+    /// though it is the lightest of the three. It carries provenance tags, the
+    /// legend, a verdict's basis line and every caveat — all of them sentences
+    /// a reader is expected to read, and several of them the sentences that
+    /// stop a number being misread.
+    static var tokens: [ContrastToken] {
+        [
+            ContrastToken(name: "PlanFitInk.strong", color: PlanFitInk.strong, role: .bodyText),
+            ContrastToken(name: "PlanFitInk.support", color: PlanFitInk.support, role: .bodyText),
+            ContrastToken(name: "PlanFitInk.faint", color: PlanFitInk.faint, role: .bodyText),
+            ContrastToken(name: "PlanFitMark neutral", color: PlanFitMark.Tone.neutral.color, role: .bodyText),
+            ContrastToken(name: "PlanFitMark attention", color: PlanFitMark.Tone.attention.color, role: .bodyText),
+            ContrastToken(name: "PlanFitMark blocked", color: PlanFitMark.Tone.blocked.color, role: .bodyText),
+            ContrastToken(
+                name: "PlanFitSurface.section stroke", color: PlanFitSurface.section.stroke,
+                role: .decorative,
+                exemption: "A card's edge. The card is already separated by its "
+                    + "fill, its padding and its heading; the stroke only "
+                    + "sharpens an edge that three other things already draw."
+            ),
+            ContrastToken(
+                name: "PlanFitSurface.lede stroke", color: PlanFitSurface.lede.stroke,
+                role: .decorative,
+                exemption: "As above, on the one card that also carries the "
+                    + "largest type on the page."
+            ),
+        ]
+    }
+
+    private func ratio(_ token: ContrastToken, on ground: Ground) -> Double {
+        let resolved = WCAG.resolve(token.color, dark: ground.dark)
+        let over = WCAG.composite(resolved.rgb, alpha: resolved.alpha, over: ground.rgb)
+        return WCAG.contrast(over, ground.rgb)
+    }
+
+    @Test("every plan-fit token clears its floor on every surface the page builds")
+    func tokensClearTheirFloor() {
+        var report: [String] = []
+        for token in Self.tokens {
+            for ground in Self.grounds {
+                let measured = ratio(token, on: ground)
+                report.append(String(format: "%@ on %@: %.2f:1 (%@)",
+                                     token.name, ground.name, measured, token.role.rawValue))
+                guard let floor = token.role.floor else { continue }
+                let message = String(format: "%@ on %@ measures %.2f:1, below the %.1f:1 floor",
+                                     token.name, ground.name, measured, floor)
+                #expect(measured >= floor, "\(message)")
+            }
+        }
+        // FR-057 asks for measured values in both appearances, so they are
+        // printed rather than only asserted.
+        print("== plan-fit token contrast ==\n" + report.joined(separator: "\n"))
+    }
+
+    /// The semantic marks are the ones a reader has to tell apart, so they are
+    /// held to a second bar as well: each tone must be distinguishable from the
+    /// neutral one, in case a reader can see colour but not much of it.
+    @Test("the semantic tones are distinguishable from neutral, not just legible")
+    func semanticTonesDifferFromNeutral() {
+        for ground in Self.grounds {
+            let neutral = WCAG.resolve(PlanFitMark.Tone.neutral.color, dark: ground.dark)
+            let neutralOver = WCAG.composite(neutral.rgb, alpha: neutral.alpha, over: ground.rgb)
+            for tone in [PlanFitMark.Tone.attention, .blocked] {
+                let resolved = WCAG.resolve(tone.color, dark: ground.dark)
+                let over = WCAG.composite(resolved.rgb, alpha: resolved.alpha, over: ground.rgb)
+                let difference = abs(over.r - neutralOver.r) + abs(over.g - neutralOver.g)
+                    + abs(over.b - neutralOver.b)
+                #expect(difference > 0.15,
+                        "\(tone) is barely distinguishable from neutral on \(ground.name)")
+            }
+        }
+    }
+
+    /// And the reason the bar above matters less than it looks: a reader who
+    /// sees no colour at all still gets the meaning, because every tone carries
+    /// a distinct SF Symbol and the mark renders the word beside it.
+    @Test("each tone carries a distinct symbol, so colour is never the only carrier")
+    func everyToneHasItsOwnSymbol() {
+        let tones: [PlanFitMark.Tone] = [.neutral, .attention, .blocked]
+        let symbols = tones.map(\.symbolName)
+        #expect(Set(symbols).count == tones.count, "two tones share a symbol: \(symbols)")
+        #expect(symbols.allSatisfy { !$0.isEmpty })
+    }
+}

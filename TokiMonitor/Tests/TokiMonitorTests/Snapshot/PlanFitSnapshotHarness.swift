@@ -310,6 +310,38 @@ extension PanelRaster {
         return count
     }
 
+
+    /// The raster with every hue removed, as WCAG relative luminance per
+    /// sampled pixel.
+    ///
+    /// This is how a pixel test can speak to FR-058 at all. If a distinction
+    /// were carried by colour ALONE — two marks the same lightness in
+    /// different hues — the greyscale versions would be identical, and a
+    /// reader who cannot separate the hues would be looking at the same thing
+    /// twice. Sampled on the same 2px stride as the other measurements here.
+    func luminanceField() -> [Double] {
+        var out: [Double] = []
+        out.reserveCapacity((height / 2) * (width / 2))
+        for y in stride(from: 0, to: height, by: 2) {
+            for x in stride(from: 0, to: width, by: 2) {
+                let p = rgb(x: x, y: y)
+                out.append(WCAG.luminance(WCAG.RGB(r: p.0, g: p.1, b: p.2)))
+            }
+        }
+        return out
+    }
+
+    /// Share of sampled pixels whose luminance differs by more than `epsilon`.
+    static func luminanceDifference(_ a: PanelRaster, _ b: PanelRaster, epsilon: Double = 0.01) -> Double {
+        let left = a.luminanceField(), right = b.luminanceField()
+        guard left.count == right.count, !left.isEmpty else { return 1 }
+        var differing = 0
+        for index in left.indices where abs(left[index] - right[index]) > epsilon {
+            differing += 1
+        }
+        return Double(differing) / Double(left.count)
+    }
+
     /// Ink inside the outermost `margin` device pixels of the left and right
     /// edges.
     ///

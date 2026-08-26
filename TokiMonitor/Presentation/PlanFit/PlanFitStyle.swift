@@ -54,12 +54,18 @@ enum PlanFitType {
 /// appearances, and `PlanFitSnapshotTests` measures the rendered pixels rather
 /// than trusting the arithmetic.
 enum PlanFitInk {
-    /// Values, headlines, anything load-bearing.
+    /// Values, headlines, anything load-bearing. 12.8:1 at worst.
     static let strong = Color.primary
-    /// Running text and labels. ~8.9:1 light, ~7.7:1 dark.
+    /// Running text and labels. 5.6:1 light, 6.5:1 dark.
     static let support = Color.primary.opacity(0.72)
-    /// Provenance tags and legends. ~5.7:1 light, ~6.5:1 dark.
-    static let faint = Color.primary.opacity(0.6)
+    /// Provenance tags, legends, a verdict's basis line, every caveat.
+    ///
+    /// Held to the 4.5:1 TEXT floor rather than the 3:1 one despite being the
+    /// lightest of the three: these are the sentences that stop a number being
+    /// misread, and a caveat nobody can read is a caveat that is not there.
+    /// It was 0.6 and measured 3.92:1 in the deepest card — under the floor on
+    /// every light ground the page builds. 4.6:1 light, 5.5:1 dark.
+    static let faint = Color.primary.opacity(0.68)
 }
 
 // MARK: - Provenance (T052 / FR-047, FR-049)
@@ -277,10 +283,14 @@ struct PlanFitMark: View {
             // Not `.orange` / `.red`: the system accents drop under 4.5:1 on a
             // light background. These are darkened for light mode and lifted
             // for dark, resolved through the appearance rather than fixed.
+            // The light value is darker than it looks like it needs to be:
+            // 0.62/0.36/0 clears 4.5:1 on the bare page and measures 4.32:1
+            // inside the lede card, which is where the page's most important
+            // warning is actually drawn (`PlanFitContrastTests`).
             case .attention: return Color(nsColor: .init(name: nil) { appearance in
                 appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
                     ? .init(srgbRed: 1.0, green: 0.70, blue: 0.28, alpha: 1)
-                    : .init(srgbRed: 0.62, green: 0.36, blue: 0.0, alpha: 1)
+                    : .init(srgbRed: 0.56, green: 0.33, blue: 0.0, alpha: 1)
             })
             case .blocked: return Color(nsColor: .init(name: nil) { appearance in
                 appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
