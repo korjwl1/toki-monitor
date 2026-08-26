@@ -21,6 +21,8 @@
 		AA98MINWIN0000002 /* MinimumWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA98MINWIN0000001 /* MinimumWindowTests.swift */; };
 		AA40PSNAPHARN00002 /* PanelSnapshotHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */; };
 		AA40PSTATETEST0002 /* PanelStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSTATETEST0001 /* PanelStateTests.swift */; };
+		AB01PTIMET0000002 /* PanelTimeOverrideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB01PTIMET0000001 /* PanelTimeOverrideTests.swift */; };
+		AA99VMAPT00000002 /* ValueMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA99VMAPT00000001 /* ValueMappingTests.swift */; };
 		AA97SERSTATT00002 /* SeriesStatisticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA97SERSTATT00001 /* SeriesStatisticsTests.swift */; };
 		AA93CROSSHT000002 /* DashboardCrosshairTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA93CROSSHT000001 /* DashboardCrosshairTests.swift */; };
 		AA92TRZOOMT000002 /* TimeRangeZoomTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA92TRZOOMT000001 /* TimeRangeZoomTests.swift */; };
@@ -34,6 +36,7 @@
 		AA80JSONVALUE0000002 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80JSONVALUE0000001 /* JSONValue.swift */; };
 		AA80UNKNOWNPANEL0002 /* UnknownPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80UNKNOWNPANEL0001 /* UnknownPanelView.swift */; };
 		AA40PANELSTATE0002 /* PanelState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PANELSTATE0001 /* PanelState.swift */; };
+		AA81PTIMEOVR00002 /* PanelTimeOverride.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA81PTIMEOVR00001 /* PanelTimeOverride.swift */; };
 		AA80SERSTATS00002 /* SeriesStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80SERSTATS00001 /* SeriesStatistics.swift */; };
 		AA78CROSSH000002 /* DashboardCrosshair.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA78CROSSH000001 /* DashboardCrosshair.swift */; };
 		AA77TRZOOM000002 /* TimeRangeZoom.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA77TRZOOM000001 /* TimeRangeZoom.swift */; };
@@ -246,6 +249,8 @@
 		AA98MINWIN0000001 /* MinimumWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinimumWindowTests.swift; sourceTree = "<group>"; };
 		AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelSnapshotHarness.swift; sourceTree = "<group>"; };
 		AA40PSTATETEST0001 /* PanelStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateTests.swift; sourceTree = "<group>"; };
+		AB01PTIMET0000001 /* PanelTimeOverrideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelTimeOverrideTests.swift; sourceTree = "<group>"; };
+		AA99VMAPT00000001 /* ValueMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValueMappingTests.swift; sourceTree = "<group>"; };
 		AA97SERSTATT00001 /* SeriesStatisticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesStatisticsTests.swift; sourceTree = "<group>"; };
 		AA93CROSSHT000001 /* DashboardCrosshairTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCrosshairTests.swift; sourceTree = "<group>"; };
 		AA92TRZOOMT000001 /* TimeRangeZoomTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeRangeZoomTests.swift; sourceTree = "<group>"; };
@@ -259,6 +264,7 @@
 		AA80JSONVALUE0000001 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
 		AA80UNKNOWNPANEL0001 /* UnknownPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnknownPanelView.swift; sourceTree = "<group>"; };
 		AA40PANELSTATE0001 /* PanelState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelState.swift; sourceTree = "<group>"; };
+		AA81PTIMEOVR00001 /* PanelTimeOverride.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelTimeOverride.swift; sourceTree = "<group>"; };
 		AA80SERSTATS00001 /* SeriesStatistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesStatistics.swift; sourceTree = "<group>"; };
 		AA78CROSSH000001 /* DashboardCrosshair.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCrosshair.swift; sourceTree = "<group>"; };
 		AA77TRZOOM000001 /* TimeRangeZoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeRangeZoom.swift; sourceTree = "<group>"; };
@@ -716,6 +722,8 @@
 				AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */,
 				AA40POPTTESTS00001 /* PanelOptionsTests.swift */,
 				AA40PSTATETEST0001 /* PanelStateTests.swift */,
+				AB01PTIMET0000001 /* PanelTimeOverrideTests.swift */,
+				AA99VMAPT00000001 /* ValueMappingTests.swift */,
 				AA97SERSTATT00001 /* SeriesStatisticsTests.swift */,
 				AA93CROSSHT000001 /* DashboardCrosshairTests.swift */,
 				AA92TRZOOMT000001 /* TimeRangeZoomTests.swift */,
@@ -840,6 +848,7 @@
 				AA62SERIESVIS00001 /* SeriesVisibility.swift */,
 				AA61PANELRPT000001 /* PanelRepeat.swift */,
 				AA40PANELSTATE0001 /* PanelState.swift */,
+				AA81PTIMEOVR00001 /* PanelTimeOverride.swift */,
 				AA80SERSTATS00001 /* SeriesStatistics.swift */,
 				AA78CROSSH000001 /* DashboardCrosshair.swift */,
 				AA77TRZOOM000001 /* TimeRangeZoom.swift */,
@@ -1004,6 +1013,7 @@
 				AA80JSONVALUE0000002 /* JSONValue.swift in Sources */,
 				AA80UNKNOWNPANEL0002 /* UnknownPanelView.swift in Sources */,
 				AA40PANELSTATE0002 /* PanelState.swift in Sources */,
+				AA81PTIMEOVR00002 /* PanelTimeOverride.swift in Sources */,
 				AA80SERSTATS00002 /* SeriesStatistics.swift in Sources */,
 				AA78CROSSH000002 /* DashboardCrosshair.swift in Sources */,
 				AA77TRZOOM000002 /* TimeRangeZoom.swift in Sources */,
@@ -1149,6 +1159,8 @@
 				AA98MINWIN0000002 /* MinimumWindowTests.swift in Sources */,
 				AA40PSNAPHARN00002 /* PanelSnapshotHarness.swift in Sources */,
 				AA40PSTATETEST0002 /* PanelStateTests.swift in Sources */,
+				AB01PTIMET0000002 /* PanelTimeOverrideTests.swift in Sources */,
+				AA99VMAPT00000002 /* ValueMappingTests.swift in Sources */,
 				AA97SERSTATT00002 /* SeriesStatisticsTests.swift in Sources */,
 				AA93CROSSHT000002 /* DashboardCrosshairTests.swift in Sources */,
 				AA92TRZOOMT000002 /* TimeRangeZoomTests.swift in Sources */,

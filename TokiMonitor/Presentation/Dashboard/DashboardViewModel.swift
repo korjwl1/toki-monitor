@@ -439,21 +439,54 @@ final class DashboardViewModel {
         let defaultClient = queryClient
         let activeSelector = activeDatasource
 
+        // A panel with its own window (FR-037) cannot share a round trip with
+        // one on the dashboard's: the coordinator groups by (query,
+        // datasource), and two panels running the same query over different
+        // windows would collapse into one result. Grouping by window first
+        // keeps the sharing for every panel that has no override, which is
+        // nearly all of them.
+        // Keyed by the window's two strings rather than by `TimeConfig`: the
+        // config is `Equatable` and not `Hashable`, and the pair IS its
+        // identity — two panels with the same from/to run the same window.
+        func grouped(_ panels: [PanelConfig]) -> [(TimeConfig, [PanelConfig])] {
+            var order: [String] = []
+            var byKey: [String: (TimeConfig, [PanelConfig])] = [:]
+            for panel in panels {
+                let panelTime = PanelTimeOverride.effectiveTime(for: panel, dashboard: time)
+                let key = "\(panelTime.from)|\(panelTime.to)"
+                if byKey[key] == nil {
+                    order.append(key)
+                    byKey[key] = (panelTime, [])
+                }
+                byKey[key]?.1.append(panel)
+            }
+            return order.compactMap { byKey[$0] }
+        }
+        let regularByTime = grouped(regularPanels)
+        let projectByTime = grouped(projectPanels)
+
         fetchTask = Task { [weak self] in
-            let results = await coordinator.fetchRegular(
-                panels: regularPanels,
-                time: time,
-                variables: variables,
-                activeDatasource: activeSelector,
-                defaultClient: defaultClient
-            )
+            var results: [UUID: PanelDataState] = [:]
+            for (panelTime, group) in regularByTime {
+                let batch = await coordinator.fetchRegular(
+                    panels: group,
+                    time: panelTime,
+                    variables: variables,
+                    activeDatasource: activeSelector,
+                    defaultClient: defaultClient
+                )
+                results.merge(batch) { _, new in new }
+                if Task.isCancelled { return }
+            }
 
             if Task.isCancelled { return }
             guard let self else { return }
 
             var projectResults: [UUID: PanelDataState] = [:]
-            if !projectPanels.isEmpty {
-                projectResults = await self.fetchProjectPanels(projectPanels, time: time)
+            for (panelTime, group) in projectByTime {
+                let batch = await self.fetchProjectPanels(group, time: panelTime)
+                projectResults.merge(batch) { _, new in new }
+                if Task.isCancelled { return }
             }
             if Task.isCancelled { return }
 
@@ -614,7 +647,10 @@ final class DashboardViewModel {
     /// into `panelData` would put an unsaved query's answer on the dashboard
     /// behind the editor.
     func fetchPreview(for panel: PanelConfig) async -> PanelDataState {
-        let time = dashboardConfig.time
+        // The panel's own window, so the editor's preview shows what the
+        // dashboard will show rather than a different hour of the same query.
+        let time = PanelTimeOverride.effectiveTime(for: panel,
+                                                   dashboard: dashboardConfig.time)
         if panelTokensByProject(panel) {
             return await fetchProjectPanels([panel], time: time)[panel.id] ?? .idle
         }

@@ -37,6 +37,12 @@ struct PanelContainerView<Content: View>: View {
     /// question it answers ("where did this number come from?") is asked while
     /// READING a dashboard, not while building one.
     var onInspect: (() -> Void)?
+    /// This panel's own time window, in words, when it has one (FR-037).
+    ///
+    /// A panel silently drawing a different window from the one the toolbar
+    /// names is the worst kind of wrong number — right, about a question
+    /// nobody asked. This is what stops that.
+    var timeOverrideLabel: String?
     /// A copy a `repeat` produced, rather than a panel of its own. It has no
     /// separate definition to delete or to drag, so it offers neither — and
     /// its edit button opens the panel it is a copy OF.
@@ -63,6 +69,7 @@ struct PanelContainerView<Content: View>: View {
         failedTargets: [String: String] = [:],
         filterNotices: [String] = [],
         onInspect: (() -> Void)? = nil,
+        timeOverrideLabel: String? = nil,
         isRepeatInstance: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
@@ -78,6 +85,7 @@ struct PanelContainerView<Content: View>: View {
         self.failedTargets = failedTargets
         self.filterNotices = filterNotices
         self.onInspect = onInspect
+        self.timeOverrideLabel = timeOverrideLabel
         self.isRepeatInstance = isRepeatInstance
         self.content = content()
     }
@@ -104,6 +112,30 @@ struct PanelContainerView<Content: View>: View {
                 L.tr("일부 쿼리가 실패했습니다. \(detail)",
                      "Some queries failed. \(detail)")
             )
+        }
+    }
+
+    /// The window this panel is on, when it is not the dashboard's.
+    ///
+    /// Beside the title rather than over the chart: what is drawn is real, it
+    /// is just a different hour from the one the toolbar names, and the reader
+    /// needs the label at the moment they read the number.
+    @ViewBuilder
+    private var timeOverrideBadge: some View {
+        if let timeOverrideLabel {
+            HStack(spacing: DS.xs) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundStyle(DS.iconSecondary)
+                Text(timeOverrideLabel)
+                    .foregroundStyle(DS.bodySecondary)
+            }
+            .font(.system(size: DS.fontTiny))
+            .padding(.horizontal, DS.xs)
+            .padding(.vertical, 1)
+            .background(.quaternary, in: Capsule())
+            .help(L.tr("이 패널은 대시보드 시간 범위를 따르지 않습니다: \(timeOverrideLabel)",
+                       "This panel does not follow the dashboard's time range: \(timeOverrideLabel)"))
+            .accessibilityHidden(true)
         }
     }
 
@@ -152,6 +184,7 @@ struct PanelContainerView<Content: View>: View {
                     // the title drew black on a dark card.
                     .foregroundStyle(Color.primary)
 
+                timeOverrideBadge
                 partialFailureBadge
                 unappliedFilterBadge
 
@@ -313,7 +346,12 @@ struct PanelContainerView<Content: View>: View {
                 title: title,
                 typeName: (panelType ?? .unknown).displayName,
                 state: state,
-                value: state?.showsContent == false ? nil : valueSummary
+                value: state?.showsContent == false ? nil : valueSummary,
+                // Spoken as part of the panel's own label rather than left to
+                // the badge: the badge is `accessibilityHidden` because a
+                // separate element saying "last 1h" after the numbers would
+                // arrive too late to change how they are heard.
+                timeOverride: timeOverrideLabel
             )
         )
         .accessibilityHint(

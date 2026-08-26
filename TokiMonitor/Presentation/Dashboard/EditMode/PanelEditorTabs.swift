@@ -413,11 +413,93 @@ struct PanelEditorOptionsTab: View {
                 thresholdEditor
             }
 
+            if panel.panelType.honoursValueMappings {
+                Divider()
+                valueMappingEditor
+            }
+
             Divider()
             overrideEditor
 
             Divider()
+            panelTimeEditor
+
+            Divider()
             repeatEditor
+        }
+    }
+
+    // MARK: - Panel time (FR-037)
+
+    /// A window for this panel alone.
+    ///
+    /// Both controls are pickers over a closed list rather than text fields: a
+    /// token that does not parse leaves the panel silently on the dashboard's
+    /// window, and "I typed 7days and nothing happened" is precisely the
+    /// failure a picker cannot produce.
+    private var panelTimeEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L.tr("패널 시간", "Panel time"))
+                .font(.subheadline.bold())
+
+            HStack {
+                Text(L.tr("상대 시간", "Relative time"))
+                    .font(.caption)
+                    .frame(width: 96, alignment: .leading)
+                Picker("", selection: Binding(
+                    get: { panel.relativeTime ?? "" },
+                    set: { panel.relativeTime = $0.isEmpty ? nil : $0 }
+                )) {
+                    Text(L.tr("대시보드 따름", "Follow dashboard")).tag("")
+                    ForEach(PanelTimeOverride.suggestedTokens, id: \.self) { token in
+                        Text(L.tr("최근 \(token)", "last \(token)")).tag(token)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 180)
+            }
+
+            HStack {
+                Text(L.tr("시간 이동", "Time shift"))
+                    .font(.caption)
+                    .frame(width: 96, alignment: .leading)
+                Picker("", selection: Binding(
+                    get: { panel.timeShift ?? "" },
+                    set: { panel.timeShift = $0.isEmpty ? nil : $0 }
+                )) {
+                    Text(L.tr("이동 없음", "No shift")).tag("")
+                    ForEach(PanelTimeOverride.suggestedTokens, id: \.self) { token in
+                        Text(L.tr("\(token) 전", "\(token) earlier")).tag(token)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 180)
+            }
+
+            if let label = PanelTimeOverride.label(for: panel) {
+                Label(
+                    L.tr("이 패널은 대시보드 시간 범위를 따르지 않습니다 (\(label)). 패널 제목 옆에 그렇게 표시됩니다.",
+                         "This panel will not follow the dashboard's time range (\(label)). It says so beside its title."),
+                    systemImage: "clock.arrow.circlepath"
+                )
+                .font(.caption)
+                .foregroundStyle(DS.bodySecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // A token off a dashboard written elsewhere that this build cannot
+            // read. Kept on disk (계약 C1) and named here rather than silently
+            // dropped from the picker above.
+            ForEach(PanelTimeOverride.invalidTokens(of: panel), id: \.self) { token in
+                Label(
+                    L.tr("`\(token)`을(를) 읽을 수 없어 무시합니다. 저장할 때는 그대로 보존됩니다.",
+                         "`\(token)` cannot be read and is ignored. It is kept as written when saving."),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(DS.threshold(.orange))
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -904,6 +986,152 @@ struct PanelEditorOptionsTab: View {
                     .font(.caption)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - Value mappings
+
+    /// Rules that replace a value's rendering, ahead of the unit (FR-025).
+    ///
+    /// In the order they will be applied, first match winning — so the list on
+    /// screen reads the way the renderer reads it, and a reader who puts the
+    /// specific rule above the general one gets what they arranged.
+    private var valueMappingEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(L.tr("값 매핑", "Value mappings"))
+                    .font(.subheadline.bold())
+                Spacer()
+                Text(L.tr("위에서부터 먼저 적용", "first match wins"))
+                    .font(.caption2)
+                    .foregroundStyle(DS.bodySecondary)
+            }
+
+            if panel.options.valueMappings.isEmpty {
+                Text(L.tr("값 매핑은 단위 서식보다 먼저 적용됩니다 — 예: 0을 \"아직 없음\"으로, 값 없음을 \"측정 안 됨\"으로.",
+                          "A mapping is applied ahead of the unit — 0 as \"nothing yet\", an absent sample as \"not measured\"."))
+                    .font(.caption)
+                    .foregroundStyle(DS.bodySecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            ForEach(panel.options.valueMappings) { mapping in
+                if let index = panel.options.valueMappings.firstIndex(where: { $0.id == mapping.id }) {
+                    valueMappingRow(index: index)
+                }
+            }
+
+            Button {
+                panel.options.valueMappings.append(
+                    ValueMapping(match: .value(0), text: "")
+                )
+            } label: {
+                Label(L.tr("값 매핑 추가", "Add value mapping"), systemImage: "plus")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func valueMappingRow(index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: DS.xs) {
+                Picker("", selection: Binding(
+                    get: { ValueMappingKind(of: panel.options.valueMappings[index].match) },
+                    set: { panel.options.valueMappings[index].match = $0.emptyMatch }
+                )) {
+                    ForEach(ValueMappingKind.allCases, id: \.rawValue) { kind in
+                        Text(kind.displayName).tag(kind)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 110)
+
+                matchFields(index: index)
+
+                Spacer(minLength: 0)
+
+                Button(role: .destructive) {
+                    panel.options.valueMappings.remove(at: index)
+                } label: {
+                    Image(systemName: "minus.circle")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L.tr("이 값 매핑 삭제", "Delete this value mapping"))
+            }
+
+            HStack(spacing: DS.xs) {
+                Text("→").font(.caption).foregroundStyle(DS.bodySecondary)
+                TextField(L.tr("표시할 문자열", "Shown instead"),
+                          text: Binding(
+                            get: { panel.options.valueMappings[index].text },
+                            set: { panel.options.valueMappings[index].text = $0 }
+                          ))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 180)
+
+                // Optional, and the text is what carries the meaning either
+                // way — colour is never the only carrier (계약 R6).
+                Picker("", selection: Binding(
+                    get: { panel.options.valueMappings[index].color },
+                    set: { panel.options.valueMappings[index].color = $0 }
+                )) {
+                    Text(L.tr("색 없음", "No colour")).tag(ThresholdColor?.none)
+                    ForEach(ThresholdColor.allCases, id: \.rawValue) { token in
+                        HStack(spacing: DS.xs) {
+                            Circle().fill(DS.threshold(token)).frame(width: 10, height: 10)
+                            Text(token.displayName)
+                        }
+                        .tag(ThresholdColor?.some(token))
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 130)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func matchFields(index: Int) -> some View {
+        switch panel.options.valueMappings[index].match {
+        case .value(let number):
+            TextField(L.tr("값", "Value"), value: Binding(
+                get: { number },
+                set: { panel.options.valueMappings[index].match = .value($0) }
+            ), format: .number)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 80)
+        case .text(let string):
+            TextField(L.tr("문자열", "Text"), text: Binding(
+                get: { string },
+                set: { panel.options.valueMappings[index].match = .text($0) }
+            ))
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 120)
+        case .range(let from, let to):
+            TextField(L.tr("이상", "From"), value: Binding(
+                get: { from },
+                set: { panel.options.valueMappings[index].match = .range(from: $0, to: to) }
+            ), format: .number)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 70)
+            TextField(L.tr("이하", "To"), value: Binding(
+                get: { to },
+                set: { panel.options.valueMappings[index].match = .range(from: from, to: $0) }
+            ), format: .number)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 70)
+        case .special(let special):
+            Picker("", selection: Binding(
+                get: { special },
+                set: { panel.options.valueMappings[index].match = .special($0) }
+            )) {
+                ForEach(ValueMapping.Special.allCases, id: \.rawValue) { value in
+                    Text(value.displayName).tag(value)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 150)
         }
     }
 
@@ -1561,6 +1789,46 @@ struct PanelEditorTransformTab: View {
         static func label(for kind: TransformationStep.Kind) -> String {
             if let entry = Catalogue(rawValue: kind.typeID) { return entry.label }
             return kind.typeID
+        }
+    }
+}
+
+
+// MARK: - Which kind of match a row is editing
+
+/// The match cases, flattened so a picker can select one.
+///
+/// `ValueMapping.Match` carries its operand, so it cannot be a picker's
+/// selection directly — changing the kind would need an operand to change TO.
+/// This is that choice, and `emptyMatch` is the operand a freshly chosen kind
+/// starts from.
+enum ValueMappingKind: String, CaseIterable, Sendable {
+    case value, text, range, special
+
+    init(of match: ValueMapping.Match) {
+        switch match {
+        case .value:   self = .value
+        case .text:    self = .text
+        case .range:   self = .range
+        case .special: self = .special
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .value:   return L.tr("값이 같음", "Value is")
+        case .text:    return L.tr("문자열이 같음", "Text is")
+        case .range:   return L.tr("범위 안", "In range")
+        case .special: return L.tr("특수값", "Special")
+        }
+    }
+
+    var emptyMatch: ValueMapping.Match {
+        switch self {
+        case .value:   return .value(0)
+        case .text:    return .text("")
+        case .range:   return .range(from: nil, to: nil)
+        case .special: return .special(.absent)
         }
     }
 }

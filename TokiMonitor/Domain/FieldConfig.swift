@@ -412,3 +412,197 @@ extension PanelConfig {
         return !fieldConfig.defaults.isEmpty || !fieldConfig.overrides.isEmpty
     }
 }
+
+// MARK: - Value mappings
+//
+// FR-025. A number on a panel is rendered by its unit, and there are values a
+// unit cannot render honestly: `0` on a rate-limit panel means "nothing yet",
+// not "zero per cent"; an absent sample means "we do not know", and a stat card
+// showing `-` says so but says nothing about why. A mapping is the rule that
+// replaces such a value with the words the reader would have written.
+//
+// It takes precedence over the unit (spec, ValueMapping) — the whole point is
+// to override the formatter for the values the formatter gets wrong.
+//
+// The result colour is a `ThresholdColor` for the same reason a threshold's is:
+// the closed set is what makes the contrast requirement enforceable at all
+// (계약 R6), and a mapping that painted a number `#ffff00` would be a second
+// way round the rule the thresholds already closed.
+
+/// A rule replacing one value's rendering.
+struct ValueMapping: Codable, Equatable, Sendable, Identifiable {
+
+    /// Which values the rule catches.
+    enum Match: Equatable, Sendable {
+        /// One exact number.
+        case value(Double)
+        /// One exact string — a state name, a table row's label.
+        case text(String)
+        /// A closed interval. Either end may be open.
+        case range(from: Double?, to: Double?)
+        /// A value the data does not have.
+        case special(Special)
+    }
+
+    /// The values that are not numbers at all.
+    ///
+    /// `absent` is the one the acceptance scenario is about: without it, the
+    /// only way to say "we did not receive this" is the formatter's `-`, and
+    /// nothing distinguishes it from a value that formatted to a dash.
+    enum Special: String, Codable, CaseIterable, Sendable {
+        case absent
+        case nan
+        case empty
+
+        var displayName: String {
+            switch self {
+            case .absent: return L.tr("값 없음", "No value")
+            case .nan:    return L.tr("숫자 아님 (NaN)", "Not a number (NaN)")
+            case .empty:  return L.tr("빈 문자열", "Empty string")
+            }
+        }
+    }
+
+    var id: UUID = UUID()
+    var match: Match
+    /// What to show instead. An empty string is legal and means "show nothing"
+    /// — which is what "we do not know this" often should look like.
+    var text: String
+    /// Optional tint. Nil leaves the panel's own colouring alone.
+    var color: ThresholdColor?
+
+    init(id: UUID = UUID(), match: Match, text: String, color: ThresholdColor? = nil) {
+        self.id = id
+        self.match = match
+        self.text = text
+        self.color = color
+    }
+
+    /// Whether this rule catches a number.
+    func matches(_ value: Double?) -> Bool {
+        switch match {
+        case .value(let target):
+            guard let value else { return false }
+            return value == target
+        case .text:
+            return false
+        case .range(let from, let to):
+            guard let value else { return false }
+            if let from, value < from { return false }
+            if let to, value > to { return false }
+            // An open-ended range on both sides catches every number, which is
+            // a legal — if unusual — way to label a whole panel.
+            return true
+        case .special(let special):
+            switch special {
+            case .absent: return value == nil
+            case .nan:    return value?.isNaN == true
+            case .empty:  return false
+            }
+        }
+    }
+
+    /// Whether this rule catches a string — a state name or a row label.
+    func matches(text candidate: String) -> Bool {
+        switch match {
+        case .text(let target):
+            return candidate == target
+        case .special(.empty):
+            return candidate.isEmpty
+        case .value, .range, .special:
+            return false
+        }
+    }
+
+    // MARK: Codable
+    //
+    // A discriminator rather than a nested single-key object: the match is a
+    // sum type and every encoder that flattens one into "whichever key is
+    // present" has to guess on the way back in.
+
+    private enum CodingKeys: String, CodingKey {
+        case id, type, value, text, from, to, special, color, result
+    }
+
+    private enum Kind: String, Codable {
+        case value, text, range, special
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        // `result` is where the replacement text lives on a mapping written by
+        // Grafana; `text` is where this build writes it. Reading both costs one
+        // line and keeps an imported dashboard's mappings working.
+        text = try c.decodeIfPresent(String.self, forKey: .result)
+            ?? c.decodeIfPresent(String.self, forKey: .text) ?? ""
+        color = try c.decodeIfPresent(ThresholdColor.self, forKey: .color)
+        switch try c.decodeIfPresent(Kind.self, forKey: .type) ?? .value {
+        case .value:
+            if let number = try c.decodeIfPresent(Double.self, forKey: .value) {
+                match = .value(number)
+            } else {
+                match = .text(try c.decodeIfPresent(String.self, forKey: .value) ?? "")
+            }
+        case .text:
+            match = .text(try c.decodeIfPresent(String.self, forKey: .value) ?? "")
+        case .range:
+            match = .range(from: try c.decodeIfPresent(Double.self, forKey: .from),
+                           to: try c.decodeIfPresent(Double.self, forKey: .to))
+        case .special:
+            match = .special(try c.decodeIfPresent(Special.self, forKey: .special) ?? .absent)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(text, forKey: .text)
+        try c.encodeIfPresent(color, forKey: .color)
+        switch match {
+        case .value(let number):
+            try c.encode(Kind.value, forKey: .type)
+            try c.encode(number, forKey: .value)
+        case .text(let string):
+            try c.encode(Kind.text, forKey: .type)
+            try c.encode(string, forKey: .value)
+        case .range(let from, let to):
+            try c.encode(Kind.range, forKey: .type)
+            try c.encodeIfPresent(from, forKey: .from)
+            try c.encodeIfPresent(to, forKey: .to)
+        case .special(let special):
+            try c.encode(Kind.special, forKey: .type)
+            try c.encode(special, forKey: .special)
+        }
+    }
+}
+
+/// Applying a panel's mappings.
+enum ValueMappings {
+
+    /// What to draw for a number: the first mapping that catches it, else nil.
+    ///
+    /// First wins, not last, and the list is the order the editor shows: a
+    /// reader writing "0 → none" above "0–10 → low" means the specific rule to
+    /// win, and reading bottom-up would make the order they see a lie.
+    static func result(for value: Double?, mappings: [ValueMapping])
+        -> (text: String, color: ThresholdColor?)? {
+        guard let mapping = mappings.first(where: { $0.matches(value) }) else { return nil }
+        return (mapping.text, mapping.color)
+    }
+
+    /// The same for a value that is already a string.
+    static func result(forText value: String, mappings: [ValueMapping])
+        -> (text: String, color: ThresholdColor?)? {
+        guard let mapping = mappings.first(where: { $0.matches(text: value) }) else { return nil }
+        return (mapping.text, mapping.color)
+    }
+
+    /// A number rendered by the mappings if any catch it, and by the unit
+    /// otherwise. This is the precedence the spec states.
+    static func format(_ value: Double?, config: FieldDisplayConfig,
+                       mappings: [ValueMapping]) -> String {
+        if let mapped = result(for: value, mappings: mappings) { return mapped.text }
+        return FieldFormatter.format(value, config: config)
+    }
+}

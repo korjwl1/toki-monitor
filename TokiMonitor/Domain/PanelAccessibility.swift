@@ -34,8 +34,17 @@ enum PanelAccessibility {
     /// first phrase still learns which panel they are on; one who waits for the
     /// second learns whether to trust what follows.
     static func announcement(title: String, typeName: String,
-                             state: PanelState?, value: String?) -> String {
+                             state: PanelState?, value: String?,
+                             timeOverride: String? = nil) -> String {
         var parts: [String] = ["\(title), \(typeName)"]
+        // Before the state and before the value, because it changes what both
+        // of them MEAN. "No data in this range" is a different sentence when
+        // the range is not the one the toolbar shows, and a reader who hears
+        // the qualifier afterwards has already drawn the wrong conclusion.
+        if let timeOverride, !timeOverride.isEmpty {
+            parts.append(L.tr("대시보드와 다른 시간 범위: \(timeOverride)",
+                              "on a different time range: \(timeOverride)"))
+        }
         if let state {
             // `.loaded` names no state. The value IS the state — a panel that
             // speaks a number has plainly loaded — and "Result." between the

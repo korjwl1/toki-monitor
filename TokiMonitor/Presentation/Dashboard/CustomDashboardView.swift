@@ -191,6 +191,8 @@ struct CustomDashboardView: View {
             // simply not the filtered one.
             filterNotices: viewModel.dataState(for: panel.id).frames?.setNotices ?? [],
             onInspect: onInspectPanel.map { handler in { handler(panel) } },
+            // FR-037. A panel on its own window says so, next to its title.
+            timeOverrideLabel: PanelTimeOverride.label(for: panel),
             isRepeatInstance: panel.repeatSourceID != nil
         ) {
             panelContent(for: panel)
@@ -241,6 +243,11 @@ struct CustomDashboardView: View {
     /// What this panel currently says, in words. Nil while it has no result —
     /// the state is then the whole message and `PanelStatusView` speaks it.
     private func valueSummary(for panel: PanelConfig) -> String? {
+        // Only when there is something drawn to describe. The summary reduces
+        // the panel's whole series list, and computing it for a panel that is
+        // idle, empty or failed would spend that on a string the container
+        // then discards — once per panel, on every layout pass.
+        guard panelState(for: panel).showsContent else { return nil }
         let state = viewModel.dataState(for: panel.id)
         return PanelValueSummary.text(
             panel: panel,

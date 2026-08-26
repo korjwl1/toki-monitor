@@ -19,10 +19,11 @@ struct StatPanelView: View {
         let stat = Self.statValue(panel: panel, data: data, frames: frames)
         let number = Self.numericValue(panel: panel, data: data, frames: frames)
         let band = Self.band(panel: panel, value: number)
+        let mapped = Self.mappedColor(panel: panel, value: number)
         VStack(alignment: .leading, spacing: 4) {
             Text(stat.value)
                 .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Self.valueStyle(panel: panel, band: band))
+                .foregroundStyle(Self.valueStyle(panel: panel, band: band, mapped: mapped))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .contentTransition(.numericText())
@@ -45,7 +46,7 @@ struct StatPanelView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Self.backgroundTint(panel: panel, band: band))
+        .background(Self.backgroundTint(panel: panel, band: band, mapped: mapped))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(panel.title)
         .accessibilityValue(band.map {
@@ -78,8 +79,11 @@ struct StatPanelView: View {
     /// otherwise — under `.background` the tint carries the band and the digits
     /// stay maximally legible on it.
     static func valueStyle(panel: PanelConfig,
-                           band: (color: ThresholdColor, label: String)?) -> Color {
-        guard let band, panel.options.colorMode == .value else { return Color.primary }
+                           band: (color: ThresholdColor, label: String)?,
+                           mapped: ThresholdColor? = nil) -> Color {
+        guard panel.options.colorMode == .value else { return Color.primary }
+        if let mapped { return DS.threshold(mapped) }
+        guard let band else { return Color.primary }
         return DS.threshold(band.color)
     }
 
@@ -90,12 +94,46 @@ struct StatPanelView: View {
     /// value text on a ground nothing was measured against.
     @ViewBuilder
     static func backgroundTint(panel: PanelConfig,
-                               band: (color: ThresholdColor, label: String)?) -> some View {
-        if let band, panel.options.colorMode == .background {
-            DS.threshold(band.color)
+                               band: (color: ThresholdColor, label: String)?,
+                               mapped: ThresholdColor? = nil) -> some View {
+        if let token = mapped ?? band?.color, panel.options.colorMode == .background {
+            DS.threshold(token)
                 .opacity(0.14)
                 .clipShape(RoundedRectangle(cornerRadius: DS.btnRadius, style: .continuous))
         }
+    }
+
+    /// What this card shows, after the panel's value mappings.
+    ///
+    /// Mappings come first and the unit second (FR-025): the values a mapping
+    /// is for are the ones the formatter renders wrongly — `0` printed as "0"
+    /// when it means "nothing yet", an absent sample printed as `-` when the
+    /// reader wanted "not measured".
+    static func statValue(panel: PanelConfig, data: TimeSeriesData?,
+                          frames: FrameSet?) -> PanelDataExtractor.StatValue {
+        let base = unmappedStatValue(panel: panel, data: data, frames: frames)
+        let mappings = panel.options.valueMappings
+        guard !mappings.isEmpty else { return base }
+        // `topModel` names a series rather than reducing a column, so its
+        // "value" is a string and the numeric rules must not see it — a
+        // no-value rule would otherwise catch every top-model card.
+        if panel.effectiveMetric == .topModel {
+            guard let mapped = ValueMappings.result(forText: base.value, mappings: mappings)
+            else { return base }
+            return PanelDataExtractor.StatValue(value: mapped.text, subtitle: base.subtitle)
+        }
+        let number = numericValue(panel: panel, data: data, frames: frames)
+        guard let mapped = ValueMappings.result(for: number, mappings: mappings)
+        else { return base }
+        return PanelDataExtractor.StatValue(value: mapped.text, subtitle: base.subtitle)
+    }
+
+    /// The colour a mapping asked for, when one caught this card's value.
+    ///
+    /// It wins over the threshold band: a rule written for exactly this value
+    /// is a more specific statement than the band it happens to fall in.
+    static func mappedColor(panel: PanelConfig, value: Double?) -> ThresholdColor? {
+        ValueMappings.result(for: value, mappings: panel.options.valueMappings)?.color
     }
 
     /// Resolve a stat card's number. Frames first; the legacy extractor only
@@ -107,8 +145,8 @@ struct StatPanelView: View {
     ///
     /// `GaugePanelView` reads the same number — the gauge is a second
     /// presentation of one value, not a second way of computing it.
-    static func statValue(panel: PanelConfig, data: TimeSeriesData?,
-                          frames: FrameSet?) -> PanelDataExtractor.StatValue {
+    private static func unmappedStatValue(panel: PanelConfig, data: TimeSeriesData?,
+                                          frames: FrameSet?) -> PanelDataExtractor.StatValue {
         let metric = panel.effectiveMetric
         guard let frames, !frames.frames.isEmpty else {
             return PanelDataExtractor.statValue(for: metric, data: data)

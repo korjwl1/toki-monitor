@@ -57,11 +57,17 @@ enum PanelAccessibilityProbe {
         // pass before the tree exists at all. Walking once gives an empty
         // AXGroup and a test that passes for the wrong reason, so the render is
         // repeated until something appears.
-        for _ in 0..<5 {
+        for _ in 0..<8 {
             host.layoutSubtreeIfNeeded()
             if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
                 host.cacheDisplay(in: host.bounds, to: rep)
             }
+            // A draw is not enough on its own: the tree is published on a later
+            // turn of the run loop, and the FIRST hosted view in the process
+            // needs that turn before it has one at all. Without the spin this
+            // suite passes everywhere except its first case, which is the worst
+            // possible flake — it looks like a real accessibility failure.
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
             out = []
             seen = 0
             walk(host)

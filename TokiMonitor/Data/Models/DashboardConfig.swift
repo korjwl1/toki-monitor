@@ -537,6 +537,21 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     /// what a reader expects of "one per project": a row of them.
     var repeatDirection: RepeatDirection?
 
+    // MARK: - Panel time (FR-037)
+
+    /// This panel's own window instead of the dashboard's — "1h", "7d".
+    ///
+    /// Nil on every panel that follows the toolbar, which is nearly all of
+    /// them. A panel that sets it MUST show that it has: see
+    /// `PanelTimeOverride.label(for:)` and the badge in `PanelContainerView`.
+    var relativeTime: String?
+
+    /// Move this panel's window back by this much — "1d", "1w".
+    ///
+    /// Applied after `relativeTime`, so the two compose as "the last hour, a
+    /// day ago".
+    var timeShift: String?
+
     /// Panel-level keys written by a build newer than this one, kept verbatim
     /// through load→save (계약 C1).
     var unknownFields: [String: JSONValue] = [:]
@@ -568,6 +583,7 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         case options, dataLinks, collapsed, plugin, queries, fieldConfig
         case fieldSelection, transformations
         case `repeat`, repeatDirection
+        case relativeTime, timeShift
     }
 
     static let knownKeys: Set<String> = Set(CodingKeys.allCases.map(\.stringValue))
@@ -655,6 +671,8 @@ extension PanelConfig {
                                                 forKey: .transformations) ?? []
         `repeat` = try c.decodeIfPresent(String.self, forKey: .repeat)
         repeatDirection = try c.decodeIfPresent(RepeatDirection.self, forKey: .repeatDirection)
+        relativeTime = try c.decodeIfPresent(String.self, forKey: .relativeTime)
+        timeShift = try c.decodeIfPresent(String.self, forKey: .timeShift)
         unknownFields = decoder.unknownFields(besides: Self.knownKeys)
     }
 
@@ -681,6 +699,8 @@ extension PanelConfig {
         }
         try c.encodeIfPresent(`repeat`, forKey: .repeat)
         try c.encodeIfPresent(repeatDirection, forKey: .repeatDirection)
+        try c.encodeIfPresent(relativeTime, forKey: .relativeTime)
+        try c.encodeIfPresent(timeShift, forKey: .timeShift)
         try encoder.encodeUnknownFields(unknownFields, besides: Self.knownKeys)
     }
 }
@@ -768,6 +788,14 @@ struct PanelDisplayOptions: Codable, Equatable {
     /// percentage of — see `PanelType.supportsPercentageThresholds`.
     var thresholdMode: ThresholdMode = .absolute
 
+    /// Rules that replace a value's rendering, ahead of the unit (FR-025).
+    ///
+    /// Panel-level rather than per-field: the values a mapping is for — zero,
+    /// absent, a sentinel — mean the same thing in every column of one panel,
+    /// and a rule the reader has to restate per column is a rule they will
+    /// restate wrong.
+    var valueMappings: [ValueMapping] = []
+
     init() {}
 
     /// Every property optional on the way in, with the default the editor
@@ -800,6 +828,8 @@ struct PanelDisplayOptions: Codable, Equatable {
                                               forKey: .thresholdBase) ?? .neutral
         thresholdMode = try c.decodeIfPresent(ThresholdMode.self,
                                               forKey: .thresholdMode) ?? .absolute
+        valueMappings = try c.decodeIfPresent([ValueMapping].self,
+                                              forKey: .valueMappings) ?? []
     }
 
     enum ColorMode: String, Codable, CaseIterable, Equatable {
@@ -961,6 +991,20 @@ enum PanelType: String, Codable, CaseIterable {
         switch self {
         case .stat, .gauge, .timeSeries, .stateTimeline: return true
         case .barChart, .pieChart, .table, .rowPanel, .unknown: return false
+        }
+    }
+
+    /// Whether this build's render for the type applies value mappings.
+    ///
+    /// The three that draw a value as TEXT. A line chart draws a value as a
+    /// position on an axis, and there is nowhere on it to put the word "no
+    /// value" — offering mappings there would be a control that changes
+    /// nothing, which is the R1 failure the threshold list above avoids.
+    var honoursValueMappings: Bool {
+        switch self {
+        case .stat, .gauge, .table: return true
+        case .timeSeries, .barChart, .pieChart, .stateTimeline, .rowPanel, .unknown:
+            return false
         }
     }
 

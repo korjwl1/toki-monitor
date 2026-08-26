@@ -139,10 +139,15 @@ struct TablePanelView: View {
     /// (US3, FR-023).
     private func format(_ value: Double, column: Column) -> String {
         let resolved = panel.displayConfig(for: column.field)
-        return FieldFormatter.format(
+        // Mapping ahead of unit (FR-025). A table is where a sentinel value is
+        // most likely to be mistaken for a measurement — a column of numbers
+        // with one 0 in it reads as a real zero, and only the mapped word says
+        // otherwise.
+        return ValueMappings.format(
             value,
             config: FieldDisplayConfig(unit: resolved.unit ?? column.unit,
-                                       decimals: resolved.decimals)
+                                       decimals: resolved.decimals),
+            mappings: panel.options.valueMappings
         )
     }
 }
