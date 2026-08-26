@@ -576,33 +576,5 @@ private struct GlassPanelModifier: ViewModifier {
     }
 }
 
-private struct WidgetGlassModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: .rect(cornerRadius: DS.widgetRadius))
-        } else {
-            content.background(.thinMaterial, in: RoundedRectangle(cornerRadius: DS.widgetRadius, style: .continuous))
-        }
-    }
-}
 
-private struct GlassContainerModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer { content }
-        } else {
-            content
-                .background(.ultraThinMaterial)
-        }
-    }
-}
 
-private struct GlassButtonModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: .rect(cornerRadius: DS.btnRadius))
-        } else {
-            content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DS.btnRadius, style: .continuous))
-        }
-    }
-}

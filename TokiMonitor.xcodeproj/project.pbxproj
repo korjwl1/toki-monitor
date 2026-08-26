@@ -132,7 +132,6 @@
 		789F755BF45FCF87C7EF5C9F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB89E56D927ABD7289F04084 /* SettingsView.swift */; };
 		7A3A92BC03EC47C681AC5E76 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6576E137DF2FCFE73BE66102 /* DesignSystem.swift */; };
 		AA76MOTION000002 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA76MOTION000001 /* Motion.swift */; };
-		7D6BBA3AFFEEFB28562B393D /* ClaudeUsageSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47D7D33B62F737BE41C872F /* ClaudeUsageSection.swift */; };
 		7DA0347019C7908CB10BB85F /* ModelPricingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F563B39918F892ABDEDA17 /* ModelPricingTests.swift */; };
 		7F7DBA23F9533DFA7039E150 /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDA0DC9C4300E5F7B2E3F2A /* SyncManager.swift */; };
 		8396AA1A147DFFBD23FC72C6 /* PanelDragModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 074C94EC60E9EE6F87E930EB /* PanelDragModifier.swift */; };
@@ -461,7 +460,6 @@
 		F24A89C84AD804E6D14E648F /* AnimationStateMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationStateMapperTests.swift; sourceTree = "<group>"; };
 		F24D5C9A7319840C3B1F3CC6 /* GaugePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GaugePanelView.swift; sourceTree = "<group>"; };
 		F31CF6A450F00B8FE22A493C /* LocalCLIDatasource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCLIDatasource.swift; sourceTree = "<group>"; };
-		F47D7D33B62F737BE41C872F /* ClaudeUsageSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageSection.swift; sourceTree = "<group>"; };
 		F61E686B7BA4F794ABE3C325 /* PanelDataExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelDataExtractor.swift; sourceTree = "<group>"; };
 		FC45E4DF1A7CDBFB1E6D3C49 /* AddPanelPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPanelPopover.swift; sourceTree = "<group>"; };
 		FE85317E2B7AE65F094494F0 /* ClaudeUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageClient.swift; sourceTree = "<group>"; };
@@ -584,8 +582,7 @@
 			isa = PBXGroup;
 			children = (
 				1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */,
-				F47D7D33B62F737BE41C872F /* ClaudeUsageSection.swift */,
-				10835A353F20C9BFA10795A1 /* GlassWorkaround.swift */,
+						10835A353F20C9BFA10795A1 /* GlassWorkaround.swift */,
 				15B1AC7C10926C1E37F7B0FF /* MenuContentView.swift */,
 				27DDC52F74B0CB31A48BB7CE /* SparklineView.swift */,
 				A6C1751117D1E380839B3A0E /* StatusBarController.swift */,
@@ -1068,8 +1065,7 @@
 				ED31502F8415FBFD5DA3DA8B /* ClaudeAuthReader.swift in Sources */,
 				241394A7322151BD3060226E /* ClaudeUsageClient.swift in Sources */,
 				4DA4AF6FC2656FBDABF460BB /* ClaudeUsageMonitor.swift in Sources */,
-				7D6BBA3AFFEEFB28562B393D /* ClaudeUsageSection.swift in Sources */,
-				DF1E83D524D2E5D935082DA9 /* CodexUsageClient.swift in Sources */,
+						DF1E83D524D2E5D935082DA9 /* CodexUsageClient.swift in Sources */,
 				C061672690CF6BA1C307A0E5 /* CodexUsageMonitor.swift in Sources */,
 				E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */,
 				99C01AFD6FFFB72644AD3DEB /* CustomDashboardView.swift in Sources */,
