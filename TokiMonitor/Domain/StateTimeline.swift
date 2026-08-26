@@ -171,33 +171,18 @@ enum StateTimelineBuilder {
     /// value would produce one span per sample.
     static func stateName(for value: Double?, thresholds: [ThresholdStep]) -> String {
         guard let value else { return "" }
-        guard let band = band(for: value, thresholds: thresholds) else {
-            guard !thresholds.isEmpty else {
-                return value == value.rounded() ? String(Int(value)) : String(format: "%g", value)
-            }
-            // Below every step: the band with no lower bound.
-            let lowest = thresholds.map(\.value).min() ?? 0
-            return "< \(number(lowest))"
-        }
-        return "≥ \(number(band.value))"
+        // The band naming lives in `Thresholds` so that a span here and a stat
+        // card elsewhere name the same band the same way.
+        if let name = Thresholds.label(for: value, steps: thresholds) { return name }
+        return value == value.rounded() ? String(Int(value)) : String(format: "%g", value)
     }
 
     /// The colour for a value, or nil to let the palette assign one by name.
-    static func color(for value: Double?, thresholds: [ThresholdStep]) -> String? {
-        band(for: value, thresholds: thresholds)?.color
-    }
-
-    private static func band(for value: Double?,
-                             thresholds: [ThresholdStep]) -> ThresholdStep? {
-        guard let value, !thresholds.isEmpty else { return nil }
-        let sorted = thresholds.sorted { $0.value < $1.value }
-        guard value >= sorted[0].value else { return nil }
-        var band = sorted[0]
-        for step in sorted where value >= step.value { band = step }
-        return band
-    }
-
-    private static func number(_ v: Double) -> String {
-        v == v.rounded() ? String(Int(v)) : String(format: "%g", v)
+    ///
+    /// Nil below every step rather than the base colour: with no thresholds at
+    /// all the numbers themselves are the states, and colouring them all with
+    /// one base would collapse a status column into a single stripe.
+    static func color(for value: Double?, thresholds: [ThresholdStep]) -> ThresholdColor? {
+        Thresholds.reached(value, steps: thresholds)?.color
     }
 }

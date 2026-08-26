@@ -148,6 +148,22 @@ struct TimeSeriesChartView: View {
                 }
             }
 
+            // Threshold rules. The steps were editable for years and reached
+            // nothing but the gauge; on a line chart they are the horizontal
+            // lines that say where "too much" starts.
+            ForEach(thresholdRules, id: \.at) { rule in
+                RuleMark(y: .value(L.tr("임계값", "Threshold"), rule.at))
+                    .foregroundStyle(DS.threshold(rule.color))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    .annotation(position: .top, alignment: .leading, spacing: 1) {
+                        // The line's own value, so the band is legible without
+                        // separating the hues (계약 R6).
+                        Text(rule.label)
+                            .font(.system(size: DS.fontTiny, design: .monospaced))
+                            .foregroundStyle(DS.threshold(rule.color))
+                    }
+            }
+
             // Hover crosshair
             if showsTooltip, let hoveredDate {
                 RuleMark(x: .value("", hoveredDate))
@@ -205,6 +221,29 @@ struct TimeSeriesChartView: View {
     }
 
     private var showsTooltip: Bool { options.tooltipMode != .hidden }
+
+    /// Where each threshold sits on this chart's own y axis.
+    ///
+    /// In percentage mode the scale is what the chart is actually drawing —
+    /// a line chart has no stated ends, so the data's own range is the only
+    /// honest thing to take a percentage of. With no data there is no range,
+    /// and `Thresholds.placed` then yields nothing rather than stacking every
+    /// step at zero.
+    private var thresholdRules: [(at: Double, color: ThresholdColor, label: String)] {
+        guard options.showThresholdMarkers, !options.thresholds.isEmpty else { return [] }
+        let drawn = segments.flatMap { $0.points.map(\.value) }
+        let scale = drawn.isEmpty ? nil : (drawn.min() ?? 0)...(drawn.max() ?? 0)
+        let suffix = options.thresholdMode == .percentage ? "%" : ""
+        return Thresholds
+            .placed(options.thresholds, mode: options.thresholdMode, scale: scale)
+            .map { entry in
+                let written = entry.step.value
+                let text = written == written.rounded()
+                    ? "\(Int(written))\(suffix)"
+                    : String(format: "%g%@", written, suffix)
+                return (at: entry.at, color: entry.step.color, label: text)
+            }
+    }
 
     /// Dots scale with the line so a 5pt line is not decorated with pinheads.
     private var pointSize: CGFloat { max(12, options.lineWidth * 8) }

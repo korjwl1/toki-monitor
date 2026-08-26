@@ -236,17 +236,28 @@ struct PanelEditorVisualizationTab: View {
         }
     }
 
-    /// The colour-mode and graph-mode pickers used to live here. Neither
-    /// reached the render — a stat card is a number and a subtitle, with no
-    /// sparkline to switch on and no threshold colouring to apply — so under
-    /// contract R1 they are not offered. They will come back with the
-    /// threshold work that gives them something to do.
+    /// Colour mode is back, because the threshold work gave it something to do:
+    /// a stat card now reads its own thresholds and can tint the number or wash
+    /// the card with the band it is in. Graph mode is still absent — there is no
+    /// sparkline to switch on, and offering the picker would be the R1 failure.
     private var statOptions: some View {
-        Text(L.tr("스탯 패널의 표시는 단위와 소수 자릿수로 정합니다 — 옵션 탭에 있습니다.",
-                  "A stat panel is styled by its unit and decimals, on the Options tab."))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 8) {
+            Picker(L.tr("임계값 색 적용", "Threshold colour"), selection: $panel.options.colorMode) {
+                Text(L.tr("값", "Value")).tag(PanelDisplayOptions.ColorMode.value)
+                Text(L.tr("배경", "Background")).tag(PanelDisplayOptions.ColorMode.background)
+                Text(L.tr("없음", "None")).tag(PanelDisplayOptions.ColorMode.none)
+            }
+            .pickerStyle(.segmented)
+
+            Text(panel.options.thresholds.isEmpty
+                 ? L.tr("임계값이 없으면 색을 바꿀 근거가 없습니다 — 옵션 탭에서 지정하세요.",
+                        "With no thresholds there is nothing to colour by — set them on the Options tab.")
+                 : L.tr("나머지 표시는 단위와 소수 자릿수로 정합니다 — 옵션 탭에 있습니다.",
+                        "The rest of a stat panel is styled by its unit and decimals, on the Options tab."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var timeSeriesOptions: some View {
@@ -301,8 +312,10 @@ struct PanelEditorVisualizationTab: View {
 
     private var gaugeOptions: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle(L.tr("임계값 밴드 표시", "Show threshold bands"),
-                   isOn: $panel.options.showThresholdMarkers)
+            // The band toggle moved to the threshold editor on the Options tab,
+            // next to the steps it switches on and off. Two controls for one
+            // setting, on two tabs, is how a reader ends up sure they turned it
+            // on somewhere.
 
             // A dial with no stated ends is decoration. Left blank the panel
             // derives them — from the thresholds, or from a round ceiling
@@ -467,50 +480,172 @@ struct PanelEditorOptionsTab: View {
                     "One panel per selected value — \(count) right now.")
     }
 
-    /// Thresholds colour a gauge's bands and a state timeline's spans. Nothing
-    /// else reads them yet, so nothing else offers them (contract R1).
-    private var honoursThresholds: Bool {
-        panel.panelType == .gauge || panel.panelType == .stateTimeline
-    }
+    /// Thresholds colour a stat card's number, a gauge's bands, a line chart's
+    /// rules and a state timeline's spans. Anything else does not read them, so
+    /// does not offer them (contract R1).
+    private var honoursThresholds: Bool { panel.panelType.honoursThresholds }
 
     private var thresholdEditor: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L.tr("임계값", "Thresholds"))
-                .font(.subheadline.bold())
+            HStack {
+                Text(L.tr("임계값", "Thresholds"))
+                    .font(.subheadline.bold())
+                Spacer()
+                Toggle(L.tr("표시", "Show"), isOn: $panel.options.showThresholdMarkers)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+            }
 
-            ForEach(panel.options.thresholds) { threshold in
-                if let index = panel.options.thresholds.firstIndex(where: { $0.id == threshold.id }) {
-                    HStack {
-                        TextField(L.tr("값", "Value"), value: Binding(
-                            get: { panel.options.thresholds[index].value },
-                            set: { panel.options.thresholds[index].value = $0 }
-                        ), format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 80)
-
-                        TextField(L.tr("색상", "Color"), text: Binding(
-                            get: { panel.options.thresholds[index].color },
-                            set: { panel.options.thresholds[index].color = $0 }
-                        ))
-                        .textFieldStyle(.roundedBorder)
-
-                        Button(role: .destructive) {
-                            panel.options.thresholds.remove(at: index)
-                        } label: {
-                            Image(systemName: "minus.circle")
-                        }
-                        .buttonStyle(.plain)
+            // Percentage needs something to be a percentage of. A stat card is
+            // one number and a state timeline is a row of spans; neither has a
+            // scale, so the mode is not offered there rather than offered and
+            // ignored.
+            if panel.panelType.supportsPercentageThresholds {
+                Picker("", selection: $panel.options.thresholdMode) {
+                    ForEach(ThresholdMode.allCases, id: \.rawValue) { mode in
+                        Text(mode.displayName).tag(mode)
                     }
+                }
+                .pickerStyle(.segmented)
+
+                Text(percentageNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Steps, highest first — the way they are read, and the way the
+            // resolver applies them.
+            ForEach(sortedThresholdIDs, id: \.self) { id in
+                if let index = panel.options.thresholds.firstIndex(where: { $0.id == id }) {
+                    thresholdRow(index: index)
                 }
             }
 
+            // The band below every step. It had no colour of its own before, so
+            // a value sitting under the lowest threshold said nothing.
+            HStack {
+                Text(L.tr("기준", "Base"))
+                    .font(.caption)
+                    .frame(width: 56, alignment: .leading)
+                thresholdColorPicker(
+                    selection: $panel.options.thresholdBase,
+                    label: L.tr("기준 색", "Base colour")
+                )
+                Spacer()
+                Text(L.tr("모든 단계 아래", "below every step"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
             Button {
-                panel.options.thresholds.append(ThresholdStep(value: 0, color: "red"))
+                panel.options.thresholds.append(
+                    ThresholdStep(value: nextThresholdValue, color: .red)
+                )
             } label: {
                 Label(L.tr("임계값 추가", "Add threshold"), systemImage: "plus")
                     .font(.caption)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    /// Steps in descending order, which is how a threshold list is read: the
+    /// worst band at the top. The stored order does not matter — the resolver
+    /// sorts — so this is presentation only and reordering is not a control the
+    /// reader needs.
+    private var sortedThresholdIDs: [UUID] {
+        panel.options.thresholds.sorted { $0.value > $1.value }.map(\.id)
+    }
+
+    private func thresholdRow(index: Int) -> some View {
+        HStack {
+            Text(panel.options.thresholdMode == .percentage
+                 ? L.tr("≥ %", "≥ %")
+                 : L.tr("≥", "≥"))
+                .font(.caption)
+                .frame(width: 56, alignment: .leading)
+
+            TextField(L.tr("값", "Value"), value: Binding(
+                get: { panel.options.thresholds[index].value },
+                set: { panel.options.thresholds[index].value = $0 }
+            ), format: .number)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 80)
+
+            thresholdColorPicker(
+                selection: Binding(
+                    get: { panel.options.thresholds[index].color },
+                    set: { panel.options.thresholds[index].color = $0 }
+                ),
+                label: L.tr("색상", "Colour")
+            )
+
+            // A colour this build could not validate is kept on disk but not
+            // drawn. Saying so is the difference between "my red went grey" and
+            // a bug report.
+            if let raw = panel.options.thresholds[index].unknownColorRaw {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .help(L.tr("`\(raw)` 색은 대비를 확인할 수 없어 그리지 않습니다. 저장할 때는 그대로 보존됩니다.",
+                               "`\(raw)` cannot be checked for contrast, so it is not drawn. It is kept as written when saving."))
+            }
+
+            Spacer()
+
+            Button(role: .destructive) {
+                panel.options.thresholds.remove(at: index)
+            } label: {
+                Image(systemName: "minus.circle")
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// The closed set, as swatches with names. There is no text field: a free
+    /// string cannot be checked against the contrast requirement, and one that
+    /// missed simply drew grey (계약 R6, FR-027).
+    private func thresholdColorPicker(selection: Binding<ThresholdColor>,
+                                      label: String) -> some View {
+        Picker(label, selection: selection) {
+            ForEach(ThresholdColor.allCases, id: \.rawValue) { token in
+                HStack(spacing: DS.xs) {
+                    Circle()
+                        .fill(DS.threshold(token))
+                        .frame(width: 10, height: 10)
+                    Text(token.displayName)
+                }
+                .tag(token)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .frame(width: 130)
+    }
+
+    /// One above the current highest, so a second threshold does not land on
+    /// top of the first and draw a zero-width band.
+    private var nextThresholdValue: Double {
+        guard let top = panel.options.thresholds.map(\.value).max() else {
+            return panel.options.thresholdMode == .percentage ? 80 : 0
+        }
+        return panel.options.thresholdMode == .percentage
+            ? Swift.min(top + 10, 100)
+            : top + 1
+    }
+
+    private var percentageNote: String {
+        switch panel.options.thresholdMode {
+        case .absolute:
+            return L.tr("값은 데이터와 같은 단위로 읽습니다.",
+                        "Values are read in the data's own unit.")
+        case .percentage where panel.panelType == .gauge:
+            return L.tr("값은 게이지 최소~최대 구간의 백분율입니다.",
+                        "Values are a percentage of the gauge's min–max range.")
+        case .percentage:
+            return L.tr("값은 지금 그려진 데이터 범위의 백분율입니다.",
+                        "Values are a percentage of the range currently drawn.")
         }
     }
 }

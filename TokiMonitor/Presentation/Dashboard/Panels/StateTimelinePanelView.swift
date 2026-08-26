@@ -76,10 +76,10 @@ struct StateTimelinePanelView: View {
         }
         return states.map { state in
             if let v = valueForState[state],
-               let named = StateTimelineBuilder.color(for: v, thresholds: panel.options.thresholds) {
-                // Thresholds store the same colour names the rest of the app
-                // uses, so a threshold reads the same here as on a gauge.
-                return ProviderInfo.colorFromName(named)
+               let token = StateTimelineBuilder.color(for: v, thresholds: panel.options.thresholds) {
+                // One measured palette for every threshold in the app, so a
+                // band reads the same here as it does on a gauge.
+                return DS.threshold(token)
             }
             return Self.defaultPalette[abs(state.hashValue) % Self.defaultPalette.count]
         }

@@ -176,7 +176,12 @@ extension PanelDisplayOptions {
     }
 
     private var thresholdSpecs: [ThresholdSpec] {
-        thresholds.map { ThresholdSpec(value: $0.value, color: $0.color) }
+        // The string a step arrived with wins over the token it resolved to,
+        // so a spec written from an imported dashboard keeps that dashboard's
+        // colour rather than being rewritten to this build's vocabulary.
+        thresholds.map {
+            ThresholdSpec(value: $0.value, color: $0.unknownColorRaw ?? $0.color.rawValue)
+        }
     }
 
     /// Encode this options bag into the typed spec for `kind`. Returns the

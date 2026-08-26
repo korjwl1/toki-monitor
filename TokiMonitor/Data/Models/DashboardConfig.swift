@@ -758,6 +758,50 @@ struct PanelDisplayOptions: Codable, Equatable {
     var decimals: Int?
     var thresholds: [ThresholdStep] = []
 
+    /// The band below every step (FR-026). Without it the region under the
+    /// lowest threshold had no colour of its own, so a gauge sitting there drew
+    /// the accent colour and said nothing about the value.
+    var thresholdBase: ThresholdColor = .neutral
+
+    /// Whether the step values are absolute numbers or percentages of the
+    /// panel's scale (FR-026). Only offered where a scale exists to take a
+    /// percentage of — see `PanelType.supportsPercentageThresholds`.
+    var thresholdMode: ThresholdMode = .absolute
+
+    init() {}
+
+    /// Every property optional on the way in, with the default the editor
+    /// starts from.
+    ///
+    /// The synthesized decoder required each key, so every property added to
+    /// this bag over the years made the panels of an older dashboard
+    /// undecodable — and an undecodable panel fails its dashboard. Base colour
+    /// and threshold mode are two more such properties, and they are the last
+    /// ones to be able to do that.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        colorMode = try c.decodeIfPresent(ColorMode.self, forKey: .colorMode) ?? .value
+        graphMode = try c.decodeIfPresent(GraphMode.self, forKey: .graphMode) ?? .none
+        legendPosition = try c.decodeIfPresent(LegendPosition.self,
+                                               forKey: .legendPosition) ?? .bottom
+        showLegend = try c.decodeIfPresent(Bool.self, forKey: .showLegend) ?? true
+        tooltipMode = try c.decodeIfPresent(TooltipMode.self, forKey: .tooltipMode) ?? .single
+        fillOpacity = try c.decodeIfPresent(Double.self, forKey: .fillOpacity) ?? 0.1
+        lineWidth = try c.decodeIfPresent(Double.self, forKey: .lineWidth) ?? 2
+        showHeader = try c.decodeIfPresent(Bool.self, forKey: .showHeader) ?? true
+        showThresholdMarkers = try c.decodeIfPresent(Bool.self,
+                                                     forKey: .showThresholdMarkers) ?? true
+        gaugeMin = try c.decodeIfPresent(Double.self, forKey: .gaugeMin)
+        gaugeMax = try c.decodeIfPresent(Double.self, forKey: .gaugeMax)
+        unit = try c.decodeIfPresent(String.self, forKey: .unit)
+        decimals = try c.decodeIfPresent(Int.self, forKey: .decimals)
+        thresholds = try c.decodeIfPresent([ThresholdStep].self, forKey: .thresholds) ?? []
+        thresholdBase = try c.decodeIfPresent(ThresholdColor.self,
+                                              forKey: .thresholdBase) ?? .neutral
+        thresholdMode = try c.decodeIfPresent(ThresholdMode.self,
+                                              forKey: .thresholdMode) ?? .absolute
+    }
+
     enum ColorMode: String, Codable, CaseIterable, Equatable {
         case value
         case background
@@ -790,10 +834,54 @@ struct ThresholdStep: Codable, Equatable, Identifiable {
     /// animated identity churn through the whole list.
     var id: UUID = UUID()
     var value: Double
-    var color: String  // hex color or named color
+
+    /// Was a free string. A free string cannot satisfy the contrast
+    /// requirement and cannot be checked against it, so the set is closed
+    /// (계약 R6, FR-027).
+    ///
+    /// Setting it clears `unknownColorRaw`: once the reader has picked a
+    /// colour here, the string this step arrived with is no longer what it
+    /// says.
+    var color: ThresholdColor {
+        didSet { unknownColorRaw = nil }
+    }
+
+    /// The colour string exactly as it was written, when it is not one this
+    /// build can validate — a hex, or a palette name from elsewhere.
+    /// Re-encoded in place of `color` so that opening a dashboard from another
+    /// tool and saving it does not overwrite a colour this build merely
+    /// declined to draw (계약 C1). Never rendered: `color` is.
+    var unknownColorRaw: String?
+
+    init(value: Double, color: ThresholdColor, unknownColorRaw: String? = nil) {
+        self.value = value
+        self.color = color
+        self.unknownColorRaw = unknownColorRaw
+    }
 
     enum CodingKeys: String, CodingKey {
         case value, color
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        value = try c.decode(Double.self, forKey: .value)
+        let raw = try c.decode(String.self, forKey: .color)
+        if let known = ThresholdColor.named(raw) {
+            color = known
+            unknownColorRaw = raw == known.rawValue ? nil : raw
+        } else {
+            // Neutral rather than a guess. A colour this build cannot place is
+            // not evidence about the value, and drawing it as red would be.
+            color = .neutral
+            unknownColorRaw = raw
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(value, forKey: .value)
+        try c.encode(unknownColorRaw ?? color.rawValue, forKey: .color)
     }
 }
 
@@ -825,6 +913,26 @@ enum PanelType: String, Codable, CaseIterable {
     /// failing the whole dashboard (계약 R5). The string actually on disk is
     /// kept in `PanelConfig.unknownPanelTypeRaw`.
     case unknown = "__unknown__"
+
+    /// Whether this build's render for the type reads the panel's thresholds.
+    ///
+    /// The editor offers the threshold list only where the answer is yes.
+    /// Offering it elsewhere is the R1 failure exactly: the reader sets a
+    /// threshold, nothing changes, and they go looking for their own mistake.
+    var honoursThresholds: Bool {
+        switch self {
+        case .stat, .gauge, .timeSeries, .stateTimeline: return true
+        case .barChart, .pieChart, .table, .rowPanel, .unknown: return false
+        }
+    }
+
+    /// Whether the type has a scale a percentage threshold can be a percentage
+    /// OF — the gauge's stated ends, the line chart's drawn range. A stat card
+    /// is one number and a state timeline is a row of spans; neither has one,
+    /// so the mode is not offered there.
+    var supportsPercentageThresholds: Bool {
+        self == .gauge || self == .timeSeries
+    }
 
     /// Panel types available for user creation (excludes rowPanel from general picker)
     static var creatableTypes: [PanelType] {

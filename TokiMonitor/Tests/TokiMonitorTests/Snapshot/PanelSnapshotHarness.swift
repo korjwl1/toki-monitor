@@ -287,8 +287,8 @@ enum PanelSnapshotFixtures {
         config.options.gaugeMin = 0
         config.options.gaugeMax = 100_000
         config.options.thresholds = [
-            ThresholdStep(value: 50_000, color: "orange"),
-            ThresholdStep(value: 80_000, color: "red"),
+            ThresholdStep(value: 50_000, color: .orange),
+            ThresholdStep(value: 80_000, color: .red),
         ]
         return config
     }

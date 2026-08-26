@@ -30,15 +30,21 @@ struct DashboardConfigStoreTests {
         return try! JSONSerialization.jsonObject(with: data)
     }
 
-    /// An entry from a newer build: valid JSON, but names a panel type this
-    /// build's enum has no case for.
+    /// An entry this build cannot decode: valid JSON, with a value of the wrong
+    /// type for a required field.
+    ///
+    /// The unknown `panelType` it also carries is no longer what makes it
+    /// unreadable — that case is handled deliberately now (계약 R5): the panel
+    /// is kept, drawn as "this build cannot show it", and written back. So the
+    /// entry needs a real structural fault to stand for the thing these tests
+    /// are about.
     private var futureEntry: [String: Any] {
         [
             "id": UUID().uuidString,
             "uid": "fromfuture",
             "title": "From a newer build",
             "schemaVersion": 4,
-            "version": 1,
+            "version": "one",
             "tags": [],
             "panels": [[
                 "id": UUID().uuidString,

@@ -20,8 +20,8 @@ struct StateTimelineTests {
     }
 
     private let bands = [
-        ThresholdStep(value: 0, color: "green"),
-        ThresholdStep(value: 80, color: "red"),
+        ThresholdStep(value: 0, color: .green),
+        ThresholdStep(value: 80, color: .red),
     ]
 
     private func spans(_ frame: Frame, field: String = "v",
@@ -147,15 +147,15 @@ struct StateTimelineTests {
 
     @Test("a value's band names its colour")
     func colourFollowsBand() {
-        #expect(StateTimelineBuilder.color(for: 10, thresholds: bands) == "green")
-        #expect(StateTimelineBuilder.color(for: 95, thresholds: bands) == "red")
+        #expect(StateTimelineBuilder.color(for: 10, thresholds: bands) == .green)
+        #expect(StateTimelineBuilder.color(for: 95, thresholds: bands) == .red)
         #expect(StateTimelineBuilder.color(for: 10, thresholds: []) == nil,
                 "with no thresholds the palette assigns by name")
     }
 
     @Test("a value below every step is its own state")
     func belowLowestStep() {
-        let steps = [ThresholdStep(value: 50, color: "red")]
+        let steps = [ThresholdStep(value: 50, color: .red)]
         #expect(StateTimelineBuilder.stateName(for: 10, thresholds: steps) == "< 50")
         #expect(StateTimelineBuilder.stateName(for: 60, thresholds: steps) == "≥ 50")
     }

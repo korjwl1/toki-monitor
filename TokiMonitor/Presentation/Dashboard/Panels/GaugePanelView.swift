@@ -47,9 +47,13 @@ struct GaugePanelView: View {
                     // exactly the values that matter — the high ones, where the
                     // arc covers the whole dial.
                     if panel.options.showThresholdMarkers {
-                        ForEach(Self.bands(scale: scale, thresholds: panel.options.thresholds)) { band in
+                        ForEach(Self.bands(scale: scale, options: panel.options)) { band in
+                            // Full opacity. The band colours are chosen to
+                            // clear 4.5:1 against the panel; drawing them at
+                            // 0.65 threw that away and left a scale nobody
+                            // could have measured.
                             GaugeArc(from: band.start, to: band.end, lineWidth: stroke * 0.34)
-                                .stroke(band.color.opacity(0.65),
+                                .stroke(band.color,
                                         style: StrokeStyle(lineWidth: stroke * 0.34, lineCap: .butt))
                                 .padding(bandInset)
                         }
@@ -58,17 +62,29 @@ struct GaugePanelView: View {
                     // Value
                     if let fraction = scale.fraction {
                         GaugeArc(from: 0, to: fraction, lineWidth: stroke)
-                            .stroke(Self.valueColor(value, options: panel.options),
+                            .stroke(Self.valueColor(value, options: panel.options, scale: scale),
                                     style: StrokeStyle(lineWidth: stroke, lineCap: .round))
                     }
 
-                    Text(stat.value)
-                        .font(.system(size: min(max(diameter * 0.2, 12), 32),
-                                      weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Color.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.4)
-                        .padding(.horizontal, stroke * 2.2)
+                    VStack(spacing: 2) {
+                        Text(stat.value)
+                            .font(.system(size: min(max(diameter * 0.2, 12), 32),
+                                          weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Color.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.4)
+                        // The band, in words. The arc's colour is otherwise the
+                        // whole message, and colour must never carry meaning
+                        // alone (계약 R6).
+                        if let band = Self.bandLabel(value, options: panel.options,
+                                                     scale: scale) {
+                            Text(band)
+                                .font(.system(size: DS.fontTiny, design: .monospaced))
+                                .foregroundStyle(Color.primary.opacity(0.72))
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.horizontal, stroke * 2.2)
                 }
                 .frame(width: diameter, height: diameter)
 
@@ -88,10 +104,7 @@ struct GaugePanelView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(panel.title)
-        .accessibilityValue(
-            L.tr("\(stat.value), \(Self.label(scale.min, panel: panel))에서 \(Self.label(scale.max, panel: panel)) 사이",
-                 "\(stat.value), on a scale from \(Self.label(scale.min, panel: panel)) to \(Self.label(scale.max, panel: panel))")
-        )
+        .accessibilityValue(Self.spokenValue(panel: panel, data: data, frames: frames))
     }
 
     // MARK: - Scale
@@ -111,7 +124,12 @@ struct GaugePanelView: View {
     /// every gauge at full and say nothing.
     static func scale(for value: Double?, options: PanelDisplayOptions) -> Scale {
         let lower = options.gaugeMin ?? 0
-        let thresholdTop = options.thresholds.map(\.value).max()
+        // Only absolute steps describe a range. A percentage step is measured
+        // AGAINST the scale, so letting one set it would make a gauge whose
+        // top is always 100 and whose thresholds always land in the same place.
+        let thresholdTop = options.thresholdMode == .absolute
+            ? options.thresholds.map(\.value).max()
+            : nil
         let upper: Double
         if let explicit = options.gaugeMax {
             upper = explicit
@@ -148,33 +166,82 @@ struct GaugePanelView: View {
         let color: Color
     }
 
-    /// One arc per threshold step, from that step's value to the next one's
-    /// (or to the end of the scale). Steps outside the scale are clamped
-    /// rather than dropped, so a threshold above the maximum still colours the
-    /// top of the dial instead of vanishing.
-    static func bands(scale: Scale, thresholds: [ThresholdStep]) -> [Band] {
+    /// One arc per band, starting with the BASE — the region below the lowest
+    /// step, which had no colour of its own before and so said nothing about a
+    /// value sitting in it (FR-026).
+    ///
+    /// Each band runs from its step to the next one, or to the end of the
+    /// scale. Steps outside the scale are clamped rather than dropped, so a
+    /// threshold above the maximum still colours the top of the dial instead of
+    /// vanishing. In percentage mode the steps are placed on the scale first —
+    /// 80 means 80% of the span, not 80 tokens.
+    static func bands(scale: Scale, options: PanelDisplayOptions) -> [Band] {
         let span = scale.max - scale.min
-        guard span > 0, !thresholds.isEmpty else { return [] }
-        let sorted = thresholds.sorted { $0.value < $1.value }
-        return sorted.enumerated().compactMap { index, step in
-            let upper = index + 1 < sorted.count ? sorted[index + 1].value : scale.max
-            let start = Swift.min(Swift.max((step.value - scale.min) / span, 0), 1)
-            let end = Swift.min(Swift.max((upper - scale.min) / span, 0), 1)
-            guard end > start else { return nil }
-            return Band(id: index, start: start, end: end,
-                        color: ProviderInfo.colorFromName(step.color))
+        guard span > 0 else { return [] }
+        let placed = Thresholds.placed(options.thresholds, mode: options.thresholdMode,
+                                       scale: scale.min...scale.max)
+        guard !placed.isEmpty else { return [] }
+
+        func fraction(_ v: Double) -> Double {
+            Swift.min(Swift.max((v - scale.min) / span, 0), 1)
         }
+
+        var out: [Band] = []
+        let base = Band(id: 0, start: 0, end: fraction(placed[0].at),
+                        color: DS.threshold(options.thresholdBase))
+        if base.end > base.start { out.append(base) }
+        for (index, entry) in placed.enumerated() {
+            let upper = index + 1 < placed.count ? placed[index + 1].at : scale.max
+            let start = fraction(entry.at)
+            let end = fraction(upper)
+            guard end > start else { continue }
+            out.append(Band(id: index + 1, start: start, end: end,
+                            color: DS.threshold(entry.step.color)))
+        }
+        return out
     }
 
     /// The colour of the value arc: the highest threshold the value has
-    /// reached, or the accent colour when the panel has no thresholds.
-    static func valueColor(_ value: Double?, options: PanelDisplayOptions) -> Color {
-        guard options.showThresholdMarkers, let value else { return .accentColor }
-        let reached = options.thresholds
-            .filter { value >= $0.value }
-            .max { $0.value < $1.value }
-        guard let reached else { return .accentColor }
-        return ProviderInfo.colorFromName(reached.color)
+    /// reached, the base colour below all of them, or the accent colour when
+    /// the panel has no thresholds at all.
+    static func valueColor(_ value: Double?, options: PanelDisplayOptions,
+                           scale: Scale? = nil) -> Color {
+        guard options.showThresholdMarkers, value != nil,
+              !options.thresholds.isEmpty else { return .accentColor }
+        let range = scale.map { $0.min...$0.max }
+        return DS.threshold(Thresholds.color(
+            for: value, base: options.thresholdBase, steps: options.thresholds,
+            mode: options.thresholdMode, scale: range
+        ))
+    }
+
+    /// What band the value is in, in words. Colour is never the only carrier of
+    /// meaning (계약 R6), and on a dial there is nothing else to carry it — the
+    /// arc's colour is the whole message otherwise.
+    static func bandLabel(_ value: Double?, options: PanelDisplayOptions,
+                          scale: Scale) -> String? {
+        guard options.showThresholdMarkers else { return nil }
+        return Thresholds.label(for: value, steps: options.thresholds,
+                                mode: options.thresholdMode,
+                                scale: scale.min...scale.max)
+    }
+
+    /// What VoiceOver reads: the number, the ends of the scale, and the band —
+    /// the same three things the sighted reader gets, none of them carried by
+    /// colour.
+    static func spokenValue(panel: PanelConfig, data: TimeSeriesData?,
+                            frames: FrameSet?) -> String {
+        let stat = StatPanelView.statValue(panel: panel, data: data, frames: frames)
+        let value = StatPanelView.numericValue(panel: panel, data: data, frames: frames)
+        let scale = Self.scale(for: value, options: panel.options)
+        let low = label(scale.min, panel: panel)
+        let high = label(scale.max, panel: panel)
+        let range = L.tr("\(stat.value), \(low)에서 \(high) 사이",
+                         "\(stat.value), on a scale from \(low) to \(high)")
+        guard let band = bandLabel(value, options: panel.options, scale: scale) else {
+            return range
+        }
+        return L.tr("\(range), 임계값 \(band)", "\(range), threshold \(band)")
     }
 
     // MARK: - Labels

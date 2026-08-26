@@ -151,3 +151,171 @@ enum FieldFormatter {
         ("percentUnit", L.tr("비율 (0-1)", "Ratio (0-1)")),
     ]
 }
+
+// MARK: - Thresholds
+//
+// Three things were missing and one was wrong.
+//
+// Missing: a BASE step (the band below the first threshold had no colour of its
+// own, so a gauge under its lowest threshold drew the accent colour and said
+// nothing); a PERCENTAGE mode (every threshold had to be restated when a scale
+// changed); and any use of the steps outside the gauge and the state timeline.
+//
+// Wrong: the colour was a free string. That makes the contrast requirement
+// unenforceable — `#ffff00` is 1.07:1 on a light panel — and it failed
+// silently, because the resolver returned a neutral grey for anything it did
+// not recognise, so a typo drew a band that looked deliberate (계약 R6, FR-027).
+
+/// A threshold colour. The set is closed: every member is a token whose
+/// contrast has been measured against both appearances, and the editor offers
+/// no way to write anything else. The hex behind each token lives with the
+/// other design colours in `DS.threshold(_:)`, which is where the measurements
+/// are recorded.
+enum ThresholdColor: String, Codable, CaseIterable, Sendable {
+    case green
+    case yellow
+    case orange
+    case red
+    case blue
+    case purple
+    /// The default base: "nothing to say about this value yet".
+    case neutral
+
+    var displayName: String {
+        switch self {
+        case .green:   return L.tr("초록", "Green")
+        case .yellow:  return L.tr("노랑", "Yellow")
+        case .orange:  return L.tr("주황", "Orange")
+        case .red:     return L.tr("빨강", "Red")
+        case .blue:    return L.tr("파랑", "Blue")
+        case .purple:  return L.tr("보라", "Purple")
+        case .neutral: return L.tr("회색", "Neutral")
+        }
+    }
+
+    /// Read a colour written by something other than this editor.
+    ///
+    /// Grafana's own palette names are accepted, because a dashboard imported
+    /// from there should keep the colours its author chose rather than falling
+    /// to the base colour. Anything else — a hex, a name from a palette this
+    /// build does not have — is not guessed at: it returns nil, and
+    /// `ThresholdStep` keeps the original string so that saving does not
+    /// destroy it (계약 C1).
+    static func named(_ raw: String) -> ThresholdColor? {
+        if let exact = ThresholdColor(rawValue: raw) { return exact }
+        let base = raw
+            .replacingOccurrences(of: "dark-", with: "")
+            .replacingOccurrences(of: "light-", with: "")
+            .replacingOccurrences(of: "semi-", with: "")
+            .replacingOccurrences(of: "super-", with: "")
+            .lowercased()
+        switch base {
+        case "green":                    return .green
+        case "yellow", "gold":           return .yellow
+        case "orange":                   return .orange
+        case "red":                      return .red
+        case "blue":                     return .blue
+        case "purple", "violet":         return .purple
+        case "gray", "grey", "text":     return .neutral
+        default:                         return nil
+        }
+    }
+}
+
+/// What a threshold's `value` is measured in.
+enum ThresholdMode: String, Codable, CaseIterable, Sendable {
+    /// The value is a number on the same scale as the data.
+    case absolute
+    /// The value is a percentage of the panel's scale, 0…100. Only offered
+    /// where a scale exists to take a percentage OF (계약 R1).
+    case percentage
+
+    var displayName: String {
+        switch self {
+        case .absolute:   return L.tr("절대값", "Absolute")
+        case .percentage: return L.tr("백분율", "Percentage")
+        }
+    }
+}
+
+/// Reading a value against a panel's thresholds.
+///
+/// One implementation for every panel type. The gauge and the state timeline
+/// each had their own "which step has this value reached" loop; a stat card
+/// showing a different band from the gauge beside it, over the same number and
+/// the same steps, is exactly the kind of divergence two loops produce.
+enum Thresholds {
+
+    /// Where a step sits on the data's own scale.
+    ///
+    /// In percentage mode this needs the scale: a step at 80 means 80% of the
+    /// span between its ends. Without one it returns nil rather than falling
+    /// back to reading 80 as an absolute — a threshold silently moving from
+    /// "80% of the plan" to "80 tokens" is a wrong answer that looks right.
+    static func absoluteValue(of step: ThresholdStep, mode: ThresholdMode,
+                              scale: ClosedRange<Double>?) -> Double? {
+        switch mode {
+        case .absolute:
+            return step.value
+        case .percentage:
+            guard let scale else { return nil }
+            return scale.lowerBound
+                + (scale.upperBound - scale.lowerBound) * (step.value / 100)
+        }
+    }
+
+    /// Steps in ascending order on the data's scale, paired with where they
+    /// land. Steps that cannot be placed are dropped rather than stacked at
+    /// zero.
+    static func placed(_ steps: [ThresholdStep], mode: ThresholdMode,
+                       scale: ClosedRange<Double>?) -> [(step: ThresholdStep, at: Double)] {
+        steps
+            .compactMap { step in
+                absoluteValue(of: step, mode: mode, scale: scale).map { (step: step, at: $0) }
+            }
+            .sorted { $0.at < $1.at }
+    }
+
+    /// The highest step this value has reached, or nil for the base band.
+    static func reached(_ value: Double?, steps: [ThresholdStep],
+                        mode: ThresholdMode = .absolute,
+                        scale: ClosedRange<Double>? = nil) -> ThresholdStep? {
+        guard let value else { return nil }
+        return placed(steps, mode: mode, scale: scale)
+            .last { value >= $0.at }?
+            .step
+    }
+
+    /// The colour for a value: the step it has reached, or the base.
+    static func color(for value: Double?, base: ThresholdColor,
+                      steps: [ThresholdStep], mode: ThresholdMode = .absolute,
+                      scale: ClosedRange<Double>? = nil) -> ThresholdColor {
+        reached(value, steps: steps, mode: mode, scale: scale)?.color ?? base
+    }
+
+    /// What to call the band a value is in — "≥ 80%", "< 50", "기준".
+    ///
+    /// Colour must never be the only carrier of meaning (계약 R6), and this is
+    /// the other carrier: every panel that colours something by threshold
+    /// prints or speaks this beside it.
+    static func label(for value: Double?, steps: [ThresholdStep],
+                      mode: ThresholdMode = .absolute,
+                      scale: ClosedRange<Double>? = nil) -> String? {
+        guard value != nil else { return nil }
+        // Nil, not "< 80%", when percentage steps have no scale to sit on.
+        // There is nothing true to say about the band in that case, and naming
+        // one anyway would be the silent wrong answer `absoluteValue` refuses
+        // to give.
+        let placed = placed(steps, mode: mode, scale: scale)
+        guard let lowest = placed.first else { return nil }
+        let suffix = mode == .percentage ? "%" : ""
+        guard let step = reached(value, steps: steps, mode: mode, scale: scale) else {
+            return "< \(number(lowest.step.value))\(suffix)"
+        }
+        return "≥ \(number(step.value))\(suffix)"
+    }
+
+    private static func number(_ v: Double) -> String {
+        v == v.rounded() ? String(Int(v)) : String(format: "%g", v)
+    }
+}

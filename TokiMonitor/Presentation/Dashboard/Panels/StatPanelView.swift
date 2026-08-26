@@ -16,14 +16,25 @@ struct StatPanelView: View {
 
     var body: some View {
         let stat = Self.statValue(panel: panel, data: data, frames: frames)
+        let number = Self.numericValue(panel: panel, data: data, frames: frames)
+        let band = Self.band(panel: panel, value: number)
         VStack(alignment: .leading, spacing: 4) {
             Text(stat.value)
                 .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Color.primary)
+                .foregroundStyle(Self.valueStyle(panel: panel, band: band))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .contentTransition(.numericText())
                 .animation(.easeOut(duration: 0.5), value: stat.value)
+            // Which band, in words. A tinted number is a claim about the value
+            // and colour must never be the only thing making it (계약 R6) —
+            // this is what a reader who cannot separate the hues, and what
+            // VoiceOver, get instead.
+            if let band {
+                Text(band.label)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Color.primary.opacity(0.72))
+            }
             if let subtitle = stat.subtitle {
                 Text(subtitle)
                     .font(.system(size: 10))
@@ -31,6 +42,57 @@ struct StatPanelView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Self.backgroundTint(panel: panel, band: band))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(panel.title)
+        .accessibilityValue(band.map {
+            L.tr("\(stat.value), 임계값 \($0.label)", "\(stat.value), threshold \($0.label)")
+        } ?? stat.value)
+    }
+
+    // MARK: - Thresholds
+
+    /// The band this card's number is in, or nil when the panel has no
+    /// thresholds to place it against.
+    ///
+    /// Absolute only. A percentage step needs a scale to be a percentage OF,
+    /// and a stat card has none — so `Thresholds` returns nothing rather than
+    /// reading 80% as 80, and the editor does not offer the mode here (계약 R1).
+    static func band(panel: PanelConfig, value: Double?)
+        -> (color: ThresholdColor, label: String)? {
+        guard panel.options.showThresholdMarkers, value != nil,
+              !panel.options.thresholds.isEmpty,
+              let label = Thresholds.label(for: value, steps: panel.options.thresholds,
+                                           mode: panel.options.thresholdMode)
+        else { return nil }
+        let color = Thresholds.color(for: value, base: panel.options.thresholdBase,
+                                     steps: panel.options.thresholds,
+                                     mode: panel.options.thresholdMode)
+        return (color, label)
+    }
+
+    /// The number's own colour under `.value`, and the ordinary text colour
+    /// otherwise — under `.background` the tint carries the band and the digits
+    /// stay maximally legible on it.
+    static func valueStyle(panel: PanelConfig,
+                           band: (color: ThresholdColor, label: String)?) -> Color {
+        guard let band, panel.options.colorMode == .value else { return Color.primary }
+        return DS.threshold(band.color)
+    }
+
+    /// A wash of the band's colour behind the card under `.background`.
+    ///
+    /// A wash rather than a fill: the token is chosen to clear 4.5:1 against
+    /// the panel, and painting the card with it at full strength would put the
+    /// value text on a ground nothing was measured against.
+    @ViewBuilder
+    static func backgroundTint(panel: PanelConfig,
+                               band: (color: ThresholdColor, label: String)?) -> some View {
+        if let band, panel.options.colorMode == .background {
+            DS.threshold(band.color)
+                .opacity(0.14)
+                .clipShape(RoundedRectangle(cornerRadius: DS.btnRadius, style: .continuous))
+        }
     }
 
     /// Resolve a stat card's number. Frames first; the legacy extractor only
