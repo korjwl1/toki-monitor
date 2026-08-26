@@ -79,15 +79,54 @@ final class DashboardVersionStore {
 
     // MARK: - Persistence
 
-    private func loadAllVersions() -> [DashboardVersion] {
+    /// Decoded entries, plus the raw bytes of any entry this build could not
+    /// read. The split matters because the caller writes the whole array back:
+    /// an all-or-nothing decode turns one unreadable entry into the silent
+    /// deletion of every version the user has, and unlike the dashboard list
+    /// there is nothing else holding a copy.
+    private func loadAllVersionsPreservingUnreadable()
+        -> (versions: [DashboardVersion], unreadable: [Any]) {
         guard let data = UserDefaults.standard.data(forKey: Self.storeKey),
-              let versions = try? JSONDecoder().decode([DashboardVersion].self, from: data)
-        else { return [] }
-        return versions
+              let raw = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
+        else { return ([], []) }
+
+        var decoded: [DashboardVersion] = []
+        var unreadable: [Any] = []
+        for element in raw {
+            guard let bytes = try? JSONSerialization.data(withJSONObject: element),
+                  let one = try? JSONDecoder().decode(DashboardVersion.self, from: bytes)
+            else {
+                unreadable.append(element)
+                continue
+            }
+            decoded.append(one)
+        }
+        return (decoded, unreadable)
     }
 
+    private func loadAllVersions() -> [DashboardVersion] {
+        loadAllVersionsPreservingUnreadable().versions
+    }
+
+    /// Writes `versions` back, re-appending verbatim anything the load could
+    /// not decode. Without this, saving is how the history gets destroyed.
     private func saveAllVersions(_ versions: [DashboardVersion]) {
-        guard let data = try? JSONEncoder().encode(versions) else { return }
-        UserDefaults.standard.set(data, forKey: Self.storeKey)
+        let unreadable = loadAllVersionsPreservingUnreadable().unreadable
+        guard let encoded = try? JSONEncoder().encode(versions) else { return }
+
+        guard !unreadable.isEmpty else {
+            UserDefaults.standard.set(encoded, forKey: Self.storeKey)
+            return
+        }
+        guard var merged = (try? JSONSerialization.jsonObject(with: encoded)) as? [Any] else {
+            UserDefaults.standard.set(encoded, forKey: Self.storeKey)
+            return
+        }
+        merged.append(contentsOf: unreadable)
+        guard let out = try? JSONSerialization.data(withJSONObject: merged) else {
+            UserDefaults.standard.set(encoded, forKey: Self.storeKey)
+            return
+        }
+        UserDefaults.standard.set(out, forKey: Self.storeKey)
     }
 }

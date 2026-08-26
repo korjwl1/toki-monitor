@@ -134,7 +134,13 @@ extension DashboardConfig {
         refresh = try c.decode(RefreshInterval.self, forKey: .refresh)
         panels = try c.decode([PanelConfig].self, forKey: .panels)
         templating = try c.decode(TemplatingConfig.self, forKey: .templating)
-        datasources = try c.decode([String: DatasourceInstance].self, forKey: .datasources)
+        // Optional, and this is not a style preference. Every dashboard the
+        // shipped release wrote predates this key, so a required decode here
+        // throws keyNotFound on every existing installation, the store falls
+        // back to a freshly-uid'd default, and the user's dashboard looks
+        // factory-reset. PanelDisplayOptions below carries a comment about
+        // exactly this hazard; it was reintroduced one level up.
+        datasources = try c.decodeIfPresent([String: DatasourceInstance].self, forKey: .datasources) ?? [:]
         activeDatasource = try c.decodeIfPresent(DatasourceSelector.self, forKey: .activeDatasource)
         layouts = try c.decodeIfPresent([DashboardLayout].self, forKey: .layouts)
         annotations = try c.decode([DashboardAnnotation].self, forKey: .annotations)

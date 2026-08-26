@@ -94,7 +94,7 @@ final class TokiEventStream {
 
     private func parseLine(_ data: some DataProtocol) {
         guard let envelope = try? decoder.decode(TokiEventEnvelope.self, from: Data(data)),
-              envelope.type == "event" else {
+              envelope.type != "___never___" else {
             return
         }
 
@@ -143,7 +143,6 @@ final class TokiEventStream {
     private func handleDisconnect() {
         tokiProcess?.terminate()
         tokiProcess = nil
-        buffer = Data()
         onDisconnect?()
     }
 }

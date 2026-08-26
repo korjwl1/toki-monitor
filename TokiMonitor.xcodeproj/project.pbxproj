@@ -116,6 +116,7 @@
 		AA10FRAME00000000000002 /* Frame.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10FRAME00000000000001 /* Frame.swift */; };
 		AA11FRAMEADAPT00000002 /* FrameAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11FRAMEADAPT00000001 /* FrameAdapter.swift */; };
 		AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01WINWIRE0000000000001 /* WindowsWireTests.swift */; };
+		AA70SHIPDECODE01B /* ShippedDashboardDecodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA70SHIPDECODE01F /* ShippedDashboardDecodeTests.swift */; };
 		AA41QREFTEST001B /* QueryRefusalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA41QREFTEST001F /* QueryRefusalTests.swift */; };
 		5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */; };
 		63B8BEFB72BBB999147E5937 /* TokiConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2BF0000196F3EA0107C726 /* TokiConnection.swift */; };
@@ -198,6 +199,8 @@
 		E58E37541C010557CB0C1865 /* DatasourceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A7FCA1C481A1421555EEF2 /* DatasourceRegistry.swift */; };
 		E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0103BDEAC6066E0274029149 /* ConnectionManager.swift */; };
 		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
+		AA90UDSSOCK000002 /* TokiTraceSocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */; };
+		AA90EVSTRBND000002 /* TokiEventStreamBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90EVSTRBND000001 /* TokiEventStreamBoundaryTests.swift */; };
 		EC7E072D4B8145B6FFB1942B /* DashboardMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDF640C227D467E72826C64 /* DashboardMigrator.swift */; };
 		ED31502F8415FBFD5DA3DA8B /* ClaudeAuthReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE42DEDC857AB657D449C5E /* ClaudeAuthReader.swift */; };
 		ED5B0A605502E2BF35B4F7AA /* DatasourceSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = D58215E739D0C0780915FF56 /* DatasourceSelector.swift */; };
@@ -343,9 +346,12 @@
 		AA10FRAME00000000000001 /* Frame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Frame.swift; sourceTree = "<group>"; };
 		AA11FRAMEADAPT00000001 /* FrameAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameAdapter.swift; sourceTree = "<group>"; };
 		AA01WINWIRE0000000000001 /* WindowsWireTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsWireTests.swift; sourceTree = "<group>"; };
+		AA70SHIPDECODE01F /* ShippedDashboardDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShippedDashboardDecodeTests.swift; sourceTree = "<group>"; };
 		AA41QREFTEST001F /* QueryRefusalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryRefusalTests.swift; sourceTree = "<group>"; };
 		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
+		AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiTraceSocketTests.swift; sourceTree = "<group>"; };
+		AA90EVSTRBND000001 /* TokiEventStreamBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamBoundaryTests.swift; sourceTree = "<group>"; };
 		77B9855FE6D408AAA8CF6F61 /* DashboardGridLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardGridLayout.swift; sourceTree = "<group>"; };
 		78A88F41ED20224F774C1ABA /* OAuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthModels.swift; sourceTree = "<group>"; };
 		7950516E788D89A85B45B397 /* StatusItemUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemUnit.swift; sourceTree = "<group>"; };
@@ -514,10 +520,13 @@
 		29DDD5F7608E33B91408BA74 /* Data */ = {
 			isa = PBXGroup;
 			children = (
+				AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */,
+				AA90EVSTRBND000001 /* TokiEventStreamBoundaryTests.swift */,
 				D48B81232926518156C12BDE /* ClaudeAuthReaderTests.swift */,
 				755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */,
 				750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */,
 				AA01WINWIRE0000000000001 /* WindowsWireTests.swift */,
+				AA70SHIPDECODE01F /* ShippedDashboardDecodeTests.swift */,
 				AA41QREFTEST001F /* QueryRefusalTests.swift */,
 				AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */,
 				AA12FRAMETEST000000001 /* FrameAdapterTests.swift */,
@@ -1190,6 +1199,8 @@
 				EE77CFE802FBAEF03819DC89 /* SemVerTests.swift in Sources */,
 				40CC603230947A99EB36F064 /* TokenAggregatorLogicTests.swift in Sources */,
 				EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */,
+				AA90UDSSOCK000002 /* TokiTraceSocketTests.swift in Sources */,
+				AA90EVSTRBND000002 /* TokiEventStreamBoundaryTests.swift in Sources */,
 				5F3B5F27AEE2D7112D148565 /* TokiReportClientTests.swift in Sources */,
 				F8B39525A65678B5F6A52331 /* UpdateCheckerTests.swift in Sources */,
 				CC0857BF78965AF7CCC554E8 /* WindowStatsTests.swift in Sources */,
@@ -1215,6 +1226,7 @@
 				AA80EXCHTEST00000002 /* DashboardExchangeTests.swift in Sources */,
 				AA02PANELNORM00000000002 /* PanelNormalizationTests.swift in Sources */,
 				AA01WINWIRE0000000000002 /* WindowsWireTests.swift in Sources */,
+				AA70SHIPDECODE01B /* ShippedDashboardDecodeTests.swift in Sources */,
 				AA41QREFTEST001B /* QueryRefusalTests.swift in Sources */,
 				AA03SERIESMERGE000000002 /* SeriesMergeTests.swift in Sources */,
 				AA12FRAMETEST000000002 /* FrameAdapterTests.swift in Sources */,
