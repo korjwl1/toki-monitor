@@ -190,6 +190,36 @@ enum PlanFitSnapshotRenderer {
         )
     }
 
+    /// The height the page needs at 800pt, so a layout claim can be made about
+    /// the WHOLE page rather than about the part that happens to fit in a
+    /// 1200pt viewport.
+    ///
+    /// This is what makes the overflow test mean anything after a section is
+    /// added: a paragraph that runs off the right edge two thousand points
+    /// down is invisible to a fixed-height render, and "no horizontal
+    /// overflow" measured on the top third of a page is not the claim FR-056
+    /// makes.
+    static func fittingHeight<V: View>(_ view: V, width: CGFloat = width) -> CGFloat {
+        let host = NSHostingView(rootView: view.frame(width: width))
+        host.frame = CGRect(x: 0, y: 0, width: width, height: 10)
+        host.layoutSubtreeIfNeeded()
+        // Bounded: a runaway layout must fail the render, not exhaust memory.
+        return min(max(host.fittingSize.height, height), 12_000)
+    }
+
+    /// The whole page, at 800pt, however tall it turns out to be.
+    static func renderWholePage(
+        _ snapshotCase: PlanFitSnapshotCase,
+        unit: PeriodUnit = .weekly
+    ) -> PanelRaster? {
+        let content = PlanFitContent(model: model(for: snapshotCase, unit: unit), unit: .constant(unit))
+        // Measured on the VStack the scroll view holds, not on the scroll view
+        // itself: a ScrollView's fitting size is whatever it is given.
+        let tall = fittingHeight(content)
+        return raster(content, theme: snapshotCase.theme,
+                      size: CGSize(width: width, height: tall))
+    }
+
     static func render(
         _ snapshotCase: PlanFitSnapshotCase,
         unit: PeriodUnit = .weekly,

@@ -1277,3 +1277,264 @@ struct PlanFitReadinessTests {
                 "day one is drawn but barely readable")
     }
 }
+
+// MARK: - The layout, over the whole page (T074)
+
+/// FR-056, made about the page rather than about the part of it that fits in a
+/// viewport.
+///
+/// The existing overflow test renders 1200pt tall and looks for ink in the
+/// margins. That is the right method and the wrong extent: a paragraph that
+/// runs off the right edge two thousand points down the page is invisible to
+/// it, and the page grew a section since. These render the page at its own
+/// fitting height, so every row of it is measured.
+@Suite("Plan-fit layout at the window minimum")
+@MainActor
+struct PlanFitWholePageLayoutTests {
+
+    /// Every state and every segment count. The states differ in what they
+    /// draw, and a thin state can overflow where a full one does not — a
+    /// single long sentence has nothing beside it to wrap against.
+    ///
+    /// One appearance rather than two: whether a run of text fits in 800pt is
+    /// a fact about the layout, and the layout is identical in both. The
+    /// appearances are covered in pixels by the contrast and greyscale tests,
+    /// which is where they can actually differ. Rendering a 5000pt page twice
+    /// to learn the same thing costs a minute of every test run.
+    @Test("no state paints outside 800pt anywhere down the page",
+          arguments: PlanFitDataSufficiency.allCases, PlanFitSegmentCount.allCases)
+    func wholePageFitsAt800(
+        sufficiency: PlanFitDataSufficiency,
+        segments: PlanFitSegmentCount
+    ) throws {
+        let snapshotCase = PlanFitSnapshotCase(
+            sufficiency: sufficiency, segments: segments, theme: .light
+        )
+        let raster = try #require(PlanFitSnapshotRenderer.renderWholePage(snapshotCase),
+                                  "\(snapshotCase.name) did not render")
+        // 8 device px = 4pt, comfortably inside the page's own 16pt padding.
+        #expect(raster.edgeInk(margin: 8) == 0,
+                "\(snapshotCase.name) paints into its margin over \(raster.height) device px of page")
+    }
+
+    /// Eight limits is the most the page can be asked to lay out, and it is
+    /// the case where the adaptive grids have the least room each. Both modes,
+    /// because monthly has fewer trend buckets and therefore wider bars.
+    @Test("eight segments hold in both period modes", arguments: PeriodUnit.allCases)
+    func eightSegmentsHold(unit: PeriodUnit) throws {
+        for theme in PlanFitSnapshotTheme.allCases {
+            let snapshotCase = PlanFitSnapshotCase(
+                sufficiency: .sufficient, segments: .eight, theme: theme
+            )
+            let raster = try #require(PlanFitSnapshotRenderer.renderWholePage(snapshotCase, unit: unit))
+            #expect(raster.edgeInk(margin: 8) == 0,
+                    "8 segments overflow in \(unit.rawValue) \(theme.rawValue)")
+            #expect(raster.pageInkCoverage > 0.03,
+                    "8 segments render nearly empty in \(unit.rawValue) \(theme.rawValue)")
+        }
+    }
+
+    /// A page that grew a section must have grown, not reflowed into the same
+    /// height by shrinking something. Cheap regression against a layout that
+    /// silently clips.
+    @Test("more limits make a taller page, never a wider one")
+    func moreLimitsGrowDownwards() {
+        let heights = PlanFitSegmentCount.allCases.map { segments -> CGFloat in
+            let snapshotCase = PlanFitSnapshotCase(
+                sufficiency: .sufficient, segments: segments, theme: .light
+            )
+            let content = PlanFitContent(
+                model: PlanFitSnapshotRenderer.model(for: snapshotCase),
+                unit: .constant(.weekly)
+            )
+            return PlanFitSnapshotRenderer.fittingHeight(content)
+        }
+        print("== plan-fit page heights at 800pt: \(heights) ==")
+        #expect(heights == heights.sorted(), "eight limits did not make a taller page than one: \(heights)")
+    }
+}
+
+// MARK: - The database as it actually is (T078)
+
+/// **What almost every existing user sees.**
+///
+/// The real database on this branch holds 21 window rows — 3 Claude, 18 Codex
+/// — and neither provider can reach the 28-day gate, so both verdicts are
+/// withheld. That is the correct outcome and it is also the risk: a withheld
+/// screen that renders thin reads as a broken feature, and this is the screen
+/// most people will spend the most time on.
+///
+/// So this asserts both halves. The verdict must be withheld with a reason and
+/// an availability statement, and the page must still be full: the facts that
+/// ARE observable at 21 rows have to be on it.
+@Suite("Plan-fit on the real 21-row database")
+@MainActor
+struct PlanFitRealDatabaseTests {
+
+    private var rows: [(provider: String, row: WindowRow)] {
+        WindowFixtures.realDatabaseShape()
+    }
+
+    private var model: PlanFitModel {
+        PlanFitModelBuilder.build(rows: rows, unit: .weekly, nowMs: WindowFixtures.nowMs)
+    }
+
+    @Test("the fixture is the shape the database actually has")
+    func fixtureMatchesReality() {
+        #expect(rows.count == 21)
+        #expect(rows.filter { $0.provider == "claude_code" }.count == 3)
+        #expect(rows.filter { $0.provider == "codex" }.count == 18)
+        // Codex has one limit series for everything; there is no per-model
+        // window on that side at all.
+        #expect(Set(rows.filter { $0.provider == "codex" }.map(\.row.limitId)) == ["codex"])
+    }
+
+    // MARK: The verdict is withheld — with a reason and a date
+
+    @Test("every limit's verdict is withheld")
+    func everyVerdictIsWithheld() {
+        let segments = WindowStats.segments(rows: rows, nowMs: WindowFixtures.nowMs)
+        #expect(!segments.isEmpty)
+        for verdict in PlanFitVerdict.evaluateAll(segments: segments) {
+            #expect(verdict.isWithheld,
+                    "\(verdict.basis.provider)/\(verdict.basis.limitId) reached a verdict on \(Int(verdict.basis.observedDays))d")
+            // V3: the basis travels with the refusal.
+            #expect(!verdict.statement().basis.isEmpty)
+            // V1: and so does when it stops being one.
+            #expect(verdict.statement().availability?.isEmpty == false)
+        }
+    }
+
+    @Test("the page leads with the withheld verdict, not with an error")
+    func ledeIsAWithheldVerdict() {
+        let lede = model.lede
+        #expect(lede.kind == .withheld)
+        #expect(!lede.headline.isEmpty)
+        #expect(lede.availability?.isEmpty == false,
+                "the lede does not say when a verdict becomes possible")
+        #expect(lede.basis?.isEmpty == false)
+    }
+
+    /// And nothing recommends paying less. A downgrade on twelve days of one
+    /// provider is the recommendation whose failure mode is being cut off.
+    @Test("nothing recommends a downgrade")
+    func noDowngrade() {
+        for segment in WindowStats.segments(rows: rows, nowMs: WindowFixtures.nowMs) {
+            if case .downgrade = segment.advice {
+                Issue.record("\(segment.provider)/\(segment.limitId) recommends paying less")
+            }
+        }
+    }
+
+    /// The subscription comparison refuses without even calculating: 12 days
+    /// is short of the gate (T068).
+    @Test("the subscription comparison performs no calculation")
+    func subscriptionComparisonIsNotCalculated() {
+        let block = model.subscriptionComparison
+        #expect(block.status == .notCalculated)
+        #expect(block.result == nil, "a figure reached the page on 12 days of history")
+        // Drawn anyway, and it says why (T067).
+        #expect(block.isPresentable)
+        #expect(!block.headline.isEmpty)
+        #expect(!block.structuralNote.isEmpty)
+    }
+
+    // MARK: The screen is full
+
+    /// Everything a 21-row account CAN honestly show is on the page.
+    @Test("the withheld page still carries the facts it has")
+    func theFactsAreStillThere() {
+        // Both providers' limits, grouped.
+        #expect(model.limitGroups.count == 2,
+                "expected a group per provider, got \(model.limitGroups.map(\.providerTitle))")
+        #expect(model.limitGroups.flatMap(\.limits).count == 2)
+        // A trend, because twelve days is more than two weekly buckets.
+        #expect(!model.trend.bars.isEmpty)
+        // The active-use split, which is the section the feature exists for.
+        #expect(!model.activeUse.isEmpty)
+        // The comparison, reduced to the common period the two providers share.
+        #expect(model.comparison.isPresentable)
+        // And the honesty block, saying what cannot be read yet and when.
+        #expect(model.readiness.isPresentable)
+        #expect(!model.readiness.unreadyMetrics.isEmpty)
+        for metric in model.readiness.unreadyMetrics {
+            #expect(!metric.reason.isEmpty, "\(metric.metric) is withheld with no reason")
+        }
+    }
+
+    /// The Codex window that ran out is on screen with the time it left on the
+    /// clock — one exhaustion in 21 rows is the entire interruption evidence
+    /// this account has, and dropping it would leave the page saying nothing
+    /// happened.
+    @Test("the single exhaustion reaches the screen with its timing")
+    func theOneExhaustionIsVisible() {
+        let text = PlanFitModelText.joined(of: model)
+        let exhaustions = WindowStats.segments(rows: rows, nowMs: WindowFixtures.nowMs)
+            .flatMap(\.activeUse.exhaustions)
+        #expect(exhaustions.count == 1)
+        #expect(model.activeUse.contains { !$0.ticks.isEmpty },
+                "the exhaustion is not on the timing strip")
+        #expect(text.contains(L.tr("소진", "out")) || text.contains("exhaust"),
+                "the page never mentions running out")
+    }
+
+    /// Recorded work time of zero is not a claim that nobody worked. Six of
+    /// the eighteen Codex rows recorded none, and the page has to keep them in
+    /// the undecidable set rather than counting them as spare capacity.
+    @Test("windows with no recorded work time are undecided, not idle")
+    func zeroActiveTimeIsNotIdle() {
+        let segments = WindowStats.segments(rows: rows, nowMs: WindowFixtures.nowMs)
+        let codex = segments.first { $0.provider == "codex" }
+        let breakdown = try? #require(codex?.activeUse)
+        #expect(breakdown?.cannotTellCount ?? 0 > 0,
+                "every window was classified, on evidence that cannot classify them")
+    }
+
+    // MARK: In pixels
+
+    @Test("the real screen renders as a full page in both appearances",
+          arguments: PlanFitSnapshotTheme.allCases)
+    func theRealScreenRenders(theme: PlanFitSnapshotTheme) throws {
+        let content = PlanFitContent(model: model, unit: .constant(.weekly))
+        let raster = try #require(PlanFitSnapshotRenderer.raster(
+            content, theme: theme,
+            size: CGSize(width: PlanFitSnapshotRenderer.width,
+                         height: PlanFitSnapshotRenderer.height)
+        ))
+        #expect(raster.pageInkCoverage > 0.05,
+                "the screen every user opens is nearly empty: \(raster.pageInkCoverage)")
+        #expect(raster.pagePeakContrast >= 4.5)
+        #expect(raster.edgeInk(margin: 8) == 0)
+    }
+
+    /// Against the populated page, in pixels. The claim T078 is really making
+    /// is comparative: the day-one screen must not look like a stub beside an
+    /// account with a full 28 days behind it.
+    @Test("it is not a stub beside a fully populated page")
+    func notAStub() throws {
+        let real = try #require(PlanFitSnapshotRenderer.raster(
+            PlanFitContent(model: model, unit: .constant(.weekly)),
+            theme: .light,
+            size: CGSize(width: PlanFitSnapshotRenderer.width,
+                         height: PlanFitSnapshotRenderer.height)
+        ))
+        let populated = try #require(PlanFitSnapshotRenderer.render(
+            PlanFitSnapshotCase(sufficiency: .sufficient, segments: .four, theme: .light)
+        ))
+        #expect(real.pageInkCoverage > populated.pageInkCoverage * 0.6,
+                "21 rows draws \(real.pageInkCoverage) against \(populated.pageInkCoverage) — it reads as a stub")
+    }
+
+    /// The whole page, at its own height, with nothing off the edge.
+    @Test("the real page holds at 800pt over its full height")
+    func realPageHoldsAt800() throws {
+        let content = PlanFitContent(model: model, unit: .constant(.weekly))
+        let tall = PlanFitSnapshotRenderer.fittingHeight(content)
+        let raster = try #require(PlanFitSnapshotRenderer.raster(
+            content, theme: .light,
+            size: CGSize(width: PlanFitSnapshotRenderer.width, height: tall)
+        ))
+        #expect(raster.edgeInk(margin: 8) == 0,
+                "the real page overflows 800pt somewhere in its \(Int(tall))pt")
+    }
+}

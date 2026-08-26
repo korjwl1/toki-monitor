@@ -166,6 +166,64 @@ enum WindowFixtures {
         return rows
     }
 
+
+    // MARK: - The database as it actually is (T078)
+
+    /// **21 window rows: 3 Claude, 18 Codex.**
+    ///
+    /// This is not a scenario — it is the measured content of the real
+    /// database on this branch, and therefore the shape of the page nearly
+    /// every existing user opens on day one. The two providers arrive at
+    /// different lengths for a structural reason, not a coincidental one:
+    ///
+    /// - **Codex history is recovered retroactively** from rollout files on
+    ///   disk, so it reaches back as far as the files do — eighteen five-hour
+    ///   windows over about twelve days here.
+    /// - **Claude history only exists from the moment polling started**,
+    ///   because the provider exposes the CURRENT window and nothing else. Three
+    ///   rows is a bit over half a day.
+    ///
+    /// Neither provider can reach the 28-day gate, so both verdicts are
+    /// withheld — and that is the whole point of rendering it. If the withheld
+    /// screen looks thin, the feature reads as broken to almost everyone who
+    /// has it.
+    static func realDatabaseShape(nowMs: Int64 = WindowFixtures.nowMs) -> [(provider: String, row: WindowRow)] {
+        var rows: [(provider: String, row: WindowRow)] = []
+
+        // Claude: three five-hour windows, worked in, none exhausted. Polling
+        // started this morning.
+        for index in 0..<3 {
+            rows.append(window(
+                provider: "claude_code", kind: "session", limitId: "five_hour",
+                endOffsetDays: 0.2 + Double(index) * 0.22,
+                peakPct: Double(38 + index * 17),
+                activeMs: Int64(50 + index * 25) * 60_000,
+                plan: "max_5x", account: "acct-real-claude", nowMs: nowMs
+            ))
+        }
+
+        // Codex: eighteen windows over twelve days, one of them exhausted
+        // early. `limit_id` is "codex" for every one of them — Codex has no
+        // per-model window at all, which is why the model breakdown for it can
+        // only come from token events.
+        for index in 0..<18 {
+            let maxed = index == 11
+            rows.append(window(
+                provider: "codex", kind: "session", limitId: "codex",
+                endOffsetDays: 12.0 * Double(index) / 17.0,
+                peakPct: maxed ? 100 : Double(22 + (index * 13) % 55),
+                // A third of them recorded no work time. That is not "nobody
+                // worked" — `activeMs` restarts with the daemon — and the page
+                // is required not to read it that way.
+                activeMs: index % 3 == 0 ? 0 : Int64(35 + (index * 7) % 80) * 60_000,
+                maxedOut: maxed,
+                timeLeftFractionAtExhaustion: maxed ? 0.45 : nil,
+                plan: "codex_plus", account: "acct-real-codex", nowMs: nowMs
+            ))
+        }
+        return rows
+    }
+
     // MARK: - Two providers, two history lengths (contract W2)
 
     /// The asymmetry the comparison exists to handle.
