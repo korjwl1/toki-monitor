@@ -43,10 +43,29 @@ struct StateTimelinePanelView: View {
         let spans = spans
         if spans.isEmpty {
             Text("-")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.bodySecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            Chart(spans) { span in
+            VStack(spacing: DS.xs) {
+                chart(spans)
+                // The app's own legend rather than Swift Charts'. Theirs lays
+                // its entries out in one unscrollable row and painted them past
+                // the panel edge at the narrowest cell this type allows
+                // (계약 R6); ours scrolls inside its own container.
+                //
+                // Read-only here: these entries name STATES, not series, so
+                // there is nothing to hide — see `PanelLegendView.onToggle`.
+                PanelLegendView(
+                    entries: legendEntries(for: spans),
+                    hidden: [],
+                    position: .bottom
+                )
+            }
+        }
+    }
+
+    private func chart(_ spans: [TimelineSpan]) -> some View {
+        Chart(spans) { span in
                 BarMark(
                     xStart: .value(L.dash.axisTime, span.start),
                     xEnd: .value(L.dash.axisTime, span.end),
@@ -67,7 +86,24 @@ struct StateTimelinePanelView: View {
                     AxisValueLabel(format: dateFormat).font(.system(size: 9))
                 }
             }
-            .chartLegend(position: .bottom, spacing: 6)
+            .chartLegend(.hidden)
+            // Swift Charts draws an axis label centred on its tick and does
+            // not clip: at the narrowest cell this type allows, the last time
+            // label hangs ~13pt past the panel and paints on the panel beside
+            // it. The page has no horizontal scroll to absorb that (계약 R6),
+            // so the panel absorbs it — a clipped label is a legibility cost
+            // inside one panel, and the alternative is ink on another one.
+            .clipped()
+    }
+
+    /// One entry per state, in the order the chart assigned their colours.
+    private func legendEntries(for spans: [TimelineSpan]) -> [PanelLegendView.Entry] {
+        var states: [String] = []
+        for span in spans where !states.contains(span.label) { states.append(span.label) }
+        let colors = palette(for: spans)
+        return states.enumerated().map { index, state in
+            PanelLegendView.Entry(name: state,
+                                  color: index < colors.count ? colors[index] : .gray)
         }
     }
 

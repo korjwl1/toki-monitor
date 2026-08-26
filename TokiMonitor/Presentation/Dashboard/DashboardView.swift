@@ -367,14 +367,25 @@ struct DashboardView: View {
             dashboardTitle
             dataSourcePicker
 
-            Spacer()
+            Spacer(minLength: DS.sm)
 
-            // Controls (right side) — variables + filters together
-            ForEach(viewModel.variables) { variable in
-                if variable.hide != .hidden {
-                    variableControl(for: variable)
+            // Controls (right side) — variables + filters together.
+            //
+            // The variable strip scrolls inside itself. It is the one part of
+            // this bar whose width is unbounded — a dashboard can declare any
+            // number of variables, and each ad hoc filter is a chip — so
+            // without this the bar pushes the time range, the refresh control
+            // and the edit button off the right edge of an 800pt window, where
+            // there is no scroll to reach them (FR-059).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: DS.sm) { variableStrip }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DS.sm) { variableStrip }
+                        .padding(.horizontal, 2)
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
+
             timeRangeButton
             refreshControl
             editModeControls
@@ -788,6 +799,16 @@ struct DashboardView: View {
         .focusable()
         .help(L.tr("더 보기", "More"))
         .accessibilityLabel(L.tr("대시보드 메뉴", "Dashboard menu"))
+    }
+
+    /// The reader-controllable variables, in declaration order.
+    @ViewBuilder
+    private var variableStrip: some View {
+        ForEach(viewModel.variables) { variable in
+            if variable.hide != .hidden {
+                variableControl(for: variable)
+            }
+        }
     }
 
     @ViewBuilder
