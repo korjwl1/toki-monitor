@@ -116,8 +116,16 @@ struct TimeSeriesChartView: View {
                                 }
                                 .onEnded { value in
                                     finishZoomDrag(start: value.startLocation.x,
-                                                   end: value.location.x, proxy: proxy)
+                                                   end: value.location.x,
+                                                   proxy: proxy, geo: geo)
                                 }
+                            ,
+                            // Off while the dashboard is being edited: there
+                            // the same drag means "move this panel", and an
+                            // inner gesture wins over the outer one — so
+                            // dragging a chart to reposition it would have
+                            // zoomed the whole dashboard instead.
+                            isEnabled: !viewModel.isEditing
                         )
                         // The band being dragged over. Drawn here rather than
                         // as a `RectangleMark` so it does not enter the chart's
@@ -419,7 +427,14 @@ struct TimeSeriesChartView: View {
             viewModel.crosshair.clear(panelID: panel?.id)
             return
         }
-        let date = proxy.value(atX: location.x, as: Date.self)
+        // Plot-relative, not view-relative. `ChartProxy.value(atX:)` measures
+        // from the plot's own origin, and the y axis sits to the left of it —
+        // so passing the raw location read the cursor about thirty points
+        // later than it was. It was invisible while the tooltip was the only
+        // reader of this value (both the tooltip and the rule were drawn from
+        // the same wrong date); a crosshair shared with the panel next door is
+        // not, because that panel's axis is a different width.
+        let date = proxy.value(atX: relativeX, as: Date.self)
         hoveredDate = date
         // Published even when this panel draws no tooltip: the rule is shared,
         // the tooltip is not.
@@ -460,14 +475,18 @@ struct TimeSeriesChartView: View {
     }
 
     /// Turn a finished drag into a time range, or discard it.
-    private func finishZoomDrag(start: CGFloat, end: CGFloat, proxy: ChartProxy) {
+    private func finishZoomDrag(start: CGFloat, end: CGFloat,
+                                proxy: ChartProxy, geo: GeometryProxy) {
         defer {
             dragStartX = nil
             dragCurrentX = nil
         }
+        // Plot-relative for the same reason `track` is.
+        guard let plotFrame = proxy.plotFrame else { return }
+        let origin = geo[plotFrame].origin.x
         guard abs(end - start) >= TimeRangeZoom.minimumDragWidth,
-              let from = proxy.value(atX: start, as: Date.self),
-              let to = proxy.value(atX: end, as: Date.self)
+              let from = proxy.value(atX: start - origin, as: Date.self),
+              let to = proxy.value(atX: end - origin, as: Date.self)
         else { return }
         viewModel.zoomToSelection(from: from, to: to)
     }

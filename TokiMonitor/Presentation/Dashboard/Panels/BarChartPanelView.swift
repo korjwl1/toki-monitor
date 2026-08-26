@@ -79,12 +79,20 @@ struct BarChartPanelView: View {
         .chartOverlay { proxy in
             GeometryReader { geo in
                 ZStack(alignment: .topLeading) {
-                    if hoverState.date != nil, let plotFrame = proxy.plotFrame {
+                    // The shared instant (US7), drawn from the dashboard's
+                    // crosshair rather than from this panel's own hover — so
+                    // pointing at the line chart above marks the same moment
+                    // here. `x(for:)` places it, because a bar chart's rule has
+                    // to be positioned by hand: the overlay is not a mark and
+                    // has no scale of its own.
+                    if let shared = viewModel.crosshair.date,
+                       let plotFrame = proxy.plotFrame,
+                       let x = proxy.position(forX: shared) {
                         let plotRect = geo[plotFrame]
                         Rectangle()
-                            .fill(.secondary.opacity(0.3))
+                            .fill(DS.iconSecondary)
                             .frame(width: 1, height: plotRect.height)
-                            .offset(x: hoverState.position.x, y: plotRect.minY)
+                            .offset(x: plotRect.minX + x, y: plotRect.minY)
                             .allowsHitTesting(false)
                     }
 
@@ -95,8 +103,16 @@ struct BarChartPanelView: View {
                             guard options.tooltipMode != .hidden else { return }
                             switch phase {
                             case .active(let location):
-                                hoverState.date = snapToNearestBar(at: location, proxy: proxy, geo: geo, modelData: modelData)
+                                let snapped = snapToNearestBar(at: location, proxy: proxy, geo: geo, modelData: modelData)
+                                hoverState.date = snapped
                                 hoverState.position = location
+                                // A bar chart snaps to a bucket, so what it
+                                // publishes is the bucket's own instant — which
+                                // is the honest thing to mark on the charts
+                                // beside it.
+                                if let snapped {
+                                    viewModel.crosshair.move(to: snapped, panelID: panel.id)
+                                }
                                 // Which stacked band the cursor is in. Only
                                 // `.single` needs it, but reading it here keeps
                                 // the geometry in the one place that has it.
@@ -109,13 +125,16 @@ struct BarChartPanelView: View {
                             case .ended:
                                 hoverState.date = nil
                                 hoverState.value = nil
+                                viewModel.crosshair.clear(panelID: panel.id)
                             }
                         }
                 }
             }
         }
         .overlay(alignment: .topLeading) {
-            if options.tooltipMode != .hidden {
+            // The rule is shared; the tooltip is not — one tooltip per panel
+            // would cover the very charts the shared rule exists to compare.
+            if options.tooltipMode != .hidden, viewModel.crosshair.isOwner(panel.id) {
                 BarChartTooltipOverlay(
                     state: hoverState,
                     modelData: modelData,

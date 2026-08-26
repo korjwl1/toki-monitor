@@ -144,8 +144,16 @@ extension PanelState {
         case .idle:
             return L.tr("새로 고치면 이 패널의 쿼리를 실행합니다.",
                         "Refresh to run this panel's query.")
-        case .loading:
-            return nil
+        case .loading(let hasPrevious):
+            // Only the held-over case has anything to add — and it has to. On
+            // screen the previous result is dimmed and carries a progress
+            // marker, which is two visual cues and no words: a reader who is
+            // told "Loading" and then read a number would take the number for
+            // the new one.
+            return hasPrevious
+                ? L.tr("아래 값은 이전 결과이며, 새 결과를 불러오는 중입니다.",
+                       "The values below are the previous result; a new one is on its way.")
+                : nil
         case .loaded:
             return nil
         case .empty(let reason):

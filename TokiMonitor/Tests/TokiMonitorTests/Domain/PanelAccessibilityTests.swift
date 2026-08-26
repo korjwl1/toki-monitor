@@ -78,6 +78,11 @@ struct PanelAccessibilityTests {
         #expect(spoken.contains(PanelState.loading(hasPrevious: true).title))
         #expect(spoken.contains("1.2M"),
                 "the previous result is still on screen, so it is still what the panel says")
+        // And the reader is told it is the PREVIOUS one. On screen that is
+        // carried by dimming and a spinner, neither of which they get.
+        #expect(spoken.contains(PanelState.loading(hasPrevious: true).detail ?? "!"))
+        #expect(PanelState.loading(hasPrevious: false).detail == nil,
+                "a panel loading from nothing has no stale numbers to warn about")
     }
 
     @Test("a panel with no query state is just a name and a kind")
