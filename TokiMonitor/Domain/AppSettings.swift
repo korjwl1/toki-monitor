@@ -669,11 +669,13 @@ final class AppSettings {
         return result
     }
 
+    /// Per-key, so one unreadable provider entry costs that provider's
+    /// customisation and not everyone else's. The whole map is written back on
+    /// every change, which is what makes an all-or-nothing decode here a reset
+    /// of all provider colours and enable flags rather than a failed read.
     private static func loadProviderSettings(_ ud: UserDefaults) -> [String: ProviderSettings] {
-        guard let data = ud.data(forKey: "providerSettings"),
-              let map = try? JSONDecoder().decode([String: ProviderSettings].self, from: data)
-        else { return [:] }
-        return map
+        guard let data = ud.data(forKey: "providerSettings") else { return [:] }
+        return LossTolerantStore.decodeDictionary(ProviderSettings.self, from: data).items
     }
 }
 

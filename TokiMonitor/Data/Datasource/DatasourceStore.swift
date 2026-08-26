@@ -7,15 +7,22 @@ import Foundation
 final class DatasourceStore {
     private static let userKey = "datasourceInstances"
 
+    /// `add` and `remove` both load, change and write the whole list, so an
+    /// all-or-nothing decode here would let one unreadable instance delete
+    /// every datasource the user defined on the next edit. Built-in kinds live
+    /// in `DatasourceRegistry` and survive; anything hand-configured does not.
     func load() -> [DatasourceInstance] {
-        guard let data = UserDefaults.standard.data(forKey: Self.userKey),
-              let list = try? JSONDecoder().decode([DatasourceInstance].self, from: data)
-        else { return [] }
-        return list
+        loadPreservingUnreadable().items
+    }
+
+    private func loadPreservingUnreadable() -> (items: [DatasourceInstance], unreadable: [Any]) {
+        guard let data = UserDefaults.standard.data(forKey: Self.userKey) else { return ([], []) }
+        return LossTolerantStore.decodeArray(DatasourceInstance.self, from: data)
     }
 
     func save(_ list: [DatasourceInstance]) {
-        guard let data = try? JSONEncoder().encode(list) else { return }
+        let unreadable = loadPreservingUnreadable().unreadable
+        guard let data = LossTolerantStore.encodeArray(list, preserving: unreadable) else { return }
         UserDefaults.standard.set(data, forKey: Self.userKey)
     }
 

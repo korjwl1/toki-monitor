@@ -83,6 +83,7 @@
 		2FD39BD3817670D06BE68CEF /* ProviderRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507FA6EFF17810ED320DE318 /* ProviderRegistryTests.swift */; };
 		30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */; };
 		3574E94BBA0BB4EA83DB6F40 /* Animations in Resources */ = {isa = PBXBuildFile; fileRef = 4C9D9972B2FA620BD19C947D /* Animations */; };
+		AA80LOSSTOLERANT1B /* LossTolerantStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80LOSSTOLERANT1F /* LossTolerantStore.swift */; };
 		3A08C6B2401417D71EEA07F6 /* AnnotationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */; };
 		3B53DEBD38340CE172E5019E /* MenuBarSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4771B8F6125461E69C2CFE8 /* MenuBarSettingsPane.swift */; };
 		3C67B974F8F903F27F8D9F62 /* TokiMonitorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A83167497A1EE039A2B2494 /* TokiMonitorApp.swift */; };
@@ -214,6 +215,7 @@
 		F4E2F3776A2D4DB6AEF2D86C /* AppIcon_1024.png in Resources */ = {isa = PBXBuildFile; fileRef = 689790D76D5DEE3F14EB819D /* AppIcon_1024.png */; };
 		F786762BAD8B9D912858D747 /* StatPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 096E04F1C2D87A5D5F1C0251 /* StatPanelView.swift */; };
 		F7B06F96F0152C66001A51CB /* TokiReportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48136C76E19A8BB32E9ECE5 /* TokiReportClient.swift */; };
+		AA81CFGFILES001B /* DashboardConfigStore+Files.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA81CFGFILES001F /* DashboardConfigStore+Files.swift */; };
 		F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */; };
 		F8B39525A65678B5F6A52331 /* UpdateCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E64865C3A6EAAA4D6BDF07 /* UpdateCheckerTests.swift */; };
 		FAAE9290A0103A52B4EDDA4E /* frame_01.png in Resources */ = {isa = PBXBuildFile; fileRef = 140E82C9A015AA41CD3C0C1A /* frame_01.png */; };
@@ -316,6 +318,7 @@
 		34515E784769F22E891CE8F6 /* DashboardLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardLayout.swift; sourceTree = "<group>"; };
 		3489A041D9F174427EDFF7ED /* AboutPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutPane.swift; sourceTree = "<group>"; };
 		37F55200D88B2D7260541C5D /* ProviderSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderSummary.swift; sourceTree = "<group>"; };
+		AA81CFGFILES001F /* DashboardConfigStore+Files.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardConfigStore+Files.swift"; sourceTree = "<group>"; };
 		3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		3EED40448CCAA9BDD9E5EE7E /* TimeSeriesPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesPanelView.swift; sourceTree = "<group>"; };
 		4215CB67D3CB129464800547 /* TokiMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TokiMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -447,6 +450,7 @@
 		AA34STPANEL00000001 /* StateTimelinePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateTimelinePanelView.swift; sourceTree = "<group>"; };
 		DD104D8D23446C055623FC7D /* DashboardVersionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardVersionStore.swift; sourceTree = "<group>"; };
 		DFDF640C227D467E72826C64 /* DashboardMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMigrator.swift; sourceTree = "<group>"; };
+		AA80LOSSTOLERANT1F /* LossTolerantStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LossTolerantStore.swift; sourceTree = "<group>"; };
 		E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
 		E131E3756214B21A8B8654B1 /* PanelEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEditorView.swift; sourceTree = "<group>"; };
 		E5FAA4A976ADB25E1195013F /* CodexUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageClient.swift; sourceTree = "<group>"; };
@@ -624,6 +628,7 @@
 				1CB0CA29129542559BD4F7E3 /* DashboardSettingsSheet.swift */,
 				AA80IMPORTSHEET00001 /* DashboardImportSheet.swift */,
 				D8FB627746EE1DECBC2CBA2C /* DashboardToolbar.swift */,
+				AA81CFGFILES001F /* DashboardConfigStore+Files.swift */,
 				3BDCB8700F8EE06B7CB0AC2F /* DashboardView.swift */,
 				23B4788B94701C007A8F796E /* DashboardViewModel.swift */,
 				530B806F812350D8094AA0EC /* DashboardWindow.swift */,
@@ -882,6 +887,7 @@
 				AA74PANELA11Y0001 /* PanelAccessibility.swift */,
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				6B17BA2BAF5855E537D1C1D0 /* AnimationTheme.swift */,
+				AA80LOSSTOLERANT1F /* LossTolerantStore.swift */,
 				E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */,
 				5D82D563F2B758C1208E987E /* AppSettings.swift */,
 				955951A7FF5652C64A116C70 /* ClaudeUsageMonitor.swift */,
@@ -1051,6 +1057,7 @@
 				4DBBE21D70D7916D7F2DC175 /* AnimationStateMapper.swift in Sources */,
 				502EEB38E57AB5717C4E6301 /* AnimationTheme.swift in Sources */,
 				C4A21221786A98400990A92C /* AnnotationListSheet.swift in Sources */,
+				AA80LOSSTOLERANT1B /* LossTolerantStore.swift in Sources */,
 				3A08C6B2401417D71EEA07F6 /* AnnotationStore.swift in Sources */,
 				96C312BC7B488E45DAB00737 /* AppSettings.swift in Sources */,
 				E5113FB852A0035ADFB20C19 /* BarChartPanelView.swift in Sources */,
@@ -1078,6 +1085,7 @@
 				AA80IMPORTSHEET00002 /* DashboardImportSheet.swift in Sources */,
 				A673F7E773850A93FABC17EE /* DashboardToolbar.swift in Sources */,
 				125A70F9AEFAEA35D938E593 /* DashboardVersionStore.swift in Sources */,
+				AA81CFGFILES001B /* DashboardConfigStore+Files.swift in Sources */,
 				F8B2DD6025F117063D447B82 /* DashboardView.swift in Sources */,
 				9E36E60496F48745EAECB4C2 /* DashboardViewModel.swift in Sources */,
 				C33D79DB96B18D96790274FE /* DashboardWindow.swift in Sources */,
