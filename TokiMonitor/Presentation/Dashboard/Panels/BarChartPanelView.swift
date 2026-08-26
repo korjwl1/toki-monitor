@@ -24,6 +24,7 @@ struct BarChartPanelView: View {
 
     @State private var hoverState = BarHoverState()
     @State private var modelData: [(model: String, points: [TimeSeriesData.ChartPoint])] = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var options: PanelDisplayOptions { panel.options }
 
@@ -186,18 +187,25 @@ struct BarChartPanelView: View {
             metric: panel.effectiveMetric, panel: panel, frames: frames,
             data: data, hidden: hiddenSeries
         )
+        // See `TimeSeriesChartView.animateIn` — bars growing out of the axis
+        // are the same motion, and Reduce Motion drops it here too (FR-064).
+        guard Motion.growsFromZero(reduceMotion) else {
+            modelData = real
+            return
+        }
         modelData = real.map { entry in
             (model: entry.model, points: entry.points.map {
                 TimeSeriesData.ChartPoint(date: $0.date, value: 0)
             })
         }
-        withAnimation(.easeOut(duration: 0.3)) {
+        withAnimation(Motion.data(reduceMotion)) {
             modelData = real
         }
     }
 
     private func collapseToZero() {
-        withAnimation(.easeIn(duration: 0.15)) {
+        guard Motion.growsFromZero(reduceMotion) else { return }
+        withAnimation(Motion.dataOut(reduceMotion)) {
             modelData = modelData.map { entry in
                 (model: entry.model, points: entry.points.map {
                     TimeSeriesData.ChartPoint(date: $0.date, value: 0)

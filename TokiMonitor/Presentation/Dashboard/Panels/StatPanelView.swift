@@ -13,6 +13,7 @@ struct StatPanelView: View {
     let panel: PanelConfig
     let data: TimeSeriesData?
     let frames: FrameSet?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let stat = Self.statValue(panel: panel, data: data, frames: frames)
@@ -25,7 +26,9 @@ struct StatPanelView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .contentTransition(.numericText())
-                .animation(.easeOut(duration: 0.5), value: stat.value)
+                // The digits roll to the new number. Under Reduce Motion the
+                // number simply changes (FR-064).
+                .animation(Motion.data(reduceMotion), value: stat.value)
             // Which band, in words. A tinted number is a claim about the value
             // and colour must never be the only thing making it (계약 R6) —
             // this is what a reader who cannot separate the hues, and what

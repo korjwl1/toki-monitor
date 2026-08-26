@@ -20,6 +20,7 @@ struct DashboardView: View {
     /// the save panel says it (계약 C3).
     @State private var showCopyDisclosure = false
     @State private var preEditConfig: DashboardConfig?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     enum SidebarItem: Hashable {
         case explore
@@ -141,7 +142,7 @@ struct DashboardView: View {
                 Text(L.dash.dashboards)
                 Spacer()
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(Motion.layout(reduceMotion)) {
                         if viewModel.isEditingDashboardList {
                             // 완료: @State 배열을 store에 저장
                             viewModel.isEditingDashboardList = false
@@ -301,6 +302,61 @@ struct DashboardView: View {
                 }
             }
         }
+        .background(commandSink)
+    }
+
+    // MARK: - Keyboard
+
+    /// The chords, in one place.
+    ///
+    /// Zero-sized buttons rather than `.keyboardShortcut` scattered over the
+    /// toolbar, for the two commands that have no toolbar control at all (zoom
+    /// and pan) and to keep the rest from drifting apart from
+    /// `DashboardCommand`. They are hidden from assistive technology: the
+    /// visible control is the one a VoiceOver reader should find, and a second
+    /// invisible "Refresh now" in the rotor is noise.
+    private var commandSink: some View {
+        ForEach(DashboardCommand.allCases) { command in
+            Button(command.title) { perform(command) }
+                .keyboardShortcut(command.key, modifiers: command.modifiers)
+                .disabled(command.requiresEditMode && !viewModel.isEditing)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func perform(_ command: DashboardCommand) {
+        switch command {
+        case .refresh:
+            viewModel.fetchData()
+        case .timeRange:
+            showTimeRangePicker = true
+        case .zoomIn:
+            viewModel.zoomTimeRange(0.5)
+        case .zoomOut:
+            viewModel.zoomTimeRange(2)
+        case .panBackward:
+            viewModel.panTimeRange(by: -0.5)
+        case .panForward:
+            viewModel.panTimeRange(by: 0.5)
+        case .toggleEdit:
+            guard !viewModel.isReadOnlyDashboard else { return }
+            withAnimation(Motion.layout(reduceMotion)) {
+                if viewModel.isEditing {
+                    viewModel.saveDashboardWithVersion()
+                    viewModel.isEditing = false
+                    preEditConfig = nil
+                } else {
+                    preEditConfig = viewModel.dashboardConfig
+                    viewModel.isEditing = true
+                }
+            }
+        case .addPanel:
+            showAddPanel = true
+        case .addRow:
+            viewModel.addRow()
+        }
     }
 
     // MARK: - Unified Controls Bar
@@ -364,11 +420,14 @@ struct DashboardView: View {
                 } label: {
                     Image(systemName: "pencil")
                         .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(DS.iconSecondary)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .focusable()
+                .help(L.tr("대시보드 이름 바꾸기", "Rename dashboard"))
+                .accessibilityLabel(L.tr("대시보드 이름 바꾸기", "Rename dashboard"))
             }
         }
     }
@@ -402,7 +461,10 @@ struct DashboardView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .focusable()
         .help(syncConfigured ? L.sync.dataSource : L.sync.serverDisabled)
+        .accessibilityLabel(L.tr("데이터 소스: \(isServer ? L.sync.server : L.sync.local)",
+                                 "Data source: \(isServer ? L.sync.server : L.sync.local)"))
         .onChange(of: syncConfigured) { _, configured in
             if !configured { viewModel.dataSource = .local }
         }
@@ -424,6 +486,10 @@ struct DashboardView: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .focusable()
+        .help("\(DashboardCommand.timeRange.title) (\(DashboardCommand.timeRange.chordDescription))")
+        .accessibilityLabel(L.tr("시간 범위: \(viewModel.timeRangeLabel)",
+                                 "Time range: \(viewModel.timeRangeLabel)"))
         .popover(isPresented: $showTimeRangePicker) {
             TimeRangePickerPopover(viewModel: viewModel, isPresented: $showTimeRangePicker)
         }
@@ -471,6 +537,14 @@ struct DashboardView: View {
         .menuStyle(.borderlessButton)
         .fixedSize()
         .contentShape(Rectangle())
+        .focusable()
+        .help("\(DashboardCommand.refresh.title) (\(DashboardCommand.refresh.chordDescription))")
+        .accessibilityLabel(
+            viewModel.refreshInterval == .off
+                ? L.tr("새로고침", "Refresh")
+                : L.tr("새로고침, \(viewModel.refreshInterval.displayName)마다",
+                       "Refresh, every \(viewModel.refreshInterval.displayName)")
+        )
     }
 
     // MARK: - Notices
@@ -541,7 +615,7 @@ struct DashboardView: View {
         if viewModel.isEditing {
             // Cancel button
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(Motion.layout(reduceMotion)) {
                     if let original = preEditConfig {
                         viewModel.dashboardConfig = original
                         viewModel.saveDashboard()
@@ -560,11 +634,13 @@ struct DashboardView: View {
                 .modifier(ToolbarPillModifier())
             }
             .buttonStyle(.plain)
+            .focusable()
+            .accessibilityLabel(L.tr("편집 취소", "Cancel editing"))
         }
 
         // Edit/Done toggle
         Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(Motion.layout(reduceMotion)) {
                 if viewModel.isEditing {
                     viewModel.saveDashboardWithVersion()
                     viewModel.isEditing = false
@@ -584,6 +660,10 @@ struct DashboardView: View {
             .modifier(ToolbarPillModifier(isActive: viewModel.isEditing))
         }
         .buttonStyle(.plain)
+        .focusable()
+        .accessibilityLabel(viewModel.isEditing
+                            ? L.tr("편집 완료", "Finish editing")
+                            : L.tr("대시보드 편집", "Edit dashboard"))
         // 계약 C2: a newer-schema document is read-only here. The button stays
         // visible with its reason attached rather than disappearing, so the
         // absence of editing is explained instead of just observed.
@@ -602,6 +682,9 @@ struct DashboardView: View {
                     .modifier(ToolbarPillModifier())
             }
             .buttonStyle(.plain)
+            .focusable()
+            .help("\(DashboardCommand.addPanel.title) (\(DashboardCommand.addPanel.chordDescription))")
+            .accessibilityLabel(DashboardCommand.addPanel.title)
             // Anchor the popover to the actual + button so it appears
             // beneath it, instead of drifting to the main content area
             // (which can land outside the dashboard window entirely on
@@ -619,7 +702,9 @@ struct DashboardView: View {
                     .modifier(ToolbarPillModifier())
             }
             .buttonStyle(.plain)
-            .help(L.dash.addRow)
+            .focusable()
+            .help("\(DashboardCommand.addRow.title) (\(DashboardCommand.addRow.chordDescription))")
+            .accessibilityLabel(DashboardCommand.addRow.title)
 
             Button {
                 viewModel.resetToDefault()
@@ -629,6 +714,9 @@ struct DashboardView: View {
                     .modifier(ToolbarPillModifier())
             }
             .buttonStyle(.plain)
+            .focusable()
+            .help(L.tr("기본 레이아웃으로 되돌리기", "Reset to the default layout"))
+            .accessibilityLabel(L.tr("기본 레이아웃으로 되돌리기", "Reset to the default layout"))
         }
     }
 
@@ -692,9 +780,14 @@ struct DashboardView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: DS.fontCaption))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .focusable()
+        .help(L.tr("더 보기", "More"))
+        .accessibilityLabel(L.tr("대시보드 메뉴", "Dashboard menu"))
     }
 
     @ViewBuilder

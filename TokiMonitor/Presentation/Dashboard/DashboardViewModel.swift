@@ -67,6 +67,12 @@ final class DashboardViewModel {
     var seriesVisibility = SeriesVisibility()
     var panelData: [UUID: PanelDataState] = [:]
 
+    /// Where the reader is pointing, shared by every time chart on this
+    /// dashboard so the same instant can be read off all of them at once
+    /// (US7). Render stage like `seriesVisibility`, and persisted for the same
+    /// reason: none.
+    let crosshair = DashboardCrosshair()
+
     /// Labels a variable's own query returned, keyed by variable id. The
     /// editor offers these instead of a hard-coded list, which could name a
     /// label the query never produces — the user then gets an empty dropdown
@@ -653,6 +659,34 @@ final class DashboardViewModel {
 
     func setAbsoluteTimeRange(from: Date, to: Date) {
         timeConfig = TimeConfig.absolute(from: from, to: to)
+    }
+
+    /// Scale the range about its centre — the keyboard's half of drag-to-zoom.
+    func zoomTimeRange(_ factor: Double) {
+        let next = TimeRangeZoom.zoom(timeConfig, factor: factor)
+        guard next != timeConfig else { return }
+        timeConfig = next
+    }
+
+    /// Slide the range by a fraction of its width. Negative moves back.
+    func panTimeRange(by fraction: Double) {
+        let next = TimeRangeZoom.pan(timeConfig, by: fraction)
+        // A pan that hits `now` and cannot move produces the same config; the
+        // setter refetches every panel, so returning early is the difference
+        // between a key that does nothing and a key that re-queries the whole
+        // dashboard to show the same thing.
+        guard next != timeConfig else { return }
+        timeConfig = next
+    }
+
+    /// Apply the range a drag across a chart selected.
+    ///
+    /// Nil selections — a click, a backwards drag, a two-second window — are
+    /// dropped by `TimeRangeZoom.selection`, so this never narrows the
+    /// dashboard to a sliver because someone missed a legend entry.
+    func zoomToSelection(from start: Date, to end: Date) {
+        guard let next = TimeRangeZoom.selection(from: start, to: end) else { return }
+        timeConfig = next
     }
 
     // MARK: - Auto-Refresh

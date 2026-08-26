@@ -29,6 +29,11 @@ struct TimeSeriesChartView: View {
     @State private var hoverX: CGFloat = 0
     @State private var plotWidth: CGFloat = 1
     @State private var segments: [LineSegment] = []
+    /// Where a drag-to-zoom started and where it is now, in view coordinates.
+    /// Nil while nothing is being dragged.
+    @State private var dragStartX: CGFloat?
+    @State private var dragCurrentX: CGFloat?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var options: PanelDisplayOptions { panel?.options ?? PanelDisplayOptions() }
 
@@ -85,20 +90,44 @@ struct TimeSeriesChartView: View {
             .chartOverlay { proxy in
                 GeometryReader { geo in
                     Color.clear
+                        .contentShape(Rectangle())
                         .onContinuousHover { phase in
-                            guard showsTooltip else { return }
                             switch phase {
                             case .active(let location):
                                 track(location, proxy: proxy, geo: geo)
                             case .ended:
                                 hoveredDate = nil
                                 hoveredValue = nil
+                                viewModel.crosshair.clear(panelID: panel?.id)
                             }
                         }
+                        // Drag across the plot to zoom the WHOLE dashboard to
+                        // what was dragged over. `minimumDistance` is small so
+                        // the band appears as soon as the hand commits;
+                        // `TimeRangeZoom` is what decides whether the finished
+                        // drag was a selection or a click.
+                        .gesture(
+                            DragGesture(minimumDistance: 2)
+                                .onChanged { value in
+                                    if dragStartX == nil {
+                                        dragStartX = value.startLocation.x
+                                    }
+                                    dragCurrentX = value.location.x
+                                }
+                                .onEnded { value in
+                                    finishZoomDrag(start: value.startLocation.x,
+                                                   end: value.location.x, proxy: proxy)
+                                }
+                        )
+                        // The band being dragged over. Drawn here rather than
+                        // as a `RectangleMark` so it does not enter the chart's
+                        // own scales — a mark would extend the y domain.
+                        .overlay(alignment: .topLeading) { dragBand(in: geo) }
                 }
             }
             .overlay(alignment: .topLeading) {
-                if showsTooltip, let hoveredDate {
+                if showsTooltip, viewModel.crosshair.isOwner(panel?.id),
+                   let hoveredDate {
                     tooltipView(date: hoveredDate, styles: styles)
                         .offset(x: max(8, min(hoverX - 80, plotWidth - 170)), y: 4)
                 }
@@ -106,7 +135,9 @@ struct TimeSeriesChartView: View {
             .onAppear { animateIn() }
             .onChange(of: viewModel.dataVersion) { _, _ in animateIn() }
             .onChange(of: hiddenSeries) { _, _ in
-                withAnimation(.easeOut(duration: 0.3)) { segments = Self.segments(from: series()) }
+                withAnimation(Motion.data(reduceMotion)) {
+                    segments = Self.segments(from: series())
+                }
             }
             .onChange(of: viewModel.isLoading) { _, loading in
                 if loading { collapseToZero() }
@@ -168,10 +199,18 @@ struct TimeSeriesChartView: View {
                     }
             }
 
-            // Hover crosshair
-            if showsTooltip, let hoveredDate {
-                RuleMark(x: .value("", hoveredDate))
-                    .foregroundStyle(.primary.opacity(0.3))
+            // The shared crosshair (US7). Drawn from the dashboard's own
+            // instant rather than from this panel's hover, so pointing at one
+            // chart marks the same moment on every other one — which is the
+            // comparison a dashboard is for, and the one a per-panel rule
+            // could not make.
+            //
+            // Not gated on `showsTooltip`: a panel whose tooltip is off still
+            // has an x axis, and the reader who turned the tooltip off did not
+            // ask to be excluded from the comparison.
+            if let shared = viewModel.crosshair.date {
+                RuleMark(x: .value("", shared))
+                    .foregroundStyle(DS.iconSecondary)
                     .lineStyle(StrokeStyle(lineWidth: 1))
             }
 
@@ -332,6 +371,14 @@ struct TimeSeriesChartView: View {
 
     private func animateIn() {
         let real = Self.segments(from: series())
+        // With Reduce Motion on, the series is written once at its real values
+        // (FR-064). Not just "with a zero-length animation": the zero-valued
+        // frame below is a real frame, and passing through it on every refresh
+        // is a flick down to the axis and back.
+        guard Motion.growsFromZero(reduceMotion) else {
+            segments = real
+            return
+        }
         // Start from zero
         segments = real.map { segment in
             LineSegment(id: segment.id, model: segment.model,
@@ -340,13 +387,17 @@ struct TimeSeriesChartView: View {
                         })
         }
         // Animate to real values
-        withAnimation(.easeOut(duration: 0.3)) {
+        withAnimation(Motion.data(reduceMotion)) {
             segments = real
         }
     }
 
     private func collapseToZero() {
-        withAnimation(.easeIn(duration: 0.15)) {
+        // Nothing to collapse under Reduce Motion: the panel keeps drawing the
+        // previous result until the next one replaces it, which is what the
+        // dimmed hold-over in `PanelContainerView` already says is happening.
+        guard Motion.growsFromZero(reduceMotion) else { return }
+        withAnimation(Motion.dataOut(reduceMotion)) {
             segments = segments.map { segment in
                 LineSegment(id: segment.id, model: segment.model,
                             points: segment.points.map {
@@ -365,9 +416,14 @@ struct TimeSeriesChartView: View {
         guard relativeX >= 0, relativeX <= plotRect.width else {
             hoveredDate = nil
             hoveredValue = nil
+            viewModel.crosshair.clear(panelID: panel?.id)
             return
         }
-        hoveredDate = proxy.value(atX: location.x, as: Date.self)
+        let date = proxy.value(atX: location.x, as: Date.self)
+        hoveredDate = date
+        // Published even when this panel draws no tooltip: the rule is shared,
+        // the tooltip is not.
+        if let date { viewModel.crosshair.move(to: date, panelID: panel?.id) }
         // Only `.single` needs to know where the cursor is vertically: it is
         // the value that decides which series the reader is pointing at.
         hoveredValue = options.tooltipMode == .single
@@ -375,6 +431,45 @@ struct TimeSeriesChartView: View {
             : nil
         hoverX = location.x
         plotWidth = plotRect.width
+    }
+
+    // MARK: - Drag to zoom
+
+    /// The shaded band under a drag in progress.
+    @ViewBuilder
+    private func dragBand(in geo: GeometryProxy) -> some View {
+        if let start = dragStartX, let current = dragCurrentX,
+           abs(current - start) >= 2 {
+            let lower = Swift.min(start, current)
+            let width = abs(current - start)
+            // Accent-tinted fill with a hard edge on each side: the fill alone
+            // is a wash whose ends are ambiguous, and the ends are the whole
+            // statement the reader is making.
+            Rectangle()
+                .fill(Color.accentColor.opacity(0.18))
+                .overlay(alignment: .leading) { edge }
+                .overlay(alignment: .trailing) { edge }
+                .frame(width: width, height: geo.size.height)
+                .offset(x: lower)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var edge: some View {
+        Rectangle().fill(Color.accentColor).frame(width: 1)
+    }
+
+    /// Turn a finished drag into a time range, or discard it.
+    private func finishZoomDrag(start: CGFloat, end: CGFloat, proxy: ChartProxy) {
+        defer {
+            dragStartX = nil
+            dragCurrentX = nil
+        }
+        guard abs(end - start) >= TimeRangeZoom.minimumDragWidth,
+              let from = proxy.value(atX: start, as: Date.self),
+              let to = proxy.value(atX: end, as: Date.self)
+        else { return }
+        viewModel.zoomToSelection(from: from, to: to)
     }
 
     // MARK: - Tooltip

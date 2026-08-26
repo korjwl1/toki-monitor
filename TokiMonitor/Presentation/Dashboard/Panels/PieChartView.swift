@@ -19,6 +19,7 @@ struct PieChartView: View {
     ]
 
     @State private var hoveredLabel: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animationProgress: Double = 0
 
     private var total: Double { entries.reduce(0) { $0 + $1.value } }
@@ -70,17 +71,21 @@ struct PieChartView: View {
         }
         .frame(minHeight: 150)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            animationProgress = 0
-            withAnimation(.easeOut(duration: 0.4)) {
-                animationProgress = 1
-            }
+        .onAppear { sweepIn() }
+        .onChange(of: entries.map(\.value)) { _, _ in sweepIn() }
+    }
+
+    /// The sweep that draws the pie in. Under Reduce Motion the slices are at
+    /// full size immediately — a wedge growing round the circle is exactly the
+    /// motion the setting is asking to be spared (FR-064).
+    private func sweepIn() {
+        guard Motion.growsFromZero(reduceMotion) else {
+            animationProgress = 1
+            return
         }
-        .onChange(of: entries.map(\.value)) { _, _ in
-            animationProgress = 0
-            withAnimation(.easeOut(duration: 0.4)) {
-                animationProgress = 1
-            }
+        animationProgress = 0
+        withAnimation(.easeOut(duration: 0.4)) {
+            animationProgress = 1
         }
     }
 
@@ -107,7 +112,7 @@ struct PieChartView: View {
                         .fill(.clear)
                         .contentShape(Rectangle())
                         .onContinuousHover { phase in
-                            withAnimation(.easeOut(duration: 0.2)) {
+                            withAnimation(Motion.reveal(reduceMotion)) {
                                 switch phase {
                                 case .active(let location):
                                     hoveredLabel = findEntry(at: location, in: geo.size)
@@ -155,7 +160,7 @@ struct PieChartView: View {
                         )
                 }
                 .onHover { isHovered in
-                    withAnimation(.easeOut(duration: 0.2)) {
+                    withAnimation(Motion.reveal(reduceMotion)) {
                         hoveredLabel = isHovered ? entry.label : nil
                     }
                 }

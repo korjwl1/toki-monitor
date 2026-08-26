@@ -17,13 +17,14 @@ struct PanelDragModifier: ViewModifier {
 
     @State private var dragOffset: CGSize = .zero
     @State private var isDragging = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
             .offset(dragOffset)
             .opacity(isDragging ? 0.7 : 1.0)
             .scaleEffect(isDragging ? 0.98 : 1.0)
-            .animation(.easeInOut(duration: 0.15), value: isDragging)
+            .animation(Motion.reveal(reduceMotion), value: isDragging)
             .gesture(dragGesture, isEnabled: isEditing)
             // SwiftUI does not call `.onEnded` when a gesture is disabled
             // mid-drag (e.g. `isEditing` flips false from a hotkey). Reset

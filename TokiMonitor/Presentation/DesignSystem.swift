@@ -24,6 +24,35 @@ enum DS {
     // MARK: - Colors
     static let dividerColor = Color.primary.opacity(0.1)
 
+    // MARK: - Measured foreground tokens (FR-058, 계약 R6)
+    //
+    // Named tokens rather than `.secondary` / `.tertiary` at each call site.
+    // The system label colours are a scale of alphas, and the ones below the
+    // top two do not clear the contrast floors on the ground these panels sit
+    // on: measured against a panel over #F5F5F5 / #1C1C1C, `.secondary` is
+    // 3.05:1 in light and `.tertiary` is 1.87:1 — the first is legal for an
+    // axis and not for a sentence, the second is legal for nothing.
+    //
+    // `ContrastTests` measures every token here, in both appearances, against
+    // both the plain ground and the closest surface the panel material reaches.
+    // The ratios in the doc comments come from that test, not from an eyeball.
+
+    /// Body text that is not the primary line: a detail sentence, a subtitle,
+    /// a badge. Held to the 4.5:1 text floor.
+    static let bodySecondary = Color.primary.opacity(0.72)
+
+    /// Icons, axis labels, legend text and other non-text marks. Held to the
+    /// 3:1 floor — and comfortably over it, because these are small and thin.
+    static let iconSecondary = Color.primary.opacity(0.55)
+
+    /// A border that carries meaning — an edit-mode outline, a table header
+    /// rule. Also 3:1: a boundary a reader cannot find is not a boundary.
+    ///
+    /// The same alpha as `iconSecondary` and named separately anyway: they are
+    /// held to the same floor for different reasons, and a later change to one
+    /// should not silently move the other.
+    static let borderStrong = Color.primary.opacity(0.55)
+
     // MARK: - Menu Bar
     enum Menu {
         static let leftWidth: CGFloat = 200

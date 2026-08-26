@@ -10,6 +10,12 @@ struct PanelContainerView<Content: View>: View {
     /// content entirely (a row header), which is why this is optional rather
     /// than defaulting to `.idle`.
     var state: PanelState?
+    /// What kind of panel this is, for the reader who cannot see it. Without
+    /// it "1.2M" could be a lone number or the end of a line (FR-063).
+    var panelType: PanelType?
+    /// What the panel currently says, already formatted by whichever render
+    /// owns the number. Nil in every state that has no value to speak.
+    var valueSummary: String?
     let onDelete: () -> Void
     let onEdit: () -> Void
     /// Re-runs this panel's query. Only `.failed` offers it.
@@ -38,11 +44,18 @@ struct PanelContainerView<Content: View>: View {
     @ViewBuilder let content: Content
 
     @State private var isHovered = false
+    /// Keyboard focus on the card itself. It does two jobs: it is what makes
+    /// the edit and inspect controls appear without a mouse (FR-061), and it
+    /// is what draws the focus ring that says where the keyboard is (FR-062).
+    @FocusState private var isFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         title: String,
         isEditing: Bool,
         state: PanelState? = nil,
+        panelType: PanelType? = nil,
+        valueSummary: String? = nil,
         onDelete: @escaping () -> Void,
         onEdit: @escaping () -> Void,
         onRetry: (() -> Void)? = nil,
@@ -56,6 +69,8 @@ struct PanelContainerView<Content: View>: View {
         self.title = title
         self.isEditing = isEditing
         self.state = state
+        self.panelType = panelType
+        self.valueSummary = valueSummary
         self.onDelete = onDelete
         self.onEdit = onEdit
         self.onRetry = onRetry
@@ -81,7 +96,7 @@ struct PanelContainerView<Content: View>: View {
                     .foregroundStyle(.orange)
                 Text(L.tr("쿼리 \(refIds.joined(separator: ", ")) 실패",
                           "Query \(refIds.joined(separator: ", ")) failed"))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.bodySecondary)
             }
             .font(.system(size: DS.fontTiny))
             .help(detail)
@@ -106,7 +121,7 @@ struct PanelContainerView<Content: View>: View {
                 Image(systemName: "line.3.horizontal.decrease.circle")
                     .foregroundStyle(.orange)
                 Text(L.tr("필터 미적용", "Filter not applied"))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.bodySecondary)
             }
             .font(.system(size: DS.fontTiny))
             .help(detail)
@@ -124,7 +139,7 @@ struct PanelContainerView<Content: View>: View {
             HStack(spacing: DS.sm) {
                 if isEditing && !isRepeatInstance {
                     Image(systemName: "line.3.horizontal")
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(DS.iconSecondary)
                         .font(.system(size: DS.fontBody))
                 }
 
@@ -142,44 +157,64 @@ struct PanelContainerView<Content: View>: View {
 
                 Spacer()
 
-                // Show edit + inspect on hover (not in edit mode)
-                if isHovered && !isEditing {
+                // Edit + inspect appear on hover OR on keyboard focus. Hover
+                // alone made them unreachable without a mouse (FR-061): there
+                // was no state a keyboard could put the panel into that
+                // brought them on screen at all.
+                if (isHovered || isFocused) && !isEditing {
                     if let onInspect {
                         Button(action: onInspect) {
                             Image(systemName: "magnifyingglass.circle")
                                 .font(.system(size: DS.fontBody))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(DS.iconSecondary)
+                                .frame(width: 24, height: 24)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .focusable()
                         .transition(.opacity)
                         .help(L.tr("데이터·쿼리 검사", "Inspect data and query"))
+                        .accessibilityLabel(L.tr("\(title) 검사", "Inspect \(title)"))
                     }
                     Button(action: onEdit) {
                         Image(systemName: "pencil.circle")
                             .font(.system(size: DS.fontBody))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.iconSecondary)
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .focusable()
                     .transition(.opacity)
+                    .help(L.tr("패널 편집", "Edit panel"))
+                    .accessibilityLabel(L.tr("\(title) 편집", "Edit \(title)"))
                 }
 
                 if isEditing {
                     Button(action: onEdit) {
                         Image(systemName: "slider.horizontal.3")
                             .font(.system(size: DS.fontBody))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.iconSecondary)
                             .frame(width: 24, height: 24)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .focusable()
+                    .help(L.tr("패널 편집", "Edit panel"))
+                    .accessibilityLabel(L.tr("\(title) 편집", "Edit \(title)"))
 
                     if !isRepeatInstance {
                         Button(role: .destructive, action: onDelete) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: DS.fontBody))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(DS.iconSecondary)
+                                .frame(width: 24, height: 24)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .focusable()
+                        .help(L.tr("패널 삭제", "Delete panel"))
+                        .accessibilityLabel(L.tr("\(title) 삭제", "Delete \(title)"))
                     }
                 }
             }
@@ -231,7 +266,7 @@ struct PanelContainerView<Content: View>: View {
         .contentShape(Rectangle())
         .modifier(PanelCardModifier(isHovered: isHovered))
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(Motion.reveal(reduceMotion)) {
                 isHovered = hovering
             }
         }
@@ -239,9 +274,72 @@ struct PanelContainerView<Content: View>: View {
             if isEditing {
                 RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
-                    .foregroundStyle(.secondary.opacity(0.4))
+                    .foregroundStyle(DS.borderStrong)
             }
         }
+        // The focus ring. Drawn by the panel rather than left to the system
+        // because the card is a custom shape: the default ring is a rectangle
+        // and lands outside the rounded corners.
+        .overlay {
+            if isFocused {
+                RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+                    .allowsHitTesting(false)
+            }
+        }
+        .focusable()
+        .focused($isFocused)
+        // Keyboard, on the focused panel. The buttons in the title bar are the
+        // tabbable path; these are the direct one, so reaching inspect does not
+        // cost a tab through every panel control before it.
+        .onKeyPress(.return) { activatePrimary() }
+        .onKeyPress(KeyEquivalent("i")) { activatePrimary() }
+        .onKeyPress(KeyEquivalent("e")) {
+            onEdit()
+            return .handled
+        }
+        .onKeyPress(.delete) {
+            guard isEditing, !isRepeatInstance else { return .ignored }
+            onDelete()
+            return .handled
+        }
+        // What the whole card announces: what it is, what state it is in, and
+        // what it says (FR-063). `.contain` rather than `.combine` — the retry
+        // button, the legend and the badges inside must stay reachable as
+        // elements of their own.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(
+            PanelAccessibility.announcement(
+                title: title,
+                typeName: (panelType ?? .unknown).displayName,
+                state: state,
+                value: state?.showsContent == false ? nil : valueSummary
+            )
+        )
+        .accessibilityHint(
+            PanelAccessibility.hint(canInspect: onInspect != nil,
+                                    canEdit: true,
+                                    canDelete: isEditing && !isRepeatInstance) ?? ""
+        )
+        .accessibilityAction(named: L.tr("검사", "Inspect")) { onInspect?() }
+        .accessibilityAction(named: L.tr("편집", "Edit")) { onEdit() }
+        .accessibilityActions {
+            if isEditing && !isRepeatInstance {
+                Button(L.tr("삭제", "Delete"), action: onDelete)
+            }
+            if let onRetry, state?.offersRetry == true {
+                Button(L.tr("다시 시도", "Retry"), action: onRetry)
+            }
+        }
+    }
+
+    /// Return and `i` both open the inspector — "where did this number come
+    /// from" is the question a reader asks of a panel they have just landed on.
+    /// A panel with no inspector leaves the key to whatever is behind it.
+    private func activatePrimary() -> KeyPress.Result {
+        guard let onInspect else { return .ignored }
+        onInspect()
+        return .handled
     }
 }
 

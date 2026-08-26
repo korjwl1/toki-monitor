@@ -6,6 +6,7 @@ struct CustomDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
     var onEditPanel: ((PanelConfig) -> Void)?
     var onInspectPanel: ((PanelConfig) -> Void)?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
 
     var body: some View {
@@ -100,15 +101,21 @@ struct CustomDashboardView: View {
 
         return HStack(spacing: 8) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(Motion.layout(reduceMotion)) {
                     viewModel.toggleRowCollapse(panelID: panel.id)
                 }
             } label: {
                 Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.iconSecondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .focusable()
+            .accessibilityLabel(isCollapsed
+                ? L.tr("\(panel.title) 행 펼치기", "Expand row \(panel.title)")
+                : L.tr("\(panel.title) 행 접기", "Collapse row \(panel.title)"))
 
             if viewModel.isEditing {
                 TextField(L.tr("행 제목", "Row title"), text: Binding(
@@ -137,10 +144,15 @@ struct CustomDashboardView: View {
                     viewModel.removePanel(id: panel.id)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.iconSecondary)
                         .font(.system(size: 10))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .focusable()
+                .accessibilityLabel(L.tr("\(panel.title) 행 삭제",
+                                         "Delete row \(panel.title)"))
             }
         }
         .padding(.horizontal, 8)
@@ -158,6 +170,11 @@ struct CustomDashboardView: View {
             // whatever the fetch did, the answer on screen is "unknown type".
             // `nil` hands the whole box to the content (contract R5).
             state: panel.panelType == .unknown ? nil : panelState(for: panel),
+            panelType: panel.panelType,
+            // What the panel says, for a reader who cannot see it (FR-063).
+            // Resolved from the same result the render draws from, so the two
+            // cannot disagree.
+            valueSummary: valueSummary(for: panel),
             onDelete: { viewModel.removePanel(id: panel.id) },
             // Editing a copy edits the definition it came from: a copy has no
             // definition of its own, and a save that went to the copy would be
@@ -218,6 +235,18 @@ struct CustomDashboardView: View {
             // is switched off" is a different answer from "the query found
             // nothing" and has a different remedy.
             hasVisibleSeries: !usesLegendFilter(panel) || hasVisibleSeries(panel)
+        )
+    }
+
+    /// What this panel currently says, in words. Nil while it has no result —
+    /// the state is then the whole message and `PanelStatusView` speaks it.
+    private func valueSummary(for panel: PanelConfig) -> String? {
+        let state = viewModel.dataState(for: panel.id)
+        return PanelValueSummary.text(
+            panel: panel,
+            data: state.timeSeriesData,
+            frames: state.frames,
+            hidden: viewModel.hiddenSeries(for: panel.id)
         )
     }
 

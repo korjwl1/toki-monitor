@@ -34,6 +34,14 @@ struct TimeRangePickerPopover: View {
 
             Divider()
 
+            // Zoom and pan, in the one place a reader looks when they want to
+            // change the range. The chords are owned by the dashboard's command
+            // sink so that they work with this popover shut; naming them here
+            // is how anyone finds out they exist (FR-062).
+            navigationRow
+
+            Divider()
+
             // Tab content — fills remaining space, top-aligned
             Group {
                 switch selectedTab {
@@ -50,6 +58,49 @@ struct TimeRangePickerPopover: View {
             absoluteFrom = time.fromDate
             absoluteTo = time.toDate
         }
+    }
+
+    // MARK: - Zoom and pan
+
+    private var navigationRow: some View {
+        HStack(spacing: DS.xs) {
+            navButton(.panBackward, symbol: "chevron.left") {
+                viewModel.panTimeRange(by: -0.5)
+            }
+            navButton(.zoomOut, symbol: "minus.magnifyingglass") {
+                viewModel.zoomTimeRange(2)
+            }
+            navButton(.zoomIn, symbol: "plus.magnifyingglass") {
+                viewModel.zoomTimeRange(0.5)
+            }
+            navButton(.panForward, symbol: "chevron.right") {
+                viewModel.panTimeRange(by: 0.5)
+            }
+            Spacer(minLength: 0)
+            Text(viewModel.timeRangeLabel)
+                .font(.system(size: DS.fontCaption))
+                .foregroundStyle(DS.bodySecondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, DS.sm)
+    }
+
+    private func navButton(_ command: DashboardCommand, symbol: String,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: DS.fontCaption))
+                .foregroundStyle(DS.iconSecondary)
+                // 24x24 minimum hit area (FR-060), with the 4pt gaps around it
+                // making up the 8pt separation between neighbours.
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable()
+        .help("\(command.title) (\(command.chordDescription))")
+        .accessibilityLabel(command.title)
     }
 
     // MARK: - Quick Ranges
@@ -121,10 +172,10 @@ struct TimeRangePickerPopover: View {
             HStack(spacing: 4) {
                 Image(systemName: "clock")
                     .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(DS.bodySecondary)
                 Text(durationLabel)
                     .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(DS.bodySecondary)
             }
 
             // Apply
