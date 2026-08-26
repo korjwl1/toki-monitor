@@ -83,6 +83,7 @@
 		2FD39BD3817670D06BE68CEF /* ProviderRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507FA6EFF17810ED320DE318 /* ProviderRegistryTests.swift */; };
 		30E96B62CCA9D6694DCED0BE /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA30A3E71C0D0B2A1682750 /* SettingsWindowController.swift */; };
 		3574E94BBA0BB4EA83DB6F40 /* Animations in Resources */ = {isa = PBXBuildFile; fileRef = 4C9D9972B2FA620BD19C947D /* Animations */; };
+		AA83FMTCACHE001B /* FormatterCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA83FMTCACHE001F /* FormatterCache.swift */; };
 		AA80LOSSTOLERANT1B /* LossTolerantStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA80LOSSTOLERANT1F /* LossTolerantStore.swift */; };
 		3A08C6B2401417D71EEA07F6 /* AnnotationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */; };
 		3B53DEBD38340CE172E5019E /* MenuBarSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4771B8F6125461E69C2CFE8 /* MenuBarSettingsPane.swift */; };
@@ -451,6 +452,7 @@
 		AA34STPANEL00000001 /* StateTimelinePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateTimelinePanelView.swift; sourceTree = "<group>"; };
 		DD104D8D23446C055623FC7D /* DashboardVersionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardVersionStore.swift; sourceTree = "<group>"; };
 		DFDF640C227D467E72826C64 /* DashboardMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMigrator.swift; sourceTree = "<group>"; };
+		AA83FMTCACHE001F /* FormatterCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatterCache.swift; sourceTree = "<group>"; };
 		AA80LOSSTOLERANT1F /* LossTolerantStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LossTolerantStore.swift; sourceTree = "<group>"; };
 		E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStore.swift; sourceTree = "<group>"; };
 		E131E3756214B21A8B8654B1 /* PanelEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEditorView.swift; sourceTree = "<group>"; };
@@ -887,6 +889,7 @@
 				AA74PANELA11Y0001 /* PanelAccessibility.swift */,
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
 				6B17BA2BAF5855E537D1C1D0 /* AnimationTheme.swift */,
+				AA83FMTCACHE001F /* FormatterCache.swift */,
 				AA80LOSSTOLERANT1F /* LossTolerantStore.swift */,
 				E10582F33BB2A12E45F2A6BB /* AnnotationStore.swift */,
 				5D82D563F2B758C1208E987E /* AppSettings.swift */,
@@ -1057,6 +1060,7 @@
 				4DBBE21D70D7916D7F2DC175 /* AnimationStateMapper.swift in Sources */,
 				502EEB38E57AB5717C4E6301 /* AnimationTheme.swift in Sources */,
 				C4A21221786A98400990A92C /* AnnotationListSheet.swift in Sources */,
+				AA83FMTCACHE001B /* FormatterCache.swift in Sources */,
 				AA80LOSSTOLERANT1B /* LossTolerantStore.swift in Sources */,
 				3A08C6B2401417D71EEA07F6 /* AnnotationStore.swift in Sources */,
 				96C312BC7B488E45DAB00737 /* AppSettings.swift in Sources */,

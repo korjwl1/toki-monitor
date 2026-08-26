@@ -261,19 +261,21 @@ extension Period {
     /// Formatted from the bucket's own boundaries so the label can never
     /// disagree with the aggregation: the presentation layer has no business
     /// re-deriving where a week starts.
+    @MainActor
     func displayLabel(calendar: Calendar = PeriodAggregation.userCalendar) -> String {
-        let locale = Locale(identifier: L.code == "ko" ? "ko_KR" : "en_US")
-        let formatter = DateFormatter()
-        formatter.locale = locale
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
+        // Cached per (locale, template, calendar, zone). Called once per period
+        // from a builder that runs inside a SwiftUI body; a fresh
+        // DateFormatter each time put ICU pattern construction on every render.
+        let localeID = FormatterCache.currentLocaleID
 
         switch unit {
         case .monthly:
-            formatter.setLocalizedDateFormatFromTemplate("yMMM")
-            return formatter.string(from: start)
+            return FormatterCache
+                .templated("yMMM", localeID: localeID, calendar: calendar)
+                .string(from: start)
         case .weekly:
-            formatter.setLocalizedDateFormatFromTemplate("Md")
+            let formatter = FormatterCache
+                .templated("Md", localeID: localeID, calendar: calendar)
             // The stored `end` is exclusive; the label names the last day the
             // week actually contains.
             let lastDay = calendar.date(byAdding: .day, value: -1, to: end) ?? end

@@ -45,6 +45,16 @@ struct PlanFitPage: View {
     /// true = rows came from the sync server (multi-device merged statistics).
     @State private var usingServerData = false
 
+    /// The instant the page reasons about, held in state rather than read in
+    /// `body`.
+    ///
+    /// `Date()` inside `body` made the model a different value on every render
+    /// — SwiftUI could not treat two renders of unchanged state as equal, and
+    /// the whole 28-day derivation (percentiles, verdicts, every string on the
+    /// page) ran again each time. Stamped once per load and once per period
+    /// change, which are the only moments the answer can actually differ.
+    @State private var nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1000)
+
     private let serverClient = ServerQueryClient()
 
     var body: some View {
@@ -52,7 +62,7 @@ struct PlanFitPage: View {
             model: PlanFitModelBuilder.build(
                 rows: rows,
                 unit: periodUnit,
-                nowMs: Int64(Date().timeIntervalSince1970 * 1000),
+                nowMs: nowMs,
                 modelUsage: modelUsage,
                 windowsAvailability: windowsAvailability,
                 usingServerData: usingServerData,
@@ -62,6 +72,12 @@ struct PlanFitPage: View {
             unit: $periodUnit
         )
         .task { await load() }
+        // Switching weekly/monthly re-derives against a fresh instant. Without
+        // this the page would keep reasoning about the moment of the last load,
+        // which is the cost of taking `now` out of `body`.
+        .onChange(of: periodUnit) { _, _ in
+            nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        }
     }
 
     // MARK: - Data
@@ -74,6 +90,7 @@ struct PlanFitPage: View {
         isLoading = true
         defer { isLoading = false }
         let now = Int(Date().timeIntervalSince1970)
+        nowMs = Int64(now) * 1000
         let start = now - Int(WindowStats.lookbackDays * 86_400)
         // Both sources bound on the window ANCHOR, which is the reset instant —
         // in the FUTURE for every open window. Ending at `now` therefore filtered

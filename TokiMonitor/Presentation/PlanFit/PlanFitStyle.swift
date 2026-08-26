@@ -463,11 +463,17 @@ enum PlanFitFormat {
         return rounded >= 0 ? "+\(rounded)%" : "\(rounded)%"
     }
 
+    /// `@MainActor` because it already was in fact — it resolves the app's
+    /// language through `L.code`, which reaches `MainActor.assumeIsolated` and
+    /// traps rather than returning when called off the main actor. The
+    /// annotation moves that from a runtime trap to a compile-time check.
+    @MainActor
     static func day(_ ms: Int64) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: L.code == "ko" ? "ko_KR" : "en_US")
-        formatter.setLocalizedDateFormatFromTemplate("MdE")
-        return formatter.string(from: Date(timeIntervalSince1970: Double(ms) / 1000))
+        // Cached: this is called once per row from a builder that runs inside
+        // a SwiftUI body, and building a DateFormatter is not cheap.
+        FormatterCache
+            .templated("MdE", localeID: FormatterCache.currentLocaleID)
+            .string(from: Date(timeIntervalSince1970: Double(ms) / 1000))
     }
 
     static func providerTitle(_ name: String) -> String {
