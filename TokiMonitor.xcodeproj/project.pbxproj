@@ -15,7 +15,6 @@
 		AA62SERIESVIS00002 /* SeriesVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62SERIESVIS00001 /* SeriesVisibility.swift */; };
 		AA61PANELRPTTEST02 /* PanelRepeatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA61PANELRPTTEST01 /* PanelRepeatTests.swift */; };
 		AA61PANELRPT000002 /* PanelRepeat.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA61PANELRPT000001 /* PanelRepeat.swift */; };
-		AA71ARCHIVETEST1B /* RemovedFeatureArchiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA71ARCHIVETEST1F /* RemovedFeatureArchiveTests.swift */; };
 		AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */; };
 		AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40POPTTESTS00001 /* PanelOptionsTests.swift */; };
 		AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */; };
@@ -200,6 +199,7 @@
 		E58E37541C010557CB0C1865 /* DatasourceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A7FCA1C481A1421555EEF2 /* DatasourceRegistry.swift */; };
 		E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0103BDEAC6066E0274029149 /* ConnectionManager.swift */; };
 		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
+		AA90VERHIST000002 /* VersionHistoryDiffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90VERHIST000001 /* VersionHistoryDiffTests.swift */; };
 		AA90AGGRATE000002 /* TokenAggregatorRateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */; };
 		AA90IPCBND000002 /* TokiIPCBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90IPCBND000001 /* TokiIPCBoundaryTests.swift */; };
 		AA90UDSSOCK000002 /* TokiTraceSocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */; };
@@ -252,7 +252,6 @@
 		AA62SERIESVIS00001 /* SeriesVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesVisibility.swift; sourceTree = "<group>"; };
 		AA61PANELRPTTEST01 /* PanelRepeatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelRepeatTests.swift; sourceTree = "<group>"; };
 		AA61PANELRPT000001 /* PanelRepeat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelRepeat.swift; sourceTree = "<group>"; };
-		AA71ARCHIVETEST1F /* RemovedFeatureArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemovedFeatureArchiveTests.swift; sourceTree = "<group>"; };
 		AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableRefreshPolicyTests.swift; sourceTree = "<group>"; };
 		AA40POPTTESTS00001 /* PanelOptionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelOptionsTests.swift; sourceTree = "<group>"; };
 		AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateSnapshotTests.swift; sourceTree = "<group>"; };
@@ -354,6 +353,7 @@
 		AA41QREFTEST001F /* QueryRefusalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryRefusalTests.swift; sourceTree = "<group>"; };
 		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
+		AA90VERHIST000001 /* VersionHistoryDiffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionHistoryDiffTests.swift; sourceTree = "<group>"; };
 		AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregatorRateTests.swift; sourceTree = "<group>"; };
 		AA90IPCBND000001 /* TokiIPCBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiIPCBoundaryTests.swift; sourceTree = "<group>"; };
 		AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiTraceSocketTests.swift; sourceTree = "<group>"; };
@@ -740,12 +740,12 @@
 		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AA90VERHIST000001 /* VersionHistoryDiffTests.swift */,
 				AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */,
 				AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */,
 				AA62FILTNOTETEST01 /* UnappliedFilterNoticeTests.swift */,
 				AA61PANELRPTTEST01 /* PanelRepeatTests.swift */,
-				AA71ARCHIVETEST1F /* RemovedFeatureArchiveTests.swift */,
-				AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */,
+						AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */,
 				AA40POPTTESTS00001 /* PanelOptionsTests.swift */,
 				AA40PSTATETEST0001 /* PanelStateTests.swift */,
 				AB01PTIMET0000001 /* PanelTimeOverrideTests.swift */,
@@ -1180,8 +1180,7 @@
 				AA62SERVISTEST0002 /* SeriesVisibilityTests.swift in Sources */,
 				AA62FILTNOTETEST02 /* UnappliedFilterNoticeTests.swift in Sources */,
 				AA61PANELRPTTEST02 /* PanelRepeatTests.swift in Sources */,
-				AA71ARCHIVETEST1B /* RemovedFeatureArchiveTests.swift in Sources */,
-				AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */,
+						AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */,
 				AA03PFSNAPT0B001 /* PlanFitSnapshotTests.swift in Sources */,
 				AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */,
 				AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */,
@@ -1209,6 +1208,7 @@
 				EE77CFE802FBAEF03819DC89 /* SemVerTests.swift in Sources */,
 				40CC603230947A99EB36F064 /* TokenAggregatorLogicTests.swift in Sources */,
 				EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */,
+				AA90VERHIST000002 /* VersionHistoryDiffTests.swift in Sources */,
 				AA90AGGRATE000002 /* TokenAggregatorRateTests.swift in Sources */,
 				AA90IPCBND000002 /* TokiIPCBoundaryTests.swift in Sources */,
 				AA90UDSSOCK000002 /* TokiTraceSocketTests.swift in Sources */,

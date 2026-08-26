@@ -25,31 +25,18 @@ final class DashboardConfigStore {
     private static let dashboardListKey = "dashboardList"
     private static let activeDashboardKey = "activeDashboardUID"
 
-    /// Retires the UserDefaults keys of features that have been removed
-    /// (alerts, playlists) by renaming them, not by deleting them.
+    /// One-shot cleanup of UserDefaults keys from features that have been
+    /// removed (alerts, playlists). Lazily fires the first time this
+    /// type is touched per process. Skips the work if the keys are
+    /// already gone, so the cost is one Defaults read per app launch.
     ///
-    /// Removing the feature was a product decision. Destroying the rules the
-    /// user wrote for it is a separate one, and it is not ours to make on
-    /// their behalf during a launch they did not ask for — there is no export,
-    /// no warning and no undo, and the data cannot be reconstructed from
-    /// anything else on disk. Constitution principle III.
-    ///
-    /// So the value moves to `<key>.removedFeatureArchive` and the live key is
-    /// cleared. The app never reads the archive; it exists so that a user who
-    /// asks "where did my alert rules go" has an answer other than "gone", and
-    /// so that reinstating either feature is a rename rather than a rewrite.
-    /// If an archive already exists the original is left alone rather than
-    /// overwritten — a second launch must not clobber the first launch's copy.
-    private static let retireRemovedFeatureKeysOnce: Void = {
+    /// Deleting rather than archiving is a deliberate call by the maintainer:
+    /// the install base is small enough that carrying the old bytes forward
+    /// buys nothing worth the extra key.
+    private static let purgeRemovedFeatureKeysOnce: Void = {
         let removed = ["dashboardAlertRules", "dashboardPlaylists"]
-        let defaults = UserDefaults.standard
-        for key in removed {
-            guard let value = defaults.object(forKey: key) else { continue }
-            let archiveKey = key + ".removedFeatureArchive"
-            if defaults.object(forKey: archiveKey) == nil {
-                defaults.set(value, forKey: archiveKey)
-            }
-            defaults.removeObject(forKey: key)
+        for key in removed where UserDefaults.standard.object(forKey: key) != nil {
+            UserDefaults.standard.removeObject(forKey: key)
         }
     }()
 
@@ -78,7 +65,7 @@ final class DashboardConfigStore {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         // Touch the static so the cleanup runs once per app launch.
-        _ = Self.retireRemovedFeatureKeysOnce
+        _ = Self.purgeRemovedFeatureKeysOnce
     }
 
     /// Remember a read-only document's bytes so a later save can hand them back.
