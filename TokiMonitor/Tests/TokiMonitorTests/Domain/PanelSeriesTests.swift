@@ -106,20 +106,20 @@ struct PanelSeriesTests {
 
     // MARK: - Charts
 
-    @Test("chart points honour the model toggle")
-    func chartPointsRespectEnabledModels() {
+    @Test("chart points honour the legend's hidden set")
+    func chartPointsRespectHiddenSeries() {
         let set = FrameSet(frames: [
             frame(["model": "opus", "provider": "claude_code"], tokens: [1, 2]),
             frame(["model": "gpt", "provider": "codex"], tokens: [3, 4]),
         ])
         let all = PanelSeries.chartPoints(metric: .tokensByModel,
                                           panel: panel(.tokensByModel, .timeSeries),
-                                          frames: set, data: nil, enabled: ["opus", "gpt"])
+                                          frames: set, data: nil, hidden: [])
         #expect(all.count == 2)
         let one = PanelSeries.chartPoints(metric: .tokensByModel,
                                           panel: panel(.tokensByModel, .timeSeries),
-                                          frames: set, data: nil, enabled: ["opus"])
-        #expect(one.count == 1, "the toggle is keyed by model even when the name carries provider")
+                                          frames: set, data: nil, hidden: ["gpt"])
+        #expect(one.count == 1, "hiding is keyed by model even when the name carries provider")
         #expect(one.first?.model == "opus · claude_code")
     }
 
@@ -130,7 +130,7 @@ struct PanelSeriesTests {
         let set = FrameSet(frames: [frame(["model": "opus"], tokens: [nil, 5])])
         let points = try #require(PanelSeries.chartPoints(
             metric: .tokensByModel, panel: panel(.tokensByModel, .timeSeries),
-            frames: set, data: nil, enabled: []).first?.points)
+            frames: set, data: nil, hidden: []).first?.points)
         #expect(points.map(\.value) == [0, 5])
         #expect(set.frames[0].field(named: "total_tokens")?.values.numbers == [nil, 5])
     }
@@ -158,6 +158,6 @@ struct PanelSeriesTests {
         #expect(PanelSeries.chartPoints(metric: .tokensByModel,
                                         panel: panel(.tokensByModel, .timeSeries),
                                         frames: nil, data: data,
-                                        enabled: ["opus"]).count == 1)
+                                        hidden: []).count == 1)
     }
 }

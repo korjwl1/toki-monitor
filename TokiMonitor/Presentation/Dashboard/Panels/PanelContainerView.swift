@@ -14,11 +14,19 @@ struct PanelContainerView<Content: View>: View {
     let onEdit: () -> Void
     /// Re-runs this panel's query. Only `.failed` offers it.
     var onRetry: (() -> Void)?
+    /// Un-hides every series. Only `.empty(.allSeriesHidden)` offers it — and
+    /// it must, because that state draws instead of the chart and takes the
+    /// legend off screen with it.
+    var onShowAllSeries: (() -> Void)?
     /// Queries of THIS panel that did not answer, keyed by refId, while at
     /// least one other did (contract Q5). The panel keeps drawing what it has —
     /// blanking it would throw away good data because of one bad query — so the
     /// only way a reader learns that a series is missing is this marker.
     var failedTargets: [String: String] = [:]
+    /// Ad hoc filters the reader set that this panel's query could not be
+    /// given (contract Q4). The panel is drawing real data — it is just not
+    /// the narrowed data the toolbar says it is, and only this says so.
+    var filterNotices: [String] = []
     /// Inspect is available whether or not the dashboard is in edit mode: the
     /// question it answers ("where did this number come from?") is asked while
     /// READING a dashboard, not while building one.
@@ -38,7 +46,9 @@ struct PanelContainerView<Content: View>: View {
         onDelete: @escaping () -> Void,
         onEdit: @escaping () -> Void,
         onRetry: (() -> Void)? = nil,
+        onShowAllSeries: (() -> Void)? = nil,
         failedTargets: [String: String] = [:],
+        filterNotices: [String] = [],
         onInspect: (() -> Void)? = nil,
         isRepeatInstance: Bool = false,
         @ViewBuilder content: () -> Content
@@ -49,7 +59,9 @@ struct PanelContainerView<Content: View>: View {
         self.onDelete = onDelete
         self.onEdit = onEdit
         self.onRetry = onRetry
+        self.onShowAllSeries = onShowAllSeries
         self.failedTargets = failedTargets
+        self.filterNotices = filterNotices
         self.onInspect = onInspect
         self.isRepeatInstance = isRepeatInstance
         self.content = content()
@@ -80,6 +92,32 @@ struct PanelContainerView<Content: View>: View {
         }
     }
 
+    /// The filter the toolbar shows and this panel does not have.
+    ///
+    /// Beside the title for the same reason the partial-failure badge is: what
+    /// is drawn is real data, so replacing it with a message would be a lie in
+    /// the other direction. The full reason — which filter, and why it could
+    /// not be placed — is in the tooltip and read out by VoiceOver.
+    @ViewBuilder
+    private var unappliedFilterBadge: some View {
+        if !filterNotices.isEmpty {
+            let detail = filterNotices.joined(separator: "\n")
+            HStack(spacing: DS.xs) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .foregroundStyle(.orange)
+                Text(L.tr("필터 미적용", "Filter not applied"))
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: DS.fontTiny))
+            .help(detail)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                L.tr("이 패널에는 필터가 적용되지 않았습니다. \(detail)",
+                     "A filter set on this dashboard was not applied to this panel. \(detail)")
+            )
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: DS.sm) {
             // Title bar
@@ -100,6 +138,7 @@ struct PanelContainerView<Content: View>: View {
                     .foregroundStyle(Color.primary)
 
                 partialFailureBadge
+                unappliedFilterBadge
 
                 Spacer()
 
@@ -176,7 +215,8 @@ struct PanelContainerView<Content: View>: View {
                                  "Previous result — refreshing")
                         )
                 case .idle, .loading(hasPrevious: false), .empty, .failed:
-                    PanelStatusView(state: state, onRetry: onRetry)
+                    PanelStatusView(state: state, onRetry: onRetry,
+                                    onShowAllSeries: onShowAllSeries)
                 }
             } else {
                 content

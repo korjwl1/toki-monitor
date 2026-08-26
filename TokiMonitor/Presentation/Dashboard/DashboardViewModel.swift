@@ -58,7 +58,13 @@ final class DashboardViewModel {
     var dataVersion: Int = 0
     var isLoading = false
     var errorMessage: String?
-    var enabledModels: Set<String> = []
+    /// Series the reader has hidden from a panel's legend (contract R7).
+    ///
+    /// Render stage, per panel, and deliberately not persisted: it is a
+    /// glance — "quiet this line for a second so I can read the other one" —
+    /// not a property of the dashboard. Storing it would hand the next reader
+    /// a chart with a series missing and nothing to explain it.
+    var seriesVisibility = SeriesVisibility()
     var panelData: [UUID: PanelDataState] = [:]
 
     /// Labels a variable's own query returned, keyed by variable id. The
@@ -458,7 +464,6 @@ final class DashboardViewModel {
             if let firstLoaded = regularPanels.first(where: { self.panelData[$0.id]?.timeSeriesData != nil }),
                let data = self.panelData[firstLoaded.id]?.timeSeriesData {
                 self.timeSeriesData = data
-                self.enabledModels = Set(data.allModelNames)
                 self.dataVersion += 1
             }
 
@@ -492,7 +497,16 @@ final class DashboardViewModel {
     private func fetchProjectPanels(_ panels: [PanelConfig], time: TimeConfig) async -> [UUID: PanelDataState] {
         var out: [UUID: PanelDataState] = [:]
         let template = PanelMetric.tokensByProject.defaultQuery
-        let query = interpolateQuery(template, time: time)
+        // Reporting form: a project panel is as capable of quietly ignoring an
+        // ad hoc filter as any other, and the reader has to be told either way
+        // (contract Q4).
+        let resolved = VariableResolver.interpolateReporting(
+            template: template, time: time, variables: dashboardConfig.templating.list
+        )
+        let query = resolved.query
+        let filterNotices = resolved.appliedFilters.hasUnapplied
+            ? [resolved.appliedFilters.reason].compactMap { $0 }
+            : []
         // After the datasource refactor, `queryClient` is always a
         // `DatasourcePlugin` wrapper (never a bare `ServerQueryClient`),
         // so the old `is ServerQueryClient` check evaluated false in
@@ -506,8 +520,10 @@ final class DashboardViewModel {
             // Server mode: use PromQL query via server proxy
             do {
                 let result = try await queryClient.queryPromQL(query: query, time: time)
+                var frames = result.frames
+                frames.setNotices += filterNotices
                 for panel in panels {
-                    out[panel.id] = .loaded(result.timeSeries, frames: result.frames)
+                    out[panel.id] = .loaded(result.timeSeries, frames: frames)
                 }
             } catch {
                 for panel in panels {
@@ -574,7 +590,7 @@ final class DashboardViewModel {
                 // Synthesized locally rather than fetched, so there are no
                 // frames to attach — Inspect reports that honestly instead of
                 // showing an empty frame set as if the query returned nothing.
-                out[panel.id] = .loaded(data, frames: FrameSet())
+                out[panel.id] = .loaded(data, frames: FrameSet(setNotices: filterNotices))
             }
         } catch {
             for panel in panels {
@@ -712,31 +728,25 @@ final class DashboardViewModel {
         return variable.current.value
     }
 
-    // MARK: - Model Filter
+    // MARK: - Series visibility (contract R7)
 
-    func toggleModel(_ model: String) {
-        if enabledModels.contains(model) {
-            enabledModels.remove(model)
-        } else {
-            enabledModels.insert(model)
-        }
+    /// Hide a series, or bring it back. Called from the panel's own legend and
+    /// from nowhere else.
+    ///
+    /// It does not fetch. The data is already here; which of it to draw is a
+    /// question about the render, and re-running the query to answer it would
+    /// make a glance at one line cost a round trip to every backend on the
+    /// dashboard.
+    func toggleSeries(_ name: String, panelID: UUID) {
+        seriesVisibility.toggle(name, panelID: panelID)
     }
 
-    func selectAllModels() {
-        if let data = timeSeriesData {
-            enabledModels = Set(data.allModelNames)
-        }
-    }
-
-    func deselectAllModels() {
-        enabledModels.removeAll()
+    /// The series hidden on one panel.
+    func hiddenSeries(for panelID: UUID) -> Set<String> {
+        seriesVisibility.hidden(for: panelID)
     }
 
     // MARK: - Computed
-
-    var filteredModelNames: [String] {
-        timeSeriesData?.allModelNames.filter { enabledModels.contains($0) } ?? []
-    }
 
     var totalTokens: UInt64 { timeSeriesData?.totalTokens ?? 0 }
     var totalCost: Double { timeSeriesData?.totalCost ?? 0 }

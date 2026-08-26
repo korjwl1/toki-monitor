@@ -15,6 +15,9 @@ import SwiftUI
 struct PanelStatusView: View {
     let state: PanelState
     var onRetry: (() -> Void)?
+    /// Brings every hidden series back. Only `.empty(.allSeriesHidden)` shows
+    /// it, and only that state can be got out of any other way.
+    var onShowAllSeries: (() -> Void)?
 
     var body: some View {
         ViewThatFits(in: .vertical) {
@@ -45,7 +48,7 @@ struct PanelStatusView: View {
                     .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            retry
+            actions
         }
     }
 
@@ -53,7 +56,7 @@ struct PanelStatusView: View {
         VStack(spacing: DS.xs) {
             symbol(size: 16)
             title
-            retry
+            actions
         }
     }
 
@@ -90,10 +93,18 @@ struct PanelStatusView: View {
     }
 
     @ViewBuilder
-    private var retry: some View {
+    private var actions: some View {
         if state.offersRetry, let onRetry {
             Button(action: onRetry) {
                 Label(L.tr("다시 시도", "Retry"), systemImage: "arrow.clockwise")
+                    .font(.system(size: 11))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        if state.offersShowAllSeries, let onShowAllSeries {
+            Button(action: onShowAllSeries) {
+                Label(L.tr("모든 계열 표시", "Show all series"), systemImage: "eye")
                     .font(.system(size: 11))
             }
             .buttonStyle(.bordered)

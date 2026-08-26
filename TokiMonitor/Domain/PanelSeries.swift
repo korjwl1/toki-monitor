@@ -43,21 +43,16 @@ enum PanelSeries {
     /// so "this model logged nothing in this bucket" reads as zero on a chart —
     /// but that is the chart's reading, not a fact recorded about the bucket.
     static func chartPoints(metric: PanelMetric, panel: PanelConfig?, frames: FrameSet?,
-                            data: TimeSeriesData?, enabled: Set<String>)
+                            data: TimeSeriesData?, hidden: Set<String> = [])
         -> [(model: String, points: [TimeSeriesData.ChartPoint])] {
         guard let frames, !frames.frames.isEmpty else {
             return PanelDataExtractor.allModelChartPoints(
-                for: metric, enabledModels: enabled, data: data
+                for: metric, hidden: hidden, data: data
             )
         }
         let (set, selection) = prepared(metric: metric, panel: panel, frames: frames)
         return FrameReader.series(set, selection: selection).compactMap { entry in
-            // The model toggle list is keyed by the legacy series name; a frame
-            // whose display name carries extra dimensions must still match the
-            // model the user toggled, so match on the first component too.
-            let modelPart = entry.name.components(separatedBy: " · ").first ?? entry.name
-            guard enabled.isEmpty || enabled.contains(modelPart) || enabled.contains(entry.name)
-            else { return nil }
+            guard !isHidden(entry.name, in: hidden) else { return nil }
             return (entry.name, entry.points.map {
                 TimeSeriesData.ChartPoint(date: $0.date, value: $0.value ?? 0)
             })
@@ -75,20 +70,42 @@ enum PanelSeries {
     /// The legacy extractor has no absence to report — it computes every bucket
     /// — so that path yields all-present points and behaves exactly as before.
     static func chartSeriesWithGaps(metric: PanelMetric, panel: PanelConfig?, frames: FrameSet?,
-                                    data: TimeSeriesData?, enabled: Set<String>)
+                                    data: TimeSeriesData?, hidden: Set<String> = [])
         -> [(model: String, points: [(date: Date, value: Double?)])] {
         guard let frames, !frames.frames.isEmpty else {
             return PanelDataExtractor.allModelChartPoints(
-                for: metric, enabledModels: enabled, data: data
+                for: metric, hidden: hidden, data: data
             ).map { ($0.model, $0.points.map { (date: $0.date, value: Double?($0.value)) }) }
         }
         let (set, selection) = prepared(metric: metric, panel: panel, frames: frames)
         return FrameReader.series(set, selection: selection).compactMap { entry in
-            let modelPart = entry.name.components(separatedBy: " · ").first ?? entry.name
-            guard enabled.isEmpty || enabled.contains(modelPart) || enabled.contains(entry.name)
-            else { return nil }
+            guard !isHidden(entry.name, in: hidden) else { return nil }
             return (entry.name, entry.points)
         }
+    }
+
+    /// Every series this panel would draw, hidden ones included.
+    ///
+    /// The legend needs the full list: an entry the reader switched off is the
+    /// only way to switch it back on, so a legend built from what is drawn
+    /// would swallow its own controls one by one.
+    static func seriesNames(metric: PanelMetric, panel: PanelConfig?,
+                            frames: FrameSet?, data: TimeSeriesData?) -> [String] {
+        chartSeriesWithGaps(metric: metric, panel: panel, frames: frames, data: data)
+            .map(\.model)
+    }
+
+    /// Whether the reader hid this series.
+    ///
+    /// A frame grouped by two dimensions displays as `opus · toki`, and the
+    /// legend offers exactly that string — but a legacy series name is the bare
+    /// model, so the first component is matched too and a chart that gained a
+    /// second grouping does not quietly un-hide everything.
+    private static func isHidden(_ name: String, in hidden: Set<String>) -> Bool {
+        if hidden.isEmpty { return false }
+        if hidden.contains(name) { return true }
+        let head = name.components(separatedBy: " · ").first ?? name
+        return hidden.contains(head)
     }
 
     // MARK: - Tables

@@ -76,14 +76,19 @@ enum PanelDataExtractor {
         }
     }
 
-    /// Returns chart point arrays keyed by model name for all enabled models.
+    /// Chart point arrays keyed by model name, minus the series the reader has
+    /// hidden from this panel's legend.
+    ///
+    /// Hidden rather than enabled: a model that logged nothing this hour is
+    /// absent from `allModelNames`, and an enabled-list would have dropped it
+    /// permanently the moment it came back.
     static func allModelChartPoints(
         for metric: PanelMetric,
-        enabledModels: Set<String>,
+        hidden: Set<String>,
         data: TimeSeriesData?
     ) -> [(model: String, points: [TimeSeriesData.ChartPoint])] {
         guard let data else { return [] }
-        let filtered = data.allModelNames.filter { enabledModels.contains($0) }
+        let filtered = data.allModelNames.filter { !hidden.contains($0) }
         return filtered.map { model in
             (model: model, points: chartPoints(for: metric, model: model, data: data))
         }

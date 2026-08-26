@@ -45,7 +45,28 @@ struct TimeSeriesChartView: View {
     }
 
     var body: some View {
+        // The legend is drawn beside the chart rather than by it: Swift Charts'
+        // own legend cannot be clicked, and clicking it is the whole point
+        // (contract R7).
+        switch legendPlacement {
+        case .none:
+            chartBody
+        case .bottom:
+            VStack(spacing: DS.xs) {
+                chartBody
+                legend
+            }
+        case .trailing:
+            HStack(alignment: .center, spacing: DS.sm) {
+                chartBody
+                legend.frame(maxWidth: 140)
+            }
+        }
+    }
+
+    private var chartBody: some View {
         chart
+            .chartLegend(.hidden)
             .chartForegroundStyleScale { (model: String) in
                 viewModel.colorForModel(model)
             }
@@ -57,8 +78,6 @@ struct TimeSeriesChartView: View {
                         .font(.system(size: DS.fontTiny))
                 }
             }
-            .chartLegend(position: legendPosition, alignment: .center, spacing: DS.sm)
-            .chartLegend(showsLegend ? .visible : .hidden)
             .chartOverlay { proxy in
                 GeometryReader { geo in
                     Color.clear
@@ -82,7 +101,7 @@ struct TimeSeriesChartView: View {
             }
             .onAppear { animateIn() }
             .onChange(of: viewModel.dataVersion) { _, _ in animateIn() }
-            .onChange(of: viewModel.enabledModels) { _, _ in
+            .onChange(of: hiddenSeries) { _, _ in
                 withAnimation(.easeOut(duration: 0.3)) { segments = Self.segments(from: series()) }
             }
             .onChange(of: viewModel.isLoading) { _, loading in
@@ -154,11 +173,35 @@ struct TimeSeriesChartView: View {
         options.showLegend && options.legendPosition != .hidden
     }
 
-    private var legendPosition: AnnotationPosition {
-        switch options.legendPosition {
-        case .bottom, .hidden: return .bottom
-        case .right: return .trailing
-        }
+    /// Where the legend goes, or nowhere.
+    private enum LegendPlacement { case none, bottom, trailing }
+
+    private var legendPlacement: LegendPlacement {
+        guard showsLegend else { return .none }
+        return options.legendPosition == .right ? .trailing : .bottom
+    }
+
+    /// Every series the panel would draw, hidden ones included — a legend
+    /// missing its own hidden entries could not bring them back.
+    private var legend: some View {
+        PanelLegendView(
+            entries: PanelSeries.seriesNames(metric: metric, panel: panel,
+                                             frames: frames, data: data)
+                .map { .init(name: $0, color: viewModel.colorForModel($0)) },
+            hidden: hiddenSeries,
+            position: options.legendPosition,
+            onToggle: { name in
+                guard let panelID = panel?.id else { return }
+                viewModel.toggleSeries(name, panelID: panelID)
+            }
+        )
+    }
+
+    /// What the reader hid on THIS panel. A preview with no panel of its own
+    /// hides nothing.
+    private var hiddenSeries: Set<String> {
+        guard let id = panel?.id else { return [] }
+        return viewModel.hiddenSeries(for: id)
     }
 
     private var showsTooltip: Bool { options.tooltipMode != .hidden }
@@ -170,7 +213,7 @@ struct TimeSeriesChartView: View {
 
     private func series() -> [(model: String, points: [(date: Date, value: Double?)])] {
         PanelSeries.chartSeriesWithGaps(metric: metric, panel: panel, frames: frames,
-                                        data: data, enabled: viewModel.enabledModels)
+                                        data: data, hidden: hiddenSeries)
     }
 
     /// Split each series at its gaps. A nil sample ends the run it is in and

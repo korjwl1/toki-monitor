@@ -28,6 +28,26 @@ struct BarChartPanelView: View {
     private var options: PanelDisplayOptions { panel.options }
 
     var body: some View {
+        // Same arrangement as the time series: the legend is ours, because a
+        // legend that cannot be clicked is not the series control the contract
+        // asks for (R7).
+        switch legendPlacement {
+        case .none:
+            chartBody
+        case .bottom:
+            VStack(spacing: DS.xs) {
+                chartBody
+                legend
+            }
+        case .trailing:
+            HStack(alignment: .center, spacing: DS.sm) {
+                chartBody
+                legend.frame(maxWidth: 140)
+            }
+        }
+    }
+
+    private var chartBody: some View {
         let bucketSecs = viewModel.dashboardConfig.time.bucketSeconds
         return Chart {
             ForEach(modelData, id: \.model) { entry in
@@ -50,8 +70,7 @@ struct BarChartPanelView: View {
                     .font(.system(size: 9))
             }
         }
-        .chartLegend(position: .bottom, alignment: .center, spacing: DS.sm)
-        .chartLegend(options.showLegend ? .visible : .hidden)
+        .chartLegend(.hidden)
         .chartOverlay { proxy in
             GeometryReader { geo in
                 ZStack(alignment: .topLeading) {
@@ -109,12 +128,35 @@ struct BarChartPanelView: View {
         .onChange(of: viewModel.isLoading) { _, loading in
             if loading { collapseToZero() }
         }
+        .onChange(of: hiddenSeries) { _, _ in animateIn() }
     }
+
+    // MARK: - Legend
+
+    private enum LegendPlacement { case none, bottom, trailing }
+
+    private var legendPlacement: LegendPlacement {
+        guard options.showLegend, options.legendPosition != .hidden else { return .none }
+        return options.legendPosition == .right ? .trailing : .bottom
+    }
+
+    private var legend: some View {
+        PanelLegendView(
+            entries: PanelSeries.seriesNames(metric: panel.effectiveMetric, panel: panel,
+                                             frames: frames, data: data)
+                .map { .init(name: $0, color: viewModel.colorForModel($0)) },
+            hidden: hiddenSeries,
+            position: options.legendPosition,
+            onToggle: { viewModel.toggleSeries($0, panelID: panel.id) }
+        )
+    }
+
+    private var hiddenSeries: Set<String> { viewModel.hiddenSeries(for: panel.id) }
 
     private func animateIn() {
         let real = PanelSeries.chartPoints(
             metric: panel.effectiveMetric, panel: panel, frames: frames,
-            data: data, enabled: viewModel.enabledModels
+            data: data, hidden: hiddenSeries
         )
         modelData = real.map { entry in
             (model: entry.model, points: entry.points.map {

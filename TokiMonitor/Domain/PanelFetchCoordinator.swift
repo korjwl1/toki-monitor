@@ -233,6 +233,11 @@ struct PanelFetchCoordinator {
         var errors: [String: String] = [:]
         var legacySeries: TimeSeriesData?
         var succeeded = 0
+        // Filters the reader set that this panel's queries could not be given.
+        // Collected before anything is executed, because the fact does not
+        // depend on the answer: a query that returns nothing, or fails, is
+        // still a query the filter never reached (contract Q4).
+        let filterNotices = Self.unappliedFilterNotices(visible)
 
         for planned in visible {
             switch results[planned.key] {
@@ -243,15 +248,6 @@ struct PanelFetchCoordinator {
                 frames += result.frames.frames.map { frame in
                     var tagged = frame
                     tagged.refId = planned.refId
-                    // A filter the reader set and this query did not honour is
-                    // a non-fatal problem with the result, which is what a
-                    // notice is for — Inspect shows them, and the panel face
-                    // will. Silence here is how a panel shows every project
-                    // under a `project` filter and looks correct.
-                    if let reason = planned.appliedFilters.reason,
-                       planned.appliedFilters.hasUnapplied {
-                        tagged.meta.notices.append(reason)
-                    }
                     return tagged
                 }
                 for (_, message) in result.frames.errors { errors[planned.refId] = message }
@@ -280,8 +276,27 @@ struct PanelFetchCoordinator {
 
         return .loaded(
             legacySeries ?? TimeSeriesData(points: [], granularity: .hourly),
-            frames: FrameSet(frames: frames, errors: errors)
+            frames: FrameSet(frames: frames, errors: errors, setNotices: filterNotices)
         )
+    }
+
+    /// One notice per query whose ad hoc filters did not land.
+    ///
+    /// `QueryRewriter` returns a query it cannot place a filter into unchanged
+    /// — the right call, since a guessed edit yields a query that still parses
+    /// and answers a different question. The consequence is a panel showing
+    /// every project while the toolbar shows `project = toki`, and nothing but
+    /// this saying so.
+    ///
+    /// The refId leads the line only when the panel has more than one visible
+    /// query; on a one-query panel it would be noise.
+    static func unappliedFilterNotices(_ visible: [PlannedQuery]) -> [String] {
+        visible.compactMap { planned -> String? in
+            guard planned.appliedFilters.hasUnapplied,
+                  let reason = planned.appliedFilters.reason
+            else { return nil }
+            return visible.count > 1 ? "\(planned.refId): \(reason)" : reason
+        }
     }
 }
 

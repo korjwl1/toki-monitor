@@ -164,10 +164,15 @@ struct CustomDashboardView: View {
             // discarded the moment the dashboard redrew.
             onEdit: { onEditPanel?(definition(of: panel)) },
             onRetry: { viewModel.fetchData() },
+            onShowAllSeries: { viewModel.seriesVisibility.showAll(panelID: panel.id) },
             // A panel with several queries can be partly answered. The state
             // says `loaded` because there IS something to draw; which query is
             // missing from it is carried separately (contract Q5).
             failedTargets: viewModel.dataState(for: panel.id).frames?.errors ?? [:],
+            // 계약 Q4. A filter the rewriter could not place is invisible
+            // everywhere else: the query ran, the panel drew, and the number is
+            // simply not the filtered one.
+            filterNotices: viewModel.dataState(for: panel.id).frames?.setNotices ?? [],
             onInspect: onInspectPanel.map { handler in { handler(panel) } },
             isRepeatInstance: panel.repeatSourceID != nil
         ) {
@@ -209,11 +214,21 @@ struct CustomDashboardView: View {
         return PanelState.resolve(
             fetch,
             hasContent: Self.hasContent(fetch),
-            // The toolbar's model filter hides series after the query has run,
-            // so "everything is switched off" is a different answer from "the
-            // query found nothing" and has a different remedy.
-            hasVisibleSeries: !usesModelFilter(panel) || !viewModel.filteredModelNames.isEmpty
+            // The legend hides series after the query has run, so "everything
+            // is switched off" is a different answer from "the query found
+            // nothing" and has a different remedy.
+            hasVisibleSeries: !usesLegendFilter(panel) || hasVisibleSeries(panel)
         )
+    }
+
+    /// Whether anything survives the legend's hidden set on this panel.
+    private func hasVisibleSeries(_ panel: PanelConfig) -> Bool {
+        guard viewModel.seriesVisibility.hasHidden(panelID: panel.id) else { return true }
+        let state = viewModel.dataState(for: panel.id)
+        return !PanelSeries.chartSeriesWithGaps(
+            metric: panel.effectiveMetric, panel: panel, frames: state.frames,
+            data: state.timeSeriesData, hidden: viewModel.hiddenSeries(for: panel.id)
+        ).isEmpty
     }
 
     /// Whether there is anything to draw. A datasource that serves frames and
@@ -226,10 +241,10 @@ struct CustomDashboardView: View {
         return false
     }
 
-    /// Only the per-series panels are narrowed by the model filter. A stat card
-    /// reduces every series into one number, so switching a model off does not
-    /// leave it with nothing to show.
-    private func usesModelFilter(_ panel: PanelConfig) -> Bool {
+    /// Only the per-series panels have a legend to hide anything with. A stat
+    /// card reduces every series into one number, so nothing there can be
+    /// switched off.
+    private func usesLegendFilter(_ panel: PanelConfig) -> Bool {
         switch panel.panelType {
         case .timeSeries, .barChart: return true
         default: return false

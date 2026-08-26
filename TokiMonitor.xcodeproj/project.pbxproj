@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA62NOTICESNAP0002 /* PanelNoticeSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */; };
+		AA62SERVISTEST0002 /* SeriesVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */; };
+		AA62FILTNOTETEST02 /* UnappliedFilterNoticeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62FILTNOTETEST01 /* UnappliedFilterNoticeTests.swift */; };
+		AA62PANELLEG000002 /* PanelLegendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62PANELLEG000001 /* PanelLegendView.swift */; };
+		AA62SERIESVIS00002 /* SeriesVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62SERIESVIS00001 /* SeriesVisibility.swift */; };
 		AA61PANELRPTTEST02 /* PanelRepeatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA61PANELRPTTEST01 /* PanelRepeatTests.swift */; };
 		AA61PANELRPT000002 /* PanelRepeat.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA61PANELRPT000001 /* PanelRepeat.swift */; };
 		AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */; };
@@ -211,6 +216,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelNoticeSnapshotTests.swift; sourceTree = "<group>"; };
+		AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesVisibilityTests.swift; sourceTree = "<group>"; };
+		AA62FILTNOTETEST01 /* UnappliedFilterNoticeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnappliedFilterNoticeTests.swift; sourceTree = "<group>"; };
+		AA62PANELLEG000001 /* PanelLegendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelLegendView.swift; sourceTree = "<group>"; };
+		AA62SERIESVIS00001 /* SeriesVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesVisibility.swift; sourceTree = "<group>"; };
 		AA61PANELRPTTEST01 /* PanelRepeatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelRepeatTests.swift; sourceTree = "<group>"; };
 		AA61PANELRPT000001 /* PanelRepeat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelRepeat.swift; sourceTree = "<group>"; };
 		AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableRefreshPolicyTests.swift; sourceTree = "<group>"; };
@@ -474,6 +484,7 @@
 		2A3062764644CB53A2DA4066 /* Panels */ = {
 			isa = PBXGroup;
 			children = (
+				AA62PANELLEG000001 /* PanelLegendView.swift */,
 				AA80UNKNOWNPANEL0001 /* UnknownPanelView.swift */,
 				AA40PANELSTATUS001 /* PanelStatusView.swift */,
 				4AB11444FDF44AA3CB147AA1 /* BarChartPanelView.swift */,
@@ -632,6 +643,7 @@
 		AA03SNAPGROUP00000001 /* Snapshot */ = {
 			isa = PBXGroup;
 			children = (
+				AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */,
 				AA03PFSNAPT0F001 /* PlanFitSnapshotTests.swift */,
 				AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */,
 				AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */,
@@ -651,6 +663,8 @@
 		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */,
+				AA62FILTNOTETEST01 /* UnappliedFilterNoticeTests.swift */,
 				AA61PANELRPTTEST01 /* PanelRepeatTests.swift */,
 				AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */,
 				AA40POPTTESTS00001 /* PanelOptionsTests.swift */,
@@ -771,6 +785,7 @@
 		F742507F177D260FFECA176D /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AA62SERIESVIS00001 /* SeriesVisibility.swift */,
 				AA61PANELRPT000001 /* PanelRepeat.swift */,
 				AA40PANELSTATE0001 /* PanelState.swift */,
 				BD9B37346F997317DEDCD356 /* AnimationStateMapper.swift */,
@@ -915,6 +930,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA62PANELLEG000002 /* PanelLegendView.swift in Sources */,
+				AA62SERIESVIS00002 /* SeriesVisibility.swift in Sources */,
 				AA61PANELRPT000002 /* PanelRepeat.swift in Sources */,
 				AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */,
 				AA03PFEMPT0B001 /* EmptyStateSection.swift in Sources */,
@@ -1058,6 +1075,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA62NOTICESNAP0002 /* PanelNoticeSnapshotTests.swift in Sources */,
+				AA62SERVISTEST0002 /* SeriesVisibilityTests.swift in Sources */,
+				AA62FILTNOTETEST02 /* UnappliedFilterNoticeTests.swift in Sources */,
 				AA61PANELRPTTEST02 /* PanelRepeatTests.swift in Sources */,
 				AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */,
 				AA03PFSNAPT0B001 /* PlanFitSnapshotTests.swift in Sources */,

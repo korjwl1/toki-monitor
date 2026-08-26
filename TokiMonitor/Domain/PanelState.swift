@@ -23,7 +23,7 @@ import Foundation
 enum PanelEmptyReason: String, Equatable, Sendable, CaseIterable {
     /// The query ran and returned no rows for the selected time range.
     case noDataInRange
-    /// There are rows, but every series is currently hidden.
+    /// There are rows, but every series is hidden from the legend.
     case allSeriesHidden
 }
 
@@ -154,8 +154,8 @@ extension PanelState {
                 return L.tr("쿼리는 성공했지만 선택한 시간 범위에 해당하는 행이 없습니다. 범위를 넓히거나 쿼리의 필터를 확인하세요.",
                             "The query succeeded but matched no rows in the selected time range. Widen the range, or check the query's filters.")
             case .allSeriesHidden:
-                return L.tr("데이터는 있습니다. 툴바에서 모델을 다시 켜면 보입니다.",
-                            "The data is there. Turn a model back on in the toolbar to see it.")
+                return L.tr("데이터는 있습니다. 범례에서 계열을 다시 켜면 보입니다.",
+                            "The data is there. Turn a series back on in the legend to see it.")
             }
         case .failed(let reason):
             return reason
@@ -166,6 +166,17 @@ extension PanelState {
     /// an answer, and re-asking the same question gets the same answer.
     var offersRetry: Bool {
         if case .failed = self { return true }
+        return false
+    }
+
+    /// Whether the state offers to show every series again.
+    ///
+    /// It has to. A panel with every series hidden draws this status instead
+    /// of its chart — and the legend is part of the chart, so the control that
+    /// got the reader here goes off screen with it. Without a way back from
+    /// this state, hiding the last series is a one-way door.
+    var offersShowAllSeries: Bool {
+        if case .empty(.allSeriesHidden) = self { return true }
         return false
     }
 

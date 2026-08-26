@@ -118,9 +118,6 @@ enum L {
     enum dash {
         static var title: String { tr("대시보드", "Dashboard") }
         static var period: String { tr("기간", "Period") }
-        static var selectAll: String { tr("전체 선택", "Select All") }
-        static var deselectAll: String { tr("전체 해제", "Deselect All") }
-        static var filter: String { tr("필터", "Filter") }
         static var refresh: String { tr("새로고침", "Refresh") }
         static var totalTokens: String { tr("총 토큰", "Total Tokens") }
         static var totalCost: String { tr("총 비용", "Total Cost") }

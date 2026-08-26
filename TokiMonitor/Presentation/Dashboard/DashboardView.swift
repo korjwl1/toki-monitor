@@ -319,7 +319,6 @@ struct DashboardView: View {
                     variableControl(for: variable)
                 }
             }
-            modelFilterMenu
             timeRangeButton
             refreshControl
             editModeControls
@@ -472,48 +471,6 @@ struct DashboardView: View {
         .menuStyle(.borderlessButton)
         .fixedSize()
         .contentShape(Rectangle())
-    }
-
-    // MARK: - Model Filter Menu
-
-    private var modelFilterMenu: some View {
-        Menu {
-            Button(L.dash.selectAll) { viewModel.selectAllModels() }
-            Button(L.dash.deselectAll) { viewModel.deselectAllModels() }
-            Divider()
-            if let data = viewModel.timeSeriesData {
-                ForEach(data.allModelNames, id: \.self) { model in
-                    Toggle(model, isOn: Binding(
-                        get: { viewModel.enabledModels.contains(model) },
-                        set: { _ in viewModel.toggleModel(model) }
-                    ))
-                }
-            }
-        } label: {
-            HStack(spacing: DS.xs) {
-                Image(systemName: isFilterActive
-                    ? "line.3.horizontal.decrease.circle.fill"
-                    : "line.3.horizontal.decrease.circle")
-                    .font(.system(size: DS.fontCaption))
-                Text(isFilterActive ? filterActiveLabel : L.dash.filter)
-                    .font(.system(size: DS.fontCaption))
-            }
-            .modifier(ToolbarPillModifier(isActive: isFilterActive))
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .contentShape(Rectangle())
-    }
-
-    private var isFilterActive: Bool {
-        guard let data = viewModel.timeSeriesData else { return false }
-        return viewModel.enabledModels.count < data.allModelNames.count
-    }
-
-    private var filterActiveLabel: String {
-        let total = viewModel.timeSeriesData?.allModelNames.count ?? 0
-        let active = viewModel.enabledModels.count
-        return "\(active)/\(total)"
     }
 
     // MARK: - Notices

@@ -55,6 +55,20 @@ struct PanelStateTests {
         #expect(Set(fingerprints).count == states.count)
     }
 
+    /// A panel whose every series is hidden draws this status instead of its
+    /// chart — and the legend, which is the only thing that hid them, is part
+    /// of the chart. Without an action here, hiding the last series is a
+    /// one-way door.
+    @Test("the all-hidden state offers the way back, and no other state does")
+    func allHiddenOffersShowAll() {
+        #expect(PanelState.empty(.allSeriesHidden).offersShowAllSeries)
+        let others: [PanelState] = [
+            .idle, .loading(hasPrevious: true), .loaded,
+            .empty(.noDataInRange), .failed(reason: "x"),
+        ]
+        #expect(others.allSatisfy { !$0.offersShowAllSeries })
+    }
+
     @Test("each reason for emptiness names a different next action")
     func emptyReasonsDiffer() {
         let details = PanelEmptyReason.allCases.map { PanelState.empty($0).detail }

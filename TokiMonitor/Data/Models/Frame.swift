@@ -168,9 +168,21 @@ struct FrameSet: Equatable, Sendable {
     /// that is how a broken dashboard looks like an idle one.
     var errors: [String: String]
 
-    init(frames: [Frame] = [], errors: [String: String] = [:]) {
+    /// Notices about the RESULT rather than about any one frame — chiefly an
+    /// ad hoc filter the reader set that this panel's query could not be given
+    /// (contract Q4).
+    ///
+    /// Separate from `Frame.meta.notices` because the fact survives having no
+    /// frames at all: a filtered query that matched nothing still has to say
+    /// that the filter never reached it, and a notice attached to frames that
+    /// do not exist says nothing.
+    var setNotices: [String]
+
+    init(frames: [Frame] = [], errors: [String: String] = [:],
+         setNotices: [String] = []) {
         self.frames = frames
         self.errors = errors
+        self.setNotices = setNotices
     }
 
     func frames(refId: String) -> [Frame] { frames.filter { $0.refId == refId } }
@@ -178,5 +190,5 @@ struct FrameSet: Equatable, Sendable {
     var isEmpty: Bool { frames.allSatisfy { $0.rowCount == 0 } }
 
     /// Every notice raised while building this set, for Inspect.
-    var notices: [String] { frames.flatMap(\.meta.notices) }
+    var notices: [String] { setNotices + frames.flatMap(\.meta.notices) }
 }
