@@ -14,9 +14,7 @@ struct PieChartView: View {
 
     private static let maxLegendItems = 8
     private static let minPercent = 2.0  // below this → "Others"
-    private static let defaultPalette: [Color] = [
-        .blue, .green, .orange, .purple, .red, .teal, .indigo, .mint, .pink, .brown
-    ]
+    private static let defaultPalette: [Color] = DS.categorical
 
     @State private var hoveredLabel: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

@@ -134,7 +134,5 @@ struct StateTimelinePanelView: View {
         }
     }
 
-    private static let defaultPalette: [Color] = [
-        .blue, .green, .orange, .purple, .red, .teal, .indigo, .mint,
-    ]
+    private static let defaultPalette: [Color] = DS.categorical
 }

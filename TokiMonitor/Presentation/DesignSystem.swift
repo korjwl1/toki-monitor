@@ -101,6 +101,21 @@ extension DS {
     ///
     /// Colour is never the only carrier: every render that uses one prints or
     /// speaks `Thresholds.label(for:steps:)` beside it.
+    /// One ordered list for colouring series that carry no meaning of their
+    /// own — models, projects, timeline states.
+    ///
+    /// It exists because there were three: the pie chart kept ten colours, the
+    /// state timeline eight and the dashboard view model seven in a different
+    /// order, so the same series could be blue in one panel and purple in the
+    /// next on the same screen. Thresholds are NOT this — those carry meaning
+    /// and come from `DS.threshold`, which is contrast-measured per appearance.
+    ///
+    /// Index by the series' position in a stable ordering, never by a hash:
+    /// `hashValue` is seeded per process and reshuffles on every launch.
+    static let categorical: [Color] = [
+        .blue, .green, .orange, .purple, .red, .teal, .indigo, .mint, .pink, .brown,
+    ]
+
     static func threshold(_ token: ThresholdColor, dark: Bool) -> Color {
         Color(hex: dark ? token.darkHex : token.lightHex)
     }

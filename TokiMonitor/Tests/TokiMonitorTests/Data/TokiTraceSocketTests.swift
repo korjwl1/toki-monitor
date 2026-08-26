@@ -70,7 +70,15 @@ struct TokiTraceSocketTests {
 
     /// Polls until `condition` holds or the deadline passes. Socket reads land
     /// on the listener's own queue, so there is nothing to await directly.
-    private func wait(upTo seconds: Double = 3.0, for condition: () -> Bool) async {
+    ///
+    /// The deadline is generous on purpose. It costs a passing run nothing —
+    /// the loop returns the moment the condition holds — and it is only ever
+    /// reached when something is actually wrong. At three seconds this suite
+    /// failed roughly one run in three: the rest of the suite renders 5000pt
+    /// snapshot pages, and under that load a socket round-trip through the
+    /// listener's queue does not always land in time. A test that fails when
+    /// the machine is busy teaches everyone to re-run instead of to look.
+    private func wait(upTo seconds: Double = 20.0, for condition: () -> Bool) async {
         let deadline = Date().addingTimeInterval(seconds)
         while Date() < deadline {
             if condition() { return }

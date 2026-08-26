@@ -476,12 +476,10 @@ enum PlanFitFormat {
             .string(from: Date(timeIntervalSince1970: Double(ms) / 1000))
     }
 
+    /// Delegates to `ProviderRegistry`, which already maps toki schemas to
+    /// providers. This used to be a second copy of that mapping.
     static func providerTitle(_ name: String) -> String {
-        switch name {
-        case "claude_code": return "Claude Code"
-        case "codex": return "Codex"
-        default: return name
-        }
+        ProviderRegistry.toolTitle(forSchema: name)
     }
 
     static func limitTitle(provider: String, kind: String, limitId: String) -> String {

@@ -1697,6 +1697,16 @@ final class DashboardViewModel {
         ("gemini", Color(red: 0.25, green: 0.50, blue: 0.85)),          // google blue
     ]
 
+    /// Deliberately NOT `DS.categorical`, and deliberately starting at purple.
+    ///
+    /// `knownModelColors` above assigns brand-adjacent colours to recognised
+    /// model families — Claude in oranges, OpenAI in greens, Gemini in blue.
+    /// This list is what an UNRECOGNISED model gets, so it has to avoid those
+    /// families or a new model would be drawn in Claude's orange next to
+    /// Claude. `DS.categorical` starts at blue and would do exactly that.
+    ///
+    /// The pie chart and the state timeline share `DS.categorical` because
+    /// they colour series that carry no identity of their own. This one does.
     private static let fallbackPalette: [Color] = [
         .purple, .teal, .indigo, .mint, .pink, .brown, .cyan
     ]
