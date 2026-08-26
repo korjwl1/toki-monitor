@@ -83,7 +83,7 @@ struct ActiveUseCard: View {
                 size: PlanFitType.body
             )
 
-            if let median = limit.medianTimeLeftText {
+            if let median = limit.medianTimeLeftText, let speech = limit.medianTimeLeftSpeech {
                 HStack(alignment: .firstTextBaseline, spacing: DS.sm) {
                     Text(median)
                         .font(.system(size: PlanFitType.metric, weight: .semibold))
@@ -91,14 +91,16 @@ struct ActiveUseCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                     ProvenanceTag(provenance: .derived)
                 }
+                .planFitFigure(speech)
             }
-            if let rate = limit.interruptionRateText {
+            if let rate = limit.interruptionRateText, let speech = limit.interruptionRateSpeech {
                 HStack(alignment: .firstTextBaseline, spacing: DS.sm) {
                     Text(rate)
                         .font(.system(size: PlanFitType.caption))
                         .foregroundStyle(PlanFitInk.support)
                     ProvenanceTag(provenance: .derived)
                 }
+                .planFitFigure(speech)
             }
 
             if !limit.ticks.isEmpty {
@@ -149,6 +151,7 @@ struct ActiveUseCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .planFitFigure(split.speech)
     }
 
     private func eventRow(_ event: ActiveUseLimitModel.Event) -> some View {

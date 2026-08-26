@@ -216,6 +216,26 @@ struct PlanFitContent: View {
             .padding(DS.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // T071. Two things, both of them about a reader who never touches the
+        // trackpad. `focusable` puts the scroll view in the key loop, which is
+        // what makes arrow keys and Page Up/Down move the page at all; without
+        // it the only focus stop on the screen is the picker, and a reader who
+        // tabs to it can change the unit but cannot read the evidence.
+        //
+        // `onKeyPress` then gives the one control a reachable shortcut from
+        // anywhere on the page rather than only while the picker holds focus —
+        // otherwise "keyboard support" would mean tabbing back to the top of a
+        // long page to flip a toggle whose effect is at the bottom of it.
+        // Returning `.ignored` for everything else is what leaves the arrow
+        // keys doing their scrolling job.
+        .focusable()
+        .onKeyPress { press in
+            guard let next = PlanFitKeyboard.unit(movingFrom: unit, key: press.key) else {
+                return .ignored
+            }
+            unit = next
+            return .handled
+        }
     }
 
     // MARK: Header
@@ -257,7 +277,14 @@ struct PlanFitContent: View {
             .labelsHidden()
             .frame(width: 160)
             .accessibilityLabel(L.tr("기간 단위", "Period unit"))
+            .accessibilityHint(PlanFitKeyboard.hint)
             Text(L.tr("이 페이지의 유일한 설정입니다", "The page's only setting"))
+                .font(.system(size: PlanFitType.tiny))
+                .foregroundStyle(PlanFitInk.faint)
+            // The shortcut is written down beside the control it drives.
+            // A keyboard affordance nobody is told about is one most people
+            // never find.
+            Text(PlanFitKeyboard.hint)
                 .font(.system(size: PlanFitType.tiny))
                 .foregroundStyle(PlanFitInk.faint)
         }

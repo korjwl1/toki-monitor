@@ -75,7 +75,8 @@ private struct MoneyRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(note.label) \(note.amount), \(note.qualifier)")
+        // T072: the qualifier and the coverage gap are spoken, not only
+        // printed — a figure heard bare reads as a bill.
+        .planFitFigure(note.speech)
     }
 }

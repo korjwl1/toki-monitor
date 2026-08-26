@@ -172,6 +172,24 @@ struct PeriodTrendModel: Equatable, Sendable {
         /// so an empty period reads as an observed zero, not as absence.
         let heightFraction: Double
         let accessibilityLabel: String
+
+        /// T072. The bar, spoken with the fact that makes its number a floor:
+        /// recorded work time is accumulated in daemon memory and restarts
+        /// with the daemon, so a bar can only ever understate the period.
+        var speech: PlanFitFigureSpeech {
+            var detail = isComplete
+                ? L.tr("완결된 기간", "a finished period")
+                : (incompleteNote ?? L.tr("진행 중인 기간", "a period still running"))
+            if exhaustions > 0 {
+                detail += L.tr(" · 소진 \(exhaustions)회", " · \(exhaustions) exhaustions")
+            }
+            return PlanFitFigureSpeech(
+                meaning: label,
+                value: accessibilityLabel,
+                provenance: .lowerBound,
+                detail: detail
+            )
+        }
     }
 
     let unit: PeriodUnit
@@ -231,6 +249,33 @@ struct LimitStatusModel: Equatable, Sendable, Identifiable {
     let headroom: HeadroomNote?
     /// Why no verdict, when there is none.
     let withheldText: String?
+
+    /// T072. The distribution, spoken with what it was read off.
+    ///
+    /// The sample line and the exclusion note are the basis here: a p95 over
+    /// forty-one covered windows and a p95 over three are the same string on
+    /// screen and very different claims, and a reader who only hears the
+    /// number cannot tell them apart.
+    var distributionSpeech: PlanFitFigureSpeech {
+        var detail = sampleText
+        if let excludedText { detail += " · \(excludedText)" }
+        return PlanFitFigureSpeech(
+            meaning: L.tr("\(title) 완료 창의 소진율 분포", "\(title) peak distribution over finished windows"),
+            value: distribution,
+            provenance: distributionProvenance,
+            detail: detail
+        )
+    }
+
+    /// The exhaustion count, spoken with how it was reached.
+    var exhaustionSpeech: PlanFitFigureSpeech {
+        PlanFitFigureSpeech(
+            meaning: L.tr("\(title) 한도 도달", "\(title) limit reached"),
+            value: exhaustionText,
+            provenance: .observed,
+            detail: sampleText
+        )
+    }
 }
 
 /// Limits grouped under their provider (T050): eight limit cards in one flat
@@ -259,6 +304,25 @@ struct ActiveUseLimitModel: Equatable, Sendable, Identifiable {
         /// The set a plan verdict is allowed to read headroom from (V4).
         let isHeadroomSource: Bool
         let note: String?
+
+        /// T072. Which set, how many windows, and whether a verdict is
+        /// allowed to read headroom from it — the last part being the whole
+        /// reason the three sets are drawn side by side.
+        var speech: PlanFitFigureSpeech {
+            var detail = distribution
+            if let note, !note.isEmpty { detail += " · \(note)" }
+            detail += isHeadroomSource
+                ? L.tr(" · 판정의 여유폭은 이 집합에서 계산합니다",
+                       " · the verdict reads its headroom from this set")
+                : L.tr(" · 판정의 여유폭은 이 집합에서 계산하지 않습니다",
+                       " · the verdict does not read headroom from this set")
+            return PlanFitFigureSpeech(
+                meaning: title,
+                value: L.tr("창 \(count)개", "\(count) windows"),
+                provenance: provenance,
+                detail: detail
+            )
+        }
     }
 
     /// One exhaustion, placed by how much of the cycle was still to run.
@@ -317,6 +381,32 @@ struct ActiveUseLimitModel: Equatable, Sendable, Identifiable {
     let recentEvents: [Event]
     /// The two thresholds, on screen where the numbers are (FR-021).
     let thresholdNote: String
+
+    /// T072. The heart of the feature, spoken with the rule that produced it:
+    /// "ran out with two hours left" only means something beside the threshold
+    /// below which running out stops counting as an interruption.
+    var medianTimeLeftSpeech: PlanFitFigureSpeech? {
+        guard let medianTimeLeftText else { return nil }
+        return PlanFitFigureSpeech(
+            meaning: L.tr("\(title) 소진 시 남아 있던 시간의 중앙값",
+                          "\(title): median time still to run when the limit was hit"),
+            value: medianTimeLeftText,
+            provenance: .derived,
+            detail: "\(exhaustionBreakdown) · \(thresholdNote)"
+        )
+    }
+
+    /// The interruption rate, spoken with the weighting that made it a rate
+    /// rather than a count.
+    var interruptionRateSpeech: PlanFitFigureSpeech? {
+        guard let interruptionRateText else { return nil }
+        return PlanFitFigureSpeech(
+            meaning: L.tr("\(title) 실질 방해 빈도", "\(title): rate of real interruption"),
+            value: interruptionRateText,
+            provenance: .derived,
+            detail: thresholdNote
+        )
+    }
 }
 
 // MARK: - Provider comparison (T054, T055 / contract W2, FR-022…FR-025)
@@ -564,6 +654,20 @@ struct MoneyNote: Equatable, Hashable, Sendable, Identifiable {
         self.qualifier = L.tr("현재 가격 기준", "at current prices")
         self.coverage = coverage
     }
+
+    /// T072. A monetary figure is the one on this page a reader is most
+    /// likely to act on and the one furthest from a bill, so the qualifier
+    /// and the coverage gap are spoken, not just printed.
+    var speech: PlanFitFigureSpeech {
+        var detail = qualifier
+        if let coverage, !coverage.isEmpty { detail += " · \(coverage)" }
+        return PlanFitFigureSpeech(
+            meaning: L.tr("\(label) 추정 비용", "\(label) estimated spend"),
+            value: amount,
+            provenance: .derived,
+            detail: detail
+        )
+    }
 }
 
 /// Every monetary figure on the page, in one place at the foot of it.
@@ -607,6 +711,19 @@ struct SubscriptionComparisonModel: Equatable, Sendable {
         /// The rate rather than the raw total, so two spans of different
         /// lengths are comparable.
         let rate: String
+
+        /// T072 + V9 in one utterance. The money and the interruptions are
+        /// spoken as ONE element, so a VoiceOver reader cannot swipe past the
+        /// half that makes the other half honest.
+        var speech: PlanFitFigureSpeech {
+            PlanFitFigureSpeech(
+                meaning: L.tr("구독으로 바꿨을 때의 차액과 그때 걸렸을 한도",
+                              "The difference on a subscription, and the limits it would have imposed"),
+                value: "\(money.amount) · \(exposure)",
+                provenance: .derived,
+                detail: "\(money.qualifier) · \(rate)"
+            )
+        }
     }
 
     let status: Status

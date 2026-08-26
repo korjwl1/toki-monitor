@@ -122,8 +122,6 @@ struct SubscriptionComparisonSection: View {
                 Spacer(minLength: 0)
                 ProvenanceTag(provenance: .derived)
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(result.money.label) \(result.money.amount), \(result.money.qualifier)")
 
             PlanFitMark(tone: .attention, text: result.exposure, size: PlanFitType.body)
             Text(result.rate)
@@ -131,5 +129,8 @@ struct SubscriptionComparisonSection: View {
                 .foregroundStyle(PlanFitInk.support)
         }
         .planFitCard(.inner)
+        // One spoken element for both halves (T072 + V9): a reader must not
+        // be able to swipe past the interruptions and keep the money.
+        .planFitFigure(result.speech)
     }
 }

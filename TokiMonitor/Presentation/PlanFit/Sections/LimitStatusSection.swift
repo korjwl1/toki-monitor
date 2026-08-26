@@ -123,7 +123,9 @@ struct LimitStatusCard: View {
                 .font(.system(size: PlanFitType.tiny))
                 .foregroundStyle(PlanFitInk.faint)
         }
-        .accessibilityElement(children: .combine)
+        // T072: one element carrying the meaning, the figure and what the
+        // figure was read off — not four stops a reader has to reassemble.
+        .planFitFigure(limit.distributionSpeech)
     }
 
     private var exhaustion: some View {
@@ -131,6 +133,7 @@ struct LimitStatusCard: View {
             text: limit.exhaustionText,
             tone: limit.hasExhaustions ? (limit.paidOverflowCredits ? .blocked : .attention) : .neutral
         )
+        .planFitFigure(limit.exhaustionSpeech)
     }
 
     private func fact(text: String, tone: PlanFitMark.Tone) -> some View {

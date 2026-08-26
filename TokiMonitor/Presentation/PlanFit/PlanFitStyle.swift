@@ -165,6 +165,99 @@ struct ProvenanceLegend: View {
     }
 }
 
+// MARK: - What VoiceOver says about a figure (T072 / FR-060)
+
+/// One figure, spoken in three parts.
+///
+/// **A number without its provenance is worse on this page than elsewhere**,
+/// because this page recommends things about money. "85%" read on its own is
+/// indistinguishable from "85% or more, over a sample of five windows, four of
+/// which the machine slept through" — and only one of those is worth acting
+/// on. A sighted reader gets the difference from the provenance tag and the
+/// sample line sitting beside the number; a VoiceOver reader gets it only if
+/// something puts it there.
+///
+/// So all three parts are stored and non-optional, and `basis` is required to
+/// name the figure's provenance. There is no initialiser that produces a
+/// figure's speech without saying what the figure stands on, and
+/// `PlanFitVoiceOverTests` walks a built page asserting every one of them.
+struct PlanFitFigureSpeech: Equatable, Hashable, Sendable {
+    /// What the figure is. Read first, as the element's label.
+    let meaning: String
+    /// The figure itself. Read as the element's value, so VoiceOver's
+    /// "label, value" cadence puts the meaning before the number.
+    let value: String
+    /// What it stands on: provenance, sample size, exclusions. Read as the
+    /// hint, which VoiceOver speaks after a beat.
+    let basis: String
+
+    /// The one initialiser. `provenance` is a parameter rather than something
+    /// the caller may fold into `detail`, so a figure cannot be given speech
+    /// that omits where its number came from.
+    init(meaning: String, value: String, provenance: Provenance, detail: String? = nil) {
+        self.meaning = meaning
+        self.value = value
+        var basis = "\(provenance.label) · \(provenance.explanation)"
+        if let detail, !detail.isEmpty { basis = "\(detail) · \(basis)" }
+        self.basis = basis
+    }
+}
+
+extension View {
+    /// Collapse a figure and its surroundings into one spoken element.
+    ///
+    /// `children: .ignore` is deliberate: without it VoiceOver reads the
+    /// number, then the label, then the provenance tag, then the sample line
+    /// as four separate stops, and the reader has to assemble the meaning from
+    /// four swipes in whatever order the layout happens to produce.
+    func planFitFigure(_ speech: PlanFitFigureSpeech) -> some View {
+        accessibilityElement(children: .ignore)
+            .accessibilityLabel(speech.meaning)
+            .accessibilityValue(speech.value)
+            .accessibilityHint(speech.basis)
+    }
+}
+
+// MARK: - Keyboard (T071 / FR-060)
+
+/// The keys the page answers to, as a value the tests can ask directly.
+///
+/// The mapping lives here rather than inside a `.onKeyPress` closure so that
+/// "left arrow moves to the previous period unit" is a fact a test states,
+/// not a fact a reviewer takes on trust from a view body nobody can run
+/// headlessly.
+enum PlanFitKeyboard {
+
+    /// Where a key press moves the period unit, or nil when the key means
+    /// nothing to this page and should fall through to the scroll view.
+    ///
+    /// Arrow keys because the segmented picker uses them when it holds focus,
+    /// and the page should not behave differently depending on which of its
+    /// two focus stops the reader is on. Brackets because they reach the same
+    /// thing without leaving the home row.
+    static func unit(movingFrom current: PeriodUnit, key: KeyEquivalent) -> PeriodUnit? {
+        let order = PeriodUnit.allCases
+        guard let index = order.firstIndex(of: current) else { return nil }
+        switch key {
+        case .leftArrow, "[":
+            return index > 0 ? order[index - 1] : nil
+        case .rightArrow, "]":
+            return index + 1 < order.count ? order[index + 1] : nil
+        default:
+            return nil
+        }
+    }
+
+    /// What the page tells a reader about its own keyboard, once, beside the
+    /// control the keys drive.
+    static var hint: String {
+        L.tr(
+            "← → 또는 [ ] 로 기간 단위를 바꿉니다",
+            "← → or [ ] switch the period unit"
+        )
+    }
+}
+
 // MARK: - Surfaces
 
 /// Card weights. The page has exactly three, and they differ in more than
@@ -246,6 +339,10 @@ struct PlanFitSectionHeader: View {
             Text(title)
                 .font(.system(size: PlanFitType.sectionTitle, weight: .semibold))
                 .foregroundStyle(PlanFitInk.strong)
+                // T071/T072: VoiceOver's heading rotor is how a reader moves
+                // between the page's sections without swiping through every
+                // figure in each of them.
+                .accessibilityAddTraits(.isHeader)
             if let subtitle {
                 Text(subtitle)
                     .font(.system(size: PlanFitType.caption))

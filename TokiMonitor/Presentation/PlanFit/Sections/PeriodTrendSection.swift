@@ -132,8 +132,8 @@ struct PeriodTrendSection: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(bar.accessibilityLabel)
+        // T072: the bar's number is a floor, and the speech says so.
+        .planFitFigure(bar.speech)
     }
 
     /// A finished period is a solid bar; an unfinished one is hollow with a

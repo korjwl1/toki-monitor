@@ -468,3 +468,197 @@ struct PlanFitColourAndMotionTests {
                 "the two appearances are nearly the same render")
     }
 }
+
+// MARK: - T071 / T072
+
+@Suite("The page is usable without a mouse and without a screen")
+@MainActor
+struct PlanFitKeyboardAndVoiceOverTests {
+
+    // MARK: T071 — the keyboard
+
+    @Test("the arrow keys and the brackets move the period unit")
+    func keysMoveTheUnit() {
+        #expect(PlanFitKeyboard.unit(movingFrom: .weekly, key: .rightArrow) == .monthly)
+        #expect(PlanFitKeyboard.unit(movingFrom: .weekly, key: "]") == .monthly)
+        #expect(PlanFitKeyboard.unit(movingFrom: .monthly, key: .leftArrow) == .weekly)
+        #expect(PlanFitKeyboard.unit(movingFrom: .monthly, key: "[") == .weekly)
+    }
+
+    /// The ends do not wrap, and a key the page has no use for is passed on.
+    ///
+    /// Both matter for the same reason: the page's other keyboard job is
+    /// SCROLLING, and a page that swallowed every arrow key would leave a
+    /// reader able to flip the toggle and unable to reach the evidence.
+    @Test("a key with nothing to do is left for the scroll view")
+    func unusedKeysFallThrough() {
+        #expect(PlanFitKeyboard.unit(movingFrom: .weekly, key: .leftArrow) == nil)
+        #expect(PlanFitKeyboard.unit(movingFrom: .monthly, key: .rightArrow) == nil)
+        for key: KeyEquivalent in [.upArrow, .downArrow, .pageUp, .pageDown, .space, .return] {
+            #expect(PlanFitKeyboard.unit(movingFrom: .weekly, key: key) == nil,
+                    "\(key) was consumed by the page")
+        }
+    }
+
+    /// Every unit is reachable from every other one by pressing keys, which is
+    /// what "the toggle is operable from the keyboard" actually has to mean.
+    @Test("every period unit is reachable from every other by keyboard alone")
+    func everyUnitIsReachable() {
+        for start in PeriodUnit.allCases {
+            for target in PeriodUnit.allCases where target != start {
+                var current = start
+                var presses = 0
+                while current != target, presses < PeriodUnit.allCases.count {
+                    let key: KeyEquivalent = .rightArrow
+                    current = PlanFitKeyboard.unit(movingFrom: current, key: key)
+                        ?? PlanFitKeyboard.unit(movingFrom: current, key: .leftArrow)
+                        ?? current
+                    presses += 1
+                }
+                #expect(current == target, "\(start) cannot reach \(target) by keyboard")
+            }
+        }
+    }
+
+    /// And the reader is told. A shortcut nobody is told about is one most
+    /// people never find.
+    @Test("the shortcut is written beside the control it drives")
+    func theShortcutIsDocumented() {
+        #expect(!PlanFitKeyboard.hint.isEmpty)
+        let snapshotCase = PlanFitSnapshotCase(sufficiency: .sufficient, segments: .four, theme: .light)
+        let content = PlanFitContent(
+            model: PlanFitSnapshotRenderer.model(for: snapshotCase),
+            unit: .constant(.weekly)
+        )
+        // `focusable` is what puts the scroll view in the key loop; without it
+        // arrow keys and Page Up/Down do not reach the page at all.
+        let body = String(describing: type(of: content.body))
+        #expect(body.contains("Focusable") || body.contains("focusable"),
+                "the page is not in the keyboard focus loop: \(body.prefix(400))")
+    }
+
+    /// Adding keyboard handling must not have added a control (FR-001).
+    @Test("the keyboard did not become a second control")
+    func keyboardIsNotAControl() {
+        let snapshotCase = PlanFitSnapshotCase(sufficiency: .sufficient, segments: .four, theme: .light)
+        let content = PlanFitContent(
+            model: PlanFitSnapshotRenderer.model(for: snapshotCase),
+            unit: .constant(.weekly)
+        )
+        let body = String(describing: type(of: content.body))
+        for construct in PlanFitControlSurfaceTests.forbidden {
+            #expect(!body.contains(construct), "`\(construct)` reached the view tree")
+        }
+    }
+
+    // MARK: T072 — VoiceOver
+
+    /// Every figure on the page, spoken.
+    ///
+    /// Collected by reflection rather than listed, so a figure added later is
+    /// audited without this test being edited — which is the only way a claim
+    /// about "every figure" survives the next section.
+    private func speeches(_ snapshotCase: PlanFitSnapshotCase) -> [PlanFitFigureSpeech] {
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
+        var found: [PlanFitFigureSpeech] = []
+        collect(model, into: &found, depth: 0)
+        return found
+    }
+
+    private func collect(_ value: Any, into out: inout [PlanFitFigureSpeech], depth: Int) {
+        guard depth < 10 else { return }
+        // The speeches are computed properties, so they are not children of
+        // their own model — each type that has one is asked for it here.
+        switch value {
+        case let limit as LimitStatusModel:
+            out.append(limit.distributionSpeech)
+            out.append(limit.exhaustionSpeech)
+        case let split as ActiveUseLimitModel.Split:
+            out.append(split.speech)
+        case let use as ActiveUseLimitModel:
+            if let speech = use.medianTimeLeftSpeech { out.append(speech) }
+            if let speech = use.interruptionRateSpeech { out.append(speech) }
+        case let note as MoneyNote:
+            out.append(note.speech)
+        case let bar as PeriodTrendModel.Bar:
+            out.append(bar.speech)
+        case let result as SubscriptionComparisonModel.Result:
+            out.append(result.speech)
+        default:
+            break
+        }
+        let mirror = Mirror(reflecting: value)
+        guard mirror.displayStyle != nil else { return }
+        for child in mirror.children {
+            collect(child.value, into: &out, depth: depth + 1)
+        }
+    }
+
+    /// The claim T072 makes: a figure is never spoken as a bare number.
+    @Test("every figure is spoken with its meaning and its basis",
+          arguments: PlanFitSnapshotMatrix.all)
+    func everyFigureCarriesMeaningAndBasis(snapshotCase: PlanFitSnapshotCase) {
+        for speech in speeches(snapshotCase) {
+            #expect(!speech.meaning.isEmpty, "\(snapshotCase.name): a figure has no meaning")
+            #expect(!speech.value.isEmpty, "\(snapshotCase.name): a figure has no value")
+            #expect(!speech.basis.isEmpty, "\(snapshotCase.name): a figure has no basis")
+            #expect(speech.meaning != speech.value,
+                    "\(snapshotCase.name): a figure's meaning is its value — \(speech.value)")
+        }
+    }
+
+    /// And the basis names where the number came from. This is the part that
+    /// matters most here: `activeMs` restarts with the daemon, so a trend
+    /// figure is a FLOOR, and a reader who hears it as an exact total is being
+    /// misled about the one axis a plan verdict rests on.
+    @Test("every figure's basis names its provenance",
+          arguments: PlanFitSnapshotMatrix.all)
+    func everyBasisNamesItsProvenance(snapshotCase: PlanFitSnapshotCase) {
+        let labels = Provenance.allCases.map(\.label)
+        for speech in speeches(snapshotCase) {
+            #expect(labels.contains { speech.basis.contains($0) },
+                    "\(snapshotCase.name): \"\(speech.basis)\" does not say where the number came from")
+        }
+    }
+
+    /// A populated page has figures to audit. Without this the two tests above
+    /// pass on an empty list.
+    @Test("the audit above has something to audit")
+    func figuresExist() {
+        let populated = PlanFitSnapshotCase(sufficiency: .sufficient, segments: .four, theme: .light)
+        #expect(speeches(populated).count >= 8,
+                "only \(speeches(populated).count) figures found — the walk is missing the page")
+        let dayOne = PlanFitSnapshotCase(sufficiency: .noRows, segments: .one, theme: .light)
+        // Day one has no figures, and that is the correct answer: it has
+        // sentences instead. The test is here so the number is a decision.
+        #expect(speeches(dayOne).isEmpty)
+    }
+
+    /// Recorded work time is a lower bound and the trend must say so out loud,
+    /// not only in the tag beside the bar.
+    @Test("the trend's figures are spoken as floors")
+    func trendIsSpokenAsAFloor() {
+        let snapshotCase = PlanFitSnapshotCase(sufficiency: .sufficient, segments: .four, theme: .light)
+        let model = PlanFitSnapshotRenderer.model(for: snapshotCase)
+        #expect(!model.trend.bars.isEmpty)
+        for bar in model.trend.bars {
+            #expect(bar.speech.basis.contains(Provenance.lowerBound.label),
+                    "a trend bar is spoken as an exact total: \(bar.speech.basis)")
+        }
+    }
+
+    /// V9 as an accessibility claim: the money and the interruptions are one
+    /// spoken element, so a reader cannot swipe past the half that makes the
+    /// other half honest.
+    @Test("the subscription figure speaks its money and its interruptions together")
+    func subscriptionFigureIsOneUtterance() {
+        let result = SubscriptionComparisonModel.Result(
+            money: MoneyNote(id: "x", label: "Difference", usd: 120, coverage: nil),
+            exposure: "12 exhaustions, 9.5h waiting",
+            rate: "3.0×/week"
+        )
+        #expect(result.speech.value.contains(result.money.amount))
+        #expect(result.speech.value.contains(result.exposure))
+        #expect(result.speech.basis.contains(result.money.qualifier))
+    }
+}

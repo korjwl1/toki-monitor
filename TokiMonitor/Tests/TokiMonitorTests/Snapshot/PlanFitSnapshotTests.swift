@@ -288,6 +288,8 @@ struct PlanFitControlSurfaceTests {
             ("ModelPatternSection", ModelPatternSection(model: model.modelPattern)),
             ("EmptyStateSection", EmptyStateSection(model: model.readiness)),
             ("MoneyFootnote", MoneyFootnote(model: model.money)),
+            ("SubscriptionComparisonSection",
+             SubscriptionComparisonSection(model: model.subscriptionComparison)),
         ]
         for (name, section) in sections {
             for child in Mirror(reflecting: section).children {
