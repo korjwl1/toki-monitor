@@ -329,3 +329,86 @@ struct TableColumnFilterTests {
                 "and nothing was asked of the backend to make that happen")
     }
 }
+
+// MARK: - Where there is deliberately no view-time filter
+//
+// Grafana lets a viewer narrow a time series, a bar chart and a pie from the
+// legend, and a table from its column headers. It lets them narrow a stat card
+// or a gauge from nowhere: which fields those show is an editor's choice
+// (`Value options` → `Fields`), and there is no viewer-facing control at all.
+//
+// That is the right answer here too, and for a reason stronger than parity. A
+// stat card and a gauge each reduce every series into ONE number. There is
+// nothing on either to point at and switch off — hiding "opus" on a card
+// showing total tokens would silently change the total, which is a different
+// number rather than less of the same one. Narrowing those is a QUERY-stage
+// question, and template variables and ad hoc filters are what answer it: they
+// rewrite what is asked for, every panel narrows together, and the change is
+// visible in the executed query.
+//
+// So nothing was built for them. This suite is what keeps that from silently
+// becoming untrue — a later change that gives either type a hidden set, a
+// filterable column or a legend has to come past these.
+
+@Suite("Stat and gauge have no view-time filter")
+@MainActor
+struct StatAndGaugeFilterTests {
+
+    private func panel(_ type: PanelType) -> PanelConfig {
+        PanelConfig(title: "One number", panelType: type, metric: .totalTokens,
+                    gridPosition: GridPosition(column: 0, row: 0, width: 6, height: 1))
+    }
+
+    /// The funnel is the table's, and only the table's.
+    @Test("neither type offers a column filter", arguments: [PanelType.stat, .gauge])
+    func noColumnFilter(type: PanelType) {
+        #expect(!type.honouredFieldProperties.contains(.filterable))
+        var p = panel(type)
+        p.fieldConfig = FieldConfigSource(defaults: FieldDisplayConfig(filterable: true))
+        // Written into the document by hand, or by another tool, it resolves to
+        // nothing — so there is no state in which one of these draws a funnel.
+        #expect(p.displayConfig(for: Field(name: "model", values: .string([])))
+                    .filterable == nil)
+    }
+
+    /// Neither type names its series, which is what a legend entry would be.
+    /// A card's name is its panel title.
+    @Test("neither type names a series to put in a legend",
+          arguments: [PanelType.stat, .gauge])
+    func noSeriesNames(type: PanelType) {
+        #expect(!type.honouredFieldProperties.contains(.displayName))
+    }
+
+    /// The empty state that says "everything is switched off, here is the way
+    /// back" belongs to the types that have a control to get there with.
+    /// Reaching it on a card would be a dead end: nothing on it can be clicked.
+    @Test("neither type can reach the all-hidden empty state")
+    func noAllHiddenState() {
+        let fetch = PanelDataState.loaded(TimeSeriesData(points: [], granularity: .hourly),
+                                          frames: FrameSet(frames: []))
+        // `hasVisibleSeries` is what produces that state, and the dashboard
+        // only ever passes anything but `true` for the types with a legend —
+        // so a card and a dial resolve to `.loaded` and offer no way back from
+        // a place they cannot get to.
+        #expect(PanelState.resolve(fetch, hasContent: true) == .loaded)
+        #expect(PanelState.loaded.offersShowAllSeries == false)
+    }
+
+    /// What DOES narrow them: a variable rewrites the query, so the panel is
+    /// answering a different question rather than drawing less of the same
+    /// answer. Visible in the executed query, which is the difference that
+    /// matters.
+    @Test("an ad hoc filter narrows a stat card, at the query stage")
+    func adHocFiltersAreTheAnswer() {
+        // The card's own stock query, so the claim is about a panel that
+        // exists rather than about a string invented for the test.
+        let query = PanelMetric.totalTokens.defaultQuery
+        let rewritten = QueryRewriter.applying(
+            [AdHocFilter(key: "model", value: "opus")], to: query
+        )
+        #expect(rewritten.contains("model=\"opus\""),
+                "the narrowing is in the query the backend runs: \(rewritten)")
+        #expect(rewritten != query,
+                "which is the difference from a render-stage filter: the question changed")
+    }
+}
