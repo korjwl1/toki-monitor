@@ -182,12 +182,13 @@
 		AA31TRANSTEST00000002 /* TransformationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA31TRANSTEST00000001 /* TransformationTests.swift */; };
 		CC0857BF78965AF7CCC554E8 /* WindowStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */; };
 		AA03WINFIXTURE0000002 /* WindowFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03WINFIXTURE0000001 /* WindowFixtures.swift */; };
+		AA70SCRATCHDEF0002 /* ScratchDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA70SCRATCHDEF0001 /* ScratchDefaults.swift */; };
+		AA70SCRATCHDEFT002 /* ScratchDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA70SCRATCHDEFT001 /* ScratchDefaultsTests.swift */; };
 		AA03SNAPHARNESS000002 /* PlanFitSnapshotHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03SNAPHARNESS000001 /* PlanFitSnapshotHarness.swift */; };
 		AA03ACTIVEUSETEST0002 /* WindowStatsActiveUseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03ACTIVEUSETEST0001 /* WindowStatsActiveUseTests.swift */; };
 		AA03PFVERDICTTEST0002 /* PlanFitVerdictTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFVERDICTTEST0001 /* PlanFitVerdictTests.swift */; };
 		AA82UTCBUCKET01B /* UTCDayBucketingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA82UTCBUCKET01F /* UTCDayBucketingTests.swift */; };
 		AA03PERIODAGGTEST002 /* PeriodAggregationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PERIODAGGTEST001 /* PeriodAggregationTests.swift */; };
-		AA03ACCTSHAPETEST002 /* AccountShapeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03ACCTSHAPETEST001 /* AccountShapeTests.swift */; };
 		CFD0A81A65B4A68AAF74C191 /* PanelFetchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CC4A7E29F84136565F5CED9 /* PanelFetchCoordinator.swift */; };
 		D38B80ADCF36C11E8E64C488 /* DashboardModel+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D10C2580CDF8F9EAD2AAACA /* DashboardModel+Display.swift */; };
 		D3B34FF52E62F5D2E45480DC /* CharacterAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA93FB660B4398E6A806FC3 /* CharacterAnimationView.swift */; };
@@ -202,6 +203,10 @@
 		E9C97C704F48EF0280E0ADD0 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0103BDEAC6066E0274029149 /* ConnectionManager.swift */; };
 		EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */; };
 		AA90VERHIST000002 /* VersionHistoryDiffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90VERHIST000001 /* VersionHistoryDiffTests.swift */; };
+		AA70DSPERS0000002 /* DatasourceStorePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA70DSPERS0000001 /* DatasourceStorePersistenceTests.swift */; };
+		AA70VERSPERS00002 /* DashboardVersionStorePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA70VERSPERS00001 /* DashboardVersionStorePersistenceTests.swift */; };
+		AA70ANNOTPERS0002 /* AnnotationStorePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA70ANNOTPERS0001 /* AnnotationStorePersistenceTests.swift */; };
+		AA70LOSSTOL000002 /* LossTolerantStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA70LOSSTOL000001 /* LossTolerantStoreTests.swift */; };
 		AA90AGGRATE000002 /* TokenAggregatorRateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */; };
 		AA90IPCBND000002 /* TokiIPCBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90IPCBND000001 /* TokiIPCBoundaryTests.swift */; };
 		AA90UDSSOCK000002 /* TokiTraceSocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */; };
@@ -358,6 +363,10 @@
 		750080E9CA86B9101502A6B7 /* TokiReportClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiReportClientTests.swift; sourceTree = "<group>"; };
 		755C88AB0D9EE0E7EDC3CDAE /* TokiEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiEventStreamTests.swift; sourceTree = "<group>"; };
 		AA90VERHIST000001 /* VersionHistoryDiffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionHistoryDiffTests.swift; sourceTree = "<group>"; };
+		AA70DSPERS0000001 /* DatasourceStorePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatasourceStorePersistenceTests.swift; sourceTree = "<group>"; };
+		AA70VERSPERS00001 /* DashboardVersionStorePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardVersionStorePersistenceTests.swift; sourceTree = "<group>"; };
+		AA70ANNOTPERS0001 /* AnnotationStorePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationStorePersistenceTests.swift; sourceTree = "<group>"; };
+		AA70LOSSTOL000001 /* LossTolerantStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LossTolerantStoreTests.swift; sourceTree = "<group>"; };
 		AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenAggregatorRateTests.swift; sourceTree = "<group>"; };
 		AA90IPCBND000001 /* TokiIPCBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiIPCBoundaryTests.swift; sourceTree = "<group>"; };
 		AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokiTraceSocketTests.swift; sourceTree = "<group>"; };
@@ -391,12 +400,13 @@
 		AA31TRANSTEST00000001 /* TransformationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransformationTests.swift; sourceTree = "<group>"; };
 		931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStatsTests.swift; sourceTree = "<group>"; };
 		AA03WINFIXTURE0000001 /* WindowFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowFixtures.swift; sourceTree = "<group>"; };
+		AA70SCRATCHDEF0001 /* ScratchDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScratchDefaults.swift; sourceTree = "<group>"; };
+		AA70SCRATCHDEFT001 /* ScratchDefaultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScratchDefaultsTests.swift; sourceTree = "<group>"; };
 		AA03SNAPHARNESS000001 /* PlanFitSnapshotHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitSnapshotHarness.swift; sourceTree = "<group>"; };
 		AA03ACTIVEUSETEST0001 /* WindowStatsActiveUseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStatsActiveUseTests.swift; sourceTree = "<group>"; };
 		AA03PFVERDICTTEST0001 /* PlanFitVerdictTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitVerdictTests.swift; sourceTree = "<group>"; };
 		AA82UTCBUCKET01F /* UTCDayBucketingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UTCDayBucketingTests.swift; sourceTree = "<group>"; };
 		AA03PERIODAGGTEST001 /* PeriodAggregationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodAggregationTests.swift; sourceTree = "<group>"; };
-		AA03ACCTSHAPETEST001 /* AccountShapeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountShapeTests.swift; sourceTree = "<group>"; };
 		955951A7FF5652C64A116C70 /* ClaudeUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageMonitor.swift; sourceTree = "<group>"; };
 		9CA03537C2F0CAF1D37B5252 /* TablePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TablePanelView.swift; sourceTree = "<group>"; };
 		A0132BCEBA0D76465E41F08A /* frame_00_thin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = frame_00_thin.png; sourceTree = "<group>"; };
@@ -544,6 +554,7 @@
 				AA03SERIESMERGE000000001 /* SeriesMergeTests.swift */,
 				AA12FRAMETEST000000001 /* FrameAdapterTests.swift */,
 				AA35VARLOADTEST00001 /* VariableLoaderTests.swift */,
+				AA70DSPERS0000001 /* DatasourceStorePersistenceTests.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -741,6 +752,8 @@
 			isa = PBXGroup;
 			children = (
 				AA03WINFIXTURE0000001 /* WindowFixtures.swift */,
+				AA70SCRATCHDEF0001 /* ScratchDefaults.swift */,
+				AA70SCRATCHDEFT001 /* ScratchDefaultsTests.swift */,
 				AA03PFTEXT0001 /* PlanFitModelText.swift */,
 			);
 			path = Support;
@@ -750,6 +763,9 @@
 			isa = PBXGroup;
 			children = (
 				AA90VERHIST000001 /* VersionHistoryDiffTests.swift */,
+				AA70VERSPERS00001 /* DashboardVersionStorePersistenceTests.swift */,
+				AA70ANNOTPERS0001 /* AnnotationStorePersistenceTests.swift */,
+				AA70LOSSTOL000001 /* LossTolerantStoreTests.swift */,
 				AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */,
 				AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */,
 				AA62FILTNOTETEST01 /* UnappliedFilterNoticeTests.swift */,
@@ -776,7 +792,6 @@
 				AA03PFVERDICTTEST0001 /* PlanFitVerdictTests.swift */,
 				AA82UTCBUCKET01F /* UTCDayBucketingTests.swift */,
 				AA03PERIODAGGTEST001 /* PeriodAggregationTests.swift */,
-				AA03ACCTSHAPETEST001 /* AccountShapeTests.swift */,
 				AA31TRANSTEST00000001 /* TransformationTests.swift */,
 				AA33FIELDTEST00000001 /* FieldSelectionTests.swift */,
 				AA35FIELDCFGTEST00001 /* FieldConfigTests.swift */,
@@ -1220,6 +1235,10 @@
 				40CC603230947A99EB36F064 /* TokenAggregatorLogicTests.swift in Sources */,
 				EBEAD3D481833720FA9F9E19 /* TokiEventStreamTests.swift in Sources */,
 				AA90VERHIST000002 /* VersionHistoryDiffTests.swift in Sources */,
+				AA70DSPERS0000002 /* DatasourceStorePersistenceTests.swift in Sources */,
+				AA70VERSPERS00002 /* DashboardVersionStorePersistenceTests.swift in Sources */,
+				AA70ANNOTPERS0002 /* AnnotationStorePersistenceTests.swift in Sources */,
+				AA70LOSSTOL000002 /* LossTolerantStoreTests.swift in Sources */,
 				AA90AGGRATE000002 /* TokenAggregatorRateTests.swift in Sources */,
 				AA90IPCBND000002 /* TokiIPCBoundaryTests.swift in Sources */,
 				AA90UDSSOCK000002 /* TokiTraceSocketTests.swift in Sources */,
@@ -1228,12 +1247,13 @@
 				F8B39525A65678B5F6A52331 /* UpdateCheckerTests.swift in Sources */,
 				CC0857BF78965AF7CCC554E8 /* WindowStatsTests.swift in Sources */,
 				AA03WINFIXTURE0000002 /* WindowFixtures.swift in Sources */,
+				AA70SCRATCHDEF0002 /* ScratchDefaults.swift in Sources */,
+				AA70SCRATCHDEFT002 /* ScratchDefaultsTests.swift in Sources */,
 				AA03SNAPHARNESS000002 /* PlanFitSnapshotHarness.swift in Sources */,
 				AA03ACTIVEUSETEST0002 /* WindowStatsActiveUseTests.swift in Sources */,
 				AA03PFVERDICTTEST0002 /* PlanFitVerdictTests.swift in Sources */,
 				AA82UTCBUCKET01B /* UTCDayBucketingTests.swift in Sources */,
 				AA03PERIODAGGTEST002 /* PeriodAggregationTests.swift in Sources */,
-				AA03ACCTSHAPETEST002 /* AccountShapeTests.swift in Sources */,
 				AA31TRANSTEST00000002 /* TransformationTests.swift in Sources */,
 				AA33FIELDTEST00000002 /* FieldSelectionTests.swift in Sources */,
 				AA35FIELDCFGTEST00002 /* FieldConfigTests.swift in Sources */,
