@@ -319,8 +319,12 @@ struct TablePanelView: View {
             Image(systemName: active
                   ? "line.3.horizontal.decrease.circle.fill"
                   : "line.3.horizontal.decrease.circle")
-                .font(.system(size: DS.fontCaption))
+                .font(.system(size: DS.fontCaption + 1))
                 .foregroundStyle(active ? Color.accentColor : Color.primary.opacity(0.72))
+                // A 10pt glyph is a 10pt target. The frame is the clickable
+                // area, not the drawing, and it is the same height as the
+                // header's own text so the row does not grow around it.
+                .frame(width: 14, height: 14)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
