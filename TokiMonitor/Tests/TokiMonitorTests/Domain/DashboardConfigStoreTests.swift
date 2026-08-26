@@ -442,11 +442,14 @@ struct DashboardSavePathTests {
 
     /// A defaults container of its own per test, so one test's dashboards are
     /// invisible to the next and neither is visible to the installed app.
+    ///
+    /// It used to be a named suite cleaned up in `deinit`, which is where the
+    /// pile of `toki.monitor.tests.<uuid>.plist` files in ~/Library/Preferences
+    /// came from: `removePersistentDomain` empties the domain but leaves the
+    /// file, and cfprefsd writes an empty one back out even if the test deletes
+    /// it. `ScratchDefaults` never reaches the preferences system at all.
     private final class Sandbox {
-        let name = "toki.monitor.tests.\(UUID().uuidString)"
-        let defaults: UserDefaults
-        init() { defaults = UserDefaults(suiteName: name)! }
-        deinit { UserDefaults().removePersistentDomain(forName: name) }
+        let defaults: UserDefaults = ScratchDefaults()
     }
 
     private func seedList(_ sandbox: Sandbox, _ elements: [Any]) throws {
