@@ -21,6 +21,7 @@ struct PanelEditorView: View {
 
     enum EditorTab: String, CaseIterable {
         case query
+        case transform
         case visualization
         case options
         case links
@@ -28,6 +29,7 @@ struct PanelEditorView: View {
         var label: String {
             switch self {
             case .query: L.tr("쿼리", "Query")
+            case .transform: L.tr("변환", "Transform")
             case .visualization: L.tr("시각화", "Visualization")
             case .options: L.tr("옵션", "Options")
             case .links: L.dash.dataLinks
@@ -37,6 +39,7 @@ struct PanelEditorView: View {
         var icon: String {
             switch self {
             case .query: "terminal"
+            case .transform: "arrow.triangle.branch"
             case .visualization: "chart.xyaxis.line"
             case .options: "gearshape"
             case .links: "link"
@@ -157,6 +160,11 @@ struct PanelEditorView: View {
                         time: viewModel.dashboardConfig.time,
                         variables: viewModel.dashboardConfig.templating.list
                     )
+                case .transform:
+                    // The panel's own result, so the field pickers offer the
+                    // columns this query returns rather than a guess, and each
+                    // step can say what it took in and gave out.
+                    PanelEditorTransformTab(panel: $panel, frames: previewState.frames)
                 case .visualization: PanelEditorVisualizationTab(panel: $panel)
                 case .options:
                     PanelEditorOptionsTab(

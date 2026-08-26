@@ -1085,3 +1085,482 @@ struct PanelEditorDataLinksTab: View {
         }
     }
 }
+
+// MARK: - Transform Tab
+
+/// The panel's transformation pipeline.
+///
+/// The six transformations and the pipeline that runs them have had tests since
+/// the frame contract landed. Until `PanelConfig.transformations` there was
+/// nowhere to store a pipeline, so the only one that ever ran was the hardcoded
+/// preset for `cacheHitRate`. This is the editor for the stored one — it builds
+/// `TransformationStep` values and hands them to the same pipeline, rather than
+/// being a second way to transform anything.
+struct PanelEditorTransformTab: View {
+    @Binding var panel: PanelConfig
+    /// This panel's own result. Used for two things: the field names the
+    /// pickers offer, and the per-step summary of what went in and what came
+    /// out (FR-029). Nil before the first fetch, and the tab says so rather
+    /// than offering an empty list of fields as if the query returned none.
+    var frames: FrameSet?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L.tr("변환", "Transformations"))
+                .font(.subheadline.bold())
+
+            Text(L.tr("질의 결과에 위에서 아래 순서로 적용됩니다.",
+                      "Applied to the query's result, top to bottom."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if panel.transformations.isEmpty {
+                Text(L.tr("아직 변환이 없습니다. 질의 결과가 그대로 그려집니다.",
+                          "No transformations yet — the query's result is drawn as it arrives."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            ForEach(panel.transformations) { step in
+                if let index = panel.transformations.firstIndex(where: { $0.id == step.id }) {
+                    stepEditor(index: index)
+                }
+            }
+
+            addMenu
+        }
+    }
+
+    private var addMenu: some View {
+        Menu {
+            ForEach(Catalogue.allCases, id: \.rawValue) { entry in
+                Button(entry.label) {
+                    panel.transformations.append(TransformationStep(kind: entry.newStep))
+                }
+            }
+        } label: {
+            Label(L.tr("변환 추가", "Add transformation"), systemImage: "plus")
+                .font(.caption)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    // MARK: - One step
+
+    private func stepEditor(index: Int) -> some View {
+        let step = panel.transformations[index]
+        return GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                if step.isUnknown {
+                    Text(L.tr("이 버전이 실행할 수 없는 변환입니다. 그대로 보존되며, 아무 것도 바꾸지 않습니다.",
+                              "This build cannot run this transformation. It is kept as written and changes nothing."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    options(index: index)
+                    stageSummary(index: index)
+                }
+            }
+            .opacity(step.disabled ? 0.5 : 1)
+        } label: {
+            HStack(spacing: DS.sm) {
+                // Off, not gone. Comparing "with and without this step" is the
+                // reason a pipeline has a switch at all (FR-028).
+                Button {
+                    panel.transformations[index].disabled.toggle()
+                } label: {
+                    Image(systemName: step.disabled ? "circle" : "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(step.disabled ? Color.secondary : Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help(step.disabled
+                      ? L.tr("이 단계를 다시 켭니다", "Switch this step back on")
+                      : L.tr("이 단계를 끕니다 — 지우지 않습니다", "Switch this step off — it is not deleted"))
+
+                Text(Catalogue.label(for: step.kind))
+                    .font(.caption.bold())
+
+                Spacer()
+
+                Button { move(index, by: -1) } label: {
+                    Image(systemName: "arrow.up").font(.caption)
+                }
+                .buttonStyle(.plain)
+                .disabled(index == 0)
+
+                Button { move(index, by: 1) } label: {
+                    Image(systemName: "arrow.down").font(.caption)
+                }
+                .buttonStyle(.plain)
+                .disabled(index == panel.transformations.count - 1)
+
+                Button(role: .destructive) {
+                    panel.transformations.remove(at: index)
+                } label: {
+                    Image(systemName: "trash").font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func move(_ index: Int, by offset: Int) {
+        let target = index + offset
+        guard panel.transformations.indices.contains(index),
+              panel.transformations.indices.contains(target) else { return }
+        panel.transformations.swapAt(index, target)
+    }
+
+    /// What went into this step and what came out (FR-029).
+    ///
+    /// A count rather than a table: the question a pipeline raises is "which
+    /// step dropped my series", and series and column counts answer it in one
+    /// line per step. A step that changed neither says so, which is the other
+    /// half of the same question.
+    @ViewBuilder
+    private func stageSummary(index: Int) -> some View {
+        if let frames {
+            let before = staged(upTo: index, from: frames)
+            let after = staged(upTo: index + 1, from: frames)
+            let inShape = shape(before)
+            let outShape = shape(after)
+            HStack(spacing: DS.xs) {
+                Image(systemName: "arrow.right")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(inShape == outShape
+                     ? L.tr("\(inShape) — 이 단계는 모양을 바꾸지 않았습니다",
+                            "\(inShape) — this step changed neither")
+                     : "\(inShape) → \(outShape)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Text(L.tr("질의 결과가 있어야 입·출력을 볼 수 있습니다.",
+                      "Run the query to see what this step takes in and gives out."))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// The frames as they stand after the first `count` steps, preset included
+    /// — the preset runs first at render time and a summary that skipped it
+    /// would describe a pipeline nobody executes.
+    private func staged(upTo count: Int, from frames: FrameSet) -> FrameSet {
+        let seeded = TransformationPipeline.apply(
+            PanelPreset.transformations(for: panel.effectiveMetric), to: frames
+        )
+        return TransformationPipeline.apply(
+            steps: Array(panel.transformations.prefix(count)), to: seeded
+        )
+    }
+
+    private func shape(_ set: FrameSet) -> String {
+        let columns = Set(set.frames.flatMap { $0.fields.map(\.name) }).count
+        return L.tr("계열 \(set.frames.count)개 · 열 \(columns)개",
+                    "\(set.frames.count) series · \(columns) columns")
+    }
+
+    /// Field names this panel's result actually has. A picker over them beats a
+    /// text field: a transformation naming a column that does not exist is the
+    /// most common way a pipeline silently does nothing.
+    private var fieldNames: [String] {
+        guard let frames else { return [] }
+        var seen: [String] = []
+        for frame in frames.frames {
+            for field in frame.fields where !seen.contains(field.name) {
+                seen.append(field.name)
+            }
+        }
+        return seen
+    }
+
+    // MARK: - Per-type options
+
+    @ViewBuilder
+    private func options(index: Int) -> some View {
+        switch panel.transformations[index].kind {
+        case let .reduce(t):
+            reducerPicker(L.tr("축약", "Reducer"), selection: t.reducer) { reducer in
+                var next = t
+                next.reducer = reducer
+                panel.transformations[index].kind = .reduce(next)
+            }
+
+        case let .calculateField(t):
+            fieldPicker(L.tr("왼쪽", "Left"), value: t.left) { name in
+                var next = t; next.left = name
+                panel.transformations[index].kind = .calculateField(next)
+            }
+            HStack {
+                Text(L.tr("연산", "Operation"))
+                    .font(.caption)
+                    .frame(width: 72, alignment: .leading)
+                Picker("", selection: Binding(
+                    get: { t.operation },
+                    set: { op in
+                        var next = t; next.operation = op
+                        panel.transformations[index].kind = .calculateField(next)
+                    }
+                )) {
+                    ForEach(CalculateFieldTransformation.Operation.allCases, id: \.rawValue) {
+                        Text(operationLabel($0)).tag($0)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            fieldPicker(L.tr("오른쪽", "Right"), value: t.right) { name in
+                var next = t; next.right = name
+                panel.transformations[index].kind = .calculateField(next)
+            }
+            textRow(L.tr("새 열 이름", "New column"), value: t.alias ?? "") { name in
+                var next = t; next.alias = name.isEmpty ? nil : name
+                panel.transformations[index].kind = .calculateField(next)
+            }
+            Toggle(L.tr("입력 열을 대체합니다", "Replace the input columns"), isOn: Binding(
+                get: { t.replaceFields },
+                set: { on in
+                    var next = t; next.replaceFields = on
+                    panel.transformations[index].kind = .calculateField(next)
+                }
+            ))
+            .font(.caption)
+
+        case let .organize(t):
+            if fieldNames.isEmpty {
+                Text(L.tr("질의 결과가 있어야 열을 고를 수 있습니다.",
+                          "Run the query to choose columns."))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(fieldNames, id: \.self) { name in
+                HStack {
+                    Toggle(isOn: Binding(
+                        get: { !t.excluded.contains(name) },
+                        set: { keep in
+                            var next = t
+                            if keep { next.excluded.remove(name) } else { next.excluded.insert(name) }
+                            panel.transformations[index].kind = .organize(next)
+                        }
+                    )) {
+                        Text(name)
+                            .font(.system(.caption, design: .monospaced))
+                    }
+                    .toggleStyle(.checkbox)
+                    Spacer()
+                    TextField(L.tr("이름 바꾸기", "Rename"), text: Binding(
+                        get: { t.renamed[name] ?? "" },
+                        set: { newName in
+                            var next = t
+                            if newName.isEmpty { next.renamed[name] = nil }
+                            else { next.renamed[name] = newName }
+                            panel.transformations[index].kind = .organize(next)
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 130)
+                }
+            }
+
+        case let .filterByValue(t):
+            fieldPicker(L.tr("열", "Column"), value: t.field) { name in
+                var next = t; next.field = name
+                panel.transformations[index].kind = .filterByValue(next)
+            }
+            HStack {
+                Text(L.tr("조건", "Keep rows"))
+                    .font(.caption)
+                    .frame(width: 72, alignment: .leading)
+                Picker("", selection: Binding(
+                    get: { t.comparison },
+                    set: { c in
+                        var next = t; next.comparison = c
+                        panel.transformations[index].kind = .filterByValue(next)
+                    }
+                )) {
+                    ForEach(FilterByValueTransformation.Comparison.allCases, id: \.rawValue) {
+                        Text(comparisonLabel($0)).tag($0)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                TextField(L.tr("값", "Value"), value: Binding(
+                    get: { t.value },
+                    set: { v in
+                        var next = t; next.value = v
+                        panel.transformations[index].kind = .filterByValue(next)
+                    }
+                ), format: .number)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 80)
+            }
+
+        case let .sortBy(t):
+            fieldPicker(L.tr("기준 열", "Sort by"), value: t.field) { name in
+                var next = t; next.field = name
+                panel.transformations[index].kind = .sortBy(next)
+            }
+            reducerPicker(L.tr("축약", "Reducer"), selection: t.reducer) { reducer in
+                var next = t; next.reducer = reducer
+                panel.transformations[index].kind = .sortBy(next)
+            }
+            Toggle(L.tr("큰 값부터", "Largest first"), isOn: Binding(
+                get: { t.descending },
+                set: { on in
+                    var next = t; next.descending = on
+                    panel.transformations[index].kind = .sortBy(next)
+                }
+            ))
+            .font(.caption)
+
+        case let .limit(t):
+            HStack {
+                Text(L.tr("계열 수", "Series"))
+                    .font(.caption)
+                    .frame(width: 72, alignment: .leading)
+                TextField("10", value: Binding(
+                    get: { t.count },
+                    set: { n in
+                        panel.transformations[index].kind = .limit(
+                            LimitTransformation(count: Swift.max(0, n))
+                        )
+                    }
+                ), format: .number)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 80)
+                Spacer()
+            }
+            Text(L.tr("잘려나간 계열 수는 패널에 표시됩니다.",
+                      "How many series were cut is shown on the panel."))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+        case .unknown:
+            EmptyView()
+        }
+    }
+
+    // MARK: - Shared controls
+
+    private func reducerPicker(_ title: String,
+                               selection: ReduceTransformation.Reducer,
+                               set: @escaping (ReduceTransformation.Reducer) -> Void)
+        -> some View {
+        HStack {
+            Text(title)
+                .font(.caption)
+                .frame(width: 72, alignment: .leading)
+            Picker("", selection: Binding(get: { selection }, set: set)) {
+                ForEach(ReduceTransformation.Reducer.allCases, id: \.rawValue) {
+                    Text($0.displayName).tag($0)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+        }
+    }
+
+    /// A column name, chosen from the ones the query returned when it has
+    /// returned any, typed otherwise.
+    @ViewBuilder
+    private func fieldPicker(_ title: String, value: String,
+                             set: @escaping (String) -> Void) -> some View {
+        if fieldNames.isEmpty {
+            textRow(title, value: value, set: set)
+        } else {
+            HStack {
+                Text(title)
+                    .font(.caption)
+                    .frame(width: 72, alignment: .leading)
+                Picker("", selection: Binding(get: { value }, set: set)) {
+                    // A name the query no longer returns stays selectable, and
+                    // says so: silently switching the reader's pipeline to a
+                    // different column would be worse than showing a stale one.
+                    if !value.isEmpty, !fieldNames.contains(value) {
+                        Text(L.tr("\(value) (결과에 없음)", "\(value) (not in the result)"))
+                            .tag(value)
+                    }
+                    if value.isEmpty {
+                        Text(L.tr("고르세요", "Choose")).tag("")
+                    }
+                    ForEach(fieldNames, id: \.self) { name in
+                        Text(name).tag(name)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+        }
+    }
+
+    private func textRow(_ title: String, value: String,
+                         set: @escaping (String) -> Void) -> some View {
+        HStack {
+            Text(title)
+                .font(.caption)
+                .frame(width: 72, alignment: .leading)
+            TextField(title, text: Binding(get: { value }, set: set))
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.caption, design: .monospaced))
+        }
+    }
+
+    private func operationLabel(_ op: CalculateFieldTransformation.Operation) -> String {
+        switch op {
+        case .add:      return L.tr("더하기 (+)", "Add (+)")
+        case .subtract: return L.tr("빼기 (−)", "Subtract (−)")
+        case .multiply: return L.tr("곱하기 (×)", "Multiply (×)")
+        case .divide:   return L.tr("나누기 (÷)", "Divide (÷)")
+        }
+    }
+
+    private func comparisonLabel(_ c: FilterByValueTransformation.Comparison) -> String {
+        switch c {
+        case .greater:        return "＞"
+        case .greaterOrEqual: return "≥"
+        case .less:           return "＜"
+        case .lessOrEqual:    return "≤"
+        case .equal:          return "="
+        case .notEqual:       return "≠"
+        }
+    }
+
+    /// The transformations offered, and what a fresh one of each looks like.
+    private enum Catalogue: String, CaseIterable {
+        case reduce, calculateField, organize, filterByValue, sortBy, limit
+
+        var label: String {
+            switch self {
+            case .reduce:         return L.tr("값 하나로 줄이기", "Reduce to one value")
+            case .calculateField: return L.tr("계산 열 추가", "Add a calculated column")
+            case .organize:       return L.tr("열 정리", "Organize columns")
+            case .filterByValue:  return L.tr("값으로 거르기", "Filter by value")
+            case .sortBy:         return L.tr("정렬", "Sort")
+            case .limit:          return L.tr("계열 수 제한", "Limit series")
+            }
+        }
+
+        var newStep: TransformationStep.Kind {
+            switch self {
+            case .reduce:         return .reduce(ReduceTransformation())
+            case .calculateField: return .calculateField(
+                CalculateFieldTransformation(left: "", right: "", operation: .add))
+            case .organize:       return .organize(OrganizeTransformation())
+            case .filterByValue:  return .filterByValue(
+                FilterByValueTransformation(field: "", comparison: .greater, value: 0))
+            case .sortBy:         return .sortBy(SortByTransformation(field: ""))
+            case .limit:          return .limit(LimitTransformation(count: 10))
+            }
+        }
+
+        static func label(for kind: TransformationStep.Kind) -> String {
+            if let entry = Catalogue(rawValue: kind.typeID) { return entry.label }
+            return kind.typeID
+        }
+    }
+}
