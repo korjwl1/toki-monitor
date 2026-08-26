@@ -125,23 +125,14 @@ struct StatPanelView: View {
             // Absent stays "-", never 0 — see FrameReader.singleValue.
             return PanelDataExtractor.StatValue(value: "-", subtitle: nil)
         }
-        // Formatting comes from the field's resolved config when the panel has
-        // one, so a card can read "$" while its neighbour reads tokens.
-        if let config = panel.fieldConfig,
-           let field = prepared.frames.compactMap({ selection.resolve(in: $0) }).first {
-            let resolved = config.resolve(for: field)
-            if !resolved.isEmpty {
-                return PanelDataExtractor.StatValue(
-                    value: FieldFormatter.format(value, config: resolved), subtitle: nil
-                )
-            }
-        }
-        // Then the panel's own unit and decimals. These sat in the editor
-        // reaching nothing at all; a panel that says "percent, 1 decimal"
-        // should read that way whether or not it also has a field override.
-        if let display = Self.panelDisplayConfig(panel) {
+        // The panel's own unit and decimals, then its defaults, then any
+        // override matching the field actually read — resolved in one place,
+        // shared with every other panel type.
+        let field = prepared.frames.compactMap { selection.resolve(in: $0) }.first
+        let resolved = panel.displayConfig(for: field)
+        if !resolved.isEmpty {
             return PanelDataExtractor.StatValue(
-                value: FieldFormatter.format(value, config: display), subtitle: nil
+                value: FieldFormatter.format(value, config: resolved), subtitle: nil
             )
         }
         return PanelDataExtractor.StatValue(
@@ -152,9 +143,12 @@ struct StatPanelView: View {
 
     /// The unit and decimals set on the panel itself, or nil when it said
     /// nothing and the metric's own default formatting should stand.
+    ///
+    /// Kept for callers that have no field to resolve against — the gauge's
+    /// scale labels, which are ends of an axis rather than values of a column.
     static func panelDisplayConfig(_ panel: PanelConfig) -> FieldDisplayConfig? {
-        guard panel.options.unit != nil || panel.options.decimals != nil else { return nil }
-        return FieldDisplayConfig(unit: panel.options.unit, decimals: panel.options.decimals)
+        let resolved = panel.displayConfig(for: nil)
+        return resolved.isEmpty ? nil : resolved
     }
 
     /// The number behind `statValue`, unformatted.

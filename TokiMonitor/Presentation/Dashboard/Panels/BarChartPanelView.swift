@@ -61,7 +61,7 @@ struct BarChartPanelView: View {
             }
         }
         .chartForegroundStyleScale { (model: String) in
-            viewModel.colorForModel(model)
+            self.color(for: model)
         }
         .chartXAxis {
             AxisMarks(preset: .aligned, values: .automatic) { _ in
@@ -116,7 +116,8 @@ struct BarChartPanelView: View {
                     modelData: modelData,
                     bucketSecs: bucketSecs,
                     mode: options.tooltipMode,
-                    colorForModel: { viewModel.colorForModel($0) },
+                    colorForModel: { color(for: $0) },
+                    formatValue: { format($0, series: $1) },
                     formatDate: { formatBarDate($0) }
                 )
             }
@@ -144,7 +145,7 @@ struct BarChartPanelView: View {
         PanelLegendView(
             entries: PanelSeries.seriesNames(metric: panel.effectiveMetric, panel: panel,
                                              frames: frames, data: data)
-                .map { .init(name: $0, color: viewModel.colorForModel($0)) },
+                .map { .init(name: $0, color: color(for: $0)) },
             hidden: hiddenSeries,
             position: options.legendPosition,
             onToggle: { viewModel.toggleSeries($0, panelID: panel.id) }
@@ -152,6 +153,27 @@ struct BarChartPanelView: View {
     }
 
     private var hiddenSeries: Set<String> { viewModel.hiddenSeries(for: panel.id) }
+
+    // MARK: - Field overrides
+
+    private var styles: [String: FieldDisplayConfig] {
+        PanelSeries.styles(metric: panel.effectiveMetric, panel: panel, frames: frames)
+    }
+
+    /// The override's colour when one names this series, else the shared model
+    /// palette — so a model keeps one colour across panels.
+    private func color(for series: String) -> Color {
+        DS.seriesColor(styles[series]?.color) ?? viewModel.colorForModel(series)
+    }
+
+    /// A bar's value in the unit its own series was given. The tooltip printed
+    /// a bare integer before, so a cost series read "3" for three dollars.
+    private func format(_ value: Double, series: String) -> String {
+        if let config = styles[series], !config.isEmpty {
+            return FieldFormatter.format(value, config: config)
+        }
+        return value == value.rounded() ? String(Int(value)) : String(format: "%g", value)
+    }
 
     private func animateIn() {
         let real = PanelSeries.chartPoints(
@@ -228,14 +250,16 @@ struct BarChartTooltipOverlay: View {
     /// tooltip always listed everything.
     let mode: PanelDisplayOptions.TooltipMode
     let colorForModel: (String) -> Color
+    /// A value in the unit its own series was given (contract R1) — the row
+    /// used to print `Int(value)` regardless, so a cost series read "3".
+    let formatValue: (Double, String) -> String
     let formatDate: (Date) -> String
 
     var body: some View {
         if let date = state.date {
-            let all = modelData.compactMap { entry -> (String, Int)? in
+            let all = modelData.compactMap { entry -> (String, Double)? in
                 guard let pt = entry.points.first(where: { isSameBucket($0.date, date) }) else { return nil }
-                let v = Int(pt.value)
-                return v > 0 ? (entry.model, v) : nil
+                return pt.value > 0 ? (entry.model, pt.value) : nil
             }
             let values = mode == .single ? Self.bandUnderCursor(all, at: state.value) : all
             VStack(alignment: .leading, spacing: 2) {
@@ -247,7 +271,7 @@ struct BarChartTooltipOverlay: View {
                         Circle()
                             .fill(colorForModel(name))
                             .frame(width: 6, height: 6)
-                        Text("\(name): \(value)")
+                        Text("\(name): \(formatValue(value, name))")
                             .font(.system(size: 10, weight: .medium, design: .monospaced))
                     }
                 }
@@ -266,11 +290,12 @@ struct BarChartTooltipOverlay: View {
     /// The stacked band containing `value`. Bars are drawn bottom-up in series
     /// order, so the bands are the running sums; a cursor above the stack
     /// belongs to the topmost band rather than to nothing.
-    static func bandUnderCursor(_ values: [(String, Int)], at value: Double?) -> [(String, Int)] {
+    static func bandUnderCursor(_ values: [(String, Double)],
+                                at value: Double?) -> [(String, Double)] {
         guard let value, !values.isEmpty else { return values }
         var lower = 0.0
         for entry in values {
-            let upper = lower + Double(entry.1)
+            let upper = lower + entry.1
             if value <= upper { return [entry] }
             lower = upper
         }

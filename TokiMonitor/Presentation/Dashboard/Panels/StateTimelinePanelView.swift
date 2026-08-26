@@ -18,10 +18,17 @@ struct StateTimelinePanelView: View {
         guard let frames, !frames.frames.isEmpty else { return [] }
         let metric = panel.effectiveMetric
         let prepared = PanelPreset.prepared(frames, panel: panel, metric: metric)
+        let panel = panel
         return StateTimelineBuilder.spans(
             prepared,
             selection: panel.fieldSelection ?? PanelPreset.selection(for: metric),
-            thresholds: panel.options.thresholds
+            thresholds: panel.options.thresholds,
+            // A row's name is the one thing a field override can change here:
+            // the colour comes from the thresholds and the values are band
+            // names rather than numbers (계약 R1).
+            name: panel.hasFieldConfig
+                ? { frame, field in panel.seriesName(frame.displayName, field: field) }
+                : nil
         )
     }
 

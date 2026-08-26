@@ -914,6 +914,44 @@ enum PanelType: String, Codable, CaseIterable {
     /// kept in `PanelConfig.unknownPanelTypeRaw`.
     case unknown = "__unknown__"
 
+    /// Which field-override properties this build's render for the type reads.
+    ///
+    /// The editor offers exactly these and no more (계약 R1). A gauge has no
+    /// legend to rename and no series to colour — its colour comes from its
+    /// thresholds — so offering `displayName` or `color` there would be six
+    /// controls of which two work.
+    var honouredFieldProperties: Set<FieldDisplayProperty> {
+        switch self {
+        case .stat:
+            // One number, formatted. Its name is the panel title.
+            return [.unit, .decimals]
+        case .gauge:
+            // Formatting, plus the ends of the dial when the gauge itself does
+            // not state them.
+            return [.unit, .decimals, .min, .max]
+        case .timeSeries:
+            return [.displayName, .unit, .decimals, .color, .min, .max]
+        case .barChart:
+            // No y-domain control on this render, so no min/max.
+            return [.displayName, .unit, .decimals, .color]
+        case .pieChart:
+            // Slices are labelled; the numbers are printed as shares of the
+            // whole, which no unit applies to. Colour is deliberately absent —
+            // a slice takes the colour its model has on every other panel, and
+            // a per-field override would break that correspondence for one
+            // panel only.
+            return [.displayName]
+        case .table:
+            return [.displayName, .unit, .decimals]
+        case .stateTimeline:
+            // Rows are named; their colour comes from the thresholds and their
+            // values are band names rather than numbers.
+            return [.displayName]
+        case .rowPanel, .unknown:
+            return []
+        }
+    }
+
     /// Whether this build's render for the type reads the panel's thresholds.
     ///
     /// The editor offers the threshold list only where the answer is yes.

@@ -87,6 +87,21 @@ extension DS {
         dynamicThresholds[token] ?? .primary
     }
 
+    /// A series colour written on a field override.
+    ///
+    /// The editor offers the same measured tokens the thresholds use, so a
+    /// colour a reader picks here is one whose contrast is known. A string from
+    /// somewhere else — a Grafana export's `#7EB26D` — is honoured as written:
+    /// its author chose it, and refusing to draw it would lose more than it
+    /// protects. Anything unreadable returns nil and the palette assigns.
+    static func seriesColor(_ raw: String?) -> Color? {
+        guard let raw, !raw.isEmpty else { return nil }
+        if let token = ThresholdColor.named(raw) { return threshold(token) }
+        let digits = raw.hasPrefix("#") ? String(raw.dropFirst()) : raw
+        guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return nil }
+        return Color(hex: value)
+    }
+
     private static let dynamicThresholds: [ThresholdColor: Color] = Dictionary(
         uniqueKeysWithValues: ThresholdColor.allCases.map { token in
             (token, Color(nsColor: NSColor(name: nil) { appearance in

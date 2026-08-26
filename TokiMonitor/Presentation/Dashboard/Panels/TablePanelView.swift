@@ -21,6 +21,9 @@ struct TablePanelView: View {
         let alignment: Alignment
         /// nil for the name column, which is not a measure.
         let unit: String?
+        /// The frame column this table column reads, so an override written
+        /// against `cost_usd` can find it. nil for the name column.
+        let field: Field?
     }
 
     /// Measures keep a fixed width so their digits line up column to column;
@@ -31,12 +34,32 @@ struct TablePanelView: View {
 
     private func columns(nameWidth: CGFloat) -> [Column] {
         [
-            Column(title: L.dash.axisModel, width: nameWidth, alignment: .leading, unit: nil),
+            Column(title: L.dash.axisModel, width: nameWidth, alignment: .leading,
+                   unit: nil, field: nil),
             Column(title: L.dash.axisTokens, width: Self.measureWidth,
-                   alignment: .trailing, unit: "tokens"),
+                   alignment: .trailing, unit: "tokens", field: Self.column("total_tokens")),
             Column(title: L.dash.axisCost, width: Self.measureWidth,
-                   alignment: .trailing, unit: "currencyUSD"),
+                   alignment: .trailing, unit: "currencyUSD", field: Self.column("cost_usd")),
         ]
+    }
+
+    /// A stand-in for the frame column this table column sums, carrying its
+    /// name and the labels the rows share.
+    ///
+    /// The table reduces every frame into one row, so by the time a cell is
+    /// formatted the field it came from is gone. A matcher needs one to test,
+    /// and a name is what `byName`, `byRegex` and `allNumeric` match on — the
+    /// three that make sense against a column of a summary table.
+    private static func column(_ name: String) -> Field {
+        Field(name: name, values: .number([]))
+    }
+
+    /// The header, after any `displayName` override written against that
+    /// column. A reader who renamed `cost_usd` to "Spend" should see it here
+    /// as well as in a legend.
+    private func title(_ column: Column) -> String {
+        guard let field = column.field else { return column.title }
+        return panel.seriesName(column.title, field: field)
     }
 
     var body: some View {
@@ -79,7 +102,7 @@ struct TablePanelView: View {
     private func header(_ columns: [Column]) -> some View {
         HStack(spacing: 0) {
             ForEach(columns.indices, id: \.self) { index in
-                Text(columns[index].title)
+                Text(title(columns[index]))
                     .font(.system(size: DS.fontCaption, weight: .semibold))
                     .foregroundStyle(Color.primary.opacity(0.72))
                     .frame(width: columns[index].width, alignment: columns[index].alignment)
@@ -107,14 +130,19 @@ struct TablePanelView: View {
             .padding(.horizontal, DS.xs)
     }
 
-    /// Per-cell formatting. The column's own unit is the default; a unit set on
-    /// the panel overrides it, because a reader who typed one into the editor
-    /// expects to see it (contract R1).
+    /// Per-cell formatting.
+    ///
+    /// The column's own unit is the default; the panel's resolved config for
+    /// that column wins over it. Resolved per COLUMN rather than per panel,
+    /// which is the whole point of an override here: a table showing tokens and
+    /// cost has to be able to say "money" about one column and not the other
+    /// (US3, FR-023).
     private func format(_ value: Double, column: Column) -> String {
-        FieldFormatter.format(
+        let resolved = panel.displayConfig(for: column.field)
+        return FieldFormatter.format(
             value,
-            config: FieldDisplayConfig(unit: panel.options.unit ?? column.unit,
-                                       decimals: panel.options.decimals)
+            config: FieldDisplayConfig(unit: resolved.unit ?? column.unit,
+                                       decimals: resolved.decimals)
         )
     }
 }

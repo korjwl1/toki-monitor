@@ -50,32 +50,40 @@ enum StateTimelineBuilder {
     ///   - thresholds: ascending steps. Empty means every distinct value is
     ///     its own state, which is right for an already-discrete column and
     ///     wrong for a continuous one — hence the panel seeds them.
+    ///   - name: what to call each row. A `displayName` override is written
+    ///     against the field the panel reads, so the closure gets both.
     static func spans(_ set: FrameSet,
                       selection: FieldSelection,
-                      thresholds: [ThresholdStep] = []) -> [TimelineSpan] {
-        set.frames.flatMap { spans(in: $0, selection: selection, thresholds: thresholds) }
+                      thresholds: [ThresholdStep] = [],
+                      name: ((Frame, Field) -> String)? = nil) -> [TimelineSpan] {
+        set.frames.flatMap {
+            spans(in: $0, selection: selection, thresholds: thresholds, name: name)
+        }
     }
 
     static func spans(in frame: Frame,
                       selection: FieldSelection,
-                      thresholds: [ThresholdStep]) -> [TimelineSpan] {
+                      thresholds: [ThresholdStep],
+                      name: ((Frame, Field) -> String)? = nil) -> [TimelineSpan] {
+        let rowName = selection.resolve(in: frame)
+            .flatMap { field in name?(frame, field) } ?? frame.displayName
         if let explicit = explicitIntervals(in: frame, selection: selection,
-                                            thresholds: thresholds) {
+                                            thresholds: thresholds, name: rowName) {
             return explicit
         }
-        return runs(in: frame, selection: selection, thresholds: thresholds)
+        return runs(in: frame, selection: selection, thresholds: thresholds, name: rowName)
     }
 
     // MARK: - Rows that are already intervals
 
     private static func explicitIntervals(in frame: Frame,
                                           selection: FieldSelection,
-                                          thresholds: [ThresholdStep]) -> [TimelineSpan]? {
+                                          thresholds: [ThresholdStep],
+                                          name: String) -> [TimelineSpan]? {
         guard case let .time(starts)? = frame.field(named: startField)?.values,
               case let .time(ends)? = frame.field(named: endField)?.values
         else { return nil }
 
-        let name = frame.displayName
         let numbers = selection.resolve(in: frame)?.values.numbers
         let strings = selection.resolve(in: frame)?.values.strings
         var out: [TimelineSpan] = []
@@ -97,12 +105,12 @@ enum StateTimelineBuilder {
 
     private static func runs(in frame: Frame,
                              selection: FieldSelection,
-                             thresholds: [ThresholdStep]) -> [TimelineSpan] {
+                             thresholds: [ThresholdStep],
+                             name: String) -> [TimelineSpan] {
         guard case let .time(times)? = frame.timeField?.values, times.count > 0,
               let field = selection.resolve(in: frame)
         else { return [] }
 
-        let name = frame.displayName
         let numbers = field.values.numbers
         let strings = field.values.strings
         // The last sample has no successor to end it. Using the median step

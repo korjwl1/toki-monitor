@@ -33,6 +33,42 @@ enum PanelSeries {
         return value
     }
 
+    /// How this panel names a series, or nil when it says nothing and the
+    /// frame's own name stands.
+    ///
+    /// Returned as a closure rather than applied afterwards because the rule is
+    /// matched against the FIELD the panel reads, and only `FrameReader` knows
+    /// which field a given series resolved to.
+    private static func naming(_ panel: PanelConfig?) -> ((Frame, Field) -> String)? {
+        guard let panel, panel.hasFieldConfig,
+              panel.panelType.honouredFieldProperties.contains(.displayName)
+        else { return nil }
+        return { frame, field in panel.seriesName(frame.displayName, field: field) }
+    }
+
+    // MARK: - Per-series display config
+
+    /// The resolved display config for each series this panel draws, keyed by
+    /// the name the render uses for it.
+    ///
+    /// This is how a rule reaches a chart: the renderer asks by series name,
+    /// which is the only identity it has at the point where it is choosing a
+    /// colour or formatting a tooltip row. Empty when the panel has no rules,
+    /// so the common case costs one dictionary that is never built.
+    static func styles(metric: PanelMetric, panel: PanelConfig?,
+                       frames: FrameSet?) -> [String: FieldDisplayConfig] {
+        guard let panel, panel.hasFieldConfig, let frames, !frames.frames.isEmpty
+        else { return [:] }
+        let (set, selection) = prepared(metric: metric, panel: panel, frames: frames)
+        let name = naming(panel)
+        var out: [String: FieldDisplayConfig] = [:]
+        for frame in set.frames {
+            guard let field = selection.resolve(in: frame) else { continue }
+            out[name?(frame, field) ?? frame.displayName] = panel.displayConfig(for: field)
+        }
+        return out
+    }
+
     // MARK: - Time series and bars
 
     /// Per-series points, keyed by the name the legend shows.
@@ -49,12 +85,13 @@ enum PanelSeries {
             )
         }
         let (set, selection) = prepared(metric: metric, panel: panel, frames: frames)
-        return FrameReader.series(set, selection: selection).compactMap { entry in
-            guard !isHidden(entry.name, in: hidden) else { return nil }
-            return (entry.name, entry.points.map {
-                TimeSeriesData.ChartPoint(date: $0.date, value: $0.value ?? 0)
-            })
-        }
+        return FrameReader.series(set, selection: selection, name: naming(panel))
+            .compactMap { entry in
+                guard !isHidden(entry.name, in: hidden) else { return nil }
+                return (entry.name, entry.points.map {
+                    TimeSeriesData.ChartPoint(date: $0.date, value: $0.value ?? 0)
+                })
+            }
     }
 
     /// Per-series points that keep an absent bucket ABSENT.
@@ -76,10 +113,11 @@ enum PanelSeries {
             ).map { ($0.model, $0.points.map { (date: $0.date, value: Double?($0.value)) }) }
         }
         let (set, selection) = prepared(metric: metric, panel: panel, frames: frames)
-        return FrameReader.series(set, selection: selection).compactMap { entry in
-            guard !isHidden(entry.name, in: hidden) else { return nil }
-            return (entry.name, entry.points)
-        }
+        return FrameReader.series(set, selection: selection, name: naming(panel))
+            .compactMap { entry in
+                guard !isHidden(entry.name, in: hidden) else { return nil }
+                return (entry.name, entry.points)
+            }
     }
 
     /// Every series this panel would draw, hidden ones included.
@@ -121,17 +159,20 @@ enum PanelSeries {
         guard let frames, !frames.frames.isEmpty else {
             return PanelDataExtractor.tableRows(from: data)
         }
-        let prepared = PanelPreset.prepared(
-            frames, panel: panel, metric: panel?.effectiveMetric ?? .totalTokens
-        )
+        let metric = panel?.effectiveMetric ?? .totalTokens
+        let prepared = PanelPreset.prepared(frames, panel: panel, metric: metric)
+        let name = naming(panel)
+        let selection = panel?.fieldSelection ?? PanelPreset.selection(for: metric)
         return prepared.frames.map { frame in
             func sum(_ name: String) -> Double? {
                 guard let numbers = frame.field(named: name)?.values.numbers else { return nil }
                 return ReduceTransformation.reduce(numbers, using: .sum)
             }
+            let rowName = selection.resolve(in: frame)
+                .flatMap { field in name?(frame, field) } ?? frame.displayName
             return PanelDataExtractor.ModelRow(
-                id: frame.displayName,
-                model: frame.displayName,
+                id: rowName,
+                model: rowName,
                 tokens: UInt64(max(0, sum("total_tokens") ?? 0)),
                 cost: sum("cost_usd") ?? 0,
                 events: Int(max(0, sum("events") ?? 0))
@@ -171,6 +212,15 @@ enum PanelSeries {
             else { continue }
             var name = label(frame, key: byProject ? "project" : "model")
             if byProject { name = ProjectNameResolver.cleanProjectName(name) }
+            // An explicit display name wins over the dimension narrowing: the
+            // reader who wrote one has said what to call this slice. The
+            // narrowed name stays the fallback, so a panel with rules that do
+            // not name anything still says "toki" rather than "toki · opus".
+            if let panel, panel.hasFieldConfig,
+               panel.panelType.honouredFieldProperties.contains(.displayName),
+               let field = selection.resolve(in: frame) {
+                name = panel.seriesName(name, field: field)
+            }
             if totals[name] == nil { order.append(name) }
             totals[name, default: 0] += value
         }

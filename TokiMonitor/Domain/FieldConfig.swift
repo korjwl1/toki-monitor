@@ -319,3 +319,96 @@ enum Thresholds {
         v == v.rounded() ? String(Int(v)) : String(format: "%g", v)
     }
 }
+
+// MARK: - What a panel resolves for a field
+
+/// One property of `FieldDisplayConfig`, so a panel type can say which ones its
+/// render actually reads.
+///
+/// The editor offers a property on a panel only when that panel's render
+/// honours it (계약 R1). Without this the override editor would be one list of
+/// six controls, most of which do nothing on most panel types — and a control
+/// that silently does nothing sends the reader hunting for their own mistake.
+enum FieldDisplayProperty: String, CaseIterable, Sendable {
+    case displayName
+    case unit
+    case decimals
+    case color
+    case min
+    case max
+
+    var label: String {
+        switch self {
+        case .displayName: return L.tr("표시 이름", "Display name")
+        case .unit:        return L.tr("단위", "Unit")
+        case .decimals:    return L.tr("소수점 자릿수", "Decimals")
+        case .color:       return L.tr("색", "Colour")
+        case .min:         return L.tr("최소", "Min")
+        case .max:         return L.tr("최대", "Max")
+        }
+    }
+}
+
+extension FieldDisplayConfig {
+    /// Drop everything the panel drawing this field cannot honour.
+    ///
+    /// Applied on the way OUT of the resolver rather than on the way in: a
+    /// dashboard authored elsewhere, or on a panel that was a line chart
+    /// yesterday, may carry properties this type does not read. They stay in
+    /// the document — deleting a rule because the panel type changed would lose
+    /// work the reader did — and simply do not reach the render.
+    func honouring(_ properties: Set<FieldDisplayProperty>) -> FieldDisplayConfig {
+        FieldDisplayConfig(
+            displayName: properties.contains(.displayName) ? displayName : nil,
+            unit: properties.contains(.unit) ? unit : nil,
+            decimals: properties.contains(.decimals) ? decimals : nil,
+            min: properties.contains(.min) ? min : nil,
+            max: properties.contains(.max) ? max : nil,
+            color: properties.contains(.color) ? color : nil
+        )
+    }
+}
+
+extension PanelConfig {
+    /// The display config for one of this panel's fields.
+    ///
+    /// Three layers, innermost first: the panel's own unit and decimals (the
+    /// Options tab, which is where a reader sets "this whole panel is money"),
+    /// then `fieldConfig`'s defaults, then every override whose matcher hits —
+    /// later rules winning, so the list reads top to bottom the way the editor
+    /// shows it.
+    ///
+    /// This is the single resolution point. Before it there was one, inline, in
+    /// the stat card; every other panel type ignored `fieldConfig` entirely, so
+    /// a rule the reader could see in the JSON changed one panel out of seven.
+    func displayConfig(for field: Field?) -> FieldDisplayConfig {
+        var resolved = FieldDisplayConfig(unit: options.unit, decimals: options.decimals)
+        if let fieldConfig {
+            resolved = resolved.merging(fieldConfig.defaults)
+            if let field {
+                for rule in fieldConfig.overrides where rule.matcher.matches(field) {
+                    resolved = resolved.merging(rule.config)
+                }
+            }
+        }
+        return resolved.honouring(panelType.honouredFieldProperties)
+    }
+
+    /// The name to draw for a series, after any `displayName` override.
+    func seriesName(_ fallback: String, field: Field?) -> String {
+        guard let template = displayConfig(for: field).displayName, !template.isEmpty
+        else { return fallback }
+        var out = template
+        for (key, value) in field?.labels ?? [:] {
+            out = out.replacingOccurrences(of: "{{\(key)}}", with: value)
+        }
+        return out
+    }
+
+    /// Whether anything about this panel's fields has been configured. Renders
+    /// take a cheaper path when nothing has.
+    var hasFieldConfig: Bool {
+        guard let fieldConfig else { return false }
+        return !fieldConfig.defaults.isEmpty || !fieldConfig.overrides.isEmpty
+    }
+}

@@ -68,9 +68,9 @@ struct TimeSeriesChartView: View {
         chart
             .chartLegend(.hidden)
             .chartForegroundStyleScale { (model: String) in
-                viewModel.colorForModel(model)
+                self.color(for: model)
             }
-            .chartYScale(domain: .automatic(includesZero: true))
+            .modifier(YAxisDomain(range: pinnedYDomain))
             .chartXAxis {
                 AxisMarks(preset: .aligned, values: .automatic) { _ in
                     AxisGridLine()
@@ -203,7 +203,7 @@ struct TimeSeriesChartView: View {
         PanelLegendView(
             entries: PanelSeries.seriesNames(metric: metric, panel: panel,
                                              frames: frames, data: data)
-                .map { .init(name: $0, color: viewModel.colorForModel($0)) },
+                .map { .init(name: $0, color: color(for: $0)) },
             hidden: hiddenSeries,
             position: options.legendPosition,
             onToggle: { name in
@@ -221,6 +221,47 @@ struct TimeSeriesChartView: View {
     }
 
     private var showsTooltip: Bool { options.tooltipMode != .hidden }
+
+    // MARK: - Field overrides
+
+    /// The resolved display config for each series, keyed by the name the chart
+    /// draws it under. Empty unless the panel has rules.
+    private var styles: [String: FieldDisplayConfig] {
+        PanelSeries.styles(metric: metric, panel: panel, frames: frames)
+    }
+
+    /// A series' colour: the override's, when one names it, else the shared
+    /// model palette — so a model keeps one colour across every panel that did
+    /// not deliberately say otherwise.
+    private func color(for series: String) -> Color {
+        DS.seriesColor(styles[series]?.color) ?? viewModel.colorForModel(series)
+    }
+
+    /// The y axis, when an override pins one or both ends. Nil leaves the chart
+    /// to size itself and include zero, as it always has.
+    ///
+    /// A half-stated range is completed from the data rather than from zero: a
+    /// reader who wrote only a maximum meant "cap the top", not "and start at
+    /// whatever you like".
+    private var pinnedYDomain: ClosedRange<Double>? {
+        let bounds = styles.values
+        let low = bounds.compactMap(\.min).min()
+        let high = bounds.compactMap(\.max).max()
+        guard low != nil || high != nil else { return nil }
+        let drawn = segments.flatMap { $0.points.map(\.value) }
+        let lower = low ?? Swift.min(0, drawn.min() ?? 0)
+        let upper = high ?? Swift.max(drawn.max() ?? lower, lower)
+        guard upper > lower else { return nil }
+        return lower...upper
+    }
+
+    /// A value in the unit its own series was given.
+    private func format(_ value: Double, series: String) -> String {
+        if let config = styles[series], !config.isEmpty {
+            return FieldFormatter.format(value, config: config)
+        }
+        return TokenFormatter.formatTokens(UInt64(Swift.max(0, value)))
+    }
 
     /// Where each threshold sits on this chart's own y axis.
     ///
@@ -368,13 +409,13 @@ struct TimeSeriesChartView: View {
             ForEach(tooltipRows(date: date), id: \.model) { row in
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(viewModel.colorForModel(row.model))
+                        .fill(color(for: row.model))
                         .frame(width: 6, height: 6)
                     Text(row.model)
                         .font(.system(size: 9))
                         .lineLimit(1)
                     Spacer()
-                    Text(TokenFormatter.formatTokens(UInt64(max(0, row.value))))
+                    Text(format(row.value, series: row.model))
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                 }
             }
@@ -382,5 +423,22 @@ struct TimeSeriesChartView: View {
         .padding(6)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .frame(width: 160)
+    }
+}
+
+/// A y scale that is either pinned by a field override or left automatic.
+///
+/// Two `chartYScale` calls with different domain types cannot be one expression,
+/// and a chart that applied the automatic one and then the pinned one would
+/// keep the last — which is the wrong half whenever there is no override.
+private struct YAxisDomain: ViewModifier {
+    let range: ClosedRange<Double>?
+
+    func body(content: Content) -> some View {
+        if let range {
+            content.chartYScale(domain: range)
+        } else {
+            content.chartYScale(domain: .automatic(includesZero: true))
+        }
     }
 }

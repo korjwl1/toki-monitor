@@ -61,18 +61,27 @@ enum FrameReader {
             : ReduceTransformation.reduce(perFrame, using: combine)
     }
 
-    /// Per-series points for a chart, keyed by the frame's display name.
+    /// Per-series points for a chart.
+    ///
+    /// `name` decides what each series is called. It takes the frame and the
+    /// field the selection resolved to, because a `displayName` override is
+    /// written against the FIELD — `{{project}} tokens` fills from that field's
+    /// own labels. Nil is the frame's own display name, which is what every
+    /// caller wanted before overrides could rename anything.
     static func series(
         _ set: FrameSet,
-        selection: FieldSelection
+        selection: FieldSelection,
+        name: ((Frame, Field) -> String)? = nil
     ) -> [(name: String, points: [(date: Date, value: Double?)])] {
         set.frames.compactMap { frame in
             guard let times = frame.timeField,
                   case let .time(dates) = times.values,
-                  let values = selection.resolve(in: frame)?.values.numbers
+                  let field = selection.resolve(in: frame),
+                  let values = field.values.numbers
             else { return nil }
             let n = min(dates.count, values.count)
-            return (frame.displayName, (0..<n).map { (dates[$0], values[$0]) })
+            let seriesName = name?(frame, field) ?? frame.displayName
+            return (seriesName, (0..<n).map { (dates[$0], values[$0]) })
         }
     }
 

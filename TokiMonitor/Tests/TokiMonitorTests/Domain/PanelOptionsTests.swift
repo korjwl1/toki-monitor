@@ -221,7 +221,7 @@ struct PanelOptionsTests {
     /// editor and the tooltip always listed everything.
     @Test("single-series tooltip picks the stacked band under the cursor")
     func singleTooltipPicksOneBand() {
-        let values = [("opus", 10), ("sonnet", 20), ("haiku", 5)]
+        let values: [(String, Double)] = [("opus", 10), ("sonnet", 20), ("haiku", 5)]
         #expect(BarChartTooltipOverlay.bandUnderCursor(values, at: 5).map(\.0) == ["opus"])
         #expect(BarChartTooltipOverlay.bandUnderCursor(values, at: 25).map(\.0) == ["sonnet"])
         #expect(BarChartTooltipOverlay.bandUnderCursor(values, at: 33).map(\.0) == ["haiku"])

@@ -24,7 +24,7 @@ struct GaugePanelView: View {
     var body: some View {
         let stat = StatPanelView.statValue(panel: panel, data: data, frames: frames)
         let value = StatPanelView.numericValue(panel: panel, data: data, frames: frames)
-        let scale = Self.scale(for: value, options: panel.options)
+        let scale = Self.scale(for: value, panel: panel)
 
         GeometryReader { geo in
             // The scale labels sit under the dial, so the dial gets what is
@@ -122,6 +122,20 @@ struct GaugePanelView: View {
     /// range someone already cared about, and failing that the value picks a
     /// round ceiling above itself — never exactly the value, which would pin
     /// every gauge at full and say nothing.
+    /// The dial's ends for a whole panel: its own min/max first, then a
+    /// `min`/`max` written on a field override, then the fallbacks below.
+    ///
+    /// A gauge is the one panel type where an override's min and max have
+    /// somewhere to go, which is why it is one of the two types that offers
+    /// them (계약 R1).
+    static func scale(for value: Double?, panel: PanelConfig) -> Scale {
+        var options = panel.options
+        let resolved = panel.displayConfig(for: nil)
+        options.gaugeMin = options.gaugeMin ?? resolved.min
+        options.gaugeMax = options.gaugeMax ?? resolved.max
+        return scale(for: value, options: options)
+    }
+
     static func scale(for value: Double?, options: PanelDisplayOptions) -> Scale {
         let lower = options.gaugeMin ?? 0
         // Only absolute steps describe a range. A percentage step is measured
@@ -233,7 +247,7 @@ struct GaugePanelView: View {
                             frames: FrameSet?) -> String {
         let stat = StatPanelView.statValue(panel: panel, data: data, frames: frames)
         let value = StatPanelView.numericValue(panel: panel, data: data, frames: frames)
-        let scale = Self.scale(for: value, options: panel.options)
+        let scale = Self.scale(for: value, panel: panel)
         let low = label(scale.min, panel: panel)
         let high = label(scale.max, panel: panel)
         let range = L.tr("\(stat.value), \(low)에서 \(high) 사이",
