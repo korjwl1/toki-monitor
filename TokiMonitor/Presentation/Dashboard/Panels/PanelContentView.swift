@@ -32,7 +32,17 @@ struct PanelContentView: View {
         case .pieChart:
             pieChart
         case .table:
-            TablePanelView(panel: panel, data: data, frames: frames)
+            TablePanelView(
+                panel: panel, data: data, frames: frames,
+                // A table has no legend to hide a series with, so this is its
+                // whole view-time filter: per column, off unless the editor
+                // marked the field filterable, and it does not fetch.
+                excluded: viewModel.columnFilters(for: panel.id),
+                onSetFilter: { column, values in
+                    viewModel.setColumnFilter(values, panelID: panel.id, column: column)
+                },
+                onClearFilters: { viewModel.clearColumnFilters(panelID: panel.id) }
+            )
         case .gauge:
             GaugePanelView(panel: panel, data: data, frames: frames)
         case .stateTimeline:

@@ -140,6 +140,41 @@ struct MinimumWindowTests {
                 "the table spilled \(ink) sampled pixels onto the page instead of scrolling in its own container")
     }
 
+    /// The funnels are extra ink in a header that was already the widest thing
+    /// in the panel. They have to truncate the column name rather than widen
+    /// the column — the whole point of R6 is that no panel pushes the page.
+    @Test("a filterable table keeps its funnels inside the narrowest cell")
+    func filterableTableFitsTheNarrowestCell() {
+        var panel = PanelSnapshotFixtures.panel(.table)
+        panel.fieldConfig = FieldConfigSource(
+            defaults: FieldDisplayConfig(filterable: true)
+        )
+        let ink = overflowInk(
+            of: TablePanelView(panel: panel, data: nil,
+                               frames: PanelSnapshotFixtures.frames,
+                               onSetFilter: { _, _ in }),
+            cellWidth: Self.narrowestCell(for: .table)
+        )
+        #expect(ink == 0,
+                "the column filters spilled \(ink) sampled pixels onto the page")
+    }
+
+    /// A hidden slice leaves its legend entry behind — struck through, with a
+    /// hollow swatch — which is wider than the entry was before, in the panel
+    /// type whose legend is already pinned to 140pt.
+    @Test("a pie with a hidden slice keeps its legend inside the cell")
+    func pieWithHiddenSliceFits() {
+        let ink = overflowInk(
+            of: PieChartView(
+                entries: [.init(label: "claude-opus-4-1-20250805", value: 62),
+                          .init(label: "claude-sonnet-4-5-20250929", value: 38)],
+                colors: nil, hidden: ["claude-opus-4-1-20250805"], onToggle: { _ in }
+            ),
+            cellWidth: Self.narrowestCell(for: .pieChart)
+        )
+        #expect(ink == 0, "the pie legend spilled \(ink) sampled pixels")
+    }
+
     @Test("a state timeline over a long window scrolls inside itself")
     func wideTimelineScrollsInside() {
         let frames = FrameSet(frames: (0..<4).map { index in

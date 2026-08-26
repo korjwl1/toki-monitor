@@ -9,10 +9,12 @@
 /* Begin PBXBuildFile section */
 		AA62NOTICESNAP0002 /* PanelNoticeSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */; };
 		AA62SERVISTEST0002 /* SeriesVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */; };
+		AA85TBLFLTTEST0002 /* TableColumnFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA85TBLFLTTEST0001 /* TableColumnFilterTests.swift */; };
 		AA62FILTNOTETEST02 /* UnappliedFilterNoticeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62FILTNOTETEST01 /* UnappliedFilterNoticeTests.swift */; };
 		AA62PANELLEG000002 /* PanelLegendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62PANELLEG000001 /* PanelLegendView.swift */; };
 		AA75PANELVSUM0002 /* PanelValueSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA75PANELVSUM0001 /* PanelValueSummary.swift */; };
 		AA62SERIESVIS00002 /* SeriesVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62SERIESVIS00001 /* SeriesVisibility.swift */; };
+		AA85TBLFILTER0002 /* TableColumnFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA85TBLFILTER0001 /* TableColumnFilters.swift */; };
 		AA61PANELRPTTEST02 /* PanelRepeatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA61PANELRPTTEST01 /* PanelRepeatTests.swift */; };
 		AA61PANELRPT000002 /* PanelRepeat.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA61PANELRPT000001 /* PanelRepeat.swift */; };
 		AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */; };
@@ -254,10 +256,12 @@
 /* Begin PBXFileReference section */
 		AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelNoticeSnapshotTests.swift; sourceTree = "<group>"; };
 		AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesVisibilityTests.swift; sourceTree = "<group>"; };
+		AA85TBLFLTTEST0001 /* TableColumnFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableColumnFilterTests.swift; sourceTree = "<group>"; };
 		AA62FILTNOTETEST01 /* UnappliedFilterNoticeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnappliedFilterNoticeTests.swift; sourceTree = "<group>"; };
 		AA62PANELLEG000001 /* PanelLegendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelLegendView.swift; sourceTree = "<group>"; };
 		AA75PANELVSUM0001 /* PanelValueSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelValueSummary.swift; sourceTree = "<group>"; };
 		AA62SERIESVIS00001 /* SeriesVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesVisibility.swift; sourceTree = "<group>"; };
+		AA85TBLFILTER0001 /* TableColumnFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableColumnFilters.swift; sourceTree = "<group>"; };
 		AA61PANELRPTTEST01 /* PanelRepeatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelRepeatTests.swift; sourceTree = "<group>"; };
 		AA61PANELRPT000001 /* PanelRepeat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelRepeat.swift; sourceTree = "<group>"; };
 		AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableRefreshPolicyTests.swift; sourceTree = "<group>"; };
@@ -768,6 +772,7 @@
 				AA70LOSSTOL000001 /* LossTolerantStoreTests.swift */,
 				AA90AGGRATE000001 /* TokenAggregatorRateTests.swift */,
 				AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */,
+				AA85TBLFLTTEST0001 /* TableColumnFilterTests.swift */,
 				AA62FILTNOTETEST01 /* UnappliedFilterNoticeTests.swift */,
 				AA61PANELRPTTEST01 /* PanelRepeatTests.swift */,
 						AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */,
@@ -898,6 +903,7 @@
 			isa = PBXGroup;
 			children = (
 				AA62SERIESVIS00001 /* SeriesVisibility.swift */,
+				AA85TBLFILTER0001 /* TableColumnFilters.swift */,
 				AA61PANELRPT000001 /* PanelRepeat.swift */,
 				AA40PANELSTATE0001 /* PanelState.swift */,
 				AA81PTIMEOVR00001 /* PanelTimeOverride.swift */,
@@ -1049,6 +1055,7 @@
 				AA62PANELLEG000002 /* PanelLegendView.swift in Sources */,
 				AA75PANELVSUM0002 /* PanelValueSummary.swift in Sources */,
 				AA62SERIESVIS00002 /* SeriesVisibility.swift in Sources */,
+				AA85TBLFILTER0002 /* TableColumnFilters.swift in Sources */,
 				AA61PANELRPT000002 /* PanelRepeat.swift in Sources */,
 				AA03PFACTIV0B001 /* ActiveUseSection.swift in Sources */,
 				AA03PFEMPT0B001 /* EmptyStateSection.swift in Sources */,
@@ -1204,6 +1211,7 @@
 			files = (
 				AA62NOTICESNAP0002 /* PanelNoticeSnapshotTests.swift in Sources */,
 				AA62SERVISTEST0002 /* SeriesVisibilityTests.swift in Sources */,
+				AA85TBLFLTTEST0002 /* TableColumnFilterTests.swift in Sources */,
 				AA62FILTNOTETEST02 /* UnappliedFilterNoticeTests.swift in Sources */,
 				AA61PANELRPTTEST02 /* PanelRepeatTests.swift in Sources */,
 						AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */,

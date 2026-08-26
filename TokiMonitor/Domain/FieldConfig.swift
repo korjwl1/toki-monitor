@@ -29,9 +29,19 @@ struct FieldDisplayConfig: Codable, Equatable, Sendable {
     /// Hex string; nil leaves the palette to assign one.
     var color: String?
 
+    /// Whether a table column built from this field offers the reader a filter
+    /// in its header (Grafana's `custom.filterable`).
+    ///
+    /// An editor-time decision about a view-time control, which is the shape
+    /// Grafana chose and the right one: who may narrow the table is the
+    /// author's call, narrowing it is the reader's. Off unless a rule says
+    /// otherwise — nil and `false` mean the same thing here, and nil is what
+    /// keeps a dashboard that predates this re-encoding unchanged.
+    var filterable: Bool?
+
     var isEmpty: Bool {
         displayName == nil && unit == nil && decimals == nil
-            && min == nil && max == nil && color == nil
+            && min == nil && max == nil && color == nil && filterable == nil
     }
 
     /// Layer another config on top. Non-nil properties of `other` win, which is
@@ -43,7 +53,8 @@ struct FieldDisplayConfig: Codable, Equatable, Sendable {
             decimals: other.decimals ?? decimals,
             min: other.min ?? min,
             max: other.max ?? max,
-            color: other.color ?? color
+            color: other.color ?? color,
+            filterable: other.filterable ?? filterable
         )
     }
 }
@@ -336,6 +347,7 @@ enum FieldDisplayProperty: String, CaseIterable, Sendable {
     case color
     case min
     case max
+    case filterable
 
     var label: String {
         switch self {
@@ -345,6 +357,7 @@ enum FieldDisplayProperty: String, CaseIterable, Sendable {
         case .color:       return L.tr("색", "Colour")
         case .min:         return L.tr("최소", "Min")
         case .max:         return L.tr("최대", "Max")
+        case .filterable:  return L.tr("열 필터 허용", "Filterable")
         }
     }
 }
@@ -364,7 +377,8 @@ extension FieldDisplayConfig {
             decimals: properties.contains(.decimals) ? decimals : nil,
             min: properties.contains(.min) ? min : nil,
             max: properties.contains(.max) ? max : nil,
-            color: properties.contains(.color) ? color : nil
+            color: properties.contains(.color) ? color : nil,
+            filterable: properties.contains(.filterable) ? filterable : nil
         )
     }
 }

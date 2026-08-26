@@ -978,7 +978,12 @@ enum PanelType: String, Codable, CaseIterable {
             // panel only.
             return [.displayName]
         case .table:
-            return [.displayName, .unit, .decimals]
+            // The one type with COLUMNS, and so the one type where a per-field
+            // filter has anywhere to live. Grafana puts it in exactly the same
+            // place, for the same reason: a legend hides a series, a table has
+            // no series to hide, and its header is where a reader is already
+            // looking when they want less of it.
+            return [.displayName, .unit, .decimals, .filterable]
         case .stateTimeline:
             // Rows are named; their colour comes from the thresholds and their
             // values are band names rather than numbers.

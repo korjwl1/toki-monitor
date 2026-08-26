@@ -468,9 +468,16 @@ struct FieldOverrideApplicationTests {
         #expect(!PanelType.gauge.honouredFieldProperties.contains(.color))
         #expect(!PanelType.pieChart.honouredFieldProperties.contains(.color))
         #expect(!PanelType.stat.honouredFieldProperties.contains(.displayName))
-        #expect(PanelType.timeSeries.honouredFieldProperties.count
-                    == FieldDisplayProperty.allCases.count,
-                "a line chart is the one type that reads all six")
+        // A line chart reads every property that describes how a value is
+        // DRAWN. It has no columns, so it does not read the one that describes
+        // a column header.
+        #expect(PanelType.timeSeries.honouredFieldProperties
+                    == Set(FieldDisplayProperty.allCases).subtracting([.filterable]))
+        // And the filter is offered on the one type that has a header to put
+        // it in. Anywhere else it would be a control with nowhere to appear.
+        #expect(PanelType.allCases.filter {
+            $0.honouredFieldProperties.contains(.filterable)
+        } == [.table])
         #expect(PanelType.rowPanel.honouredFieldProperties.isEmpty)
         #expect(PanelType.unknown.honouredFieldProperties.isEmpty)
     }

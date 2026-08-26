@@ -65,6 +65,14 @@ final class DashboardViewModel {
     /// not a property of the dashboard. Storing it would hand the next reader
     /// a chart with a series missing and nothing to explain it.
     var seriesVisibility = SeriesVisibility()
+    /// Values a reader has excluded from a table's columns.
+    ///
+    /// Beside `seriesVisibility` and for the same reasons: render stage, per
+    /// panel, not persisted. The two never apply to the same panel — a legend
+    /// hides a series on a chart, a column filter excludes a value from a
+    /// table, and no panel type has both — which is what keeps this from being
+    /// the second unaware render-stage filter R7 exists to prevent.
+    var columnFilters = TableColumnFilters()
     var panelData: [UUID: PanelDataState] = [:]
 
     /// Where the reader is pointing, shared by every time chart on this
@@ -814,6 +822,27 @@ final class DashboardViewModel {
     /// The series hidden on one panel.
     func hiddenSeries(for panelID: UUID) -> Set<String> {
         seriesVisibility.hidden(for: panelID)
+    }
+
+    // MARK: - Table column filters
+
+    /// Narrow a table column to the values the reader ticked.
+    ///
+    /// It does not fetch, for the same reason `toggleSeries` does not: the rows
+    /// are already here, and which of them to draw is a question about the
+    /// drawing.
+    func setColumnFilter(_ excluded: Set<String>, panelID: UUID, column: String) {
+        columnFilters.set(excluded, panelID: panelID, column: column)
+    }
+
+    /// Every column filter on one panel, for the render.
+    func columnFilters(for panelID: UUID) -> [String: Set<String>] {
+        columnFilters.columns(panelID: panelID)
+    }
+
+    /// Bring every row of one table back.
+    func clearColumnFilters(panelID: UUID) {
+        columnFilters.clear(panelID: panelID)
     }
 
     // MARK: - Computed

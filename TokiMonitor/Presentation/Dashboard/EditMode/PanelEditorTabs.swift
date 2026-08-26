@@ -306,8 +306,43 @@ struct PanelEditorVisualizationTab: View {
         }
     }
 
+    /// A table has no legend — there are no series to switch off, only rows —
+    /// so the filter here is the whole of what a reader can do to narrow it
+    /// once the dashboard is out of edit mode. Which is why it is an editor's
+    /// decision that the reader then uses, exactly as Grafana has it.
     private var tableOptions: some View {
-        Toggle(L.tr("헤더 표시", "Show header"), isOn: $panel.options.showHeader)
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(L.tr("헤더 표시", "Show header"), isOn: $panel.options.showHeader)
+
+            Toggle(L.tr("열 필터 허용", "Filterable columns"), isOn: Binding(
+                get: { panel.fieldConfig?.defaults.filterable == true },
+                set: { on in
+                    var config = panel.fieldConfig ?? FieldConfigSource()
+                    // nil rather than `false` when switched off, so a table
+                    // nobody has filtered re-encodes exactly as it arrived.
+                    config.defaults.filterable = on ? true : nil
+                    panel.fieldConfig = config.defaults.isEmpty && config.overrides.isEmpty
+                        ? nil : config
+                }
+            ))
+
+            Text(L.tr("켜면 각 열 머리글에 깔때기가 생기고, 보는 사람이 편집 모드에 들어가지 않고 값을 골라낼 수 있습니다. 열 하나만 예외로 두려면 옵션 탭의 필드 오버라이드를 쓰세요.",
+                      "A funnel appears in each column header, and a reader picks which values to show without entering edit mode. Use a field override on the Options tab to exempt one column."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // The funnel lives in the header. With the header off there is
+            // nowhere for it to appear, and a setting whose control never
+            // shows up is the R1 failure in its quietest form.
+            if panel.fieldConfig?.defaults.filterable == true, !panel.options.showHeader {
+                Text(L.tr("헤더가 꺼져 있어 깔때기가 나타날 자리가 없습니다.",
+                          "With the header off there is nowhere for the funnel to appear."))
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private var gaugeOptions: some View {
@@ -834,6 +869,29 @@ struct PanelEditorOptionsTab: View {
                         .help(L.tr("다른 도구에서 온 색입니다. 그대로 그리고, 여기서 고르면 대체됩니다.",
                                    "A colour from another tool. It is drawn as written, and picking one here replaces it."))
                 }
+                Spacer()
+            }
+        }
+
+        if honoured.contains(.filterable) {
+            HStack {
+                Text(FieldDisplayProperty.filterable.label)
+                    .font(.caption)
+                    .frame(width: 72, alignment: .leading)
+                // Three states, not a checkbox: a rule that says nothing about
+                // filtering must leave the table's own setting standing, and
+                // only a third value can express that.
+                Picker("", selection: Binding(
+                    get: { rule.wrappedValue.config.filterable },
+                    set: { rule.wrappedValue.config.filterable = $0 }
+                )) {
+                    Text(L.tr("바꾸지 않음", "Unchanged")).tag(Bool?.none)
+                    Text(L.tr("허용", "Filterable")).tag(Bool?.some(true))
+                    Text(L.tr("허용 안 함", "Not filterable")).tag(Bool?.some(false))
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 130)
                 Spacer()
             }
         }
