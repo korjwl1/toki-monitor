@@ -185,6 +185,7 @@
 		AA03SNAPHARNESS000002 /* PlanFitSnapshotHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03SNAPHARNESS000001 /* PlanFitSnapshotHarness.swift */; };
 		AA03ACTIVEUSETEST0002 /* WindowStatsActiveUseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03ACTIVEUSETEST0001 /* WindowStatsActiveUseTests.swift */; };
 		AA03PFVERDICTTEST0002 /* PlanFitVerdictTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFVERDICTTEST0001 /* PlanFitVerdictTests.swift */; };
+		AA82UTCBUCKET01B /* UTCDayBucketingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA82UTCBUCKET01F /* UTCDayBucketingTests.swift */; };
 		AA03PERIODAGGTEST002 /* PeriodAggregationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PERIODAGGTEST001 /* PeriodAggregationTests.swift */; };
 		AA03ACCTSHAPETEST002 /* AccountShapeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03ACCTSHAPETEST001 /* AccountShapeTests.swift */; };
 		CFD0A81A65B4A68AAF74C191 /* PanelFetchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CC4A7E29F84136565F5CED9 /* PanelFetchCoordinator.swift */; };
@@ -393,6 +394,7 @@
 		AA03SNAPHARNESS000001 /* PlanFitSnapshotHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitSnapshotHarness.swift; sourceTree = "<group>"; };
 		AA03ACTIVEUSETEST0001 /* WindowStatsActiveUseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStatsActiveUseTests.swift; sourceTree = "<group>"; };
 		AA03PFVERDICTTEST0001 /* PlanFitVerdictTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitVerdictTests.swift; sourceTree = "<group>"; };
+		AA82UTCBUCKET01F /* UTCDayBucketingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UTCDayBucketingTests.swift; sourceTree = "<group>"; };
 		AA03PERIODAGGTEST001 /* PeriodAggregationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodAggregationTests.swift; sourceTree = "<group>"; };
 		AA03ACCTSHAPETEST001 /* AccountShapeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountShapeTests.swift; sourceTree = "<group>"; };
 		955951A7FF5652C64A116C70 /* ClaudeUsageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageMonitor.swift; sourceTree = "<group>"; };
@@ -770,6 +772,7 @@
 				931B0DC9F00382D4E2B59E14 /* WindowStatsTests.swift */,
 				AA03ACTIVEUSETEST0001 /* WindowStatsActiveUseTests.swift */,
 				AA03PFVERDICTTEST0001 /* PlanFitVerdictTests.swift */,
+				AA82UTCBUCKET01F /* UTCDayBucketingTests.swift */,
 				AA03PERIODAGGTEST001 /* PeriodAggregationTests.swift */,
 				AA03ACCTSHAPETEST001 /* AccountShapeTests.swift */,
 				AA31TRANSTEST00000001 /* TransformationTests.swift */,
@@ -1228,6 +1231,7 @@
 				AA03SNAPHARNESS000002 /* PlanFitSnapshotHarness.swift in Sources */,
 				AA03ACTIVEUSETEST0002 /* WindowStatsActiveUseTests.swift in Sources */,
 				AA03PFVERDICTTEST0002 /* PlanFitVerdictTests.swift in Sources */,
+				AA82UTCBUCKET01B /* UTCDayBucketingTests.swift in Sources */,
 				AA03PERIODAGGTEST002 /* PeriodAggregationTests.swift in Sources */,
 				AA03ACCTSHAPETEST002 /* AccountShapeTests.swift in Sources */,
 				AA31TRANSTEST00000002 /* TransformationTests.swift in Sources */,

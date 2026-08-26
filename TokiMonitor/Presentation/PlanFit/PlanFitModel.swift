@@ -1915,7 +1915,19 @@ extension PlanFitModelBuilder {
             let modelSamples = samples.filter { $0.model == model }.map {
                 UsageSample(date: $0.day, amount: $0.totalTokens)
             }
-            let periods = PeriodAggregation.aggregate(samples: modelSamples, unit: unit, now: now)
+            // Bucketed in UTC, because that is what these dates are. The
+            // model-usage query runs `toki query -z UTC`, so every `day` here
+            // is a UTC midnight; re-bucketing those with the local calendar
+            // pushes each one into the previous local day anywhere west of
+            // Greenwich, and the change rate comes out wrong at week and month
+            // boundaries. It reads correctly in KST, which is why it survived.
+            //
+            // The trend above does NOT need this — it buckets real
+            // `windowEndMs` instants, which are points in time rather than
+            // pre-bucketed days.
+            let periods = PeriodAggregation.aggregate(
+                samples: modelSamples, unit: unit, now: now, calendar: Self.utcCalendar
+            )
             // The daily-average rate, not the total one: a period still running
             // held against a finished one reports a collapse that is only the
             // calendar.
@@ -1976,6 +1988,17 @@ extension PlanFitModelBuilder {
     /// coverage line instead. Adding it as zero would quietly understate the
     /// total, which for the one figure on the page that is about money is the
     /// worst available failure.
+    /// UTC, with the user's first weekday preserved.
+    ///
+    /// Only for samples that are already UTC-bucketed days. Everything else on
+    /// this page uses `PeriodAggregation.userCalendar`, and that stays the
+    /// single notion of "the week".
+    static let utcCalendar: Calendar = {
+        var c = PeriodAggregation.userCalendar
+        c.timeZone = TimeZone(identifier: "UTC") ?? c.timeZone
+        return c
+    }()
+
     static func money(usage: ModelUsageInput) -> MoneySummaryModel {
         let samples = usage.samples
         guard !samples.isEmpty else { return .empty }
