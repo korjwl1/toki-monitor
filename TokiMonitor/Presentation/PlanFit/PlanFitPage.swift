@@ -150,7 +150,8 @@ struct PlanFitPage: View {
                             model: summary.model,
                             day: day,
                             totalTokens: Double(summary.totalTokens),
-                            costUsd: summary.costUsd
+                            costUsd: summary.costUsd,
+                            costFromCompiledTable: summary.costFromCompiledTable
                         ))
                     }
                 }

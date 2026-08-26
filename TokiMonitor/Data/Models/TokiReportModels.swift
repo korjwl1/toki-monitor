@@ -10,6 +10,17 @@ struct TokiModelSummary: Codable, Identifiable {
     let events: Int
     let costUsd: Double?
 
+    /// True when `costUsd` came from the price table compiled into the app
+    /// rather than from the daemon or its LiteLLM cache.
+    ///
+    /// It has to travel with the number. The compiled table is a last resort
+    /// for a model too new to be priced anywhere, and it goes stale silently;
+    /// a reader who cannot tell it apart from a daemon-reported cost has no
+    /// way to know which figures to trust. `FrameAdapter` already keeps this
+    /// distinction for the panel path — this is the same rule on the report
+    /// path, which was dropping it.
+    var costFromCompiledTable: Bool = false
+
     // Claude Code specific
     let cacheCreationInputTokens: UInt64?
     let cacheReadInputTokens: UInt64?
@@ -176,15 +187,25 @@ enum TokiReportParser {
                 if correctedModel == "(total)", let label = periodLabel {
                     correctedModel = label
                 }
-                // Compute cost client-side when not provided by CLI
-                let cost = summary.costUsd ?? ModelPricing.estimateCost(
-                    model: correctedModel,
-                    inputTokens: summary.inputTokens,
-                    outputTokens: summary.outputTokens,
-                    cacheCreationInputTokens: summary.cacheCreationInputTokens,
-                    cacheReadInputTokens: summary.cacheReadInputTokens,
-                    cachedInputTokens: summary.cachedInputTokens
-                )
+                // Compute cost client-side when not provided by CLI, and keep
+                // WHICH table answered — see `costFromCompiledTable`.
+                let cost: Double?
+                let fromCompiled: Bool
+                if let reported = summary.costUsd {
+                    cost = reported
+                    fromCompiled = false
+                } else {
+                    let estimate = ModelPricing.estimate(
+                        model: correctedModel,
+                        inputTokens: summary.inputTokens,
+                        outputTokens: summary.outputTokens,
+                        cacheCreationInputTokens: summary.cacheCreationInputTokens,
+                        cacheReadInputTokens: summary.cacheReadInputTokens,
+                        cachedInputTokens: summary.cachedInputTokens
+                    )
+                    cost = estimate?.cost
+                    fromCompiled = estimate?.source == .compiledFallback
+                }
                 return TokiModelSummary(
                     model: correctedModel,
                     inputTokens: summary.inputTokens,
@@ -192,6 +213,7 @@ enum TokiReportParser {
                     totalTokens: summary.totalTokens,
                     events: summary.events,
                     costUsd: cost,
+                    costFromCompiledTable: fromCompiled,
                     cacheCreationInputTokens: summary.cacheCreationInputTokens,
                     cacheReadInputTokens: summary.cacheReadInputTokens,
                     cachedInputTokens: summary.cachedInputTokens,

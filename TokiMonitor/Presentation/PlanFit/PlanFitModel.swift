@@ -594,6 +594,11 @@ struct ModelUsageSample: Equatable, Sendable, Hashable {
     /// nil when no price is known for the model. Not zero — an unknown cost
     /// added as zero silently understates the total.
     let costUsd: Double?
+    /// True when `costUsd` came from the table compiled into the app rather
+    /// than the daemon's price data. The distinction has to reach the screen:
+    /// the compiled table is a last resort for a model too new to be priced
+    /// anywhere, and it goes stale without saying so.
+    var costFromCompiledTable: Bool = false
 }
 
 /// Whether the token-event query ran at all.
@@ -1975,12 +1980,19 @@ extension PlanFitModelBuilder {
         let samples = usage.samples
         guard !samples.isEmpty else { return .empty }
 
-        var byProvider: [String: (cost: Double, priced: Set<String>, unpriced: Set<String>)] = [:]
+        var byProvider: [String: (cost: Double, priced: Set<String>,
+                                  unpriced: Set<String>, compiled: Set<String>)] = [:]
         for sample in samples {
-            var entry = byProvider[sample.provider] ?? (0, [], [])
+            var entry = byProvider[sample.provider] ?? (0, [], [], [])
             if let cost = sample.costUsd {
                 entry.cost += cost
                 entry.priced.insert(sample.model)
+                // Which table answered matters as much as whether one did. The
+                // coverage line below tells the reader the models it did NOT
+                // count; without this it would leave them believing the ones it
+                // did count are priced from current data, when some may come
+                // from a table compiled into the app months ago.
+                if sample.costFromCompiledTable { entry.compiled.insert(sample.model) }
             } else {
                 entry.unpriced.insert(sample.model)
             }
@@ -1995,16 +2007,24 @@ extension PlanFitModelBuilder {
             total += entry.cost
             let missing = entry.unpriced.subtracting(entry.priced)
             anyUnpriced += missing.count
+            var clauses: [String] = []
+            if !missing.isEmpty {
+                clauses.append(L.tr(
+                    "가격을 모르는 모델 \(missing.count)개는 빠져 있어 실제보다 작습니다",
+                    "\(missing.count) models have no known price and are left out, so this is under the real figure"
+                ))
+            }
+            if !entry.compiled.isEmpty {
+                clauses.append(L.tr(
+                    "모델 \(entry.compiled.count)개는 앱에 내장된 가격표로 환산했습니다",
+                    "\(entry.compiled.count) priced from the table built into the app, not from live price data"
+                ))
+            }
             notes.append(MoneyNote(
                 id: "money|\(provider)",
                 label: PlanFitFormat.providerTitle(provider),
                 usd: entry.cost,
-                coverage: missing.isEmpty
-                    ? nil
-                    : L.tr(
-                        "가격을 모르는 모델 \(missing.count)개는 빠져 있어 실제보다 작습니다",
-                        "\(missing.count) models have no known price and are left out, so this is under the real figure"
-                    )
+                coverage: clauses.isEmpty ? nil : clauses.joined(separator: ". ")
             ))
         }
         guard !notes.isEmpty else { return .empty }

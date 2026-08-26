@@ -198,7 +198,7 @@ struct BarChartPanelView: View {
         if let config = styles[series], !config.isEmpty {
             return FieldFormatter.format(value, config: config)
         }
-        return value == value.rounded() ? String(Int(value)) : String(format: "%g", value)
+        return PanelValueFormat.fallback(value)
     }
 
     private func animateIn() {
@@ -247,18 +247,19 @@ struct BarChartPanelView: View {
         return unique.min(by: { abs($0.timeIntervalSince(date)) < abs($1.timeIntervalSince(date)) })
     }
 
+    /// The same style the axis beside it uses.
+    ///
+    /// This used to build its own `DateFormatter` per call with a hardcoded
+    /// `"HH:mm"`. Setting `locale` does not undo a fixed format string, so a
+    /// reader whose region uses a 12-hour clock got `2:30 PM` on the axis and
+    /// `14:30` in the tooltip of the same chart. `PanelDateFormat`'s own
+    /// comment says it exists because "a preview whose axis is formatted
+    /// differently from the dashboard is showing a different chart" — the same
+    /// argument applies within one chart.
     private func formatBarDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale.current
-        let secs = viewModel.dashboardConfig.time.bucketSeconds
-        if secs < 3600 {
-            f.dateFormat = "HH:mm"
-        } else if secs < 86400 {
-            f.dateFormat = "M/d HH:mm"
-        } else {
-            f.dateFormat = "M/d"
-        }
-        return f.string(from: date)
+        date.formatted(
+            PanelDateFormat.forBucket(seconds: viewModel.dashboardConfig.time.bucketSeconds)
+        )
     }
 }
 

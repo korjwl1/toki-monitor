@@ -117,14 +117,20 @@ struct StateTimelinePanelView: View {
             states.append(span.label)
             if let v = span.value { valueForState[span.label] = v }
         }
-        return states.map { state in
+        return states.enumerated().map { index, state in
             if let v = valueForState[state],
                let token = StateTimelineBuilder.color(for: v, thresholds: panel.options.thresholds) {
                 // One measured palette for every threshold in the app, so a
                 // band reads the same here as it does on a gauge.
                 return DS.threshold(token)
             }
-            return Self.defaultPalette[abs(state.hashValue) % Self.defaultPalette.count]
+            // Indexed by the state's position, not by its hash. Swift seeds
+            // Hasher per process, so `hashValue` gives a different answer every
+            // launch — the palette was being reshuffled on every start, which
+            // is the opposite of what the comment above promises. (`abs()` on
+            // Int.min also traps.) Position is stable because `states` is built
+            // in first-appearance order from spans that are already sorted.
+            return Self.defaultPalette[index % Self.defaultPalette.count]
         }
     }
 

@@ -313,7 +313,7 @@ struct TimeSeriesChartView: View {
         if let config = styles[series], !config.isEmpty {
             return FieldFormatter.format(value, config: config)
         }
-        return TokenFormatter.formatTokens(UInt64(Swift.max(0, value)))
+        return PanelValueFormat.fallback(value)
     }
 
     /// Where each threshold sits on this chart's own y axis.

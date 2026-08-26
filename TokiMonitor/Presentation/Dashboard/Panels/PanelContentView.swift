@@ -69,6 +69,28 @@ struct PanelContentView: View {
 /// The axis label format that matches a time range's bucket width. Shared for
 /// the same reason as the render: a preview whose axis is formatted
 /// differently from the dashboard is showing a different chart.
+/// The one fallback used when a series has no field config.
+///
+/// It exists because there were two. `BarChartPanelView` fell back to
+/// `String(Int(value))` / `"%g"` and `TimeSeriesChartView` to
+/// `TokenFormatter.formatTokens`, from functions with the same name, the same
+/// signature and the same doc comment — so the same series read `1500000` in a
+/// bar tooltip and `1.5M` in a line tooltip on the same dashboard. Neither was
+/// wrong on its own; having both was.
+///
+/// Whole numbers abbreviate (they are token counts in every stock panel);
+/// anything with a fraction is a cost or a ratio and keeps its decimals,
+/// which `formatTokens` would have truncated away.
+enum PanelValueFormat {
+    static func fallback(_ value: Double) -> String {
+        guard value == value.rounded(), value.magnitude < 1e18 else {
+            return String(format: "%g", value)
+        }
+        if value < 0 { return String(Int(value)) }
+        return TokenFormatter.formatTokens(UInt64(value))
+    }
+}
+
 enum PanelDateFormat {
     static func forBucket(seconds: Int) -> Date.FormatStyle {
         if seconds < 3600 {
