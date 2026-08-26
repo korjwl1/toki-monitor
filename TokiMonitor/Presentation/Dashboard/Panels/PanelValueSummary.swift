@@ -41,7 +41,7 @@ enum PanelValueSummary {
         case .timeSeries, .barChart:
             return seriesText(panel: panel, data: data, frames: frames, hidden: hidden)
         case .pieChart:
-            return breakdownText(panel: panel, data: data, frames: frames)
+            return breakdownText(panel: panel, data: data, frames: frames, hidden: hidden)
         case .table:
             return tableText(panel: panel, data: data, frames: frames)
         case .stateTimeline:
@@ -102,9 +102,18 @@ enum PanelValueSummary {
     }
 
     private static func breakdownText(panel: PanelConfig, data: TimeSeriesData?,
-                                      frames: FrameSet?) -> String? {
-        let slices = PanelSeries.breakdown(metric: panel.effectiveMetric, panel: panel,
-                                           frames: frames, data: data)
+                                      frames: FrameSet?, hidden: Set<String>) -> String? {
+        // Bucketed and then filtered exactly as the chart does it, so the
+        // shares spoken here are the shares drawn — a summary that kept a
+        // hidden slice in its denominator would read out percentages that do
+        // not match any wedge on the screen.
+        let bucketed = PieChartView.bucketed(
+            PanelSeries.breakdown(metric: panel.effectiveMetric, panel: panel,
+                                  frames: frames, data: data)
+                .map { PieChartView.Entry(label: $0.label, value: $0.value) }
+        )
+        let slices = PieChartView.visible(bucketed, hidden: hidden)
+            .map { (label: $0.label, value: $0.value) }
         let total = slices.reduce(0) { $0 + $1.value }
         guard !slices.isEmpty, total > 0 else { return nil }
         let ranked = slices.sorted { $0.value > $1.value }

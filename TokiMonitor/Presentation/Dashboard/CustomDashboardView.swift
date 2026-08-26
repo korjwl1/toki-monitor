@@ -261,9 +261,22 @@ struct CustomDashboardView: View {
     private func hasVisibleSeries(_ panel: PanelConfig) -> Bool {
         guard viewModel.seriesVisibility.hasHidden(panelID: panel.id) else { return true }
         let state = viewModel.dataState(for: panel.id)
+        let hidden = viewModel.hiddenSeries(for: panel.id)
+        // A pie's series are its slices, and they are bucketed before they are
+        // drawn — "Others" is one entry the reader can switch off like any
+        // other. Asked the chart's own way so the answer cannot disagree with
+        // what the panel would have drawn.
+        if panel.panelType == .pieChart {
+            let slices = PanelSeries.breakdown(
+                metric: panel.effectiveMetric, panel: panel, frames: state.frames,
+                data: state.timeSeriesData
+            ).map { PieChartView.Entry(label: $0.label, value: $0.value) }
+            return !PieChartView.visible(PieChartView.bucketed(slices),
+                                         hidden: hidden).isEmpty
+        }
         return !PanelSeries.chartSeriesWithGaps(
             metric: panel.effectiveMetric, panel: panel, frames: state.frames,
-            data: state.timeSeriesData, hidden: viewModel.hiddenSeries(for: panel.id)
+            data: state.timeSeriesData, hidden: hidden
         ).isEmpty
     }
 
@@ -277,12 +290,17 @@ struct CustomDashboardView: View {
         return false
     }
 
-    /// Only the per-series panels have a legend to hide anything with. A stat
-    /// card reduces every series into one number, so nothing there can be
-    /// switched off.
+    /// Only the panels with a legend can hide anything with one. A stat card
+    /// reduces every series into one number and a gauge draws a single dial;
+    /// nothing there can be switched off, and Grafana does not offer it either.
+    ///
+    /// A table's filter is deliberately NOT here. Its funnels live in the
+    /// column header, which the table keeps drawing — replacing the table with
+    /// a status view would take the only way back off the screen. A legend
+    /// goes off screen with its chart, which is why these three need the state.
     private func usesLegendFilter(_ panel: PanelConfig) -> Bool {
         switch panel.panelType {
-        case .timeSeries, .barChart: return true
+        case .timeSeries, .barChart, .pieChart: return true
         default: return false
         }
     }

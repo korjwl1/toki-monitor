@@ -203,3 +203,112 @@ struct SeriesVisibilityTests {
         #expect(client.count == 1, "and nothing was asked of the backend to make that happen")
     }
 }
+
+// MARK: - The pie's legend
+
+/// Contract R7 again, for the panel type that had no legend at all.
+///
+/// The pie collapses everything below 2% into one "Others" entry, so the
+/// question a legend toggle raises here is not "does it hide" but "hide WHAT,
+/// relative to that bucket". The order the two are applied in is the answer,
+/// and it is what these pin.
+@Suite("Pie chart legend")
+@MainActor
+struct PieChartLegendTests {
+
+    private func entries(_ pairs: [(String, Double)]) -> [PieChartView.Entry] {
+        pairs.map { PieChartView.Entry(label: $0.0, value: $0.1) }
+    }
+
+    private var wide: [PieChartView.Entry] {
+        // Three readable slices and a tail of four that are each under 2%.
+        entries([("opus", 500), ("sonnet", 300), ("haiku", 180),
+                 ("a", 5), ("b", 5), ("c", 5), ("d", 5)])
+    }
+
+    @Test("the tail collapses into one entry")
+    func tailIsBucketed() {
+        let bucketed = PieChartView.bucketed(wide)
+        #expect(bucketed.map(\.label) == ["opus", "sonnet", "haiku", PieChartView.othersLabel])
+        #expect(bucketed.last?.value == 20, "the bucket is the sum of what it swallowed")
+    }
+
+    /// Applied after the bucketing, not before. Hiding the biggest slice makes
+    /// the tail a much larger share of what is left — but it does not promote a
+    /// tail member into a slice of its own, so the list the reader is clicking
+    /// through does not rearrange under them.
+    @Test("hiding a slice never rearranges the legend")
+    func hidingDoesNotRebucket() {
+        let bucketed = PieChartView.bucketed(wide)
+        let visible = PieChartView.visible(bucketed, hidden: ["opus"])
+        #expect(visible.map(\.label) == ["sonnet", "haiku", PieChartView.othersLabel])
+        #expect(PieChartView.bucketed(wide).map(\.label) == bucketed.map(\.label),
+                "and the legend still lists the hidden entry, which is the way back")
+    }
+
+    @Test("what is left re-proportions to fill the circle")
+    func remainderReproportions() {
+        let visible = PieChartView.visible(PieChartView.bucketed(wide), hidden: ["opus"])
+        let total = visible.reduce(0) { $0 + $1.value }
+        #expect(total == 500, "300 + 180 + 20, with opus's 500 out of the denominator")
+        // sonnet was 30% of 1000 and is 60% of what remains.
+        #expect(abs((visible[0].value / total) - 0.6) < 0.0001)
+    }
+
+    /// "Others" is not a series; it is the name of whatever did not fit. It is
+    /// still one legend entry, and switching it off hides the tail as a unit —
+    /// which is the only thing the tail is.
+    @Test("the Others bucket can be switched off, and takes the whole tail")
+    func othersIsTogglable() {
+        let visible = PieChartView.visible(PieChartView.bucketed(wide),
+                                           hidden: [PieChartView.othersLabel])
+        #expect(visible.map(\.label) == ["opus", "sonnet", "haiku"])
+        #expect(visible.reduce(0) { $0 + $1.value } == 980)
+    }
+
+    @Test("hiding everything leaves nothing to draw")
+    func everythingHidden() {
+        let bucketed = PieChartView.bucketed(wide)
+        let visible = PieChartView.visible(bucketed, hidden: Set(bucketed.map(\.label)))
+        #expect(visible.isEmpty, "which is what puts the panel in its allSeriesHidden state")
+    }
+
+    @Test("a slice is identified by its label, so a redraw keeps its identity")
+    func labelIsIdentity() {
+        #expect(PieChartView.Entry(label: "opus", value: 1).id == "opus")
+        #expect(PieChartView.Entry(label: "opus", value: 1)
+                == PieChartView.Entry(label: "opus", value: 1))
+    }
+
+    /// The same claim `SeriesVisibilityTests.togglingDoesNotRefetch` makes for
+    /// the line chart, made where the pie can be caught: everything between the
+    /// fetched frames and the drawn slices is pure.
+    @Test("hiding a slice redraws from the frames already fetched")
+    func hidingDoesNotRefetch() async {
+        let client = SeriesVisibilityTests.CountingDatasource()
+        let panel = PanelConfig(
+            title: "Share", panelType: .pieChart, metric: .tokensByModel,
+            gridPosition: GridPosition(column: 0, row: 0, width: 12, height: 4),
+            targets: [PanelTarget(refId: "A", metric: .tokensByModel, query: "usage[1h]")]
+        )
+        let states = await PanelFetchCoordinator().fetchRegular(
+            panels: [panel], time: TimeConfig(), variables: [],
+            activeDatasource: DatasourceSelector(kind: BuiltinDatasourceKind.localCLI),
+            defaultClient: client
+        )
+        #expect(client.count == 1)
+        let frames = states[panel.id]?.frames
+
+        let slices = PanelSeries.breakdown(metric: .tokensByModel, panel: panel,
+                                           frames: frames, data: nil)
+            .map { PieChartView.Entry(label: $0.label, value: $0.value) }
+        let bucketed = PieChartView.bucketed(slices)
+        #expect(bucketed.count == 2)
+
+        var visibility = SeriesVisibility()
+        visibility.toggle("opus", panelID: panel.id)
+        let visible = PieChartView.visible(bucketed, hidden: visibility.hidden(for: panel.id))
+        #expect(visible.map(\.label) == ["sonnet"])
+        #expect(client.count == 1, "nothing was asked of the backend to make that happen")
+    }
+}

@@ -60,7 +60,12 @@ struct PanelContentView: View {
                 // it means a model is the same colour in every panel.
                 colors: metric == .tokensByProject
                     ? nil
-                    : slices.map { viewModel.colorForModel($0.label) }
+                    : slices.map { viewModel.colorForModel($0.label) },
+                // The same per-panel hidden set the line and bar charts read
+                // (contract R7). Clicking a slice's legend entry hides it here
+                // and nowhere else, and does not fetch.
+                hidden: viewModel.hiddenSeries(for: panel.id),
+                onToggle: { viewModel.toggleSeries($0, panelID: panel.id) }
             )
         }
     }

@@ -35,6 +35,13 @@ struct PanelLegendView: View {
     /// nothing is worse than no control — so with no handler the entries are
     /// labels rather than buttons.
     var onToggle: ((String) -> Void)?
+    /// Which entry the pointer is over, or nil on the way out.
+    ///
+    /// Only the pie asks for it, and it asks because its legend is the only
+    /// text a slice has: pointing at "opus" in the list has to say which wedge
+    /// that is. A chart whose marks are already labelled leaves this nil and
+    /// the legend does not track the pointer at all.
+    var onHover: ((String?) -> Void)?
 
     var body: some View {
         if position == .right {
@@ -65,10 +72,12 @@ struct PanelLegendView: View {
             Button { onToggle(entry.name) } label: { row(entry, isHidden: isHidden) }
                 .buttonStyle(.plain)
                 .modifier(LegendInteraction(name: entry.name, isHidden: isHidden))
+                .modifier(LegendHover(name: entry.name, onHover: onHover))
         } else {
             row(entry, isHidden: isHidden)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(entry.name)
+                .modifier(LegendHover(name: entry.name, onHover: onHover))
         }
     }
 
@@ -88,6 +97,24 @@ struct PanelLegendView: View {
                 .lineLimit(1)
         }
         .contentShape(Rectangle())
+    }
+}
+
+/// Reports the entry under the pointer, where a chart has asked to be told.
+///
+/// A no-op modifier when nothing asked: attaching `onHover` unconditionally
+/// would make every legend row a hover target on charts that have no use for
+/// one.
+private struct LegendHover: ViewModifier {
+    let name: String
+    let onHover: ((String?) -> Void)?
+
+    func body(content: Content) -> some View {
+        if let onHover {
+            content.onHover { inside in onHover(inside ? name : nil) }
+        } else {
+            content
+        }
     }
 }
 
