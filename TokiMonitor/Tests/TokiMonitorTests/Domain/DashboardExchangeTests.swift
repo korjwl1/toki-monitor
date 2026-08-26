@@ -328,3 +328,47 @@ struct DashboardExportContentTests {
         #expect(text.contains("질의") || text.lowercased().contains("quer"))
     }
 }
+
+// MARK: - Normalisation keeps its hands off what it cannot read
+
+/// `normalizePanel` rebuilds a panel's Perses envelopes from its legacy fields,
+/// which is right for a panel this build drew and wrong for one it could not.
+/// Rebuilding `plugin` for an unknown type would replace a newer build's
+/// visualisation spec with a placeholder derived from this build's defaults —
+/// the exact loss the round-trip contract exists to prevent.
+@Suite("An undrawable panel is not normalised")
+@MainActor
+struct UnknownPanelNormalizationTests {
+
+    @Test("a panel this build cannot draw keeps its plugin envelope untouched")
+    func unknownPanelIsLeftAlone() throws {
+        var doc = try #require(try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(DashboardConfigStore.defaultConfig)
+        ) as? [String: Any])
+        var panels = try #require(doc["panels"] as? [[String: Any]])
+        panels[0]["panelType"] = "sankeyDiagram"
+        panels[0]["plugin"] = ["kind": "SankeyChart",
+                               "spec": Data("{\"flow\":true}".utf8).base64EncodedString()]
+        doc["panels"] = panels
+
+        let config = try JSONDecoder().decode(
+            DashboardConfig.self, from: try JSONSerialization.data(withJSONObject: doc)
+        )
+        var panel = config.panels[0]
+        let before = panel
+        DashboardViewModel.normalizePanel(&panel)
+        #expect(panel == before, "normalisation must not touch a type it cannot read")
+        #expect(panel.plugin?.kind == "SankeyChart")
+    }
+
+    @Test("a panel this build does draw is still normalised")
+    func knownPanelIsStillNormalised() {
+        var panel = PanelConfig(
+            title: "p", panelType: .stat, metric: .totalTokens,
+            gridPosition: GridPosition(column: 0, row: 0, width: 6, height: 1)
+        )
+        #expect(panel.plugin == nil)
+        DashboardViewModel.normalizePanel(&panel)
+        #expect(panel.plugin?.kind == BuiltinPanelPluginKind.statChart)
+    }
+}

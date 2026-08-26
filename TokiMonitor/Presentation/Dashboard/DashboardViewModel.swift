@@ -886,6 +886,14 @@ final class DashboardViewModel {
     /// `options`, `targets`). Called on every add/update so the on-disk JSON
     /// stays accurate after edit-mode mutations.
     static func normalizePanel(_ panel: inout PanelConfig) {
+        // A panel type this build has no renderer for has no legacy fields
+        // worth trusting either: `panelType` and `options` are this build's
+        // vocabulary, and rebuilding `plugin` from them would overwrite what a
+        // newer build wrote with a placeholder kind and a spec derived from
+        // defaults. Normalisation is for panels this build understands
+        // (계약 C1, R5).
+        guard panel.panelType != .unknown else { return }
+
         // Plugin envelope: re-encode whenever the encoded spec no longer
         // matches the current options — not merely when it is absent or of the
         // wrong kind. Renderers read the LEGACY options, so an options edit
