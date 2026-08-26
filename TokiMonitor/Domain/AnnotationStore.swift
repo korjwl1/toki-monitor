@@ -7,6 +7,17 @@ final class AnnotationStore {
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "TokiMonitor", category: "AnnotationStore")
     private static let storeKey = "dashboardAnnotations"
 
+    /// Where this store reads and writes.
+    ///
+    /// Injectable for one reason: a test that exercised the save path against
+    /// `.standard` would write into the real installation's annotations. A
+    /// previous session did exactly that and destroyed the user's work.
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
     func annotations(for dashboardUID: String) -> [DashboardAnnotation] {
         loadAll().filter { $0.dashboardUID == dashboardUID }
             .sorted { $0.timestamp > $1.timestamp }
@@ -54,7 +65,7 @@ final class AnnotationStore {
     /// Annotations are not reconstructible from anything else.
     private func loadAllPreservingUnreadable()
         -> (items: [DashboardAnnotation], unreadable: [Any]) {
-        guard let data = UserDefaults.standard.data(forKey: Self.storeKey) else { return ([], []) }
+        guard let data = defaults.data(forKey: Self.storeKey) else { return ([], []) }
         guard let raw = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else {
             Self.logger.error("Annotations at key '\(Self.storeKey)' are not a JSON array; leaving them untouched")
             return ([], [])
@@ -94,7 +105,7 @@ final class AnnotationStore {
         }
 
         guard !unreadable.isEmpty else {
-            UserDefaults.standard.set(encoded, forKey: Self.storeKey)
+            defaults.set(encoded, forKey: Self.storeKey)
             return
         }
         guard var merged = (try? JSONSerialization.jsonObject(with: encoded)) as? [Any],
@@ -103,9 +114,9 @@ final class AnnotationStore {
                   return try? JSONSerialization.data(withJSONObject: merged)
               }()
         else {
-            UserDefaults.standard.set(encoded, forKey: Self.storeKey)
+            defaults.set(encoded, forKey: Self.storeKey)
             return
         }
-        UserDefaults.standard.set(out, forKey: Self.storeKey)
+        defaults.set(out, forKey: Self.storeKey)
     }
 }

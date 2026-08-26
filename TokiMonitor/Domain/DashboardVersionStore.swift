@@ -6,6 +6,17 @@ final class DashboardVersionStore {
     private static let storeKey = "dashboardVersions"
     private static let maxVersionsPerDashboard = 50
 
+    /// Where this store reads and writes.
+    ///
+    /// Injectable for one reason: a test that exercised the save path against
+    /// `.standard` would write into the real installation's version history. A
+    /// previous session did exactly that and destroyed the user's work.
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
     func saveVersion(for dashboard: DashboardConfig, message: String = "") {
         var versions = loadAllVersions()
         let existingCount = versions.filter { $0.dashboardUID == dashboard.uid }.count
@@ -86,7 +97,7 @@ final class DashboardVersionStore {
     /// there is nothing else holding a copy.
     private func loadAllVersionsPreservingUnreadable()
         -> (versions: [DashboardVersion], unreadable: [Any]) {
-        guard let data = UserDefaults.standard.data(forKey: Self.storeKey),
+        guard let data = defaults.data(forKey: Self.storeKey),
               let raw = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
         else { return ([], []) }
 
@@ -115,18 +126,18 @@ final class DashboardVersionStore {
         guard let encoded = try? JSONEncoder().encode(versions) else { return }
 
         guard !unreadable.isEmpty else {
-            UserDefaults.standard.set(encoded, forKey: Self.storeKey)
+            defaults.set(encoded, forKey: Self.storeKey)
             return
         }
         guard var merged = (try? JSONSerialization.jsonObject(with: encoded)) as? [Any] else {
-            UserDefaults.standard.set(encoded, forKey: Self.storeKey)
+            defaults.set(encoded, forKey: Self.storeKey)
             return
         }
         merged.append(contentsOf: unreadable)
         guard let out = try? JSONSerialization.data(withJSONObject: merged) else {
-            UserDefaults.standard.set(encoded, forKey: Self.storeKey)
+            defaults.set(encoded, forKey: Self.storeKey)
             return
         }
-        UserDefaults.standard.set(out, forKey: Self.storeKey)
+        defaults.set(out, forKey: Self.storeKey)
     }
 }
