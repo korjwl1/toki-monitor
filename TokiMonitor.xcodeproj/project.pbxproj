@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */; };
 		AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40POPTTESTS00001 /* PanelOptionsTests.swift */; };
 		AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */; };
 		AA40PSNAPHARN00002 /* PanelSnapshotHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */; };
@@ -208,6 +209,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableRefreshPolicyTests.swift; sourceTree = "<group>"; };
 		AA40POPTTESTS00001 /* PanelOptionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelOptionsTests.swift; sourceTree = "<group>"; };
 		AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStateSnapshotTests.swift; sourceTree = "<group>"; };
 		AA40PSNAPHARN00001 /* PanelSnapshotHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelSnapshotHarness.swift; sourceTree = "<group>"; };
@@ -645,6 +647,7 @@
 		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AA60VARREFTEST000001 /* VariableRefreshPolicyTests.swift */,
 				AA40POPTTESTS00001 /* PanelOptionsTests.swift */,
 				AA40PSTATETEST0001 /* PanelStateTests.swift */,
 				AA41PFCTEST0001F /* PanelFetchCoordinatorTests.swift */,
@@ -1048,6 +1051,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */,
 				AA03PFSNAPT0B001 /* PlanFitSnapshotTests.swift in Sources */,
 				AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */,
 				AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */,

@@ -233,3 +233,55 @@ enum VariableResolver {
         }
     }
 }
+
+// MARK: - Refresh policy
+//
+// Three policies were offered in the variable editor and the three of them
+// were read in exactly one place — a `switch` inside `DashboardViewModel
+// .refreshVariables` — so nothing could state, or check, that they lead to
+// different behaviour. They do, but only because of an argument the caller
+// passes: `.onDashboardLoad` and `.onTimeRangeChanged` are the same set on
+// every trigger EXCEPT a time-range change, where the first drops out.
+//
+// Pulled out here so the difference is a fact about a function of two
+// arguments rather than about the sequence of calls a view model happens to
+// make. A control that changes nothing is worse than no control (contract R1),
+// and this is the check that the control changes something.
+extension VariableResolver {
+
+    /// Whether a variable with this policy reloads its options for a trigger.
+    ///
+    /// - Parameter onTimeRangeChange: true only for the refresh a time-range
+    ///   change triggers. Dashboard load, datasource switch and an explicit
+    ///   reload all pass false.
+    ///
+    /// The three answers, as a table — the point being that no two rows are
+    /// the same:
+    ///
+    /// | policy               | load  | time-range change |
+    /// |----------------------|-------|-------------------|
+    /// | `.never`             | no    | no                |
+    /// | `.onDashboardLoad`   | yes   | no                |
+    /// | `.onTimeRangeChanged`| yes   | yes               |
+    ///
+    /// `.onTimeRangeChanged` reloading at load time is not a bug: a variable
+    /// that has never loaded has no options to offer, so a dashboard opened
+    /// with one would show an empty picker until the reader changed the time.
+    static func shouldRefresh(_ policy: DashboardVariable.VariableRefresh,
+                              onTimeRangeChange: Bool) -> Bool {
+        switch policy {
+        case .never:
+            return false
+        case .onDashboardLoad:
+            return !onTimeRangeChange
+        case .onTimeRangeChanged:
+            return true
+        }
+    }
+
+    /// The variables to reload for a trigger, in dashboard order.
+    static func variablesToRefresh(_ list: [DashboardVariable],
+                                   onTimeRangeChange: Bool) -> [DashboardVariable] {
+        list.filter { shouldRefresh($0.refresh, onTimeRangeChange: onTimeRangeChange) }
+    }
+}

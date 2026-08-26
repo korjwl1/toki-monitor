@@ -270,14 +270,9 @@ final class DashboardViewModel {
             resolvedVariables: resolved,
             queryClient: queryClient
         )
-        let pairs: [(UUID, VariablePluginRef)] = dashboardConfig.templating.list
-            .filter { v in
-                switch v.refresh {
-                case .never: return false
-                case .onTimeRangeChanged: return true
-                case .onDashboardLoad: return !onTimeRangeChange
-                }
-            }
+        let pairs: [(UUID, VariablePluginRef)] = VariableResolver
+            .variablesToRefresh(dashboardConfig.templating.list,
+                                onTimeRangeChange: onTimeRangeChange)
             .compactMap { v in v.plugin.map { (v.id, $0) } }
         guard !pairs.isEmpty else { return }
         // Cancel any in-flight refresh so a slower previous load can't

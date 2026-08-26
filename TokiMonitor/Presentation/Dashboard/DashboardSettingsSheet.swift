@@ -307,6 +307,8 @@ struct DashboardSettingsSheet: View {
                         .font(.caption)
                     Spacer()
                 }
+
+                refreshPolicyPicker(variable)
             }
         } label: {
             HStack {
@@ -323,6 +325,50 @@ struct DashboardSettingsSheet: View {
             }
         }
     }
+
+    /// When this variable reloads its options.
+    ///
+    /// Only for variables whose options come from a query. A static list, a
+    /// constant and a text variable answer the same thing every time they are
+    /// asked, so for those the three policies are one policy — and a control
+    /// with one outcome is worse than no control (contract R1), which is why
+    /// they do not get one.
+    @ViewBuilder
+    private func refreshPolicyPicker(_ variable: DashboardVariable) -> some View {
+        let kind = variable.plugin?.kind ?? legacyPluginKind(variable)
+        if Self.queriedPluginKinds.contains(kind) {
+            HStack {
+                Text(L.tr("갱신", "Refresh"))
+                    .font(.caption)
+                    .frame(width: 60, alignment: .leading)
+                Picker("", selection: Binding(
+                    get: { variable.refresh },
+                    set: { policy in
+                        mutateVariable(variable.id) { $0.refresh = policy }
+                        viewModel.refreshVariables()
+                    }
+                )) {
+                    Text(L.tr("안 함", "Never"))
+                        .tag(DashboardVariable.VariableRefresh.never)
+                    Text(L.tr("대시보드를 열 때", "On dashboard load"))
+                        .tag(DashboardVariable.VariableRefresh.onDashboardLoad)
+                    Text(L.tr("시간 범위가 바뀔 때", "On time range change"))
+                        .tag(DashboardVariable.VariableRefresh.onTimeRangeChanged)
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 220, alignment: .leading)
+                Spacer()
+            }
+        }
+    }
+
+    /// Plugin kinds whose option list is produced by running a query, and so
+    /// can differ between one reload and the next.
+    private static let queriedPluginKinds: Set<String> = [
+        BuiltinVariablePluginKind.tokiLabelValues,
+        BuiltinVariablePluginKind.groupBy,
+        BuiltinVariablePluginKind.adHoc,
+    ]
 
     // MARK: - Plugin-specific spec editors
 
