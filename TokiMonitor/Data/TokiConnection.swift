@@ -3,21 +3,32 @@ import Foundation
 /// Resolves the absolute path to the `toki` binary.
 /// GUI apps don't inherit shell PATH, so we search common locations.
 enum TokiPath {
-    static let resolved: String = {
-        let candidates = [
+    static let resolved = resolve()
+
+    static func resolve(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        homeDirectory: String = NSHomeDirectory(),
+        isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+    ) -> String {
+        var candidates: [String] = []
+        if let override = environment["TOKI_EXECUTABLE"],
+           !override.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            candidates.append(override)
+        }
+        candidates.append(contentsOf: [
             "/opt/homebrew/bin/toki",
             "/usr/local/bin/toki",
-            "\(NSHomeDirectory())/.local/bin/toki",
-            "\(NSHomeDirectory())/.cargo/bin/toki",
-        ]
+            "\(homeDirectory)/.local/bin/toki",
+            "\(homeDirectory)/.cargo/bin/toki",
+        ])
         for path in candidates {
-            if FileManager.default.isExecutableFile(atPath: path) {
+            if isExecutable(path) {
                 return path
             }
         }
         // Fallback — hope it's in PATH
         return "toki"
-    }()
+    }
 }
 
 /// UDS server that listens for incoming JSONL from `toki trace --sink uds://<path>`.

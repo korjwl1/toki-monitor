@@ -47,7 +47,20 @@ struct SyncCredentials: Codable {
 final class SyncClient {
     static let shared = SyncClient()
 
-    private let service = "toki-sync"
+    /// Tests and development builds can opt into a separate Keychain service
+    /// without touching the credentials used by the installed CLI. Production
+    /// launches keep the established `toki-sync` service name.
+    static func keychainService(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String {
+        guard let override = environment["TOKI_SYNC_KEYRING_SERVICE"],
+              !override.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "toki-sync"
+        }
+        return override
+    }
+
+    private var service: String { Self.keychainService() }
     private let account = "credentials"
 
     // MARK: - Keychain

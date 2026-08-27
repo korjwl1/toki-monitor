@@ -12,10 +12,9 @@ import Testing
 ///    `queryModelUsageByProvider` and `queryPromQL(query:time:)` all hand the
 ///    bytes straight to it.
 ///
-/// What is NOT here is `TokiReportClient`'s own argument assembly, because the
-/// class calls `CLIProcessRunner.run(executable: TokiPath.resolved, …)` with no
-/// seam to put a fixture behind. Covering it means running the real `toki`
-/// against the live daemon, which these tests will not do.
+/// What is NOT here is `TokiReportClient`'s own argument assembly. Executable
+/// selection has a pure seam and is covered below, but covering the client's
+/// full command still means running real `toki` against a live daemon.
 ///
 /// The runner is driven with fixture executables written to a per-test
 /// temporary directory — never `toki`, never the daemon socket.
@@ -177,6 +176,46 @@ struct CLIProcessRunnerTests {
         let exe = try script("printf 'ok'")
         let data = try await CLIProcessRunner.run(executable: exe, arguments: [], timeout: 10)
         #expect(String(data: data, encoding: .utf8) == "ok")
+    }
+}
+
+@Suite("Runtime integration isolation")
+struct RuntimeIsolationTests {
+    @Test("An explicit source binary wins over installed toki copies")
+    func sourceBinaryOverrideWins() {
+        let resolved = TokiPath.resolve(
+            environment: ["TOKI_EXECUTABLE": "/workspace/toki/target/debug/toki"],
+            homeDirectory: "/test-home",
+            isExecutable: { path in
+                path == "/workspace/toki/target/debug/toki"
+                    || path == "/opt/homebrew/bin/toki"
+            }
+        )
+
+        #expect(resolved == "/workspace/toki/target/debug/toki")
+    }
+
+    @Test("A missing override falls back to the first executable install path")
+    func missingOverrideFallsBack() {
+        let resolved = TokiPath.resolve(
+            environment: ["TOKI_EXECUTABLE": "/missing/toki"],
+            homeDirectory: "/test-home",
+            isExecutable: { $0 == "/opt/homebrew/bin/toki" }
+        )
+
+        #expect(resolved == "/opt/homebrew/bin/toki")
+    }
+
+    @Test("Keychain isolation is opt-in and blank overrides are ignored")
+    @MainActor
+    func keychainServiceResolution() {
+        #expect(SyncClient.keychainService(environment: [:]) == "toki-sync")
+        #expect(SyncClient.keychainService(environment: ["TOKI_SYNC_KEYRING_SERVICE": "  "]) == "toki-sync")
+        #expect(
+            SyncClient.keychainService(
+                environment: ["TOKI_SYNC_KEYRING_SERVICE": "toki-sync-integration"]
+            ) == "toki-sync-integration"
+        )
     }
 }
 
