@@ -39,19 +39,23 @@ struct StatPanelView: View {
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(Color.primary.opacity(0.72))
             }
-            if let subtitle = stat.subtitle {
-                Text(subtitle)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // The pricing qualifier is carried by the tile, not printed under the
+        // number. Rendering it inline gave one tile in a row of four a second
+        // line of prose and broke the grid they are read across; the caveat is
+        // still reachable on hover and is spoken by VoiceOver below.
+        .help(stat.subtitle ?? "")
         .background(Self.backgroundTint(panel: panel, band: band, mapped: mapped))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(panel.title)
-        .accessibilityValue(band.map {
-            L.tr("\(stat.value), 임계값 \($0.label)", "\(stat.value), threshold \($0.label)")
-        } ?? stat.value)
+        .accessibilityValue({
+            let base = band.map {
+                L.tr("\(stat.value), 임계값 \($0.label)", "\(stat.value), threshold \($0.label)")
+            } ?? stat.value
+            guard let qualifier = stat.subtitle else { return base }
+            return "\(base), \(qualifier)"
+        }())
     }
 
     // MARK: - Thresholds

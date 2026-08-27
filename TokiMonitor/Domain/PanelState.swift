@@ -137,13 +137,20 @@ extension PanelState {
         }
     }
 
-    /// Why the panel looks like this, and what to do next. `nil` where the
-    /// title already says everything.
+    /// The one thing the headline cannot say on its own.
+    ///
+    /// Only two states earn a sentence: a held-over result, where the number
+    /// on screen belongs to the previous query and would otherwise be read as
+    /// the new one, and a failure, which is meaningless without its reason.
+    ///
+    /// Idle and empty do not. "No data in this range" is the whole of what
+    /// happened, and following it with instructions to widen the range turns
+    /// a quiet dashboard into a tutorial -- every panel lecturing the reader
+    /// at once, in the state they see most often.
     var detail: String? {
         switch self {
         case .idle:
-            return L.tr("새로 고치면 이 패널의 쿼리를 실행합니다.",
-                        "Refresh to run this panel's query.")
+            return nil
         case .loading(let hasPrevious):
             // Only the held-over case has anything to add — and it has to. On
             // screen the previous result is dimmed and carries a progress
@@ -156,15 +163,10 @@ extension PanelState {
                 : nil
         case .loaded:
             return nil
-        case .empty(let reason):
-            switch reason {
-            case .noDataInRange:
-                return L.tr("쿼리는 성공했지만 선택한 시간 범위에 해당하는 행이 없습니다. 범위를 넓히거나 쿼리의 필터를 확인하세요.",
-                            "The query succeeded but matched no rows in the selected time range. Widen the range, or check the query's filters.")
-            case .allSeriesHidden:
-                return L.tr("데이터는 있습니다. 범례에서 계열을 다시 켜면 보입니다.",
-                            "The data is there. Turn a series back on in the legend to see it.")
-            }
+        case .empty:
+            // The headline distinguishes "no rows" from "all hidden", which is
+            // the distinction that matters (US2). Neither needs a paragraph.
+            return nil
         case .failed(let reason):
             return reason
         }

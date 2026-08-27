@@ -295,16 +295,12 @@ struct PlanFitContent: View {
             .labelsHidden()
             .frame(width: 160)
             .accessibilityLabel(L.tr("기간 단위", "Period unit"))
+            // The shortcut and the fact that this is the page's only control
+            // both live in the accessibility hint rather than on screen. A
+            // segmented control does not need a caption explaining that it is
+            // a segmented control, and captioning it made this the only
+            // element on the page carrying prose about itself.
             .accessibilityHint(PlanFitKeyboard.hint)
-            Text(L.tr("이 페이지의 유일한 설정입니다", "The page's only setting"))
-                .font(.system(size: PlanFitType.tiny))
-                .foregroundStyle(PlanFitInk.faint)
-            // The shortcut is written down beside the control it drives.
-            // A keyboard affordance nobody is told about is one most people
-            // never find.
-            Text(PlanFitKeyboard.hint)
-                .font(.system(size: PlanFitType.tiny))
-                .foregroundStyle(PlanFitInk.faint)
         }
     }
 }

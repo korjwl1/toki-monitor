@@ -326,11 +326,6 @@ struct PanelEditorVisualizationTab: View {
                 }
             ))
 
-            Text(L.tr("켜면 각 열 머리글에 깔때기가 생기고, 보는 사람이 편집 모드에 들어가지 않고 값을 골라낼 수 있습니다. 열 하나만 예외로 두려면 옵션 탭의 필드 오버라이드를 쓰세요.",
-                      "A funnel appears in each column header, and a reader picks which values to show without entering edit mode. Use a field override on the Options tab to exempt one column."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
 
             // The funnel lives in the header. With the header off there is
             // nowhere for it to appear, and a setting whose control never
@@ -381,8 +376,8 @@ struct PanelEditorVisualizationTab: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if panel.options.thresholds.isEmpty {
-                Text(L.tr("임계값이 없으면 값이 그대로 상태가 됩니다 — 연속적인 수치라면 옵션 탭에서 임계값을 지정하세요.",
-                          "With no thresholds each distinct value is its own state — set thresholds in the Options tab for a continuous measure."))
+                Text(L.tr("임계값이 없으면 값이 그대로 상태가 됩니다.",
+                          "With no thresholds each distinct value is its own state."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
