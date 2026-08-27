@@ -143,10 +143,8 @@ extension PanelState {
     /// on screen belongs to the previous query and would otherwise be read as
     /// the new one, and a failure, which is meaningless without its reason.
     ///
-    /// Idle and empty do not. "No data in this range" is the whole of what
-    /// happened, and following it with instructions to widen the range turns
-    /// a quiet dashboard into a tutorial -- every panel lecturing the reader
-    /// at once, in the state they see most often.
+    /// Idle does not. Empty states keep one short recovery hint: the headline
+    /// says what happened, while the hint says what the reader can do next.
     var detail: String? {
         switch self {
         case .idle:
@@ -163,10 +161,15 @@ extension PanelState {
                 : nil
         case .loaded:
             return nil
-        case .empty:
-            // The headline distinguishes "no rows" from "all hidden", which is
-            // the distinction that matters (US2). Neither needs a paragraph.
-            return nil
+        case .empty(let reason):
+            switch reason {
+            case .noDataInRange:
+                return L.tr("기간을 넓히거나 쿼리 필터를 확인하세요.",
+                            "Try a wider range or check the query filters.")
+            case .allSeriesHidden:
+                return L.tr("차트를 보려면 계열을 다시 표시하세요.",
+                            "Show a series to display the chart.")
+            }
         case .failed(let reason):
             return reason
         }
