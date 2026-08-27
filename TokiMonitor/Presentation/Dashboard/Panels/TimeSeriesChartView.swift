@@ -37,12 +37,14 @@ struct TimeSeriesChartView: View {
 
     private var options: PanelDisplayOptions { panel?.options ?? PanelDisplayOptions() }
 
-    /// A run of consecutive samples with no gap in them.
+    /// One continuous run of samples for a series.
     ///
-    /// Charts joins consecutive `LineMark`s that share a series, so a gap can
-    /// only be drawn by NOT sharing one. Each run therefore gets its own series
-    /// id while keeping the model name for colour and legend — which is what
-    /// makes an absent bucket read as absent instead of as a dive to zero.
+    /// A bucket with no events is not an unknown value: it is a bucket in which
+    /// nothing was spent. Splitting the series there — the way a generic
+    /// time-series chart treats a missing scrape — drew usage as disconnected
+    /// islands and read as data loss. These metrics are counters over a closed
+    /// window, so an absent bucket is zero and the line goes through it, as it
+    /// did before the panel rewrite.
     struct LineSegment: Identifiable {
         let id: String
         let model: String
@@ -349,30 +351,28 @@ struct TimeSeriesChartView: View {
                                         data: data, hidden: hiddenSeries)
     }
 
-    /// Split each series at its gaps. A nil sample ends the run it is in and
-    /// the next present sample starts a new one.
+    /// One segment per series, spanning the whole window, with absent buckets
+    /// read as zero.
+    ///
+    /// These panels chart counters (tokens, cost, calls) over a closed window,
+    /// so a bucket that recorded nothing recorded zero — at the edges of the
+    /// window as much as in the middle. Starting a series at its first
+    /// non-empty bucket makes two models that ran at different times look like
+    /// they were measured over different windows, and the reader cannot tell a
+    /// series that had not started yet from one the chart simply cut short.
+    ///
+    /// A series with no samples at all draws nothing: that is absence of the
+    /// series, not a window of zeroes.
     static func segments(
         from series: [(model: String, points: [(date: Date, value: Double?)])]
     ) -> [LineSegment] {
         var out: [LineSegment] = []
         for entry in series {
-            var run: [TimeSeriesData.ChartPoint] = []
-            var index = 0
-            func flush() {
-                guard !run.isEmpty else { return }
-                out.append(LineSegment(id: "\(entry.model)#\(index)",
-                                       model: entry.model, points: run))
-                index += 1
-                run = []
+            guard entry.points.contains(where: { $0.value != nil }) else { continue }
+            let run = entry.points.map {
+                TimeSeriesData.ChartPoint(date: $0.date, value: $0.value ?? 0)
             }
-            for point in entry.points {
-                if let value = point.value {
-                    run.append(TimeSeriesData.ChartPoint(date: point.date, value: value))
-                } else {
-                    flush()
-                }
-            }
-            flush()
+            out.append(LineSegment(id: entry.model, model: entry.model, points: run))
         }
         return out
     }

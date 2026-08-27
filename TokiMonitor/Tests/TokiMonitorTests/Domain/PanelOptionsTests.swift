@@ -19,34 +19,34 @@ struct PanelOptionsTests {
         })]
     }
 
-    /// The failure this prevents: a nil bucket rendered as 0 draws a dive to
-    /// the axis and a climb back out, and the reader cannot tell that invented
-    /// V from a measured one.
-    @Test("an absent sample breaks the line instead of being drawn as zero")
-    func absentSampleBreaksTheLine() {
+    /// The failure this prevents: these panels chart counters over a closed
+    /// window, so a bucket with no events is a bucket in which nothing was
+    /// spent. Breaking the line there drew usage as disconnected islands and
+    /// read as data loss, which is worse than the dive to zero it avoided.
+    @Test("an absent sample is drawn as zero and the line stays connected")
+    func absentSampleIsZero() {
         let segments = TimeSeriesChartView.segments(from: series([10, 20, nil, 40, 50]))
-        #expect(segments.count == 2, "the gap must split the line into two runs")
-        #expect(segments[0].points.map(\.value) == [10, 20])
-        #expect(segments[1].points.map(\.value) == [40, 50])
-        #expect(!segments.flatMap { $0.points }.contains { $0.value == 0 },
-                "no zero may be invented for the absent bucket")
-        // Both runs still belong to the same series, so they keep one colour
-        // and one legend entry.
+        #expect(segments.count == 1, "the series must stay one connected run")
+        #expect(segments[0].points.map(\.value) == [10, 20, 0, 40, 50])
         #expect(Set(segments.map(\.model)) == ["opus"])
-        #expect(Set(segments.map(\.id)).count == 2, "runs need distinct ids or Charts joins them")
+        #expect(Set(segments.map(\.id)).count == 1, "one id, or Charts draws it as separate series")
     }
 
-    @Test("a run of absent samples is one gap, not several")
-    func consecutiveGapsCollapse() {
+    @Test("a run of absent samples stays one connected series")
+    func consecutiveGapsStayConnected() {
         let segments = TimeSeriesChartView.segments(from: series([1, nil, nil, nil, 5]))
-        #expect(segments.count == 2)
+        #expect(segments.count == 1)
+        #expect(segments[0].points.map(\.value) == [1, 0, 0, 0, 5])
     }
 
-    @Test("leading and trailing gaps produce no empty runs")
-    func edgeGapsProduceNoEmptyRuns() {
+    /// The window is the window. A series that starts at its first non-empty
+    /// bucket makes two models that ran at different times look like they were
+    /// measured over different spans.
+    @Test("leading and trailing absences are zero-filled like any other bucket")
+    func edgeGapsAreZeroFilled() {
         let segments = TimeSeriesChartView.segments(from: series([nil, 1, 2, nil]))
         #expect(segments.count == 1)
-        #expect(segments[0].points.count == 2)
+        #expect(segments[0].points.map(\.value) == [0, 1, 2, 0])
     }
 
     @Test("a fully absent series draws nothing rather than a flat zero line")
