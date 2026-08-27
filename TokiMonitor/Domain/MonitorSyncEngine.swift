@@ -348,13 +348,29 @@ final class MonitorSyncEngine {
             // The server's CURRENT version, so this write is still a
             // compare-and-swap: the user chose to replace what they were shown,
             // not to replace whatever happens to be there by the time it lands.
-            let expected: Int64? = {
-                switch conflict.kind {
-                case .deletedOnServer: return 0
-                case .writeRace(let version): return version
-                case .divergent: return conflict.remote?.version
+            //
+            // A divergent conflict is only ever built from a successful read,
+            // so its version is always there. If it somehow is not, this
+            // refuses rather than falling back to a versionless write — a
+            // versionless write is precisely the blind overwrite the whole
+            // channel is built to avoid, and it would be reached by the one
+            // path where the user has already said "replace it".
+            let expected: Int64?
+            switch conflict.kind {
+            case .deletedOnServer:
+                expected = 0
+            case .writeRace(let version):
+                expected = version
+            case .divergent:
+                guard let version = conflict.remote?.version else {
+                    outcome.problems.append(.init(key: conflict.key, message: L.tr(
+                        "서버의 현재 버전을 알 수 없어 덮어쓰지 않았습니다. 다시 동기화한 뒤 시도하세요.",
+                        "The server's current version is unknown, so nothing was overwritten. Sync again and retry."
+                    )))
+                    return outcome
                 }
-            }()
+                expected = version
+            }
             await push(key: conflict.key, payload: payload, ifVersion: expected,
                        ledger: &ledger, outcome: &outcome)
 
