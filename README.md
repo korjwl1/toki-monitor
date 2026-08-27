@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>A rabbit that runs as fast as you burn tokens.</b><br>
-  macOS menu bar monitor for Claude Code and Codex CLI token usage, powered by <a href="https://github.com/korjwl1/toki">toki</a> (<i>tokki</i> = 토끼) — zero CPU at idle, instant queries, always running in the background.
+  macOS menu bar monitor for Claude Code and Codex CLI token usage, powered by <a href="https://github.com/korjwl1/toki">toki</a> (<i>tokki</i> = 토끼) — event-driven ingestion, indexed queries, always running in the background.
 </p>
 
 ```bash
@@ -18,7 +18,7 @@ brew install --cask toki-monitor
   <a href="https://github.com/korjwl1/toki-monitor/releases/latest"><img src="https://img.shields.io/github/v/release/korjwl1/toki-monitor?label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/homebrew-toki--monitor-brightgreen" alt="Homebrew">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" alt="macOS 14+">
-  <img src="https://img.shields.io/badge/license-FSL--1.1--Apache--2.0-green" alt="FSL-1.1-Apache-2.0">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
   <img src="https://img.shields.io/badge/swift-6.0%2B-orange" alt="Swift 6.0+">
 </p>
 
@@ -27,14 +27,16 @@ brew install --cask toki-monitor
 </p>
 
 <p align="center">
-  <img src="docs/images/demo.gif" alt="Toki Monitor demo — rabbit animation and dashboard" width="640" />
-</p>
-
-<p align="center">
   <img src="docs/images/rabbit-run.gif" alt="Running rabbit" height="36" />
   &nbsp;&nbsp;&nbsp;
   <img src="docs/images/rabbit-sleep.gif" alt="Sleeping rabbit" height="36" />
 </p>
+
+> [!IMPORTANT]
+> This branch is **0.2.4-dev** and is not the Homebrew/GitHub v0.2.4 release.
+> Plan Fit, historical window panels, the expanded dashboard data-frame model,
+> and monitor-settings sync described below are implemented in this checkout but
+> still require the matching unreleased `toki` / `toki-sync` source revisions.
 
 ---
 
@@ -45,7 +47,10 @@ brew tap korjwl1/tap
 brew install --cask toki-monitor
 ```
 
-This installs [toki](https://github.com/korjwl1/toki) automatically. Launch the app — the daemon starts on its own.
+This installs the published Toki Monitor v0.2.4 and
+[toki](https://github.com/korjwl1/toki) automatically. Launch the app — it starts
+and manages the daemon on its own. The development-only features called out in
+this README are not in that cask yet.
 
 <details>
 <summary>Build from source</summary>
@@ -56,7 +61,11 @@ cd toki-monitor
 xcodebuild -project TokiMonitor.xcodeproj -scheme TokiMonitor -configuration Release build
 ```
 
-Requires macOS 14+ (Sonoma), Xcode 16+, and [toki](https://github.com/korjwl1/toki) CLI.
+Requires macOS 14+ (Sonoma), Xcode 16+, Swift 6, and a `toki` 2.x CLI. This
+checkout's Plan Fit and historical window views require the matching unreleased
+`toki` source revision that implements `toki query windows` and the `WINDOWS`
+daemon command. Set `TOKI_EXECUTABLE=/absolute/path/to/toki` when that binary is
+not in a standard Homebrew, Cargo, or `~/.local/bin` location.
 </details>
 
 ---
@@ -110,25 +119,46 @@ Character mode uses a sigmoid speed curve, steepest in the 500–3,000 tok/m ran
 
 Each panel runs its own PromQL query. Identical queries are deduplicated automatically.
 
-- Time series, bar chart, pie chart, stat, gauge, table
+- Time series, bar chart, pie chart, stat, gauge, table, and state timeline
 - Provider filter via PromQL `{provider="..."}` — applied per panel
 - Project-level token breakdown with smart path recovery
 - Time range picker with presets and absolute dates
-- Dashboard versioning and annotations
+- Variables, per-field overrides, value mappings, thresholds, transformations,
+  panel repetition, and per-panel time overrides
+- Multiple queries per panel, Panel Inspect, and explicit unsupported-query states
+- Explore with backend-aware PromQL suggestions
+- Dashboard versioning, annotations, JSON import/export, and loss-tolerant schema migration
 - Shows in Dock when open, hides when closed
+
+The expanded frame/field/transform pipeline and state timeline are part of the
+unreleased 0.2.4-dev checkout.
 
 <p align="center">
   <img src="docs/images/dashboard.png" alt="Dashboard" width="640" />
 </p>
 
+### Plan Fit (0.2.4-dev, unreleased)
+
+Plan Fit is a curated 28-day view reached from the dashboard sidebar. It uses
+finished provider rate-limit windows to produce evidence-backed per-limit
+verdicts, weekly/monthly work trends, exhaustion timing, active-use coverage,
+model patterns, provider comparisons, and subscription comparisons. It refuses
+to recommend a plan when the account shape, coverage, or sample size is not
+strong enough. Local and configured server window histories are merged per
+provider; a server does not erase richer local history for a provider it lacks.
+
 ### Usage monitoring
 
 | Provider | What you get |
 |----------|-------------|
-| **Claude** | 5-hour and 7-day windows with reset countdown |
-| **Codex** | Weekly and 5-hour windows with reset countdown |
+| **Claude** | 5-hour, weekly, and available model-scoped windows with reset countdown |
+| **Codex** | 5-hour and weekly windows with reset countdown |
 
-Reads credentials directly from each CLI's local storage — no extra login required. Claude reads from the macOS Keychain (`Claude Code-credentials`), Codex from `~/.codex/auth.json`. Color-coded bars: green → yellow → orange → red.
+Current development builds prefer window state collected by the toki daemon and
+fall back to the providers' local credentials when the daemon cannot serve it.
+The fallback reads Claude from the macOS Keychain (`Claude Code-credentials`)
+and Codex from `~/.codex/auth.json`. Color-coded bars run green → yellow →
+orange → red.
 
 Not logged in? The widget shows a prompt instead of hiding — Claude shows "Claude Code login required", Codex shows the `codex --login` command.
 
@@ -151,7 +181,7 @@ Not logged in? The widget shows a prompt instead of hiding — Claude shows "Cla
 - Widget order (up/down buttons + show/hide per provider)
 - HP bar — thin bar above character showing remaining Claude/Codex usage (green → yellow → orange → red)
 - Sleep delay (30s / 1m / 1m 30s / 2m)
-- Usage alerts (Claude 75%, 90%)
+- Per-window usage alerts for Claude and Codex (75%, 90%)
 - About page with toki CLI version and Homebrew update check
 - Full Korean / English localization
 - Liquid Glass on macOS Tahoe
@@ -166,7 +196,20 @@ Connect to a [toki-sync](https://github.com/korjwl1/toki-sync) server to view us
 - Token refresh — automatic JWT refresh on 401, system notification when re-login is needed
 - HTTPS enforced — non-HTTPS server URLs are rejected (localhost exempt for development)
 
-Configure in Settings → Sync — enter the server URL and authenticate via device code flow (opens browser). Credentials are stored in the macOS Keychain, shared with the toki daemon.
+Configure it in Settings → Sync. The app invokes `toki settings sync enable`,
+which opens the browser/device-code login and writes the shared credentials and
+sync configuration. Credentials are stored in the macOS Keychain and shared
+with the toki daemon.
+
+The 0.2.4-dev checkout also contains a second, separately opt-in **Monitor
+settings sync** channel. It synchronizes dashboard definitions and monitor
+display preferences every 15 minutes and exposes conflicts for an explicit
+keep-this-Mac / take-server / keep-both decision. Query results, usage, and cost
+figures are not sent through this channel, but dashboard query strings can
+contain project or model names. Datasource definitions and launch-at-login stay
+local. This channel requires the matching unreleased toki-sync server and its
+monitor-settings API; the currently tagged `toki-sync-protocol` v1.0.0 does not
+carry that release state.
 
 <p align="center">
   <img src="docs/images/settings-menubar.png" alt="Settings — Menu Bar" width="480" />
@@ -182,16 +225,15 @@ Configure in Settings → Sync — enter the server URL and authenticate via dev
 
 Every other AI usage monitor works the same way: poll files on a timer, reparse everything, show the result, throw it away. Switch time ranges? Rescan. Close the app? Data gone.
 
-[toki](https://github.com/korjwl1/toki) is different — a Rust daemon that watches AI tool session files via kqueue, event-driven instead of polling. Tokens flow into an embedded time-series database (fjall TSDB) instantly. When nothing happens, CPU usage is literally 0%. The full token history is indexed and queryable at any time range in ~7 ms via PromQL, in ~5 MB of memory.
+[toki](https://github.com/korjwl1/toki) is different — a Rust daemon that watches AI tool session files via kqueue, event-driven instead of periodically rescanning the whole history. Tokens flow into an embedded time-series database (fjall TSDB), where the indexed history is available to PromQL queries. Toki Monitor still uses low-frequency timers for rate decay, rate-limit state, sync status, and update checks, so “zero CPU” is not a literal whole-app guarantee.
 
 See [docs/strengths.md](docs/strengths.md) for the full comparison against polling- and proxy-based monitors.
 
 | | toki | Every other tool |
 |---|---|---|
-| **How it collects** | kqueue file watcher — instant, 0% CPU idle | Timer-based rescan (30s–5min intervals) |
+| **How it collects** | kqueue file watcher — event-driven incremental ingest | Timer-based rescan (30s–5min intervals) |
 | **Where it stores** | Embedded TSDB — persistent, indexed | Nowhere — lost when app closes |
-| **How it queries** | PromQL engine — ~7 ms any range | Full file rescan each time |
-| **Memory** | ~5 MB | 20–100 MB+ |
+| **How it queries** | Indexed PromQL engine | Full file rescan each time |
 | **Architecture** | One daemon serves CLI + menu bar + dashboard | Each app rescans independently |
 
 ### Architecture
@@ -200,20 +242,25 @@ See [docs/strengths.md](docs/strengths.md) for the full comparison against polli
 toki (Rust daemon)              Toki Monitor (Swift/SwiftUI)
 ├─ fjall TSDB                   ├─ Data        // UDS, CLI, Keychain, ServerQueryClient
 ├─ kqueue file watchers         ├─ Domain      // Aggregation, alerts, SyncManager
-├─ PromQL engine                └─ Presentation// Menu bar, dashboard, sync settings
+├─ PromQL engine                └─ Presentation// Menu bar, dashboard, Plan Fit, settings
 ├─ UDS server
 └─ sync thread → toki-sync     toki-sync server (optional)
-                                ├─ PromQL proxy (VictoriaMetrics)
+                                ├─ PromQL/window query API
+                                └─ monitor-settings API (0.2.4-dev pairing)
 
-Local:  Panel query → toki report → Chart
-Server: Panel query → URLSession → toki-sync → VM → Chart
+Live:   toki trace → monitor-owned UDS → menu bar
+Local:  Panel query → toki CLI → daemon/TSDB → frames → panel
+Server: Panel query → URLSession → toki-sync → frames → panel
 ```
 
 ### Privacy
 
-- All data stays on your machine — no telemetry, no cloud
+- Local mode has no telemetry and keeps usage data on your machine
 - Usage APIs read only rate limit status, never prompts or responses
 - toki reads session files read-only — never modifies your AI tool data
+- Enabling toki-sync uploads usage data to the server you configure
+- Enabling monitor-settings sync separately uploads dashboard definitions and
+  selected display preferences; its opt-in screen discloses the exact scope
 
 ---
 
@@ -225,17 +272,24 @@ Server: Panel query → URLSession → toki-sync → VM → Chart
 | OpenAI | [Codex CLI](https://github.com/openai/codex) | OAuth | Shipped |
 | Google | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | — | Planned |
 
-Adding a provider only requires a toki parser — Toki Monitor picks it up automatically.
+The generic query/dashboard path follows toki's provider-tagged schema. A new
+provider still needs metadata in `ProviderRegistry`, and provider-specific
+rate-limit widgets need an auth/usage adapter when their APIs differ.
 
 ---
 
 ## Testing
 
 ```bash
-xcodebuild test -scheme TokiMonitor -destination 'platform=macOS'
+xcodebuild test -project TokiMonitor.xcodeproj -scheme TokiMonitor -destination 'platform=macOS'
 ```
 
-36 tests, 8 suites: event parsing, report decoding, state transitions, animation mapping, formatting, provider registry, data aggregation.
+The current source declares **943 Swift Testing tests and 18 XCTest methods**
+across IPC/CLI boundaries, dashboard persistence and migration, frame and query
+semantics, window and Plan Fit statistics, settings sync conflict handling,
+accessibility, contrast, and rendered snapshot checks. Three timer-driven
+`TokenAggregator` tests are intentionally disabled because their production
+clock is not injectable; they are known skips, not passing coverage.
 
 ---
 
@@ -252,7 +306,8 @@ Quick path:
 
 ## Custom animations
 
-Add your own character to the menu bar. Each theme is a folder under `Resources/Animations/`:
+Source contributors can add a bundled character to the menu bar. Each theme is
+a folder under `TokiMonitor/Resources/Animations/`:
 
 ```text
 Resources/Animations/
@@ -311,15 +366,17 @@ Resources/Animations/
 | `sleep.textOffset` | zZ position offset from top-right of character (overlay mode) |
 | `sleep.interval` | Seconds per frame during sleep animation |
 
-Themes are discovered at launch. Select in Settings → Menu Bar → Character.
+Themes bundled into the app are discovered at launch. Select one in Settings →
+Menu Bar → Character. There is not currently a user-level themes directory.
 
 ---
 
 ## Upcoming
 
 - Gemini CLI support — Google Gemini provider integration
-- Multi-device sync — shipped, share usage across machines via toki-sync (server mode in dashboard)
 - Usage reports — weekly/monthly summaries with week-over-week and month-over-month comparisons
+- Release the 0.2.4-dev window/Plan Fit/dashboard/settings-sync work with matching
+  toki, toki-sync, and protocol tags
 
 ---
 
@@ -337,6 +394,6 @@ For commercial use in paid products, please sponsor or [reach out](mailto:korjwl
 
 ## License
 
-[FSL-1.1-Apache-2.0](LICENSE) — built by [@korjwl1](https://github.com/korjwl1)
+[MIT](LICENSE) — built by [@korjwl1](https://github.com/korjwl1)
 
 Part of the [toki](https://github.com/korjwl1/toki) ecosystem.

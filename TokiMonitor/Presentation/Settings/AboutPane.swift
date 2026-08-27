@@ -96,7 +96,7 @@ struct AboutPane: View {
             }
 
             // License
-            Text("FSL-1.1-Apache-2.0")
+            Text("MIT License")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
 

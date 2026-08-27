@@ -1,12 +1,17 @@
 # Universal UI/UX design reference
 
-Reference notes used when making UI/UX decisions for toki-monitor — exact numbers, ratios, and formulas distilled from industry sources. Concrete tokens applied in the codebase live in `TokiMonitor/` source files; this document is the upstream principle library, not a per-component spec.
+Reference notes used when making UI/UX decisions for toki-monitor — ratios and
+heuristics distilled from industry sources. This is not a conformance claim or
+a per-component spec. The current compact macOS tokens (including the 4/8/12/16/24
+spacing scale and measured light/dark contrast colours) live in
+`TokiMonitor/Presentation/DesignSystem.swift` and are the source of truth.
 
 ---
 
 ## The 8pt grid system
 
-All spacing, sizing, padding, and margin values use multiples of 8.
+Use an 8pt rhythm for broad layout and a 4pt half-grid for compact macOS controls.
+The current app deliberately uses both.
 
 **Primary scale:** 8, 16, 24, 32, 40, 48, 56, 64, 72, 80 px
 
@@ -23,7 +28,8 @@ All spacing, sizing, padding, and margin values use multiples of 8.
 - Padding and margin: multiples of 8 (or 4 for tight spaces)
 - Font size: can vary freely, but line-height MUST be a multiple of 4
 - Icon sizes: 16, 24, 32, 48 px (multiples of 8)
-- Touch targets: minimum 48px (multiple of 8)
+- Touch targets: follow the desktop 24pt minimum / 32pt recommendation below;
+  reserve 44–48pt targets for touch-oriented contexts
 
 ---
 
@@ -461,7 +467,7 @@ Section pointers, not a replacement for the body:
 1. 8pt grid — see [The 8pt grid system](#the-8pt-grid-system)
 2. Inner padding < outer margin — see [Whitespace and spacing hierarchy](#whitespace-and-spacing-hierarchy)
 3. Body text contrast 4.5:1, large/UI 3:1 — see [Color contrast (WCAG)](#color-contrast-wcag)
-4. Touch targets ≥ 44px — see [Fitts's law and touch targets](#fittss-law-and-touch-targets)
+4. Desktop targets ≥ 24px (32px recommended); touch targets 44–48px — see [Fitts's law and touch targets](#fittss-law-and-touch-targets)
 5. Body line-height 1.5x, heading 1.25x — see [Typography scale](#typography-scale)
 6. 60-30-10 color split — see [The 60-30-10 color rule](#the-60-30-10-color-rule)
 7. Max 5-7 items before chunking — see [Information density (Miller's law)](#information-density-millers-law)

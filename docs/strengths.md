@@ -4,16 +4,20 @@
 
 Toki Monitor is the macOS UI layer for [toki](https://github.com/korjwl1/toki) — a Rust-based CLI that collects, indexes, and stores AI token usage data in a local time-series database (fjall). The monitor turns `trace` events into live menu-bar animations and `report` queries into Grafana-style dashboards.
 
+> **Development status:** this document describes the **0.2.4-dev** source
+> checkout. Plan Fit, historical window panels, the expanded dashboard data
+> model, and monitor-settings sync are not part of the published v0.2.4 cask and
+> require matching unreleased toki/toki-sync revisions.
+
 ## Why toki's architecture wins
 
 Unlike direct file-polling tools (TokenBar, Tokscale, SessionWatcher), toki uses a **daemon + TSDB** architecture:
 
 | | toki (ours) | Direct polling (competitors) |
 |---|---|---|
-| **Data collection** | Rust daemon with kqueue/FSEvents — event-driven, 0% CPU when idle | Periodic file scanning — CPU cost scales with data |
+| **Data collection** | Rust daemon with kqueue — event-driven incremental ingest | Periodic file scanning — CPU cost scales with data |
 | **Storage** | fjall TSDB (~2.2 MB binary) — indexed, queryable | None or in-memory — lost when app closes |
-| **Query** | PromQL-style instant response | Full rescan on every query |
-| **Memory** | ~5 MB | 20–100 MB+ |
+| **Query** | Indexed PromQL-style query engine | Full rescan on every query |
 | **Long-term data** | O(delta) incremental updates | O(total data) full scan, degrades over time |
 | **Multi-client** | CLI + menu bar share the same daemon | Each tool scans independently |
 
@@ -36,17 +40,27 @@ Unlike proxy-based monitors (BurnRate):
 ### Grafana-style dashboard
 
 - Customizable panel layout with drag-and-drop
-- Time series, bar chart, stat, gauge, and table panels
-- PromQL-powered queries via toki CLI
-- Variable system, time range picker with absolute dates
-- Dashboard versioning and annotations
+- Time series, bar chart, pie, stat, gauge, table, and state-timeline panels
+- Local toki CLI and optional toki-sync datasources, selectable per dashboard or query
+- Multi-query frames, transformations, value mappings, thresholds, field overrides,
+  panel repeat, panel time overrides, and inspectable query states
+- Backend-aware Explore, variables, time range picker, import/export, versioning,
+  annotations, and loss-tolerant schema migration
+
+### Plan Fit (0.2.4-dev)
+
+- Curated 28-day analysis over provider rate-limit windows
+- Per-limit verdicts that withhold recommendations when evidence is too thin
+- Weekly/monthly trends, active-use coverage, exhaustion timing, model patterns,
+  provider comparisons, and subscription comparisons
+- Per-provider arbitration between local and multi-device server history
 
 ### Anomaly detection
 
 - **Velocity alert**: icon color changes when cost/min exceeds threshold
 - **Historical baseline**: compares against 24-hour average via PromQL
-- Configurable alert method: icon color, system notification, or both
-- Custom alert colors
+- Per-provider overrides and configurable thresholds
+- Separate system notifications when provider windows cross enabled 75%/90% levels
 
 ### Claude integration
 
@@ -71,7 +85,7 @@ Unlike proxy-based monitors (BurnRate):
 
 ### Developer-friendly
 
-- Open source, free, FSL-1.1-Apache-2.0 license (converts to Apache 2.0 on 2028-03-23)
+- Open source and free under the MIT License
 - Available via Homebrew tap: `brew tap korjwl1/tap && brew install --cask toki-monitor`
 - Clean Architecture: Data / Domain / Presentation layers
 - async/await throughout, unified design system
@@ -80,23 +94,29 @@ Unlike proxy-based monitors (BurnRate):
 
 ```text
 toki (Rust daemon)              Toki Monitor (Swift/SwiftUI)
-├─ fjall TSDB                   ├─ Data        // UDS trace, CLI report, OAuth
-├─ File watchers (kqueue)       ├─ Domain      // Aggregation, alerts, settings
-├─ PromQL engine                └─ Presentation// Menu bar, dashboard, settings
-└─ UDS server
+├─ fjall TSDB                   ├─ Data        // UDS trace, CLI, Keychain, sync HTTP
+├─ File watchers (kqueue)       ├─ Domain      // frames, windows, Plan Fit, settings
+├─ PromQL engine                └─ Presentation// Menu bar, dashboard, Plan Fit, settings
+├─ UDS server
+└─ sync thread → toki-sync     toki-sync (optional)
 
 Data Flow:
-  toki daemon → toki trace → UDS → TokiEventStream → TokenAggregator → Menu Bar
-  toki report (PromQL) → TokiReportClient → DashboardViewModel → Charts
+  toki trace → monitor-owned UDS → TokiEventStream → TokenAggregator → Menu Bar
+  local:  toki query → TokiReportClient → frames → Dashboard / Plan Fit
+  server: URLSession → toki-sync → frames/windows → Dashboard / Plan Fit
 ```
+
+Usage sync and monitor-settings sync are separate opt-ins. The latter uploads
+dashboard definitions and selected display preferences, not query results or
+usage/cost figures, and presents divergent edits for an explicit decision.
 
 ## Competitive landscape
 
-9+ macOS menu bar apps now exist in this space. Toki Monitor's unique advantages that no competitor replicates:
+Toki Monitor's architectural differentiators are:
 
 1. **TSDB-backed historical analysis** — query any time range instantly
-2. **PromQL query language** — entirely unique in the menu bar app space
-3. **Grafana-style customizable dashboard** — the only menu bar app offering this
+2. **PromQL query language** with explicit local/server datasource behavior
+3. **Grafana-style customizable dashboard** plus a curated Plan Fit view
 4. **Animated status icon** with speed proportional to token rate
 5. **Open source + free** with feature depth comparable to paid apps ($2-5)
 

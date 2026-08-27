@@ -4,16 +4,20 @@
 
 Toki Monitor는 [toki](https://github.com/korjwl1/toki)의 macOS UI 레이어입니다. toki는 Rust 기반 CLI로, AI 토큰 사용량 데이터를 수집하고 로컬 시계열 데이터베이스(fjall)에 저장합니다. `trace` 이벤트는 메뉴바 애니메이션으로, `report` 쿼리는 Grafana 스타일 대시보드로 연결됩니다.
 
+> **개발 상태:** 이 문서는 **0.2.4-dev** 소스 체크아웃을 설명합니다.
+> 요금제 적합도, 히스토리 윈도우 패널, 확장 대시보드 데이터 모델, 모니터
+> 설정 동기화는 공개된 v0.2.4 cask에 없으며 대응 미릴리즈 toki/toki-sync
+> 리비전이 필요합니다.
+
 ## toki 아키텍처의 우위
 
 직접 파일 폴링 도구(TokenBar, Tokscale, SessionWatcher)와 달리, toki는 **데몬 + TSDB** 아키텍처를 사용합니다:
 
 | | toki (우리) | 직접 폴링 (경쟁사) |
 |---|---|---|
-| **데이터 수집** | Rust 데몬, kqueue/FSEvents 이벤트 기반 — 유휴 시 CPU 0% | 주기적 파일 스캔 — 데이터 양에 비례하여 CPU 소모 |
+| **데이터 수집** | Rust 데몬, kqueue 이벤트 기반 증분 수집 | 주기적 파일 스캔 — 데이터 양에 비례하여 CPU 소모 |
 | **저장** | fjall TSDB (~2.2 MB 바이너리) — 인덱싱, 쿼리 가능 | 없음 또는 메모리 — 앱 종료 시 소실 |
-| **쿼리** | PromQL 스타일 즉시 응답 | 매번 전체 재스캔 |
-| **메모리** | ~5 MB | 20~100 MB+ |
+| **쿼리** | 인덱스 기반 PromQL 스타일 엔진 | 매번 전체 재스캔 |
 | **장기 데이터** | O(변경분) 증분 업데이트 | O(전체 데이터) 풀 스캔, 시간 경과 시 성능 저하 |
 | **멀티 클라이언트** | CLI + 메뉴바 앱이 동일 데몬 공유 | 각 도구가 독립적으로 스캔 |
 
@@ -36,17 +40,26 @@ Toki Monitor는 [toki](https://github.com/korjwl1/toki)의 macOS UI 레이어입
 ### Grafana 스타일 대시보드
 
 - 드래그 드롭 패널 레이아웃 커스텀
-- 타임시리즈, 바 차트, 스탯, 게이지, 테이블 패널
-- toki CLI 기반 PromQL 쿼리
-- 변수 시스템, 절대 시간 범위 선택
-- 대시보드 버전 관리 및 어노테이션
+- 타임시리즈, 바, 파이, 스탯, 게이지, 테이블, 상태 타임라인 패널
+- 대시보드 또는 쿼리별로 고르는 로컬 toki CLI / toki-sync 데이터소스
+- 복수 쿼리 프레임, 변환, 값 매핑, 임계값, 필드 오버라이드, 패널 반복,
+  패널별 시간 범위, Panel Inspect
+- 백엔드 맞춤 Explore, 변수, 기간 선택, 가져오기/내보내기, 버전,
+  어노테이션, 손실 방지 스키마 마이그레이션
+
+### 요금제 적합도 (0.2.4-dev)
+
+- 프로바이더 한도 윈도우를 사용한 28일 분석
+- 근거가 부족하면 추천을 보류하는 한도별 판정
+- 주간/월간 추세, 실사용 커버리지, 소진 시점, 모델 패턴, 프로바이더 및 구독 비교
+- 로컬과 멀티 디바이스 서버 히스토리를 프로바이더별로 중재
 
 ### 이상 감지
 
 - **비용 속도 경고**: 분당 비용 임계값 초과 시 아이콘 색상 변경
 - **과거 기준 분석**: PromQL로 24시간 평균 대비 비교
-- 경고 방식 선택: 아이콘 색상, 시스템 알림, 또는 둘 다
-- 경고 색상 사용자 지정
+- 프로바이더별 오버라이드와 임계값 설정
+- 프로바이더 윈도우가 활성화된 75%/90%를 넘을 때 별도 시스템 알림
 
 ### Claude 연동
 
@@ -71,7 +84,7 @@ Toki Monitor는 [toki](https://github.com/korjwl1/toki)의 macOS UI 레이어입
 
 ### 개발자 친화적
 
-- 오픈소스, 무료, FSL-1.1-Apache-2.0 라이선스 (2028-03-23 부로 Apache 2.0 전환)
+- MIT 라이선스로 배포되는 무료 오픈소스
 - Homebrew tap 으로 설치 가능: `brew tap korjwl1/tap && brew install --cask toki-monitor`
 - Clean Architecture: Data / Domain / Presentation 레이어
 - async/await 전환 완료, 통합 디자인 시스템
@@ -80,23 +93,29 @@ Toki Monitor는 [toki](https://github.com/korjwl1/toki)의 macOS UI 레이어입
 
 ```text
 toki (Rust 데몬)                Toki Monitor (Swift/SwiftUI)
-├─ fjall TSDB                   ├─ Data        // UDS trace, CLI report, OAuth
-├─ 파일 감시 (kqueue)           ├─ Domain      // 집계, 알림, 설정
-├─ PromQL 엔진                  └─ Presentation// 메뉴바, 대시보드, 설정
-└─ UDS 서버
+├─ fjall TSDB                   ├─ Data        // UDS trace, CLI, Keychain, sync HTTP
+├─ 파일 감시 (kqueue)           ├─ Domain      // 프레임, 윈도우, 요금제 적합도, 설정
+├─ PromQL 엔진                  └─ Presentation// 메뉴바, 대시보드, 요금제 적합도, 설정
+├─ UDS 서버
+└─ sync 스레드 → toki-sync     toki-sync (선택)
 
 데이터 흐름:
-  toki daemon → toki trace → UDS → TokiEventStream → TokenAggregator → 메뉴바
-  toki report (PromQL) → TokiReportClient → DashboardViewModel → 차트
+  toki trace → 모니터 소유 UDS → TokiEventStream → TokenAggregator → 메뉴바
+  로컬: toki query → TokiReportClient → 프레임 → 대시보드 / 요금제 적합도
+  서버: URLSession → toki-sync → 프레임/윈도우 → 대시보드 / 요금제 적합도
 ```
+
+사용량 동기화와 모니터 설정 동기화는 별도 동의 항목입니다. 후자는 쿼리
+결과·사용량·비용이 아니라 대시보드 정의와 선택한 표시 설정을 올리며, 서로
+달라진 편집 내용은 사용자가 직접 결정하게 합니다.
 
 ## 경쟁 환경
 
-현재 macOS 메뉴바 앱만 9개 이상. Toki Monitor만의 고유 우위로 경쟁사 중 단 하나도 제공하지 않는 기능들:
+Toki Monitor의 아키텍처상 차별점:
 
 1. **TSDB 기반 히스토리 분석** — 어떤 시간 범위든 즉시 쿼리
-2. **PromQL 쿼리 언어** — 메뉴바 앱 중 유일
-3. **Grafana 스타일 커스텀 대시보드** — 메뉴바 앱 중 유일
+2. **PromQL 쿼리 언어** — 로컬/서버 데이터소스 동작을 명시
+3. **Grafana 스타일 커스텀 대시보드**와 별도의 요금제 적합도 화면
 4. **토큰 속도 연동 애니메이션 아이콘** — 시각적 실시간 피드백
 5. **오픈소스 + 무료** — 유료 앱($2-5) 수준의 기능 깊이
 

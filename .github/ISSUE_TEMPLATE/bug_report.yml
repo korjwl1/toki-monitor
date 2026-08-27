@@ -33,7 +33,7 @@ body:
     attributes:
       label: Toki Monitor version
       description: Settings → About
-      placeholder: "0.1.0-alpha4"
+      placeholder: "0.2.4 or 0.2.4-dev + commit"
     validations:
       required: true
   - type: input
@@ -41,7 +41,7 @@ body:
     attributes:
       label: toki CLI version
       description: Output of `toki --version`
-      placeholder: "1.1.4"
+      placeholder: "2.2.0 or source commit"
     validations:
       required: true
   - type: dropdown
@@ -49,11 +49,12 @@ body:
     attributes:
       label: macOS version
       options:
+        - macOS 26 Tahoe (Apple Silicon)
+        - macOS 26 Tahoe (Intel)
         - macOS 15 Sequoia (Apple Silicon)
         - macOS 15 Sequoia (Intel)
         - macOS 14 Sonoma (Apple Silicon)
         - macOS 14 Sonoma (Intel)
-        - macOS 26 Tahoe (Apple Silicon)
         - Other
     validations:
       required: true

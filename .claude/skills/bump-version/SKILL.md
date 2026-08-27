@@ -8,6 +8,23 @@ Bump the version to `$ARGUMENTS`, build the app, create a GitHub release, and up
 
 If no argument is provided, ask the user what version to bump to.
 
+## Step 0 — Release compatibility gate
+
+Before changing a version, run the full test suite and confirm which ecosystem
+revisions the release needs. Window/Plan Fit builds require a released toki that
+serves `toki query windows` and `WINDOWS`. Monitor-settings sync additionally
+requires a compatible toki-sync release and protocol tag; as of the 0.2.4-dev
+checkout, `toki-sync-protocol` v1.1.0 is not tagged and the consumer repos still
+pin v1.0.0 with local patches. Do not publish the monitor first and leave those
+features paired only with sibling working trees.
+
+```bash
+xcodebuild test -project TokiMonitor.xcodeproj -scheme TokiMonitor \
+  -destination 'platform=macOS'
+```
+
+Only the three documented timer-driven `TokenAggregator` skips are expected.
+
 ## Step 1 — Update version strings
 
 Update the version in **both** files to the exact same value:

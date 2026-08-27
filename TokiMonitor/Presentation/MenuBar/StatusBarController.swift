@@ -344,12 +344,13 @@ final class StatusBarController {
         )
 
         let hostingView = NSHostingView(rootView: contentView)
-        hostingView.sizingOptions = [.minSize, .intrinsicContentSize]
+        hostingView.sizingOptions = [.intrinsicContentSize]
         if #available(macOS 14.0, *) {
             hostingView.safeAreaRegions = []
         }
         hostingView.layoutSubtreeIfNeeded()
-        hostingView.setFrameSize(resolvedContentSize(for: hostingView))
+        let menuSize = measuredMenuSize(hostingView)
+        hostingView.setFrameSize(menuSize)
         menuHostingView = hostingView
 
         let panel = NSPanel(
@@ -375,51 +376,31 @@ final class StatusBarController {
         panel.isFloatingPanel = true
 
         panel.contentView = hostingView
-        // Trigger layout now that the hosting view is mounted in a window —
-        // guarantees panel.frame.size reflects real SwiftUI content before we
-        // compute the origin.
-        panel.layoutIfNeeded()
+        panel.setContentSize(menuSize)
 
         // Position below the clicked status item
         if let button = unit.statusItem.button,
            let buttonWindow = button.window {
             let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+            let pointer = NSEvent.mouseLocation
 
-            // Identify the screen the user clicked on. The cursor position at
-            // click time is more reliable than button.window.screen, which can
-            // resolve to the primary display on multi-display setups.
-            let mouseLocation = NSEvent.mouseLocation
-            let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) })
-                ?? buttonWindow.screen
-                ?? NSScreen.screens.first(where: { $0.frame.contains(buttonFrame.origin) })
-                ?? NSScreen.main
-            let screenFrame = screen?.visibleFrame ?? .zero
-
-            // NSHostingView.fittingSize can return (0, 0) on the first click
-            // before SwiftUI has resolved layout. A zero-sized panel inflates
-            // upward from its bottom-left origin once real content renders,
-            // pushing the visible panel off-screen (or onto an adjacent display
-            // on vertically stacked multi-monitor setups).
-            panel.setContentSize(resolvedContentSize(for: hostingView))
-            let panelSize = panel.frame.size
-
-            var x = buttonFrame.minX
-            if !(screenFrame.minX...screenFrame.maxX).contains(x) {
-                x = mouseLocation.x - panelSize.width / 2
+            if let screen = menuScreen(pointer: pointer, buttonFrame: buttonFrame, window: buttonWindow) {
+                let visible = screen.visibleFrame
+                let panelSize = panel.frame.size
+                let margin: CGFloat = 4
+                let buttonIsOnScreen = screen.frame.intersects(buttonFrame)
+                let preferredX = buttonIsOnScreen
+                    ? buttonFrame.minX
+                    : pointer.x - panelSize.width / 2
+                let minimumX = visible.minX + margin
+                let maximumX = max(minimumX, visible.maxX - panelSize.width - margin)
+                let x = min(max(preferredX, minimumX), maximumX)
+                let y = max(
+                    visible.minY + margin,
+                    visible.maxY - panelSize.height - margin
+                )
+                panel.setFrameOrigin(NSPoint(x: x, y: y))
             }
-            if x + panelSize.width > screenFrame.maxX {
-                x = screenFrame.maxX - panelSize.width - 4
-            }
-            if x < screenFrame.minX {
-                x = screenFrame.minX + 4
-            }
-
-            // Anchor below the menu bar of the clicked screen. Using
-            // screenFrame.maxY rather than buttonFrame.minY keeps the panel on
-            // the intended display even if buttonFrame reflects another screen's
-            // coordinates.
-            let y = screenFrame.maxY - panelSize.height - 4
-            panel.setFrameOrigin(NSPoint(x: x, y: y))
         }
 
         panel.orderFrontRegardless()
@@ -529,13 +510,27 @@ final class StatusBarController {
         updateReportActive()
     }
 
-    /// Resolves a non-zero content size from an NSHostingView, falling back
-    /// through fittingSize → intrinsicContentSize → current frame size. SwiftUI
-    /// layout occasionally hasn't settled on the first read, especially right
-    /// after `NSHostingView` is created.
-    private func resolvedContentSize(for hostingView: NSHostingView<MenuContentView>) -> NSSize {
-        let candidates = [hostingView.fittingSize, hostingView.intrinsicContentSize, hostingView.frame.size]
-        return candidates.first(where: { $0.width > 1 && $0.height > 1 }) ?? NSSize(width: 400, height: 300)
+    private func measuredMenuSize(_ hostingView: NSHostingView<MenuContentView>) -> NSSize {
+        let measured = hostingView.fittingSize
+        guard measured.width.isFinite, measured.height.isFinite,
+              measured.width > 1, measured.height > 1 else {
+            return NSSize(width: 400, height: 300)
+        }
+        return measured
+    }
+
+    private func menuScreen(
+        pointer: NSPoint,
+        buttonFrame: NSRect,
+        window: NSWindow
+    ) -> NSScreen? {
+        if let pointed = NSScreen.screens.first(where: { $0.frame.contains(pointer) }) {
+            return pointed
+        }
+        if let overlapping = NSScreen.screens.first(where: { $0.frame.intersects(buttonFrame) }) {
+            return overlapping
+        }
+        return window.screen ?? NSScreen.main
     }
 
     private func statusItemFrame(_ unit: StatusItemUnit) -> NSRect? {
