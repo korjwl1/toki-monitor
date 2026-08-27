@@ -1305,7 +1305,7 @@ enum PlanFitModelBuilder {
             title: PlanFitFormat.limitTitle(
                 provider: segment.provider, kind: segment.kind, limitId: segment.limitId
             ),
-            planLabel: segment.plan.isEmpty ? nil : segment.plan,
+            planLabel: PlanFitFormat.planTitle(segment.plan),
             isHistorical: segment.advice == .historical,
             distribution: distribution,
             // A censored percentile is a floor on demand, not an observation

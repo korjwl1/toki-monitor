@@ -32,6 +32,7 @@
 		AA90A11YRENDER0002 /* PanelAccessibilityRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90A11YRENDER0001 /* PanelAccessibilityRenderTests.swift */; };
 		AA96PVSUMT0000002 /* PanelValueSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA96PVSUMT0000001 /* PanelValueSummaryTests.swift */; };
 		AA95MOTIONT000002 /* DashboardMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA95MOTIONT000001 /* DashboardMotionTests.swift */; };
+		AA90PLANTITLE01B /* PlanTitleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA90PLANTITLE01F /* PlanTitleTests.swift */; };
 		AA94CONTRAST00002 /* ContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA94CONTRAST00001 /* ContrastTests.swift */; };
 		AA03PFAUDIT0002 /* PlanFitSourceAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFAUDIT0001 /* PlanFitSourceAuditTests.swift */; };
 		AA03PFTEXT0002 /* PlanFitModelText.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFTEXT0001 /* PlanFitModelText.swift */; };
@@ -279,6 +280,7 @@
 		AA90A11YRENDER0001 /* PanelAccessibilityRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelAccessibilityRenderTests.swift; sourceTree = "<group>"; };
 		AA96PVSUMT0000001 /* PanelValueSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelValueSummaryTests.swift; sourceTree = "<group>"; };
 		AA95MOTIONT000001 /* DashboardMotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMotionTests.swift; sourceTree = "<group>"; };
+		AA90PLANTITLE01F /* PlanTitleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanTitleTests.swift; sourceTree = "<group>"; };
 		AA94CONTRAST00001 /* ContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContrastTests.swift; sourceTree = "<group>"; };
 		AA03PFAUDIT0001 /* PlanFitSourceAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitSourceAuditTests.swift; sourceTree = "<group>"; };
 		AA03PFTEXT0001 /* PlanFitModelText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitModelText.swift; sourceTree = "<group>"; };
@@ -746,6 +748,7 @@
 				AA90A11YRENDER0001 /* PanelAccessibilityRenderTests.swift */,
 				AA96PVSUMT0000001 /* PanelValueSummaryTests.swift */,
 				AA95MOTIONT000001 /* DashboardMotionTests.swift */,
+				AA90PLANTITLE01F /* PlanTitleTests.swift */,
 				AA94CONTRAST00001 /* ContrastTests.swift */,
 				AA03PFAUDIT0001 /* PlanFitSourceAuditTests.swift */,
 			);
@@ -1230,6 +1233,7 @@
 				AA90A11YRENDER0002 /* PanelAccessibilityRenderTests.swift in Sources */,
 				AA96PVSUMT0000002 /* PanelValueSummaryTests.swift in Sources */,
 				AA95MOTIONT000002 /* DashboardMotionTests.swift in Sources */,
+				AA90PLANTITLE01B /* PlanTitleTests.swift in Sources */,
 				AA94CONTRAST00002 /* ContrastTests.swift in Sources */,
 				AA03PFAUDIT0002 /* PlanFitSourceAuditTests.swift in Sources */,
 				AA03PFTEXT0002 /* PlanFitModelText.swift in Sources */,

@@ -478,6 +478,54 @@ enum PlanFitFormat {
 
     /// Delegates to `ProviderRegistry`, which already maps toki schemas to
     /// providers. This used to be a second copy of that mapping.
+    /// A provider plan string rendered for a reader.
+    ///
+    /// The string itself is what the provider reports — `default_claude_max_5x`
+    /// today — and it is the only tier identity that exists. There is NO price
+    /// here on purpose: token prices have a public feed the daemon already
+    /// tracks, and subscription tiers have none. A monthly figure written into
+    /// this app would be a number nobody updates, shown next to numbers that
+    /// are current, with nothing on screen saying which is which.
+    ///
+    /// Unknown strings pass through unchanged rather than being dropped or
+    /// guessed at — a tier this build has not seen is still the reader's tier,
+    /// and the raw name is more use to them than "Unknown".
+    static func planTitle(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+
+        var s = trimmed.lowercased()
+        // The provider prefixes its own tiers; it carries no meaning to a reader.
+        if s.hasPrefix("default_") { s.removeFirst("default_".count) }
+
+        // Multiplier suffix (`_5x`, `_20x`) is the part a reader recognises, so
+        // it survives capitalisation as written rather than becoming "5X".
+        var multiplier: String?
+        if let r = s.range(of: "_", options: .backwards) {
+            let tail = String(s[r.upperBound...])
+            if tail.count >= 2, tail.hasSuffix("x"), tail.dropLast().allSatisfy(\.isNumber) {
+                multiplier = tail
+                s = String(s[..<r.lowerBound])
+            }
+        }
+
+        let words = s.split(whereSeparator: { $0 == "_" || $0 == "-" }).map { part -> String in
+            switch part {
+            case "claude": return "Claude"
+            case "codex": return "Codex"
+            case "max": return "Max"
+            case "pro": return "Pro"
+            case "team": return "Team"
+            case "enterprise": return "Enterprise"
+            case "free": return "Free"
+            case "prolite": return "Pro Lite"
+            default: return part.prefix(1).uppercased() + part.dropFirst()
+            }
+        }
+        guard !words.isEmpty else { return trimmed }
+        return (words + [multiplier].compactMap { $0 }).joined(separator: " ")
+    }
+
     static func providerTitle(_ name: String) -> String {
         ProviderRegistry.toolTitle(forSchema: name)
     }
