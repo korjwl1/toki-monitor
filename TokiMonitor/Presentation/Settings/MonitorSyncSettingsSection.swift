@@ -9,8 +9,19 @@ import SwiftUI
 /// data; this carries the monitor's own configuration. Someone who wants one
 /// and not the other must be able to have exactly that.
 struct MonitorSyncSettingsSection: View {
-    @State private var controller = MonitorSyncController.shared
-    @State private var isEnabled = MonitorSyncController.shared.isEnabled
+    /// Injectable for one reason: rendering this section in a test must not
+    /// reach `MonitorSyncController.shared`, which is wired to
+    /// `UserDefaults.standard` — and under this test host that IS the live
+    /// `com.toki.monitor` domain holding the user's real dashboards. The
+    /// default keeps every call site unchanged.
+    @State private var controller: MonitorSyncController
+    @State private var isEnabled: Bool
+
+    init(controller: MonitorSyncController = .shared) {
+        _controller = State(initialValue: controller)
+        _isEnabled = State(initialValue: controller.isEnabled)
+    }
+
     @State private var showConflicts = false
     @State private var showTurnOffConfirm = false
 

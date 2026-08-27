@@ -230,9 +230,14 @@ extension MonitorSyncError {
 /// those decisions have to be provable without a network.
 protocol MonitorSettingsTransport: Sendable {
     /// What exists on the server, without payloads.
+    ///
+    /// There is deliberately no `list()` beside this. The server offers
+    /// `GET /me/monitor/settings` and it was implemented here to mirror the
+    /// endpoint set, but the engine works from this index plus targeted gets —
+    /// it never wants every payload at once, and an untested method nothing
+    /// calls is the shape this branch spent a day deleting elsewhere. If a
+    /// caller ever needs it, it is ten lines and the endpoint is still there.
     func index() async throws -> MonitorSettingsIndex
-    /// Everything, payloads included.
-    func list() async throws -> [MonitorSettingEntry]
     /// One entry.
     func get(key: String) async throws -> MonitorSettingEntry
     /// Store or replace.
@@ -292,14 +297,6 @@ final class MonitorSettingsClient: @unchecked Sendable, MonitorSettingsTransport
         return MonitorSettingsIndex(entries: entries, quota: quota)
     }
 
-    func list() async throws -> [MonitorSettingEntry] {
-        let data = try await send(path: "/me/monitor/settings", method: "GET", key: "settings", body: nil)
-        guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              let rows = object["entries"] as? [[String: Any]] else {
-            throw MonitorSyncError.invalidResponse
-        }
-        return rows.compactMap(Self.entry(from:))
-    }
 
     func get(key: String) async throws -> MonitorSettingEntry {
         try Self.requireValidKey(key)

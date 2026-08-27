@@ -249,6 +249,7 @@
 		AA03PFMODP0B001 /* ModelPatternSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFMODP0F001 /* ModelPatternSection.swift */; };
 		AA03PFCOMP0B001 /* ProviderComparisonSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFCOMP0F001 /* ProviderComparisonSection.swift */; };
 		AA03PFVERD0B001 /* VerdictSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFVERD0F001 /* VerdictSection.swift */; };
+		AA91SYNCSNAP001B /* MonitorSyncSectionSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA91SYNCSNAP001F /* MonitorSyncSectionSnapshotTests.swift */; };
 		AA03PFSNAPT0B001 /* PlanFitSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03PFSNAPT0F001 /* PlanFitSnapshotTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -508,6 +509,7 @@
 		AA03PFMODP0F001 /* ModelPatternSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPatternSection.swift; sourceTree = "<group>"; };
 		AA03PFCOMP0F001 /* ProviderComparisonSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderComparisonSection.swift; sourceTree = "<group>"; };
 		AA03PFVERD0F001 /* VerdictSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerdictSection.swift; sourceTree = "<group>"; };
+		AA91SYNCSNAP001F /* MonitorSyncSectionSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncSectionSnapshotTests.swift; sourceTree = "<group>"; };
 		AA03PFSNAPT0F001 /* PlanFitSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanFitSnapshotTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -751,6 +753,7 @@
 			isa = PBXGroup;
 			children = (
 				AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */,
+				AA91SYNCSNAP001F /* MonitorSyncSectionSnapshotTests.swift */,
 				AA03PFSNAPT0F001 /* PlanFitSnapshotTests.swift */,
 				AA40PSNAPTESTS0001 /* PanelStateSnapshotTests.swift */,
 				AA98MINWIN0000001 /* MinimumWindowTests.swift */,
@@ -1250,6 +1253,7 @@
 				AA62FILTNOTETEST02 /* UnappliedFilterNoticeTests.swift in Sources */,
 				AA61PANELRPTTEST02 /* PanelRepeatTests.swift in Sources */,
 						AA60VARREFTEST000002 /* VariableRefreshPolicyTests.swift in Sources */,
+				AA91SYNCSNAP001B /* MonitorSyncSectionSnapshotTests.swift in Sources */,
 				AA03PFSNAPT0B001 /* PlanFitSnapshotTests.swift in Sources */,
 				AA40POPTTESTS00002 /* PanelOptionsTests.swift in Sources */,
 				AA40PSNAPTESTS0002 /* PanelStateSnapshotTests.swift in Sources */,
