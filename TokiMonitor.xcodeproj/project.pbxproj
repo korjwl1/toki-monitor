@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AAMSCLITEST001B /* MonitorSettingsClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSCLITEST001F /* MonitorSettingsClientTests.swift */; };
+		AAMSCLIENT0001B /* MonitorSettingsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSCLIENT0001F /* MonitorSettingsClient.swift */; };
 		AA62NOTICESNAP0002 /* PanelNoticeSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */; };
 		AA62SERVISTEST0002 /* SeriesVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */; };
 		AA85TBLFLTTEST0002 /* TableColumnFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA85TBLFLTTEST0001 /* TableColumnFilterTests.swift */; };
@@ -255,6 +257,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AAMSCLITEST001F /* MonitorSettingsClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSettingsClientTests.swift; sourceTree = "<group>"; };
+		AAMSCLIENT0001F /* MonitorSettingsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSettingsClient.swift; sourceTree = "<group>"; };
 		AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelNoticeSnapshotTests.swift; sourceTree = "<group>"; };
 		AA62SERVISTEST0001 /* SeriesVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesVisibilityTests.swift; sourceTree = "<group>"; };
 		AA85TBLFLTTEST0001 /* TableColumnFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableColumnFilterTests.swift; sourceTree = "<group>"; };
@@ -499,6 +503,7 @@
 		0C66381CCEF5686CC69086FD /* Data */ = {
 			isa = PBXGroup;
 			children = (
+				AAMSCLIENT0001F /* MonitorSettingsClient.swift */,
 				7C4A70A035115715F915852D /* QueryDataSource.swift */,
 				BB313CD4E60948212699989D /* ServerQueryClient.swift */,
 				E8917E556BB8BA674083AA0D /* SyncClient.swift */,
@@ -548,6 +553,7 @@
 		29DDD5F7608E33B91408BA74 /* Data */ = {
 			isa = PBXGroup;
 			children = (
+				AAMSCLITEST001F /* MonitorSettingsClientTests.swift */,
 				AA90IPCBND000001 /* TokiIPCBoundaryTests.swift */,
 				AA90UDSSOCK000001 /* TokiTraceSocketTests.swift */,
 				AA90EVSTRBND000001 /* TokiEventStreamBoundaryTests.swift */,
@@ -1055,6 +1061,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAMSCLIENT0001B /* MonitorSettingsClient.swift in Sources */,
 				AA62PANELLEG000002 /* PanelLegendView.swift in Sources */,
 				AA75PANELVSUM0002 /* PanelValueSummary.swift in Sources */,
 				AA62SERIESVIS00002 /* SeriesVisibility.swift in Sources */,
@@ -1212,6 +1219,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAMSCLITEST001B /* MonitorSettingsClientTests.swift in Sources */,
 				AA62NOTICESNAP0002 /* PanelNoticeSnapshotTests.swift in Sources */,
 				AA62SERVISTEST0002 /* SeriesVisibilityTests.swift in Sources */,
 				AA85TBLFLTTEST0002 /* TableColumnFilterTests.swift in Sources */,
