@@ -13,10 +13,9 @@ If no argument is provided, ask the user what version to bump to.
 Before changing a version, run the full test suite and confirm which ecosystem
 revisions the release needs. Window/Plan Fit builds require a released toki that
 serves `toki query windows` and `WINDOWS`. Monitor-settings sync additionally
-requires a compatible toki-sync release and protocol tag; as of the 0.2.4-dev
-checkout, `toki-sync-protocol` v1.1.0 is not tagged and the consumer repos still
-pin v1.0.0 with local patches. Do not publish the monitor first and leave those
-features paired only with sibling working trees.
+requires a compatible toki-sync release and protocol tag. The v0.3.0 baseline
+is toki v2.3.0, toki-sync v2.2.0, and toki-sync-protocol v1.1.0. Do not publish
+the monitor before new required server/protocol capabilities are released.
 
 ```bash
 xcodebuild test -project TokiMonitor.xcodeproj -scheme TokiMonitor \

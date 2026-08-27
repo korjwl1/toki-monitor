@@ -33,7 +33,7 @@ body:
     attributes:
       label: Toki Monitor version
       description: Settings → About
-      placeholder: "0.2.4 or 0.2.4-dev + commit"
+      placeholder: "0.3.0 or source commit"
     validations:
       required: true
   - type: input
@@ -41,7 +41,7 @@ body:
     attributes:
       label: toki CLI version
       description: Output of `toki --version`
-      placeholder: "2.2.0 or source commit"
+      placeholder: "2.3.0 or source commit"
     validations:
       required: true
   - type: dropdown

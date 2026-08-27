@@ -33,10 +33,9 @@ brew install --cask toki-monitor
 </p>
 
 > [!IMPORTANT]
-> This branch is **0.2.4-dev** and is not the Homebrew/GitHub v0.2.4 release.
-> Plan Fit, historical window panels, the expanded dashboard data-frame model,
-> and monitor-settings sync described below are implemented in this checkout but
-> still require the matching unreleased `toki` / `toki-sync` source revisions.
+> Version **0.3.0** requires `toki` v2.3.0 or later for Plan Fit and historical
+> windows. Monitor-settings sync additionally requires `toki-sync` v2.2.0 or
+> later; those releases share `toki-sync-protocol` v1.1.0.
 
 ---
 
@@ -47,10 +46,9 @@ brew tap korjwl1/tap
 brew install --cask toki-monitor
 ```
 
-This installs the published Toki Monitor v0.2.4 and
+This installs the published Toki Monitor v0.3.0 and
 [toki](https://github.com/korjwl1/toki) automatically. Launch the app — it starts
-and manages the daemon on its own. The development-only features called out in
-this README are not in that cask yet.
+and manages the daemon on its own.
 
 <details>
 <summary>Build from source</summary>
@@ -61,11 +59,9 @@ cd toki-monitor
 xcodebuild -project TokiMonitor.xcodeproj -scheme TokiMonitor -configuration Release build
 ```
 
-Requires macOS 14+ (Sonoma), Xcode 16+, Swift 6, and a `toki` 2.x CLI. This
-checkout's Plan Fit and historical window views require the matching unreleased
-`toki` source revision that implements `toki query windows` and the `WINDOWS`
-daemon command. Set `TOKI_EXECUTABLE=/absolute/path/to/toki` when that binary is
-not in a standard Homebrew, Cargo, or `~/.local/bin` location.
+Requires macOS 14+ (Sonoma), Xcode 16+, Swift 6, and `toki` v2.3.0 or later.
+Set `TOKI_EXECUTABLE=/absolute/path/to/toki` when that binary is not in a
+standard Homebrew, Cargo, or `~/.local/bin` location.
 </details>
 
 ---
@@ -130,14 +126,14 @@ Each panel runs its own PromQL query. Identical queries are deduplicated automat
 - Dashboard versioning, annotations, JSON import/export, and loss-tolerant schema migration
 - Shows in Dock when open, hides when closed
 
-The expanded frame/field/transform pipeline and state timeline are part of the
-unreleased 0.2.4-dev checkout.
+The expanded frame/field/transform pipeline and state timeline were introduced
+in v0.3.0.
 
 <p align="center">
   <img src="docs/images/dashboard.png" alt="Dashboard" width="640" />
 </p>
 
-### Plan Fit (0.2.4-dev, unreleased)
+### Plan Fit (v0.3.0)
 
 Plan Fit is a curated 28-day view reached from the dashboard sidebar. It uses
 finished provider rate-limit windows to produce evidence-backed per-limit
@@ -201,15 +197,14 @@ which opens the browser/device-code login and writes the shared credentials and
 sync configuration. Credentials are stored in the macOS Keychain and shared
 with the toki daemon.
 
-The 0.2.4-dev checkout also contains a second, separately opt-in **Monitor
-settings sync** channel. It synchronizes dashboard definitions and monitor
+Version 0.3.0 also contains a second, separately opt-in **Monitor settings
+sync** channel. It synchronizes dashboard definitions and monitor
 display preferences every 15 minutes and exposes conflicts for an explicit
 keep-this-Mac / take-server / keep-both decision. Query results, usage, and cost
 figures are not sent through this channel, but dashboard query strings can
 contain project or model names. Datasource definitions and launch-at-login stay
-local. This channel requires the matching unreleased toki-sync server and its
-monitor-settings API; the currently tagged `toki-sync-protocol` v1.0.0 does not
-carry that release state.
+local. This channel requires `toki-sync` v2.2.0 or later and its
+monitor-settings API.
 
 <p align="center">
   <img src="docs/images/settings-menubar.png" alt="Settings — Menu Bar" width="480" />
@@ -246,7 +241,7 @@ toki (Rust daemon)              Toki Monitor (Swift/SwiftUI)
 ├─ UDS server
 └─ sync thread → toki-sync     toki-sync server (optional)
                                 ├─ PromQL/window query API
-                                └─ monitor-settings API (0.2.4-dev pairing)
+                                └─ monitor-settings API (toki-sync v2.2+)
 
 Live:   toki trace → monitor-owned UDS → menu bar
 Local:  Panel query → toki CLI → daemon/TSDB → frames → panel
@@ -375,8 +370,6 @@ Menu Bar → Character. There is not currently a user-level themes directory.
 
 - Gemini CLI support — Google Gemini provider integration
 - Usage reports — weekly/monthly summaries with week-over-week and month-over-month comparisons
-- Release the 0.2.4-dev window/Plan Fit/dashboard/settings-sync work with matching
-  toki, toki-sync, and protocol tags
 
 ---
 

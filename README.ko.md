@@ -33,10 +33,9 @@ brew install --cask toki-monitor
 </p>
 
 > [!IMPORTANT]
-> 이 브랜치는 **0.2.4-dev**이며 Homebrew/GitHub에 공개된 v0.2.4가 아닙니다.
-> 아래의 요금제 적합도, 히스토리 한도 윈도우 패널, 확장 대시보드 데이터
-> 프레임, 모니터 설정 동기화는 이 체크아웃에 구현되어 있지만 아직 릴리즈되지
-> 않은 대응 `toki` / `toki-sync` 소스 리비전이 필요합니다.
+> **0.3.0**의 요금제 적합도와 히스토리 윈도우에는 `toki` v2.3.0 이상이
+> 필요합니다. 모니터 설정 동기화에는 `toki-sync` v2.2.0 이상이 추가로 필요하며,
+> 이 릴리즈들은 `toki-sync-protocol` v1.1.0을 공유합니다.
 
 ---
 
@@ -47,9 +46,8 @@ brew tap korjwl1/tap
 brew install --cask toki-monitor
 ```
 
-공개된 Toki Monitor v0.2.4와 [toki](https://github.com/korjwl1/toki)가
+공개된 Toki Monitor v0.3.0과 [toki](https://github.com/korjwl1/toki)가
 자동으로 함께 설치됩니다. 앱을 실행하면 데몬을 자동으로 시작하고 관리합니다.
-이 README에서 개발 버전이라고 표시한 기능은 아직 이 cask에 없습니다.
 
 <details>
 <summary>소스에서 빌드</summary>
@@ -60,9 +58,7 @@ cd toki-monitor
 xcodebuild -project TokiMonitor.xcodeproj -scheme TokiMonitor -configuration Release build
 ```
 
-macOS 14+ (Sonoma), Xcode 16+, Swift 6, `toki` 2.x CLI가 필요합니다. 이
-체크아웃의 요금제 적합도와 히스토리 윈도우 화면은 `toki query windows`와
-`WINDOWS` 데몬 명령을 구현한 대응 미릴리즈 `toki` 소스 리비전이 필요합니다.
+macOS 14+ (Sonoma), Xcode 16+, Swift 6, `toki` v2.3.0 이상이 필요합니다.
 바이너리가 Homebrew, Cargo, `~/.local/bin`의 표준 위치에 없으면
 `TOKI_EXECUTABLE=/절대/경로/toki`를 지정하세요.
 </details>
@@ -126,14 +122,13 @@ open /Applications/TokiMonitor.app
 - 대시보드 버전·어노테이션, JSON 가져오기/내보내기, 손실 방지 스키마 마이그레이션
 - 열면 Dock에 표시, 닫으면 숨김
 
-확장 프레임/필드/변환 파이프라인과 상태 타임라인은 미릴리즈
-0.2.4-dev 체크아웃의 기능입니다.
+확장 프레임/필드/변환 파이프라인과 상태 타임라인은 v0.3.0에서 도입됐습니다.
 
 <p align="center">
   <img src="docs/images/dashboard.png" alt="대시보드" width="640" />
 </p>
 
-### 요금제 적합도 (0.2.4-dev, 미릴리즈)
+### 요금제 적합도 (v0.3.0)
 
 대시보드 사이드바에서 여는 28일 분석 화면입니다. 완료된 프로바이더 한도
 윈도우를 바탕으로 한도별 근거 기반 판정, 주간/월간 사용 추세, 소진 시점,
@@ -194,14 +189,13 @@ Claude의 macOS 키체인(`Claude Code-credentials`)과 Codex의
 브라우저/device-code 로그인 후 공유 인증 정보와 동기화 설정을 기록합니다.
 인증 정보는 macOS 키체인에 저장되고 toki 데몬과 공유됩니다.
 
-0.2.4-dev 체크아웃에는 별도로 동의해야 하는 **모니터 설정 동기화** 채널도
+0.3.0에는 별도로 동의해야 하는 **모니터 설정 동기화** 채널도
 있습니다. 대시보드 정의와 모니터 표시 설정을 15분마다 맞추며, 충돌은 이 Mac
 유지 / 서버 버전 사용 / 둘 다 유지 중 사용자가 직접 결정합니다. 이 채널은
 쿼리 결과·사용량·비용 수치를 보내지 않지만 대시보드 쿼리 문자열에 들어간
 프로젝트명이나 모델명은 서버로 갈 수 있습니다. 데이터소스 정의와 로그인 항목
-설정은 로컬에 남습니다. 대응 미릴리즈 toki-sync 서버와 monitor-settings API가
-필요하며, 현재 태그된 `toki-sync-protocol` v1.0.0은 이 릴리즈 상태를 포함하지
-않습니다.
+설정은 로컬에 남습니다. `toki-sync` v2.2.0 이상의 monitor-settings API가
+필요합니다.
 
 <p align="center">
   <img src="docs/images/settings-menubar.png" alt="설정 — 메뉴 바" width="480" />
@@ -243,7 +237,7 @@ toki (Rust 데몬)                Toki Monitor (Swift/SwiftUI)
 ├─ UDS 서버
 └─ sync 스레드 → toki-sync     toki-sync 서버 (선택)
                                 ├─ PromQL/윈도우 쿼리 API
-                                └─ monitor-settings API (0.2.4-dev 대응)
+                                └─ monitor-settings API (toki-sync v2.2+)
 
 실시간: toki trace → 모니터 소유 UDS → 메뉴바
 로컬:   패널 쿼리 → toki CLI → 데몬/TSDB → 프레임 → 패널
@@ -371,8 +365,6 @@ Resources/Animations/
 
 - Gemini CLI 지원 — Google Gemini 프로바이더 연동
 - 사용량 보고서 — 주간/월간 요약, 전주 대비 및 전월 대비 분석
-- 0.2.4-dev의 윈도우/요금제 적합도/대시보드/설정 동기화 작업을 대응 toki,
-  toki-sync, protocol 태그와 함께 릴리즈
 
 ---
 

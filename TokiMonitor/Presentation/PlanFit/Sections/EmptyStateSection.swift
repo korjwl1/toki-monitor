@@ -2,8 +2,8 @@ import SwiftUI
 
 // MARK: - What the page cannot yet say (T060…T064 / contract W3, W4)
 //
-// **This is not an edge case.** Window history is new in this unreleased
-// branch and the real database holds 21 rows, so "not much data" is the day-one
+// **This is not an edge case.** Window history first shipped in v0.3.0 and a
+// new database has no rows, so "not much data" is the day-one
 // state of every existing account and this is the screen most readers will
 // spend the most time on. If it renders as a stub, the feature reads as broken
 // no matter how good the fully-populated page looks.

@@ -2,21 +2,17 @@
 
 Reference for anyone sending a patch to toki-monitor. Bug fixes, UI polish, new toki provider parsers, and animation themes are all welcome. Start by opening or commenting on an issue so the design is agreed before code lands.
 
-The current branch builds **0.2.4-dev**. It contains unreleased window tracking,
-Plan Fit, expanded dashboard, and monitor-settings sync work; do not assume the
-Homebrew v0.2.4 cask has those code paths when reproducing a development issue.
+The current branch builds **0.3.0**. Window tracking, Plan Fit, the expanded
+dashboard, and monitor-settings sync are release features in this version.
 
 ## Prerequisites
 
 - Xcode 16+
 - macOS 14+ (Sonoma or later)
 - Swift 6
-- [toki](https://github.com/korjwl1/toki) 2.x CLI installed locally — the app
+- [toki](https://github.com/korjwl1/toki) v2.3.0 or later installed locally — the app
   launches `toki trace`, runs local `toki query` commands, and talks to its daemon
-- The matching unreleased toki source revision for `toki query windows` and the
-  `WINDOWS` daemon command when working on Plan Fit or historical window panels
-- A matching unreleased toki-sync server when working on monitor-settings sync;
-  the currently tagged `toki-sync-protocol` v1.0.0 predates that release pairing
+- `toki-sync` v2.2.0 or later when working on monitor-settings sync
 
 ## Build and run
 

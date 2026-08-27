@@ -4,10 +4,9 @@
 
 Toki Monitor is the macOS UI layer for [toki](https://github.com/korjwl1/toki) — a Rust-based CLI that collects, indexes, and stores AI token usage data in a local time-series database (fjall). The monitor turns `trace` events into live menu-bar animations and `report` queries into Grafana-style dashboards.
 
-> **Development status:** this document describes the **0.2.4-dev** source
-> checkout. Plan Fit, historical window panels, the expanded dashboard data
-> model, and monitor-settings sync are not part of the published v0.2.4 cask and
-> require matching unreleased toki/toki-sync revisions.
+> **Release status:** this document describes **v0.3.0**. Plan Fit and historical
+> windows require toki v2.3.0 or later; monitor-settings sync additionally
+> requires toki-sync v2.2.0 or later.
 
 ## Why toki's architecture wins
 
@@ -47,7 +46,7 @@ Unlike proxy-based monitors (BurnRate):
 - Backend-aware Explore, variables, time range picker, import/export, versioning,
   annotations, and loss-tolerant schema migration
 
-### Plan Fit (0.2.4-dev)
+### Plan Fit (v0.3.0)
 
 - Curated 28-day analysis over provider rate-limit windows
 - Per-limit verdicts that withhold recommendations when evidence is too thin
