@@ -33,6 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Request notification permission for usage alerts
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+
+        // Monitor settings sync, if the user opted in. Does nothing at all
+        // otherwise — the switch is off in a fresh installation.
+        MonitorSyncController.shared.start()
     }
 
     /// Build a minimal NSMainMenu: the macOS-required application menu

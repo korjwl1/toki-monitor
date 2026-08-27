@@ -19,10 +19,20 @@ struct SyncSettingsView: View {
         Form {
             if syncManager.isConfigured {
                 connectedSection
+                // The monitor's own configuration rides a separate, opt-in
+                // channel. It needs the same account, hence the same screen,
+                // but it is a switch of its own: toki's usage data and the
+                // monitor's dashboards are not the same thing to share.
+                MonitorSyncSettingsSection()
             } else {
                 Section {
                     stateRow
                         .background(scrollTopTracker)
+                }
+                Section(L.monitorSync.title) {
+                    Text(L.monitorSync.needsSyncLogin)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }

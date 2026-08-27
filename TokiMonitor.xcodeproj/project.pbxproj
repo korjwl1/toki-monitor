@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AAMSSECTION001B /* MonitorSyncSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSSECTION001F /* MonitorSyncSettingsSection.swift */; };
 		AAMSPREFTEST01B /* MonitorPrefsSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSPREFTEST01F /* MonitorPrefsSnapshotTests.swift */; };
 		AAMSENGTEST001B /* MonitorSyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSENGTEST001F /* MonitorSyncEngineTests.swift */; };
 		AAMSCTRL000001B /* MonitorSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSCTRL000001F /* MonitorSyncController.swift */; };
@@ -262,6 +263,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AAMSSECTION001F /* MonitorSyncSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncSettingsSection.swift; sourceTree = "<group>"; };
 		AAMSPREFTEST01F /* MonitorPrefsSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorPrefsSnapshotTests.swift; sourceTree = "<group>"; };
 		AAMSENGTEST001F /* MonitorSyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncEngineTests.swift; sourceTree = "<group>"; };
 		AAMSCTRL000001F /* MonitorSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncController.swift; sourceTree = "<group>"; };
@@ -852,6 +854,7 @@
 		AC4F582F1B6F74BCEB60BC78 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				AAMSSECTION001F /* MonitorSyncSettingsSection.swift */,
 				3489A041D9F174427EDFF7ED /* AboutPane.swift */,
 				476DECAE0D1683A1642FEC9A /* GeneralSettingsPane.swift */,
 				C4771B8F6125461E69C2CFE8 /* MenuBarSettingsPane.swift */,
@@ -1076,6 +1079,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAMSSECTION001B /* MonitorSyncSettingsSection.swift in Sources */,
 				AAMSCTRL000001B /* MonitorSyncController.swift in Sources */,
 				AAMSENGINE0001B /* MonitorSyncEngine.swift in Sources */,
 				AAMSPAYLOAD001B /* MonitorSyncPayload.swift in Sources */,
