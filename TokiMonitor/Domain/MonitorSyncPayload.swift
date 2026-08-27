@@ -294,6 +294,35 @@ enum MonitorDashboardPayload {
         return config
     }
 
+    /// Make a second dashboard without round-tripping a future-schema payload
+    /// through this build's Codable model. Only the three identity fields are
+    /// changed; every unknown key and value remains in the JSON document.
+    @MainActor
+    static func duplicate(_ payload: String) throws -> DashboardConfig {
+        guard let data = payload.data(using: .utf8),
+              var object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        else {
+            throw DashboardExchange.ImportRefusal.unreadable(
+                L.tr("대시보드 페이로드를 복제할 수 없습니다", "the dashboard payload cannot be duplicated")
+            )
+        }
+
+        let uid = DashboardConfig.generateUID()
+        let title = (object["title"] as? String) ?? L.tr("대시보드", "Dashboard")
+        object["id"] = UUID().uuidString
+        object["uid"] = uid
+        object["title"] = L.tr("\(title) (서버 사본)", "\(title) (from server)")
+
+        guard let duplicated = try? JSONSerialization.data(withJSONObject: object),
+              let text = String(data: duplicated, encoding: .utf8)
+        else {
+            throw DashboardExchange.ImportRefusal.unreadable(
+                L.tr("대시보드 페이로드를 복제할 수 없습니다", "the dashboard payload cannot be duplicated")
+            )
+        }
+        return try decode(text)
+    }
+
     /// A one-line description of a dashboard, for a conflict the user has to
     /// decide. Never its query strings — the point is to identify the document,
     /// not to reprint it.

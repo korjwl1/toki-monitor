@@ -75,6 +75,9 @@ struct MonitorSettingsQuota: Equatable, Sendable {
 struct MonitorSettingsIndex: Equatable, Sendable {
     var entries: [MonitorSettingMeta]
     var quota: MonitorSettingsQuota
+    /// Old servers silently ignore unknown DELETE query parameters. Deletion
+    /// is therefore enabled only when the index explicitly advertises CAS.
+    var supportsDeleteCAS: Bool = false
 
     func meta(for key: String) -> MonitorSettingMeta? {
         entries.first { $0.key == key }
@@ -248,8 +251,8 @@ protocol MonitorSettingsTransport: Sendable {
     /// only correct once the user has said to.
     @discardableResult
     func put(key: String, value: String, ifVersion: Int64?) async throws -> MonitorSettingWrite
-    /// Remove.
-    func delete(key: String) async throws
+    /// Remove only if the entry is still the version the caller inspected.
+    func delete(key: String, ifVersion: Int64?) async throws
 }
 
 // MARK: - Client
@@ -294,7 +297,11 @@ final class MonitorSettingsClient: @unchecked Sendable, MonitorSettingsTransport
             usedEntries: Int(Self.int64(q?["used_entries"]) ?? 0),
             usedBytes: Int(Self.int64(q?["used_bytes"]) ?? 0)
         )
-        return MonitorSettingsIndex(entries: entries, quota: quota)
+        return MonitorSettingsIndex(
+            entries: entries,
+            quota: quota,
+            supportsDeleteCAS: (object["delete_cas"] as? Bool) == true
+        )
     }
 
 
@@ -346,10 +353,12 @@ final class MonitorSettingsClient: @unchecked Sendable, MonitorSettingsTransport
         )
     }
 
-    func delete(key: String) async throws {
+    func delete(key: String, ifVersion: Int64?) async throws {
         try Self.requireValidKey(key)
+        let suffix = ifVersion.map { "?if_version=\($0)" } ?? ""
         _ = try await send(
-            path: "/me/monitor/settings/\(Self.escape(key))", method: "DELETE", key: key, body: nil
+            path: "/me/monitor/settings/\(Self.escape(key))\(suffix)",
+            method: "DELETE", key: key, body: nil
         )
     }
 

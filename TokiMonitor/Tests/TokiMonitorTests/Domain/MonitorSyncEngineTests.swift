@@ -17,6 +17,7 @@ final class FakeMonitorServer: @unchecked Sendable, MonitorSettingsTransport {
     var failure: MonitorSyncError?
     /// When set, only writes fail. Reads still work.
     var writeFailure: MonitorSyncError?
+    var supportsDeleteCAS = true
 
     /// Writes that landed.
     private(set) var writeCount = 0
@@ -29,6 +30,8 @@ final class FakeMonitorServer: @unchecked Sendable, MonitorSettingsTransport {
     /// land in the window between reading the index and writing. That window is
     /// exactly what the compare-and-swap exists to close.
     var beforeWrite: (@Sendable () -> Void)?
+    var beforeGet: (@Sendable () -> Void)?
+    var beforeDelete: (@Sendable () -> Void)?
 
     // MARK: Seeding and inspection
 
@@ -53,7 +56,8 @@ final class FakeMonitorServer: @unchecked Sendable, MonitorSettingsTransport {
                     MonitorSettingMeta(key: $0.key, version: $0.version,
                                        updatedAt: $0.updatedAt, sizeBytes: $0.value.utf8.count)
                 }.sorted { $0.key < $1.key },
-                quota: .unknown
+                quota: .unknown,
+                supportsDeleteCAS: supportsDeleteCAS
             )
         }
     }
@@ -65,6 +69,7 @@ final class FakeMonitorServer: @unchecked Sendable, MonitorSettingsTransport {
 
     func get(key: String) throws -> MonitorSettingEntry {
         if let failure { throw failure }
+        beforeGet?()
         return try lock.withLock {
             guard let entry = storage[key] else { throw MonitorSyncError.notFound(key: key) }
             return entry
@@ -98,11 +103,23 @@ final class FakeMonitorServer: @unchecked Sendable, MonitorSettingsTransport {
         }
     }
 
-    func delete(key: String) throws {
+    func delete(key: String, ifVersion: Int64? = nil) throws {
         if let failure { throw failure }
         if let writeFailure { throw writeFailure }
+        beforeDelete?()
         try lock.withLock {
             deleteCount += 1
+            if let ifVersion {
+                guard let existing = storage[key] else {
+                    throw MonitorSyncError.notFound(key: key)
+                }
+                guard existing.version == ifVersion else {
+                    throw MonitorSyncError.conflict(
+                        key: key, currentVersion: existing.version,
+                        currentUpdatedAt: existing.updatedAt
+                    )
+                }
+            }
             guard storage.removeValue(forKey: key) != nil else {
                 throw MonitorSyncError.notFound(key: key)
             }
@@ -381,6 +398,38 @@ struct MonitorSyncEngineTests {
         #expect(server.value(for: "dashboard:aaaa1111") == exported(mine))
     }
 
+    @Test("keeping both preserves fields from a future-schema server copy")
+    func keepBothPreservesFutureSchema() async {
+        let server = FakeMonitorServer()
+        let defaults = ScratchDefaults()
+        let mine = dashboard("Mine", uid: "aaaa1111")
+        let (engine, store) = makeEngine(server, defaults, seed: [mine])
+
+        var futureObject = try! JSONSerialization.jsonObject(
+            with: try! JSONEncoder().encode(dashboard("Future", uid: "aaaa1111"))
+        ) as! [String: Any]
+        futureObject["schemaVersion"] = 99
+        futureObject["futureOnly"] = ["mode": "quantum", "weights": [1, 2, 3]]
+        let futureData = try! JSONSerialization.data(withJSONObject: futureObject)
+        let futurePayload = String(decoding: futureData, as: UTF8.self)
+        server.seed("dashboard:aaaa1111", futurePayload, version: 3)
+
+        let conflict = try! #require(await engine.sync().conflicts.first)
+        _ = await engine.resolve(conflict, with: .keepBoth)
+
+        let copy = try! #require(store.loadDashboardList().first {
+            $0.uid != "aaaa1111" && $0.title.contains("Future")
+        })
+        #expect(copy.isReadOnlyForThisBuild)
+
+        let stored = try! #require(defaults.data(forKey: "dashboardList"))
+        let elements = try! JSONSerialization.jsonObject(with: stored) as! [[String: Any]]
+        let rawCopy = try! #require(elements.first { $0["uid"] as? String == copy.uid })
+        let futureOnly = try! #require(rawCopy["futureOnly"] as? [String: Any])
+        #expect(futureOnly["mode"] as? String == "quantum")
+        #expect(futureOnly["weights"] as? [Int] == [1, 2, 3])
+    }
+
     @Test("the preferences snapshot cannot be kept twice")
     func prefsCannotKeepBoth() async {
         let server = FakeMonitorServer()
@@ -454,6 +503,75 @@ struct MonitorSyncEngineTests {
         #expect(after.didChangeAnything == false)
     }
 
+    @Test("a remote edit observed after the local delete is never erased automatically")
+    func localDeleteVersusRemoteEditAsks() async {
+        let server = FakeMonitorServer()
+        let defaults = ScratchDefaults()
+        let (engine, store) = makeEngine(
+            server, defaults, seed: [dashboard("A", uid: "aaaa1111")]
+        )
+        _ = await engine.sync()
+
+        store.deleteDashboard(uid: "aaaa1111")
+        let remoteEdit = exported(dashboard("Edited elsewhere", uid: "aaaa1111"))
+        server.seed("dashboard:aaaa1111", remoteEdit, version: 9)
+
+        let outcome = await engine.sync()
+        let conflict = try! #require(outcome.conflicts.first)
+        #expect(conflict.kind == .divergent)
+        #expect(conflict.local == nil)
+        #expect(conflict.remote?.title == "Edited elsewhere")
+        #expect(server.value(for: "dashboard:aaaa1111") == remoteEdit)
+
+        // Choosing the server restores it; choosing this Mac would delete the
+        // exact version shown, also with CAS.
+        let resolved = await engine.resolve(conflict, with: .takeRemote)
+        #expect(resolved.pulled == ["dashboard:aaaa1111"])
+        #expect(store.loadDashboardList().contains { $0.title == "Edited elsewhere" })
+    }
+
+    @Test("an edit racing the DELETE request wins and becomes a question")
+    func conditionalDeleteClosesTheRequestRace() async {
+        let server = FakeMonitorServer()
+        let defaults = ScratchDefaults()
+        let (engine, store) = makeEngine(
+            server, defaults, seed: [dashboard("A", uid: "aaaa1111")]
+        )
+        _ = await engine.sync()
+        store.deleteDashboard(uid: "aaaa1111")
+
+        let remoteEdit = exported(dashboard("Raced edit", uid: "aaaa1111"))
+        let raced = OneShot()
+        server.beforeDelete = { [weak server] in
+            guard raced.fire() else { return }
+            server?.seed("dashboard:aaaa1111", remoteEdit, version: 4)
+        }
+
+        let outcome = await engine.sync()
+        server.beforeDelete = nil
+
+        #expect(outcome.deletedOnServer.isEmpty)
+        #expect(outcome.conflicts.first?.remote?.title == "Raced edit")
+        #expect(server.value(for: "dashboard:aaaa1111") == remoteEdit)
+    }
+
+    @Test("an old server that cannot promise delete CAS is fail-closed")
+    func oldServerDoesNotReceiveABlindDelete() async {
+        let server = FakeMonitorServer()
+        let defaults = ScratchDefaults()
+        let (engine, store) = makeEngine(
+            server, defaults, seed: [dashboard("A", uid: "aaaa1111")]
+        )
+        _ = await engine.sync()
+        store.deleteDashboard(uid: "aaaa1111")
+        server.supportsDeleteCAS = false
+
+        let outcome = await engine.sync()
+        #expect(!outcome.problems.isEmpty)
+        #expect(server.value(for: "dashboard:aaaa1111") != nil)
+        #expect(server.deleteCount == 0)
+    }
+
     // MARK: - Failure
 
     @Test("a server that is not there costs nothing")
@@ -520,6 +638,37 @@ struct MonitorSyncEngineTests {
         let titles = store.loadDashboardList().map(\.title)
         #expect(titles.contains("Mine"), "what was already here survives a bad payload")
         #expect(titles.contains("Good"), "and so does the rest of the pull")
+    }
+
+    @Test("a local edit made while a pull is being fetched is not overwritten")
+    func localEditDuringPullAbortsTheStaleApply() async {
+        let server = FakeMonitorServer()
+        let defaults = ScratchDefaults()
+        let original = dashboard("Original", uid: "aaaa1111")
+        let (engine, store) = makeEngine(server, defaults, seed: [original])
+        _ = await engine.sync()
+
+        server.seed(
+            "dashboard:aaaa1111",
+            exported(dashboard("Remote edit", uid: "aaaa1111")),
+            version: 2
+        )
+        let localEdit = dashboard("Local edit during sync", uid: "aaaa1111")
+        let localBytes = try! JSONEncoder().encode([localEdit])
+        let raced = OneShot()
+        server.beforeGet = {
+            guard raced.fire() else { return }
+            defaults.set(localBytes, forKey: "dashboardList")
+        }
+
+        let outcome = await engine.sync()
+        server.beforeGet = nil
+
+        #expect(outcome.pulled.isEmpty)
+        #expect(!outcome.problems.isEmpty)
+        #expect(store.loadDashboardList().first?.title == "Local edit during sync")
+        #expect(engine.loadLedger()["dashboard:aaaa1111"]?.version == 1,
+                "the stale pull was neither applied nor recorded as agreed")
     }
 
     @Test("an agreement is recorded only for a pull that actually landed")

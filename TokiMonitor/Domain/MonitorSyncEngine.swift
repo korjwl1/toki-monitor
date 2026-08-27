@@ -78,7 +78,7 @@ struct MonitorSyncConflict: Equatable, Identifiable, Sendable {
     /// can be duplicated. There is one preferences snapshot, so keeping two
     /// would be keeping neither.
     var canKeepBoth: Bool {
-        isDashboard && kind != .deletedOnServer && remote != nil
+        isDashboard && kind != .deletedOnServer && local != nil && remote != nil
     }
 }
 
@@ -243,14 +243,58 @@ final class MonitorSyncEngine {
             // state — it is absent from `localPayloads` when this machine has
             // set no preferences at all — and reading that absence as a
             // deletion would wipe the other machines' settings.
-            case (nil, .some, .some):
+            case let (nil, .some(meta), .some(agreed)):
                 guard key != MonitorSyncKey.preferences else { break }
+
+                // An older server accepts DELETE but cannot make it
+                // conditional. Sending `if_version` to one is unsafe because
+                // it may ignore the query and erase an edit made after this
+                // index was read.
+                guard index.supportsDeleteCAS else {
+                    outcome.problems.append(.init(key: key, message: L.tr(
+                        "서버가 안전한 조건부 삭제를 지원하지 않아 삭제하지 않았습니다. 서버를 업그레이드한 뒤 다시 시도하세요.",
+                        "The server does not support safe conditional deletion, so nothing was deleted. Upgrade the server and try again."
+                    )))
+                    break
+                }
+
+                // If the remote side already moved before this run's index,
+                // the local deletion and remote edit are divergent work. Ask
+                // rather than treating the freshly edited remote as the row
+                // this machine originally chose to delete.
+                if meta.version != agreed.version {
+                    do {
+                        let remote = try await transport.get(key: key)
+                        outcome.conflicts.append(
+                            conflict(key: key, kind: .divergent,
+                                     localPayload: nil, remote: remote)
+                        )
+                    } catch {
+                        outcome.problems.append(problem(key, error))
+                    }
+                    break
+                }
                 do {
-                    try await transport.delete(key: key)
+                    try await transport.delete(key: key, ifVersion: meta.version)
                     outcome.deletedOnServer.append(key)
                     ledger[key] = nil
                 } catch MonitorSyncError.notFound {
                     ledger[key] = nil
+                } catch MonitorSyncError.conflict {
+                    // The edit landed after the index. Fetch it so the user
+                    // sees exactly what honoring the local deletion would now
+                    // remove.
+                    if let remote = try? await transport.get(key: key) {
+                        outcome.conflicts.append(
+                            conflict(key: key, kind: .divergent,
+                                     localPayload: nil, remote: remote)
+                        )
+                    } else {
+                        outcome.problems.append(.init(key: key, message: L.tr(
+                            "삭제 직전에 서버 항목이 바뀌어 삭제하지 않았습니다. 다시 동기화하세요.",
+                            "The server entry changed just before deletion, so it was not deleted. Sync again."
+                        )))
+                    }
                 } catch {
                     outcome.problems.append(problem(key, error))
                 }
@@ -315,6 +359,24 @@ final class MonitorSyncEngine {
         }
 
         if !pullsToApply.isEmpty {
+            // Every `await` above yields the MainActor, so the user can edit a
+            // dashboard while remote payloads are being fetched. Re-read the
+            // local side immediately before the synchronous apply. If it
+            // moved, applying the stale plan would overwrite work this run
+            // never inspected.
+            var verification = MonitorSyncOutcome()
+            let latestLocal = localPayloads(into: &verification)
+            outcome.problems.append(contentsOf: verification.problems)
+            guard latestLocal == local else {
+                outcome.problems.append(.init(
+                    key: L.tr("동기화", "sync"),
+                    message: L.tr(
+                        "동기화하는 동안 이 기기의 설정이 바뀌어 서버 변경 사항을 적용하지 않았습니다. 다시 동기화하세요.",
+                        "This machine's settings changed during sync, so remote changes were not applied. Sync again."
+                    )
+                ))
+                return outcome
+            }
             applyPulls(pullsToApply, ledger: &ledger, outcome: &outcome)
         }
 
@@ -341,6 +403,30 @@ final class MonitorSyncEngine {
 
         case .keepLocal:
             guard let payload = conflict.local?.payload else {
+                // A divergent conflict with no local side means this machine
+                // deleted the dashboard while the server edited it. "Keep
+                // this Mac" honors that deletion, still with CAS against the
+                // exact remote version the user was shown.
+                if conflict.kind == .divergent,
+                   conflict.isDashboard,
+                   let version = conflict.remote?.version {
+                    do {
+                        try await transport.delete(key: conflict.key, ifVersion: version)
+                        ledger[conflict.key] = nil
+                        outcome.deletedOnServer.append(conflict.key)
+                    } catch MonitorSyncError.notFound {
+                        ledger[conflict.key] = nil
+                    } catch MonitorSyncError.conflict {
+                        let remote = try? await transport.get(key: conflict.key)
+                        outcome.conflicts.append(
+                            self.conflict(key: conflict.key, kind: .divergent,
+                                          localPayload: nil, remote: remote)
+                        )
+                    } catch {
+                        outcome.problems.append(problem(conflict.key, error))
+                    }
+                    break
+                }
                 outcome.problems.append(.init(key: conflict.key, message: L.tr(
                     "이 기기의 사본을 찾을 수 없습니다", "this machine's copy is no longer here")))
                 return outcome
@@ -397,10 +483,7 @@ final class MonitorSyncEngine {
             // The server's copy becomes a second dashboard here, under a new
             // identity so it does not collide with the one it disagreed with.
             do {
-                var copy = try MonitorDashboardPayload.decode(remote.payload)
-                copy.id = UUID()
-                copy.uid = DashboardConfig.generateUID()
-                copy.title = L.tr("\(copy.title) (서버 사본)", "\(copy.title) (from server)")
+                let copy = try MonitorDashboardPayload.duplicate(remote.payload)
                 store.addDashboard(copy)
                 if let error = store.lastSaveError {
                     outcome.problems.append(.init(key: conflict.key, message: error))

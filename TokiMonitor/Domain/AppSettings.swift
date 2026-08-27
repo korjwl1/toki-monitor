@@ -617,7 +617,16 @@ final class AppSettings {
         defaults.set(usageAlert90Enabled, forKey: "usageAlert90Enabled")
         defaults.set(language.rawValue, forKey: "language")
 
-        if let data = try? JSONEncoder().encode(providerSettingsMap) {
+        // Keep per-provider values written by a newer build even when this
+        // build cannot decode them. Loading is already loss-tolerant; saving
+        // must carry the unreadable half forward or the first unrelated color
+        // or enable toggle deletes it permanently.
+        let unreadableProviderSettings = defaults.data(forKey: "providerSettings")
+            .map { LossTolerantStore.decodeDictionary(ProviderSettings.self, from: $0).unreadable }
+            ?? [:]
+        if let data = LossTolerantStore.encodeDictionary(
+            providerSettingsMap, preserving: unreadableProviderSettings
+        ) {
             defaults.set(data, forKey: "providerSettings")
         }
         if let data = try? JSONEncoder().encode(widgetOrder) {

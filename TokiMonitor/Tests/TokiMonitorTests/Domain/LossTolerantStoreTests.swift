@@ -214,4 +214,40 @@ struct LossTolerantStoreTests {
             ) == nil
         )
     }
+
+    @Test("AppSettings carries an unreadable provider through an unrelated save")
+    @MainActor
+    func appSettingsPreservesUnreadableProvider() async throws {
+        let defaults = ScratchDefaults()
+        let future: [String: Any] = [
+            "enabled": "sometimes",
+            "futureMode": ["name": "adaptive", "level": 7],
+        ]
+        defaults.set(
+            json([
+                "anthropic": ["enabled": true],
+                "future-provider": future,
+            ]),
+            forKey: "providerSettings"
+        )
+
+        let settings = AppSettings(defaults: defaults)
+        var anthropic = settings.effectiveSettings(for: "anthropic")
+        anthropic.customColorName = "purple"
+        settings.providerSettingsMap["anthropic"] = anthropic
+
+        // AppSettings deliberately debounces writes; let the real save path
+        // run rather than testing only LossTolerantStore a second time.
+        try await Task.sleep(for: .milliseconds(700))
+
+        let stored = try #require(defaults.data(forKey: "providerSettings"))
+        let object = try #require(
+            JSONSerialization.jsonObject(with: stored) as? [String: Any]
+        )
+        let kept = try #require(object["future-provider"] as? [String: Any])
+        #expect(kept["enabled"] as? String == "sometimes")
+        let mode = try #require(kept["futureMode"] as? [String: Any])
+        #expect(mode["name"] as? String == "adaptive")
+        #expect(mode["level"] as? Int == 7)
+    }
 }
