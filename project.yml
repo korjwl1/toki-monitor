@@ -50,6 +50,15 @@ targets:
     sources:
       - path: TokiMonitor/Tests/TokiMonitorTests
         optional: true
+      # Source-audit tests read these immutable build-time copies from their
+      # own bundle, so checkouts under macOS-protected Documents directories
+      # do not depend on a runtime Files & Folders grant.
+      - path: TokiMonitor/Domain
+        type: folder
+        buildPhase: resources
+      - path: TokiMonitor/Presentation
+        type: folder
+        buildPhase: resources
     dependencies:
       - target: TokiMonitor
     settings:

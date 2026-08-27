@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AASRCAUDITDOMAIN0000001B /* Domain in Resources */ = {isa = PBXBuildFile; fileRef = AASRCAUDITDOMAIN0000001F /* Domain */; };
+		AASRCAUDITPRESENT000001B /* Presentation in Resources */ = {isa = PBXBuildFile; fileRef = AASRCAUDITPRESENT000001F /* Presentation */; };
 		AAMSSECTION001B /* MonitorSyncSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSSECTION001F /* MonitorSyncSettingsSection.swift */; };
 		AAMSPREFTEST01B /* MonitorPrefsSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSPREFTEST01F /* MonitorPrefsSnapshotTests.swift */; };
 		AAMSENGTEST001B /* MonitorSyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSENGTEST001F /* MonitorSyncEngineTests.swift */; };
@@ -264,6 +266,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AASRCAUDITDOMAIN0000001F /* Domain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Domain; path = TokiMonitor/Domain; sourceTree = SOURCE_ROOT; };
+		AASRCAUDITPRESENT000001F /* Presentation */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Presentation; path = TokiMonitor/Presentation; sourceTree = SOURCE_ROOT; };
 		AAMSSECTION001F /* MonitorSyncSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncSettingsSection.swift; sourceTree = "<group>"; };
 		AAMSPREFTEST01F /* MonitorPrefsSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorPrefsSnapshotTests.swift; sourceTree = "<group>"; };
 		AAMSENGTEST001F /* MonitorSyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncEngineTests.swift; sourceTree = "<group>"; };
@@ -555,6 +559,8 @@
 		2037DBB9FB4E100B90F4162C /* TokiMonitorTests */ = {
 			isa = PBXGroup;
 			children = (
+				AASRCAUDITDOMAIN0000001F /* Domain */,
+				AASRCAUDITPRESENT000001F /* Presentation */,
 				29DDD5F7608E33B91408BA74 /* Data */,
 				A09E6DF1E20788C81FF0BBA5 /* Domain */,
 				AA90PRESGROUP0001 /* Presentation */,
@@ -1009,6 +1015,7 @@
 			buildConfigurationList = 26457A6BC80AEBC1F67B7769 /* Build configuration list for PBXNativeTarget "TokiMonitorTests" */;
 			buildPhases = (
 				4436AE9785ADAF1F65273172 /* Sources */,
+				AASRCAUDITRESOURCES00001 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -1057,6 +1064,15 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		AASRCAUDITRESOURCES00001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AASRCAUDITDOMAIN0000001B /* Domain in Resources */,
+				AASRCAUDITPRESENT000001B /* Presentation in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6041E310B99818F76D4ED00E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;

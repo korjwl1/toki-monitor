@@ -29,17 +29,15 @@ import SwiftUI
 // violation.
 
 /// The Swift sources, found from this file's compile-time path.
+private final class SourceAuditBundleToken {}
+
 enum SourceTree {
 
-    /// `<repo>/TokiMonitor`, i.e. the directory holding `Domain/`,
-    /// `Presentation/` and `Tests/`.
+    /// A build-time copy of the production source tree inside the test bundle.
+    /// Keeping the audit input in the bundle avoids macOS Files & Folders
+    /// privacy gates when a checkout happens to live under `Documents`.
     static var root: URL {
-        // .../TokiMonitor/Tests/TokiMonitorTests/Presentation/<this file>
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()   // Presentation
-            .deletingLastPathComponent()   // TokiMonitorTests
-            .deletingLastPathComponent()   // Tests
-            .deletingLastPathComponent()   // TokiMonitor
+        Bundle(for: SourceAuditBundleToken.self).resourceURL!
     }
 
     /// Every `.swift` file under `root/<subpath>`, recursively.
