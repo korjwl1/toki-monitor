@@ -155,6 +155,23 @@ enum DashboardExchange {
         return try decodeConfig(data)
     }
 
+    /// Decode without the version gate.
+    ///
+    /// The gate in `decode` is right for a file the user picked: they still
+    /// have the file, and the refusal tells them which release opens it. It is
+    /// wrong for a document arriving over the settings sync channel, where a
+    /// refusal would leave the entry stranded on the server and force every
+    /// later push from this machine to either overwrite it or stall. Such a
+    /// document decodes here with `isReadOnlyForThisBuild` true, and the store
+    /// writes its original bytes back rather than a re-encode (계약 C2).
+    static func decodeIgnoringSchemaGate(_ data: Data) throws -> DashboardConfig {
+        do {
+            return try decodeConfig(data)
+        } catch {
+            throw ImportRefusal.unreadable(describe(error))
+        }
+    }
+
     /// Decode without the version gate, with the export metadata removed so it
     /// does not settle into `unknownFields` and get re-exported stale.
     private static func decodeConfig(_ data: Data) throws -> DashboardConfig {

@@ -397,42 +397,149 @@ final class AppSettings {
         }
     }
 
-    private let defaults = UserDefaults.standard
+    /// Where these settings read and write.
+    ///
+    /// Injectable for the same reason `DashboardConfigStore`'s is: a test that
+    /// exercised the save path against `.standard` would write into the real
+    /// installation's settings. It also lets `reloadFromDefaults` be proved
+    /// against a scratch domain.
+    private let defaults: UserDefaults
     private var pendingSave: DispatchWorkItem?
 
-    init() {
-        let ud = UserDefaults.standard
-        animationThemeId = ud.string(forKey: "animationThemeId") ?? "rabbit"
-        animationStyle = Self.loadEnum(ud, key: "animationStyle") ?? .sparkline
-        hpBarSource = Self.loadEnum(ud, key: "hpBarSource") ?? .none
-        sleepDelay = Self.loadEnum(ud, key: "sleepDelay") ?? .twoMinutes
-        defaultTimeRange = Self.loadEnum(ud, key: "defaultTimeRange") ?? .oneHour
-        showRateText = ud.bool(forKey: "showRateText")
-        textPosition = Self.loadEnum(ud, key: "textPosition") ?? .trailing
-        tokenUnit = Self.loadEnum(ud, key: "tokenUnit") ?? .perMinute
-        graphTimeRange = Self.loadEnum(ud, key: "graphTimeRange") ?? .oneHourGraph
-        providerDisplayMode = Self.loadEnum(ud, key: "providerDisplayMode") ?? .aggregated
-        providerSettingsMap = Self.loadProviderSettings(ud)
-        aggregatedColorName = ud.string(forKey: "aggregatedColorName")
-        widgetOrder = Self.loadWidgetOrder(ud)
-        velocityAlertEnabled = ud.bool(forKey: "velocityAlertEnabled")
-        velocityThreshold = ud.object(forKey: "velocityThreshold") as? Double ?? 0.50
-        historicalAlertEnabled = ud.bool(forKey: "historicalAlertEnabled")
-        historicalMultiplier = ud.object(forKey: "historicalMultiplier") as? Double ?? 3.0
-        let legacy75 = ud.object(forKey: "claudeAlert75") as? Bool
-        let legacy90 = ud.object(forKey: "claudeAlert90") as? Bool
-        usageAlert75Enabled = ud.object(forKey: "usageAlert75Enabled") as? Bool ?? legacy75 ?? true
-        usageAlert90Enabled = ud.object(forKey: "usageAlert90Enabled") as? Bool ?? legacy90 ?? true
-        usageAlert75Buckets = Self.loadStringBoolMap(ud, key: "usageAlert75Buckets")
-            ?? UsageAlertBucket.allCases.reduce(into: [:]) { $0[$1.rawValue] = false }
-        usageAlert90Buckets = Self.loadStringBoolMap(ud, key: "usageAlert90Buckets")
-            ?? UsageAlertBucket.allCases.reduce(into: [:]) { $0[$1.rawValue] = false }
-        claudeUsageWidgetBuckets = Self.loadStringBoolMap(ud, key: "claudeUsageWidgetBuckets")
-            ?? ClaudeUsageBucketOption.allCases.reduce(into: [:]) { $0[$1.rawValue] = true }
-        codexUsageWidgetWindows = Self.loadStringBoolMap(ud, key: "codexUsageWidgetWindows")
-            ?? CodexUsageWindowOption.allCases.reduce(into: [:]) { $0[$1.rawValue] = true }
-        language = Self.loadEnum(ud, key: "language") ?? .system
-        launchAtLogin = ud.bool(forKey: "launchAtLogin")
+    /// Everything persisted, read once.
+    ///
+    /// The fallbacks and the legacy-key handling live here and nowhere else, so
+    /// that `init` and `reloadFromDefaults` cannot come to disagree about what
+    /// a missing key means.
+    @MainActor
+    private struct Persisted {
+        var animationThemeId: String
+        var animationStyle: AnimationStyle
+        var hpBarSource: HPBarSource
+        var sleepDelay: SleepDelay
+        var defaultTimeRange: TimeRange
+        var showRateText: Bool
+        var textPosition: TextPosition
+        var tokenUnit: TokenUnit
+        var graphTimeRange: GraphTimeRange
+        var providerDisplayMode: ProviderDisplayMode
+        var providerSettingsMap: [String: ProviderSettings]
+        var aggregatedColorName: String?
+        var widgetOrder: [MenuWidgetItem]
+        var velocityAlertEnabled: Bool
+        var velocityThreshold: Double
+        var historicalAlertEnabled: Bool
+        var historicalMultiplier: Double
+        var usageAlert75Enabled: Bool
+        var usageAlert90Enabled: Bool
+        var usageAlert75Buckets: [String: Bool]
+        var usageAlert90Buckets: [String: Bool]
+        var claudeUsageWidgetBuckets: [String: Bool]
+        var codexUsageWidgetWindows: [String: Bool]
+        var language: AppLanguage
+        var launchAtLogin: Bool
+
+        init(_ ud: UserDefaults) {
+            animationThemeId = ud.string(forKey: "animationThemeId") ?? "rabbit"
+            animationStyle = AppSettings.loadEnum(ud, key: "animationStyle") ?? .sparkline
+            hpBarSource = AppSettings.loadEnum(ud, key: "hpBarSource") ?? .none
+            sleepDelay = AppSettings.loadEnum(ud, key: "sleepDelay") ?? .twoMinutes
+            defaultTimeRange = AppSettings.loadEnum(ud, key: "defaultTimeRange") ?? .oneHour
+            showRateText = ud.bool(forKey: "showRateText")
+            textPosition = AppSettings.loadEnum(ud, key: "textPosition") ?? .trailing
+            tokenUnit = AppSettings.loadEnum(ud, key: "tokenUnit") ?? .perMinute
+            graphTimeRange = AppSettings.loadEnum(ud, key: "graphTimeRange") ?? .oneHourGraph
+            providerDisplayMode = AppSettings.loadEnum(ud, key: "providerDisplayMode") ?? .aggregated
+            providerSettingsMap = AppSettings.loadProviderSettings(ud)
+            aggregatedColorName = ud.string(forKey: "aggregatedColorName")
+            widgetOrder = AppSettings.loadWidgetOrder(ud)
+            velocityAlertEnabled = ud.bool(forKey: "velocityAlertEnabled")
+            velocityThreshold = ud.object(forKey: "velocityThreshold") as? Double ?? 0.50
+            historicalAlertEnabled = ud.bool(forKey: "historicalAlertEnabled")
+            historicalMultiplier = ud.object(forKey: "historicalMultiplier") as? Double ?? 3.0
+            let legacy75 = ud.object(forKey: "claudeAlert75") as? Bool
+            let legacy90 = ud.object(forKey: "claudeAlert90") as? Bool
+            usageAlert75Enabled = ud.object(forKey: "usageAlert75Enabled") as? Bool ?? legacy75 ?? true
+            usageAlert90Enabled = ud.object(forKey: "usageAlert90Enabled") as? Bool ?? legacy90 ?? true
+            usageAlert75Buckets = AppSettings.loadStringBoolMap(ud, key: "usageAlert75Buckets")
+                ?? UsageAlertBucket.allCases.reduce(into: [:]) { $0[$1.rawValue] = false }
+            usageAlert90Buckets = AppSettings.loadStringBoolMap(ud, key: "usageAlert90Buckets")
+                ?? UsageAlertBucket.allCases.reduce(into: [:]) { $0[$1.rawValue] = false }
+            claudeUsageWidgetBuckets = AppSettings.loadStringBoolMap(ud, key: "claudeUsageWidgetBuckets")
+                ?? ClaudeUsageBucketOption.allCases.reduce(into: [:]) { $0[$1.rawValue] = true }
+            codexUsageWidgetWindows = AppSettings.loadStringBoolMap(ud, key: "codexUsageWidgetWindows")
+                ?? CodexUsageWindowOption.allCases.reduce(into: [:]) { $0[$1.rawValue] = true }
+            language = AppSettings.loadEnum(ud, key: "language") ?? .system
+            launchAtLogin = ud.bool(forKey: "launchAtLogin")
+        }
+    }
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let v = Persisted(defaults)
+        animationThemeId = v.animationThemeId
+        animationStyle = v.animationStyle
+        hpBarSource = v.hpBarSource
+        sleepDelay = v.sleepDelay
+        defaultTimeRange = v.defaultTimeRange
+        showRateText = v.showRateText
+        textPosition = v.textPosition
+        tokenUnit = v.tokenUnit
+        graphTimeRange = v.graphTimeRange
+        providerDisplayMode = v.providerDisplayMode
+        providerSettingsMap = v.providerSettingsMap
+        aggregatedColorName = v.aggregatedColorName
+        widgetOrder = v.widgetOrder
+        velocityAlertEnabled = v.velocityAlertEnabled
+        velocityThreshold = v.velocityThreshold
+        historicalAlertEnabled = v.historicalAlertEnabled
+        historicalMultiplier = v.historicalMultiplier
+        usageAlert75Enabled = v.usageAlert75Enabled
+        usageAlert90Enabled = v.usageAlert90Enabled
+        usageAlert75Buckets = v.usageAlert75Buckets
+        usageAlert90Buckets = v.usageAlert90Buckets
+        claudeUsageWidgetBuckets = v.claudeUsageWidgetBuckets
+        codexUsageWidgetWindows = v.codexUsageWidgetWindows
+        language = v.language
+        launchAtLogin = v.launchAtLogin
+    }
+
+    /// Re-read every persisted setting.
+    ///
+    /// Called after the settings sync channel pulls a snapshot from another
+    /// machine. Without it this object would still hold the values it read at
+    /// launch, and its next debounced save would write them straight back over
+    /// what was just pulled — the pull would appear to work and then quietly
+    /// undo itself.
+    ///
+    /// `launchAtLogin` is deliberately not among the settings that travel, so
+    /// the login item on this Mac is not touched here either.
+    func reloadFromDefaults() {
+        let v = Persisted(defaults)
+        animationThemeId = v.animationThemeId
+        animationStyle = v.animationStyle
+        hpBarSource = v.hpBarSource
+        sleepDelay = v.sleepDelay
+        defaultTimeRange = v.defaultTimeRange
+        showRateText = v.showRateText
+        textPosition = v.textPosition
+        tokenUnit = v.tokenUnit
+        graphTimeRange = v.graphTimeRange
+        providerDisplayMode = v.providerDisplayMode
+        providerSettingsMap = v.providerSettingsMap
+        aggregatedColorName = v.aggregatedColorName
+        widgetOrder = v.widgetOrder
+        velocityAlertEnabled = v.velocityAlertEnabled
+        velocityThreshold = v.velocityThreshold
+        historicalAlertEnabled = v.historicalAlertEnabled
+        historicalMultiplier = v.historicalMultiplier
+        usageAlert75Enabled = v.usageAlert75Enabled
+        usageAlert90Enabled = v.usageAlert90Enabled
+        usageAlert75Buckets = v.usageAlert75Buckets
+        usageAlert90Buckets = v.usageAlert90Buckets
+        claudeUsageWidgetBuckets = v.claudeUsageWidgetBuckets
+        codexUsageWidgetWindows = v.codexUsageWidgetWindows
+        language = v.language
     }
 
     /// Get effective settings for a provider, falling back to defaults.
@@ -544,7 +651,7 @@ final class AppSettings {
 
     // MARK: - Loading
 
-    private static func loadEnum<T: RawRepresentable>(
+    static func loadEnum<T: RawRepresentable>(
         _ ud: UserDefaults, key: String
     ) -> T? where T.RawValue == String {
         guard let raw = ud.string(forKey: key) else { return nil }
@@ -588,14 +695,14 @@ final class AppSettings {
         return items
     }
 
-    private static func loadWidgetOrder(_ ud: UserDefaults) -> [MenuWidgetItem] {
+    static func loadWidgetOrder(_ ud: UserDefaults) -> [MenuWidgetItem] {
         guard let data = ud.data(forKey: "widgetOrder"),
               let items = try? JSONDecoder().decode([MenuWidgetItem].self, from: data)
         else { return [] }
         return items
     }
 
-    private static func loadStringBoolMap(_ ud: UserDefaults, key: String) -> [String: Bool]? {
+    static func loadStringBoolMap(_ ud: UserDefaults, key: String) -> [String: Bool]? {
         guard let data = ud.data(forKey: key),
               let map = try? JSONDecoder().decode([String: Bool].self, from: data)
         else { return nil }
@@ -673,7 +780,7 @@ final class AppSettings {
     /// customisation and not everyone else's. The whole map is written back on
     /// every change, which is what makes an all-or-nothing decode here a reset
     /// of all provider colours and enable flags rather than a failed read.
-    private static func loadProviderSettings(_ ud: UserDefaults) -> [String: ProviderSettings] {
+    static func loadProviderSettings(_ ud: UserDefaults) -> [String: ProviderSettings] {
         guard let data = ud.data(forKey: "providerSettings") else { return [:] }
         return LossTolerantStore.decodeDictionary(ProviderSettings.self, from: data).items
     }

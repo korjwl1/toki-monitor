@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AAMSPREFTEST01B /* MonitorPrefsSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSPREFTEST01F /* MonitorPrefsSnapshotTests.swift */; };
+		AAMSENGTEST001B /* MonitorSyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSENGTEST001F /* MonitorSyncEngineTests.swift */; };
+		AAMSCTRL000001B /* MonitorSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSCTRL000001F /* MonitorSyncController.swift */; };
+		AAMSENGINE0001B /* MonitorSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSENGINE0001F /* MonitorSyncEngine.swift */; };
+		AAMSPAYLOAD001B /* MonitorSyncPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSPAYLOAD001F /* MonitorSyncPayload.swift */; };
 		AAMSCLITEST001B /* MonitorSettingsClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSCLITEST001F /* MonitorSettingsClientTests.swift */; };
 		AAMSCLIENT0001B /* MonitorSettingsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAMSCLIENT0001F /* MonitorSettingsClient.swift */; };
 		AA62NOTICESNAP0002 /* PanelNoticeSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */; };
@@ -257,6 +262,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AAMSPREFTEST01F /* MonitorPrefsSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorPrefsSnapshotTests.swift; sourceTree = "<group>"; };
+		AAMSENGTEST001F /* MonitorSyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncEngineTests.swift; sourceTree = "<group>"; };
+		AAMSCTRL000001F /* MonitorSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncController.swift; sourceTree = "<group>"; };
+		AAMSENGINE0001F /* MonitorSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncEngine.swift; sourceTree = "<group>"; };
+		AAMSPAYLOAD001F /* MonitorSyncPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSyncPayload.swift; sourceTree = "<group>"; };
 		AAMSCLITEST001F /* MonitorSettingsClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSettingsClientTests.swift; sourceTree = "<group>"; };
 		AAMSCLIENT0001F /* MonitorSettingsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSettingsClient.swift; sourceTree = "<group>"; };
 		AA62NOTICESNAP0001 /* PanelNoticeSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelNoticeSnapshotTests.swift; sourceTree = "<group>"; };
@@ -775,6 +785,8 @@
 		A09E6DF1E20788C81FF0BBA5 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AAMSPREFTEST01F /* MonitorPrefsSnapshotTests.swift */,
+				AAMSENGTEST001F /* MonitorSyncEngineTests.swift */,
 				AA90VERHIST000001 /* VersionHistoryDiffTests.swift */,
 				AA70VERSPERS00001 /* DashboardVersionStorePersistenceTests.swift */,
 				AA70ANNOTPERS0001 /* AnnotationStorePersistenceTests.swift */,
@@ -911,6 +923,9 @@
 		F742507F177D260FFECA176D /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				AAMSCTRL000001F /* MonitorSyncController.swift */,
+				AAMSENGINE0001F /* MonitorSyncEngine.swift */,
+				AAMSPAYLOAD001F /* MonitorSyncPayload.swift */,
 				AA62SERIESVIS00001 /* SeriesVisibility.swift */,
 				AA85TBLFILTER0001 /* TableColumnFilters.swift */,
 				AA61PANELRPT000001 /* PanelRepeat.swift */,
@@ -1061,6 +1076,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAMSCTRL000001B /* MonitorSyncController.swift in Sources */,
+				AAMSENGINE0001B /* MonitorSyncEngine.swift in Sources */,
+				AAMSPAYLOAD001B /* MonitorSyncPayload.swift in Sources */,
 				AAMSCLIENT0001B /* MonitorSettingsClient.swift in Sources */,
 				AA62PANELLEG000002 /* PanelLegendView.swift in Sources */,
 				AA75PANELVSUM0002 /* PanelValueSummary.swift in Sources */,
@@ -1219,6 +1237,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAMSPREFTEST01B /* MonitorPrefsSnapshotTests.swift in Sources */,
+				AAMSENGTEST001B /* MonitorSyncEngineTests.swift in Sources */,
 				AAMSCLITEST001B /* MonitorSettingsClientTests.swift in Sources */,
 				AA62NOTICESNAP0002 /* PanelNoticeSnapshotTests.swift in Sources */,
 				AA62SERVISTEST0002 /* SeriesVisibilityTests.swift in Sources */,

@@ -284,6 +284,92 @@ enum L {
         static var serverAddress: String { tr("서버 주소", "Server Address") }
     }
 
+    // MARK: - Monitor settings sync
+    //
+    // A separate channel from toki's usage sync, and the wording keeps them
+    // apart: this one is about the monitor's OWN configuration.
+
+    enum monitorSync {
+        static var title: String { tr("모니터 설정 동기화", "Monitor Settings Sync") }
+        static var toggleLabel: String {
+            tr("대시보드와 모니터 설정을 이 계정으로 동기화", "Sync dashboards and monitor settings to this account")
+        }
+        static var syncNow: String { tr("지금 동기화", "Sync Now") }
+        static var lastSync: String { tr("마지막 동기화", "Last Sync") }
+        static var lastResult: String { tr("최근 결과", "Last Result") }
+        static var never: String { tr("아직 없음", "Not yet") }
+        static var running: String { tr("동기화 중…", "Syncing…") }
+
+        static func changeSummary(uploaded: Int, downloaded: Int, removed: Int) -> String {
+            tr("올림 \(uploaded) · 내림 \(downloaded) · 서버에서 삭제 \(removed)",
+               "\(uploaded) up · \(downloaded) down · \(removed) removed from server")
+        }
+
+        // Turning it off
+
+        static var turnOffTitle: String { tr("동기화를 끌까요?", "Turn syncing off?") }
+        static var turnOffConfirm: String { tr("끄기", "Turn off") }
+        static var turnOffExplanation: String {
+            tr("이 기기의 대시보드와 설정은 그대로 남고, 서버에 이미 올라간 내용도 지워지지 않습니다. 앞으로 변경 사항만 주고받지 않습니다.",
+               "The dashboards and settings on this Mac stay as they are, and what is already on the server is not deleted either. Only future changes stop travelling.")
+        }
+
+        // Conflicts
+
+        static func conflictCount(_ n: Int) -> String {
+            tr("결정이 필요한 항목 \(n)개", "\(n) waiting for your decision")
+        }
+        static var conflictHint: String {
+            tr("각 항목을 어떻게 처리할지 고릅니다", "Choose what happens to each one")
+        }
+        static var conflictTitle: String { tr("어느 쪽을 남길까요?", "Which copy do you want?") }
+        static var conflictExplanation: String {
+            tr("양쪽이 서로 다르게 바뀌었습니다. 고르기 전까지는 어느 쪽도 덮어쓰지 않습니다.",
+               "Both sides changed. Until you choose, neither is written over the other.")
+        }
+        static var postponeNote: String {
+            tr("지금 고르지 않아도 됩니다. 다음 동기화에서 다시 물어봅니다.",
+               "You can leave these. They will be raised again on the next sync.")
+        }
+        static var allSettled: String { tr("결정할 항목이 없습니다", "Nothing to decide") }
+        static var allSettledDetail: String {
+            tr("이 기기와 서버가 같은 상태입니다.", "This Mac and the server hold the same thing.")
+        }
+
+        static var thisMac: String { tr("이 기기", "This Mac") }
+        static var theServer: String { tr("서버", "The server") }
+        static func changedAt(_ when: String) -> String { tr("변경 \(when)", "changed \(when)") }
+
+        static func divergedHeadline(_ name: String) -> String {
+            tr("'\(name)'이(가) 양쪽에서 다릅니다", "'\(name)' differs on the two sides")
+        }
+        static func raceHeadline(_ name: String) -> String {
+            tr("'\(name)'은(는) 올리는 사이에 다른 기기가 먼저 바꿨습니다",
+               "'\(name)' was changed by another device while this one was uploading")
+        }
+        static func deletedHeadline(_ name: String) -> String {
+            tr("'\(name)'을(를) 다른 기기에서 삭제했습니다", "'\(name)' was deleted on another device")
+        }
+
+        static var keepThisMac: String { tr("이 기기 것으로", "Keep this Mac's") }
+        static var takeTheServers: String { tr("서버 것으로", "Take the server's") }
+        static var keepBoth: String { tr("둘 다 남기기", "Keep both") }
+        static var keepHere: String { tr("여기에는 남기기", "Keep it here") }
+        static var deleteHereToo: String { tr("여기서도 삭제", "Delete it here too") }
+
+        static var conflictNotificationTitle: String {
+            tr("동기화에 결정이 필요합니다", "Sync needs a decision")
+        }
+        static func conflictNotificationBody(_ n: Int) -> String {
+            tr("대시보드·설정 \(n)개가 이 기기와 서버에서 다릅니다. 고르기 전까지 어느 쪽도 덮어쓰지 않습니다.",
+               "\(n) dashboards or settings differ between this Mac and the server. Neither is written over the other until you choose.")
+        }
+
+        static var needsSyncLogin: String {
+            tr("먼저 위에서 sync 서버에 로그인하세요.", "Log in to the sync server above first.")
+        }
+    }
+
     // MARK: - Usage countdown
 
     enum usage {
